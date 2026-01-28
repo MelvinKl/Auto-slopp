@@ -36,13 +36,9 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
         git reset --hard origin/ai
     fi
     
-    # Use OpenAgent to find and implement next ready task
-    echo "  Using OpenAgent to find and implement next ready task"
-    task \
-  subagent_type="OpenAgent" \
-  description="Implement next ready bead task" \
-  prompt="Find the next ready bead task and implement it. Use the beads CLI to discover ready tasks, then implement the task and manage the beads workflow (mark in progress, close when complete). Commit all changes and push to the current branch." \
-  workdir="$repo_dir"
+    # Use opencode CLI to find and implement next ready task
+    echo "  Using opencode CLI to find and implement next ready task"
+    $OPencode_CMD run "Find the next ready bead task and implement it. Use the beads CLI to discover ready tasks, then implement the task and manage the beads workflow (mark in progress, close when complete). Commit all changes and push to the current branch." --agent OpenAgent
     
     echo "  Task implementation completed"
 done
