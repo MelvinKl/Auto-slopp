@@ -1,0 +1,14 @@
+# Repository Configuration
+# Add one repository path per line
+# These are the repositories that the automation system will process
+
+# Example format:
+# /path/to/repo1
+# /path/to/repo2
+
+# Default repositories (uncomment and modify as needed)
+# $HOME/projects/project1
+# $HOME/projects/project2
+# /opt/repos/important-app
+
+# Add your repositories below:
