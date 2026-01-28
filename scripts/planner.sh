@@ -74,13 +74,9 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
             git reset --hard origin/ai
         fi
         
-        # Generate bead tasks using OpenAgent
+        # Generate bead tasks using opencode CLI
         echo "    Generating bead tasks for: $content"
-        task \
-  subagent_type="OpenAgent" \
-  description="Generate bead tasks" \
-  prompt="Generate bead tasks for: $content" \
-  workdir="$repo_dir"
+        $OPencode_CMD run "Generate bead tasks for: $content" --agent OpenAgent
         
         # Commit and push changes in repository
         git add .
