@@ -6,3 +6,11 @@ in the scripts directory create the following scripts:
   - git reset --hard
   - git clean
   - make test: if this command fails run opencode cli with the instruction to fix the branch that contains updates to dependecnies und push them to the branch
+- update.sh: creates a directory in this repository for each repo in the repo directory. the names should be equal
+- planner.sh :
+    - checks for each repository in the repo directory a corresponding directory in this repository exists. if so iterate over all files in this directory. here is what to do:
+        - grab all files that do not end with a number that is higher than a number that is configured in the settings of this repository
+        - go to the repository for this directory and switch to the branch ai
+        - grab the content of the file and start the opencode cli with the command to tell it to generate bead tasks for whatever is written in the file.
+        - increment the number at the end of the filename (add ".1" if there is no number)
+        - commit and push all changes made in this repository
