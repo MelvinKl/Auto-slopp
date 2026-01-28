@@ -1,0 +1,8 @@
+your job is to create sensible bead tasks from this description:
+create a bash script called main.sh that calls all scripts in the scripts directory then sleep for 30 minutes. do this in an endless Loop.
+in the scripts directory create the following scripts:
+- update_fixer.sh: loops through all repositories in the repo directory (adjustable via config located in the root directory of this repository) and does in a Loop over all renovate branches the following:
+  - git fetch
+  - git reset --hard
+  - git clean
+  - make test: if this command fails run opencode cli with the instruction to fix the branch that contains updates to dependecnies und push them to the branch
