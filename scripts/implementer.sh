@@ -32,30 +32,13 @@ while read -r repo; do
         git reset --hard origin/ai
     fi
     
-    # Get next ready task
-    task_id=$(bd ready --json 2>/dev/null | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+    # Use OpenAgent to find and implement next ready task
+    echo "  Using OpenAgent to find and implement next ready task"
+    task \
+  subagent_type="OpenAgent" \
+  description="Implement next ready bead task" \
+  prompt="Find the next ready bead task and implement it. Use the beads CLI to discover ready tasks, then implement the task and manage the beads workflow (mark in progress, close when complete). Commit all changes and push to the current branch." \
+  workdir="$repo"
     
-    if [ -n "$task_id" ]; then
-        echo "  Implementing task: $task_id"
-        
-        # Get task details
-        task_details=$(bd show "$task_id" --json 2>/dev/null)
-        title=$(echo "$task_details" | grep -o '"title":"[^"]*"' | cut -d'"' -f4)
-        
-        # Mark as in progress
-        bd update "$task_id" --status in_progress
-        
-        # Implement task
-        opencode "Implement the next bd task that is ready. Task ID: $task_id. Task: $title. Please implement this task, commit the changes, and push to the current branch."
-        
-        # Push changes
-        git push
-        
-        # Close task
-        bd close "$task_id" --reason "Implemented by automation system"
-        
-        echo "  Completed task: $task_id"
-    else
-        echo "  No ready tasks"
-    fi
+    echo "  Task implementation completed"
 done < repos.txt

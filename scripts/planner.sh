@@ -55,9 +55,13 @@ while read -r repo; do
             git reset --hard origin/ai
         fi
         
-        # Generate bead tasks
+        # Generate bead tasks using OpenAgent
         echo "  Generating bead tasks for: $content"
-        opencode "Generate bead tasks for: $content"
+        task \
+  subagent_type="OpenAgent" \
+  description="Generate bead tasks" \
+  prompt="Generate bead tasks for: $content" \
+  workdir="$repo"
         
         # Commit and push
         git add .

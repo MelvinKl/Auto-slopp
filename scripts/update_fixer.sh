@@ -34,8 +34,12 @@ while read -r repo; do
         # Run tests
         if [ -f "Makefile" ]; then
             if ! make test; then
-                echo "  Tests failed, running OpenCode to fix"
-                opencode "Fix the branch '$branch' that contains updates to dependencies and push them to the branch"
+                echo "  Tests failed, using OpenAgent to fix"
+                task \
+  subagent_type="OpenAgent" \
+  description="Fix failed tests using OpenAgent" \
+  prompt="Fix the branch '$branch' that contains updates to dependencies and push them to the branch. The tests are currently failing, so identify and fix any issues preventing the tests from passing, then push the fixes to the branch." \
+  workdir="$repo"
             fi
         fi
     done
