@@ -1,49 +1,68 @@
 #!/bin/bash
 
-# Process task files and generate bead tasks
+# Process task files and generate bead tasks using YAML configuration
 echo "Running planner.sh"
 
-# Read repositories from repos.txt
-while read -r repo; do
-    # Skip comments and empty lines
-    [[ $repo =~ ^[[:space:]]*# ]] && continue
-    [[ -z "$repo" ]] && continue
-    
-    # Expand $HOME and other variables
-    repo=$(eval echo "$repo")
-    
-    if [ ! -d "$repo" ]; then
-        echo "Repository not found: $repo"
+# Load configuration from YAML
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../config.sh"
+
+echo "Using managed_repo_path: $MANAGED_REPO_PATH"
+echo "Using managed_repo_task_path: $MANAGED_REPO_TASK_PATH"
+
+# Check if managed directories exist
+if [ ! -d "$MANAGED_REPO_PATH" ]; then
+    echo "Error: managed_repo_path not found: $MANAGED_REPO_PATH"
+    exit 1
+fi
+
+if [ ! -d "$MANAGED_REPO_TASK_PATH" ]; then
+    echo "Error: managed_repo_task_path not found: $MANAGED_REPO_TASK_PATH"
+    exit 1
+fi
+
+# Track if any changes were made in task path
+TASK_PATH_CHANGES=false
+
+# Process each subdirectory in managed_repo_path
+for repo_dir in "$MANAGED_REPO_PATH"/*; do
+    if [ ! -d "$repo_dir" ]; then
         continue
     fi
     
     # Get repository name
-    repo_name=$(basename "$repo")
-    repo_name=$(echo "$repo_name" | sed 's/[^a-zA-Z0-9._-]/_/g')
+    repo_name=$(basename "$repo_dir")
+    echo "Processing repository: $repo_name"
     
-    tasks_dir="$repo_name/tasks"
-    
-    if [ ! -d "$tasks_dir" ]; then
-        echo "No tasks directory for: $repo_name"
+    # Check for matching task directory
+    task_dir="$MANAGED_REPO_TASK_PATH/$repo_name"
+    if [ ! -d "$task_dir" ]; then
+        echo "  No task directory found: $task_dir"
         continue
     fi
     
-    echo "Processing tasks for: $repo_name"
+    echo "  Found task directory: $task_dir"
     
-    # Process each .txt file in tasks directory
-    for task_file in "$tasks_dir"/*.txt; do
+    # Process each file in task directory that doesn't end with '.used'
+    for task_file in "$task_dir"/*; do
         if [ ! -f "$task_file" ]; then
             continue
         fi
         
+        # Skip files that already end with '.used'
+        if [[ "$task_file" == *.used ]]; then
+            echo "    Skipping already used file: $(basename "$task_file")"
+            continue
+        fi
+        
         filename=$(basename "$task_file")
-        echo "  Processing: $filename"
+        echo "    Processing: $filename"
         
         # Get file content
         content=$(cat "$task_file")
         
-        # Switch to ai branch
-        cd "$repo"
+        # Switch to ai branch in the repository
+        cd "$repo_dir"
         git fetch origin
         
         # Create ai branch if it doesn't exist
@@ -56,19 +75,37 @@ while read -r repo; do
         fi
         
         # Generate bead tasks using OpenAgent
-        echo "  Generating bead tasks for: $content"
+        echo "    Generating bead tasks for: $content"
         task \
   subagent_type="OpenAgent" \
   description="Generate bead tasks" \
   prompt="Generate bead tasks for: $content" \
-  workdir="$repo"
+  workdir="$repo_dir"
         
-        # Commit and push
+        # Commit and push changes in repository
         git add .
         git commit -m "Add bead tasks from $filename" || true
         git push
         
-        # Rename processed file
-        mv "$task_file" "$task_file.processed"
+        # Rename processed file to add '.used' suffix
+        mv "$task_file" "$task_file.used"
+        echo "    Renamed $filename to $filename.used"
+        
+        # Mark that changes were made in task path
+        TASK_PATH_CHANGES=true
     done
-done < repos.txt
+done
+
+# Commit and push changes in managed_repo_task_path if any files were processed
+if [ "$TASK_PATH_CHANGES" = true ]; then
+    echo "Committing changes in task path..."
+    cd "$MANAGED_REPO_TASK_PATH"
+    git add .
+    git commit -m "Mark task files as used by planner.sh" || true
+    git push
+    echo "Task path changes committed and pushed."
+else
+    echo "No task files were processed."
+fi
+
+echo "Planner.sh completed."

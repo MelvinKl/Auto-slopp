@@ -3,17 +3,26 @@
 # Main script - dynamically runs all scripts in scripts directory
 echo "Starting Repository Automation System"
 
+# Load configuration from YAML
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/config.sh"
+
+echo "Configuration loaded:"
+echo "  Sleep duration: $SLEEP_DURATION seconds"
+echo "  Managed repo path: $MANAGED_REPO_PATH"
+echo "  Task path: $MANAGED_REPO_TASK_PATH"
+
 while true; do
-    echo "=== Running automation cycle ==="
+    echo "=== Running automation cycle at $(date) ==="
     
     # Discover all scripts in scripts directory
-    SCRIPT_DIR="scripts"
+    SCRIPTS_DIR="$SCRIPT_DIR/scripts"
     
     # Find all .sh files in scripts directory, sort alphabetically
-    scripts_found=($(find "$SCRIPT_DIR" -name "*.sh" -type f | sort))
+    scripts_found=($(find "$SCRIPTS_DIR" -name "*.sh" -type f | sort))
     
     if [ ${#scripts_found[@]} -eq 0 ]; then
-        echo "No scripts found in $SCRIPT_DIR"
+        echo "No scripts found in $SCRIPTS_DIR"
     else
         echo "Found ${#scripts_found[@]} scripts to execute"
         

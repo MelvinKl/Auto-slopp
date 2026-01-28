@@ -82,26 +82,29 @@ chmod +x scripts/*.sh
 
 ### 3. Configure Repositories
 
-Edit `repos.txt` to list your repositories:
+Edit `config.yaml` to configure your repository automation:
 
-```bash
-# repos.txt
-# Add one repository path per line
-$HOME/projects/project1
-$HOME/projects/project2
-/opt/repos/important-app
+```yaml
+# config.yaml
+sleep_duration: 1000
+managed_repo_path: ~/git/managed
+managed_repo_task_path: ~/git/repo_task_path
 ```
+
+Create the managed directories and add your repositories as subdirectories under `managed_repo_path`.
 
 ### 4. Configure Settings
 
-Edit `config.sh` to adjust settings:
+Edit `config.yaml` to adjust settings:
 
-```bash
+```yaml
 # Key settings
-SLEEP_DURATION=1800        # Sleep duration in seconds (30 min)
-OPencode_CMD="opencode"    # OpenCode CLI command
-BEADS_CMD="bd"            # Beads CLI command (now handled by opencode)
+sleep_duration: 1000                # Sleep duration in seconds
+managed_repo_path: ~/git/managed    # Path to repository directories
+managed_repo_task_path: ~/git/repo_task_path  # Path to task files
 ```
+
+The configuration system automatically loads these values for all scripts.
 
 ### 5. Verify OpenAgent Integration
 
@@ -130,9 +133,9 @@ task subagent_type="OpenAgent" description="Test" prompt="Test message" workdir=
 
 ### First Time Setup
 
-1. **Configure repositories** in `repos.txt`
-2. **Adjust settings** in `config.sh`
-3. **Run creator.sh** to create directory structures:
+1. **Configure repositories** in `config.yaml`
+2. **Create managed directories** and add repositories as subdirectories
+3. **Run creator.sh** to create task directories:
    ```bash
    ./scripts/creator.sh
    ```
@@ -146,12 +149,13 @@ task subagent_type="OpenAgent" description="Test" prompt="Test message" workdir=
 ```
 Auto-slopp/
 ├── main.sh                    # Main orchestration script (dynamic discovery)
-├── config.sh                  # Simple configuration file
-├── repos.txt                  # Repository list
+├── config.yaml                # YAML configuration file
+├── config.sh                  # Configuration loader (uses config.yaml)
 ├── logs/                      # Log files
 ├── scripts/                   # Core scripts (auto-discovered)
+│   ├── yaml_config.sh        # YAML configuration utilities
 │   ├── update_fixer.sh       # Fix failed dependency updates
-│   ├── creator.sh            # Create directory structures
+│   ├── creator.sh            # Create task directories
 │   ├── planner.sh            # Process task files
 │   ├── updater.sh            # Update repositories
 │   ├── implementer.sh        # Implement bead tasks
@@ -194,10 +198,10 @@ For each repository:
 
 #### creator.sh
 ```bash
-For each repository in repos.txt:
-    ├── Create directory <repo-name>/
-    ├── Create subdirectories: tasks/, logs/, state/
-    └── Generate README.md with repository info
+For each repository in managed_repo_path:
+    ├── Create corresponding directory in managed_repo_task_path
+    ├── Add .gitkeep file for tracking
+    └── Generate README.md with task directory info
 ```
 
 #### planner.sh
@@ -276,19 +280,32 @@ BEADS_CLI="bd"                          # Beads CLI path
 LOG_LEVEL="INFO"                        # DEBUG/INFO/WARN/ERROR
 ```
 
-### repos.txt Format
+### config.yaml Format
 
-```bash
-# Repository list - one path per line
-# Use absolute paths or $HOME, $USER variables
+```yaml
+# Repository automation configuration
+sleep_duration: 1000                # Duration between cycles (seconds)
+managed_repo_path: ~/git/managed    # Path containing repository subdirectories
+managed_repo_task_path: ~/git/repo_task_path  # Path for task description files
+```
 
-# Examples:
-$HOME/projects/my-app
-$HOME/work/important-service
-/opt/git/repo-to-automate
+### Directory Structure
 
-# Comments are ignored
-# Blank lines are ignored
+```
+managed_repo_path/
+├── repo1/           # Repository 1
+├── repo2/           # Repository 2
+└── repo3/           # Repository 3
+
+managed_repo_task_path/
+├── repo1/           # Task files for repo1
+│   ├── .gitkeep
+│   ├── task1.txt
+│   └── task1.txt.used
+├── repo2/           # Task files for repo2
+│   └── .gitkeep
+└── repo3/           # Task files for repo3
+    └── .gitkeep
 ```
 
 ## 🐛 Troubleshooting
@@ -303,8 +320,9 @@ chmod +x main.sh scripts/*.sh
 
 #### 2. Repository Not Found
 ```bash
-# Check repos.txt paths
-# Ensure repositories exist and are accessible
+# Check managed_repo_path in config.yaml
+# Ensure repositories exist as subdirectories
+# Verify paths are accessible
 ```
 
 #### 3. OpenCode CLI Not Found

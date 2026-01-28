@@ -1,28 +1,32 @@
 #!/bin/bash
 
-# Update repositories and merge main into branches
+# Update repositories and merge main into branches using YAML configuration
 echo "Running updater.sh"
+
+# Load configuration from YAML
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../config.sh"
+
+echo "Using managed_repo_path: $MANAGED_REPO_PATH"
 
 # First update this repository
 echo "Updating automation repository"
 git pull
 
-# Read repositories from repos.txt
-while read -r repo; do
-    # Skip comments and empty lines
-    [[ $repo =~ ^[[:space:]]*# ]] && continue
-    [[ -z "$repo" ]] && continue
-    
-    # Expand $HOME and other variables
-    repo=$(eval echo "$repo")
-    
-    if [ ! -d "$repo" ]; then
-        echo "Repository not found: $repo"
+# Check if managed_repo_path exists
+if [ ! -d "$MANAGED_REPO_PATH" ]; then
+    echo "Error: managed_repo_path not found: $MANAGED_REPO_PATH"
+    exit 1
+fi
+
+# Process each subdirectory in managed_repo_path
+for repo_dir in "$MANAGED_REPO_PATH"/*; do
+    if [ ! -d "$repo_dir" ]; then
         continue
     fi
     
-    echo "Updating: $repo"
-    cd "$repo"
+    echo "Updating: $repo_dir"
+    cd "$repo_dir"
     
     # Fetch and clean
     git fetch --all
@@ -55,4 +59,6 @@ while read -r repo; do
             fi
         fi
     done
-done < repos.txt
+done
+
+echo "Updater.sh completed."
