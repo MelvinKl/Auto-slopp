@@ -53,7 +53,10 @@ The system has been recently enhanced with:
 ## 📋 Prerequisites
 
 Before using this system, ensure you have:
-
+- [Opencode](https://opencode.ai/docs/#install)
+- [Beads](https://github.com/steveyegge/beads)
+- [OpenAgentsControl](https://github.com/darrenhinde/OpenAgentsControl) (I reccommend the full installation)
+ 
 ```bash
 # Required tools
 git                # Git version control
