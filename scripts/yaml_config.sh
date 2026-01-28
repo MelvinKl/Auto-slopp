@@ -22,7 +22,7 @@ read_yaml_config() {
     
     # Simple YAML parsing using grep and sed
     # This handles basic key: value pairs
-    local value=$(grep "^[[:space:]]*$key:" "$config_file" | sed "s/^[[:space:]]*$key:[[:space:]]*//" | sed 's/^["'\'']//' | sed 's/["'\\'']$//')
+    local value=$(grep "^[[:space:]]*$key:" "$config_file" | sed "s/^[[:space:]]*$key:[[:space:]]*//" | sed 's/^["'"'"']//' | sed 's/["'"'"']$//')
     
     if [[ -z "$value" ]]; then
         echo "$default_value"
