@@ -1,14 +1,17 @@
 #!/bin/bash
 
 # Process task files and generate bead tasks using YAML configuration
-echo "Running planner.sh"
-
-# Load configuration from YAML
+# Load utilities and configuration first
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/../config.sh"
 
-echo "Using managed_repo_path: $MANAGED_REPO_PATH"
-echo "Using managed_repo_task_path: $MANAGED_REPO_TASK_PATH"
+# Set up error handling
+setup_error_handling
+
+log "INFO" "Starting planner.sh"
+log "INFO" "Using managed_repo_path: $MANAGED_REPO_PATH"
+log "INFO" "Using managed_repo_task_path: $MANAGED_REPO_TASK_PATH"
 
 # Check if managed directories exist
 if [ ! -d "$MANAGED_REPO_PATH" ]; then
@@ -43,8 +46,36 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
     
     echo "  Found task directory: $task_dir"
     
-    # Process each file in task directory that doesn't end with '.used'
-    for task_file in "$task_dir"/*; do
+    # Ensure files are numbered, then process in numerical order
+    # First, assign numbers to any unnumbered task files
+    unnumbered_files=($(find "$task_dir" -maxdepth 1 -type f -name "*.txt" ! -name "[0-9][0-9]-*" ! -name "*.used" | sort))
+    if [ ${#unnumbered_files[@]} -gt 0 ]; then
+        # Find the next available number
+        max_num=0
+        numbered_files=($(find "$task_dir" -maxdepth 1 -type f -name "[0-9][0-9]-*.txt" ! -name "*.used" 2>/dev/null))
+        for num_file in "${numbered_files[@]}"; do
+            basename_num=$(basename "$num_file" | sed 's/^\([0-9][0-9]\)-.*/\1/')
+            if [[ "$basename_num" =~ ^[0-9][0-9]$ ]]; then
+                num_val=$((10#$basename_num))
+                if [ $num_val -gt $max_num ]; then
+                    max_num=$num_val
+                fi
+            fi
+        done
+        
+        # Assign numbers to unnumbered files
+        next_num=$((max_num + 1))
+        for unnumbered_file in "${unnumbered_files[@]}"; do
+            filename=$(basename "$unnumbered_file" .txt)
+            new_filename=$(printf "%02d-%s.txt" "$next_num" "$filename")
+            echo "    Renaming $(basename "$unnumbered_file") to $new_filename"
+            mv "$unnumbered_file" "$task_dir/$new_filename"
+            next_num=$((next_num + 1))
+        done
+    fi
+    
+    # Process each numbered file in task directory that doesn't end with '.used'
+    for task_file in "$task_dir"/[0-9][0-9]-*.txt; do
         if [ ! -f "$task_file" ]; then
             continue
         fi
@@ -104,4 +135,4 @@ else
     echo "No task files were processed."
 fi
 
-echo "Planner.sh completed."
+script_success

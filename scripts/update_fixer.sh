@@ -1,13 +1,16 @@
 #!/bin/bash
 
 # Fix failed dependency updates in renovate branches using YAML configuration
-echo "Running update_fixer.sh"
-
-# Load configuration from YAML
+# Load utilities and configuration first
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/../config.sh"
 
-echo "Using managed_repo_path: $MANAGED_REPO_PATH"
+# Set up error handling
+setup_error_handling
+
+log "INFO" "Starting update_fixer.sh"
+log "INFO" "Using managed_repo_path: $MANAGED_REPO_PATH"
 
 # Check if managed_repo_path exists
 if [ ! -d "$MANAGED_REPO_PATH" ]; then
@@ -45,4 +48,4 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
     done
 done
 
-echo "Update_fixer.sh completed."
+script_success

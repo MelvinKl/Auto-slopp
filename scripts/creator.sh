@@ -1,31 +1,34 @@
 #!/bin/bash
 
 # Create task directories for each repository using YAML configuration
-echo "Running creator.sh"
-
-# Load configuration from YAML
+# Load utilities and configuration first
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/../config.sh"
 
-echo "Using managed_repo_path: $MANAGED_REPO_PATH"
-echo "Using managed_repo_task_path: $MANAGED_REPO_TASK_PATH"
+# Set up error handling
+setup_error_handling
 
-# Check if managed_repo_path exists
-if [ ! -d "$MANAGED_REPO_PATH" ]; then
-    echo "Error: managed_repo_path not found: $MANAGED_REPO_PATH"
-    exit 1
-fi
+log "INFO" "Starting creator.sh"
+log "INFO" "Using managed_repo_path: $MANAGED_REPO_PATH"
+log "INFO" "Using managed_repo_task_path: $MANAGED_REPO_TASK_PATH"
+
+# Validate required environment variables
+validate_env_vars MANAGED_REPO_PATH MANAGED_REPO_TASK_PATH
+
+# Check if directories exist and are accessible
+check_directory "$MANAGED_REPO_PATH" "managed_repo_path"
 
 # Create managed_repo_task_path if it doesn't exist
 if [ ! -d "$MANAGED_REPO_TASK_PATH" ]; then
-    echo "Creating managed_repo_task_path: $MANAGED_REPO_TASK_PATH"
-    mkdir -p "$MANAGED_REPO_TASK_PATH"
+    log "INFO" "Creating managed_repo_task_path: $MANAGED_REPO_TASK_PATH"
+    safe_execute "mkdir -p \"$MANAGED_REPO_TASK_PATH\""
     
     # Initialize as git repository if not already
     cd "$MANAGED_REPO_TASK_PATH"
     if [ ! -d .git ]; then
-        git init
-        echo "Initialized git repository in $MANAGED_REPO_TASK_PATH"
+        safe_git "init"
+        log "INFO" "Initialized git repository in $MANAGED_REPO_TASK_PATH"
     fi
 fi
 
@@ -40,14 +43,14 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
     
     # Get repository name
     repo_name=$(basename "$repo_dir")
-    echo "Processing repository: $repo_name"
+    log "INFO" "Processing repository: $repo_name"
     
     # Create corresponding directory in managed_repo_task_path
     task_dir="$MANAGED_REPO_TASK_PATH/$repo_name"
     
     if [ ! -d "$task_dir" ]; then
-        echo "  Creating task directory: $task_dir"
-        mkdir -p "$task_dir"
+        log "INFO" "Creating task directory: $task_dir"
+        safe_execute "mkdir -p \"$task_dir\""
         
         # Add .gitkeep file so directory can be tracked
         touch "$task_dir/.gitkeep"
@@ -74,22 +77,22 @@ EOF
         fi
         
         DIRECTORIES_CREATED=true
-        echo "  Created task directory for: $repo_name"
+        log "SUCCESS" "Created task directory for: $repo_name"
     else
-        echo "  Task directory already exists: $task_dir"
+        log "INFO" "Task directory already exists: $task_dir"
     fi
 done
 
 # Commit and push changes if any directories were created
 if [ "$DIRECTORIES_CREATED" = true ]; then
-    echo "Committing new task directories..."
+    log "INFO" "Committing new task directories..."
     cd "$MANAGED_REPO_TASK_PATH"
-    git add .
-    git commit -m "Add task directories for repositories by creator.sh" || true
-    git push
-    echo "Task directories committed and pushed."
+    safe_git "add ."
+    safe_git "commit -m \"Add task directories for repositories by creator.sh\"" || true
+    safe_git "push"
+    log "SUCCESS" "Task directories committed and pushed."
 else
-    echo "No new directories were created."
+    log "INFO" "No new directories were created."
 fi
 
-echo "Creator.sh completed."
+script_success

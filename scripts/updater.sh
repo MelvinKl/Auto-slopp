@@ -1,13 +1,16 @@
 #!/bin/bash
 
 # Update repositories and merge main into branches using YAML configuration
-echo "Running updater.sh"
-
-# Load configuration from YAML
+# Load utilities and configuration first
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/../config.sh"
 
-echo "Using managed_repo_path: $MANAGED_REPO_PATH"
+# Set up error handling
+setup_error_handling
+
+log "INFO" "Starting updater.sh"
+log "INFO" "Using managed_repo_path: $MANAGED_REPO_PATH"
 
 # First update this repository
 echo "Updating automation repository"
@@ -61,4 +64,4 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
     done
 done
 
-echo "Updater.sh completed."
+script_success
