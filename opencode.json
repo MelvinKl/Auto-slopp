@@ -1,0 +1,11 @@
+{
+  "plugin": [
+    "opencode-beads",
+    {
+	"name":"telegram-remote",
+	"path":"~/.config/opencode/plugin/telegram-remote.js",
+    },
+  ],
+  "$schema": "https://opencode.ai/config.json",
+  
+}
