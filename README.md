@@ -1,54 +1,64 @@
 # Repository Automation System
 
-A simple bash-based automation system for managing multiple Git repositories with dependency updates, task generation, and implementation.
+A robust bash-based automation system for managing multiple Git repositories with dependency updates, task generation, and implementation.
 
 ## 🎯 Overview
 
-This automation system provides straightforward management of multiple repositories through simple scripts that:
+This automation system provides comprehensive management of multiple repositories through sophisticated scripts that:
 
 - **Dynamically discovers and runs scripts** from scripts directory
+- **Uses YAML configuration** for flexible settings management
 - **Automatically handles dependency updates** from Renovate branches
-- **Creates directories** for each repository
-- **Processes task files** and generates bead tasks
-- **Implements ready tasks** using OpenAgent delegation
-- **Updates repositories** and merges branches
+- **Creates structured task directories** for each repository
+- **Processes numbered task files** with sequential ordering
+- **Generates and implements bead tasks** using OpenCode CLI
+- **Updates repositories** and merges branches safely
+- **Provides comprehensive error handling** and colored logging
 - **Runs continuously** in an endless loop
 
 ## 🔄 Recent Improvements
 
 The system has been recently enhanced with:
 
-### 🤖 OpenAgent Integration
-- All opencode operations now use `task` tool with `subagent_type='OpenAgent'`
-- Proper delegation pattern for code generation and fixes
-- Centralized interface through specialized OpenAgent
+### 🤖 OpenCode CLI Integration
+- All opencode operations now use `opencode` CLI with `--agent OpenAgent`
+- Direct integration with OpenCode for code generation and fixes
+- Consistent interface through OpenCode CLI
+
+### 📋 YAML Configuration System
+- Replaced old config.sh with flexible `config.yaml`
+- Centralized settings management with yaml_config.sh
+- Environment variable validation and expansion
+
+### 🔧 Comprehensive Error Handling
+- Added utils.sh with robust error handling and logging
+- Colored output with different log levels (INFO, SUCCESS, WARNING, ERROR, DEBUG)
+- Safe command execution with detailed error reporting
+- Git operation safety wrappers
+
+### 📁 File Numbering System
+- Automatic numbering of task files (01-, 02-, 03-, etc.)
+- Sequential processing order guaranteed
+- Automatic assignment of numbers to unnumbered files
 
 ### 📁 Dynamic Script Discovery
 - main.sh automatically discovers all `.sh` files in `scripts/` directory
 - Scripts executed in alphabetical order
 - Add new scripts without modifying main.sh
 
-### 📤 Simplified Task Management
-- Removed direct beads CLI calls from all scripts
-- Beads operations delegated to opencode internally
-- Single interface through OpenAgent
-
-### 🎯 Proper Working Directory
-- All operations execute in correct repository context
-- OpenAgent calls use proper `workdir` parameter
-- Maintains directory context throughout execution
-
 ## 🚀 Features
 
 - **🔄 Dynamic Script Discovery**: Automatically discovers and runs all .sh files in scripts/ directory
-- **🤖 OpenAgent Integration**: Uses proper agent delegation for all opencode operations
-- **📋 Task Processing**: Generates bead tasks from text files
-- **🔧 Code Generation**: Uses OpenAgent with opencode for implementation
-- **📊 Task Management**: Delegates beads operations to opencode
-- **📝 Simple Logging**: Basic echo output for easy debugging
+- **🤖 OpenCode CLI Integration**: Direct integration with opencode CLI and OpenAgent
+- **📋 Task Processing**: Generates bead tasks from numbered text files
+- **🔧 Code Generation**: Uses OpenCode CLI for implementation and fixes
+- **📊 Task Management**: Delegates beads operations to opencode internally
+- **📝 Comprehensive Logging**: Colored logging with multiple levels and error handling
+- **📁 File Numbering**: Automatic sequential numbering and ordering of task files
 - **📁 Proper Context**: Executes operations in correct repository directories
-- **🎛️ Easy Configuration**: Simple config file
+- **🎛️ YAML Configuration**: Flexible configuration system with validation
 - **🔌 Modular Design**: Add new scripts without modifying main.sh
+- **⚡ Error Recovery**: Robust error handling with safe command execution
 
 ## 📋 Prerequisites
 
@@ -91,7 +101,7 @@ managed_repo_path: ~/git/managed
 managed_repo_task_path: ~/git/repo_task_path
 ```
 
-Create the managed directories and add your repositories as subdirectories under `managed_repo_path`.
+Create managed directories and add your repositories as subdirectories under `managed_repo_path`.
 
 ### 4. Configure Settings
 
@@ -99,20 +109,24 @@ Edit `config.yaml` to adjust settings:
 
 ```yaml
 # Key settings
-sleep_duration: 1000                # Sleep duration in seconds
-managed_repo_path: ~/git/managed    # Path to repository directories
-managed_repo_task_path: ~/git/repo_task_path  # Path to task files
+sleep_duration: 1000                # Sleep duration in seconds between cycles
+managed_repo_path: ~/git/managed    # Path containing repository subdirectories
+managed_repo_task_path: ~/git/repo_task_path  # Path for task description files
 ```
 
-The configuration system automatically loads these values for all scripts.
+The configuration system uses `yaml_config.sh` to automatically load and validate these values for all scripts. Tilde paths (~) are automatically expanded to your home directory.
 
-### 5. Verify OpenAgent Integration
+### 5. Verify OpenCode CLI Integration
 
-The system uses OpenAgent delegation for all opencode operations. Ensure OpenAgent is available:
+The system uses OpenCode CLI with OpenAgent for all opencode operations. Ensure they are available:
 
 ```bash
-# Test OpenAgent delegation
-task subagent_type="OpenAgent" description="Test" prompt="Test message" workdir="."
+# Test OpenCode CLI with OpenAgent
+opencode run "Test message" --agent OpenAgent
+
+# Test configuration loading
+source scripts/yaml_config.sh && load_config
+echo "Configuration loaded successfully"
 ```
 
 ## 🎯 Quick Start
@@ -150,20 +164,28 @@ task subagent_type="OpenAgent" description="Test" prompt="Test message" workdir=
 Auto-slopp/
 ├── main.sh                    # Main orchestration script (dynamic discovery)
 ├── config.yaml                # YAML configuration file
-├── config.sh                  # Configuration loader (uses config.yaml)
-├── logs/                      # Log files
+├── config.sh                  # Configuration loader (uses yaml_config.sh)
 ├── scripts/                   # Core scripts (auto-discovered)
+│   ├── utils.sh              # Error handling and logging utilities
 │   ├── yaml_config.sh        # YAML configuration utilities
 │   ├── update_fixer.sh       # Fix failed dependency updates
 │   ├── creator.sh            # Create task directories
-│   ├── planner.sh            # Process task files
+│   ├── planner.sh            # Process task files (with numbering)
 │   ├── updater.sh            # Update repositories
 │   ├── implementer.sh        # Implement bead tasks
 │   └── [add new scripts here] # Automatically picked up!
-├── <repo-name>/              # Auto-created per repository
-│   ├── tasks/               # Task files to process
-│   ├── logs/                # Repository-specific logs
-│   └── state/               # State tracking files
+├── managed_repo_path/         # Directory containing repositories
+│   ├── repo1/               # Repository 1
+│   ├── repo2/               # Repository 2
+│   └── repo3/               # Repository 3
+├── managed_repo_task_path/    # Directory for task files
+│   ├── repo1/               # Task files for repo1
+│   │   ├── .gitkeep
+│   │   ├── 01-task-name.txt
+│   │   ├── 02-another-task.txt
+│   │   └── 01-task-name.txt.used
+│   ├── repo2/               # Task files for repo2
+│   └── repo3/               # Task files for repo3
 └── README.md                # This documentation
 ```
 
@@ -190,9 +212,10 @@ done
 ```bash
 For each repository:
     ├── Find renovate branches
-    ├── git fetch, reset, clean
+    ├── git fetch, reset, clean (safe operations)
     ├── Run `make test`
-    ├── If test fails → OpenCode CLI to fix
+    ├── If test fails → OpenCode CLI with OpenAgent to fix
+    ├── Comprehensive error handling and logging
     └── Push fixes
 ```
 
@@ -200,18 +223,21 @@ For each repository:
 ```bash
 For each repository in managed_repo_path:
     ├── Create corresponding directory in managed_repo_task_path
+    ├── Initialize git repository if needed
     ├── Add .gitkeep file for tracking
-    └── Generate README.md with task directory info
+    ├── Generate README.md with task directory info
+    └── Commit and push changes with error handling
 ```
 
 #### planner.sh
 ```bash
 For each repository with directory:
-    ├── Find task files (numbered .txt files)
-    ├── Switch to ai branch
-    ├── OpenCode CLI to generate bead tasks
-    ├── Increment file number
-    └── Commit and push changes
+    ├── Auto-number unnumbered task files (01-, 02-, etc.)
+    ├── Process files in numerical order
+    ├── Switch to ai branch (safe git operations)
+    ├── OpenCode CLI with OpenAgent to generate bead tasks
+    ├── Rename processed files with .used suffix
+    └── Commit and push changes with error handling
 ```
 
 #### updater.sh
@@ -227,22 +253,27 @@ For each repository with directory:
 #### implementer.sh
 ```bash
 For each repository:
-    ├── Switch to ai branch
+    ├── Switch to ai branch (safe git operations)
+    ├── Validate OpenCode CLI availability
     ├── Get next ready bead task
-    ├── OpenCode CLI to implement task
+    ├── OpenCode CLI with OpenAgent to implement task
+    ├── Comprehensive error handling and logging
     ├── Commit and push changes
     └── Close completed task
 ```
 
 ## 📝 Task File Format
 
-Create task files in `<repo-name>/tasks/` with numbered naming:
+Create task files in `managed_repo_task_path/<repo-name>/` with automatic numbering:
 
 ```bash
-# Example task files
-project1/tasks/add-user-authentication.1.txt
-project1/tasks/improve-error-handling.2.txt
-project1/tasks/optimze-database-queries.3.txt
+# Example task files (automatically numbered by planner.sh)
+managed_repo_task_path/repo1/01-add-user-authentication.txt
+managed_repo_task_path/repo1/02-improve-error-handling.txt
+managed_repo_task_path/repo1/03-optimize-database-queries.txt
+
+# Unnumbered files are automatically numbered:
+managed_repo_task_path/repo1/add-feature.txt  →  04-add-feature.txt
 ```
 
 Task file content:
@@ -251,34 +282,14 @@ Add user authentication to the application with login, logout, and session manag
 Include proper error handling and security measures.
 ```
 
-The planner will process files with numbers ≤ MAX_FILE_NUMBER and increment them after processing.
+**File Numbering System:**
+- Files are automatically numbered with two-digit prefixes (01-, 02-, 03-, etc.)
+- Unnumbered files are automatically assigned the next available number
+- Files are processed in numerical order
+- Processed files are renamed with `.used` suffix
+- Ensures predictable and sequential task processing
 
 ## ⚙️ Configuration
-
-### config.sh Settings
-
-```bash
-# Repository Configuration
-REPO_DIRECTORY="$HOME/repositories"     # Directory containing repos
-AUTOMATION_ROOT="$(pwd)"                # This repository root
-SCRIPTS_DIR="$AUTOMATION_ROOT/scripts"   # Scripts directory
-LOGS_DIR="$AUTOMATION_ROOT/logs"        # Logs directory
-
-# Processing Limits
-MAX_FILE_NUMBER="999"                   # Max file number to process
-MAIN_SLEEP_DURATION="1800"              # Sleep between cycles (seconds)
-
-# Git Configuration
-GIT_AUTHOR_NAME="Automation Bot"
-GIT_AUTHOR_EMAIL="automation@example.com"
-
-# CLI Paths
-OPencode_CLI="opencode"                 # OpenCode CLI path
-BEADS_CLI="bd"                          # Beads CLI path
-
-# Logging
-LOG_LEVEL="INFO"                        # DEBUG/INFO/WARN/ERROR
-```
 
 ### config.yaml Format
 
@@ -287,6 +298,34 @@ LOG_LEVEL="INFO"                        # DEBUG/INFO/WARN/ERROR
 sleep_duration: 1000                # Duration between cycles (seconds)
 managed_repo_path: ~/git/managed    # Path containing repository subdirectories
 managed_repo_task_path: ~/git/repo_task_path  # Path for task description files
+```
+
+### Configuration Loading
+
+The system uses `yaml_config.sh` to load and validate configuration:
+
+```bash
+# Configuration loading in scripts
+source "$SCRIPT_DIR/yaml_config.sh"
+load_config "$SCRIPT_DIR/../config.yaml"
+
+# Variables are automatically exported:
+# - SLEEP_DURATION
+# - MANAGED_REPO_PATH (tilde expanded)
+# - MANAGED_REPO_TASK_PATH (tilde expanded)
+# - OPencode_CMD (opencode)
+# - BEADS_CMD (bd)
+```
+
+### Environment Variables
+
+```bash
+# Enable debug mode (optional)
+export DEBUG_MODE=true
+
+# Override CLI paths (optional)
+export OPencode_CMD="/path/to/opencode"
+export BEADS_CMD="/path/to/bd"
 ```
 
 ### Directory Structure
@@ -345,17 +384,26 @@ BEADS_CLI="/path/to/bd"
 
 ### Debug Mode
 
-The scripts use simple echo statements for output. To debug:
+The scripts use comprehensive logging with colored output. To debug:
 
 ```bash
-# Run scripts individually to see output
+# Run scripts individually to see detailed output
 ./scripts/update_fixer.sh
+
+# Enable debug mode for verbose logging
+export DEBUG_MODE=true
+./scripts/creator.sh
 
 # Check what commands are being run
 bash -x ./main.sh
 
-# Test OpenAgent delegation
-task subagent_type="OpenAgent" description="Debug test" prompt="Test message" workdir="."
+# Test OpenCode CLI integration
+opencode run "Debug test" --agent OpenAgent
+
+# Test configuration loading
+source scripts/yaml_config.sh && load_config
+echo "SLEEP_DURATION: $SLEEP_DURATION"
+echo "MANAGED_REPO_PATH: $MANAGED_REPO_PATH"
 ```
 
 ### Troubleshooting OpenAgent
@@ -378,14 +426,18 @@ If OpenAgent operations fail:
 Test individual scripts:
 
 ```bash
-# Test configuration
-./scripts/common.sh  # Should load without errors
+# Test configuration loading
+source scripts/yaml_config.sh && load_config
 
 # Test repository processing
 ./scripts/creator.sh
 
-# Test task processing
+# Test task processing with numbering
 ./scripts/planner.sh
+
+# Test error handling utilities
+source scripts/utils.sh
+log "INFO" "Test message"
 ```
 
 ## 📚 Advanced Usage
@@ -393,11 +445,14 @@ Test individual scripts:
 ### Custom Sleep Duration
 
 ```bash
-# Run every hour
-SLEEP_DURATION="3600" ./main.sh
+# Run every hour (modify config.yaml)
+sleep_duration: 3600
 
-# Run every 10 minutes
-SLEEP_DURATION="600" ./main.sh
+# Or override via environment variable
+SLEEP_DURATION=600 ./main.sh
+
+# Enable debug mode
+DEBUG_MODE=true ./main.sh
 ```
 
 ### Adding New Scripts
@@ -405,11 +460,21 @@ SLEEP_DURATION="600" ./main.sh
 Simply add new `.sh` files to the `scripts/` directory:
 
 ```bash
-# Create a new script
+# Create a new script with proper error handling
 cat > scripts/new_script.sh << 'EOF'
 #!/bin/bash
-echo "Running new script"
-# Your code here
+
+# Load utilities and configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
+source "$SCRIPT_DIR/../config.sh"
+
+# Set up error handling
+setup_error_handling
+
+log "INFO" "Starting new script"
+# Your code here with error handling
+log "SUCCESS" "New script completed"
 EOF
 
 # Make it executable
@@ -453,17 +518,21 @@ jobs:
           ./main.sh
 ```
 
-### OpenAgent Customization
+### OpenCode CLI Customization
 
-Customize OpenAgent prompts by modifying the scripts:
+Customize OpenCode CLI prompts by modifying scripts:
 
 ```bash
 # Example: Custom implementer prompt
-task \
-  subagent_type="OpenAgent" \
-  description="Custom task implementation" \
-  prompt="Implement with specific coding standards and testing requirements" \
-  workdir="$repo"
+$OPencode_CMD run "Implement with specific coding standards and testing requirements" --agent OpenAgent
+
+# Custom error handling
+if command_exists "$OPencode_CMD"; then
+    safe_execute "$OPencode_CMD run \"Custom prompt\" --agent OpenAgent"
+else
+    log "ERROR" "OpenCode CLI not available"
+    exit 1
+fi
 ```
 
 ## 🤝 Contributing
@@ -471,10 +540,14 @@ task \
 When adding new functionality:
 
 1. **Follow existing patterns** in scripts
-2. **Use common.sh** for shared functions
-3. **Add proper logging** with appropriate levels
-4. **Update this README** with new features
-5. **Test thoroughly** before deployment
+2. **Use utils.sh** for shared error handling and logging
+3. **Load yaml_config.sh** for configuration
+4. **Add proper error handling** with setup_error_handling()
+5. **Use log() function** with appropriate levels (INFO, SUCCESS, WARNING, ERROR, DEBUG)
+6. **Use safe_execute()** for command execution
+7. **Use safe_git()** for git operations
+8. **Update this README** with new features
+9. **Test thoroughly** before deployment
 
 ## 📄 License
 
@@ -482,10 +555,12 @@ When adding new functionality:
 
 ## 🔗 Related Tools
 
+- **OpenCode CLI**: Code generation and automation with OpenAgent integration
 - **OpenAgent**: Specialized agent for OpenCode operations
-- **OpenCode CLI**: Code generation and automation
 - **Beads CLI**: Task management (handled internally by OpenCode)
-- **Renovate**: Dependency update automation
+- **YAML Configuration**: Flexible settings management
+- **Error Handling Utils**: Robust logging and error recovery
+- **File Numbering System**: Sequential task processing
 
 ---
 
@@ -493,10 +568,12 @@ When adding new functionality:
 
 For issues and questions:
 
-1. **Check logs** in the `logs/` directory
-2. **Review configuration** in `config.sh`
-3. **Consult troubleshooting** section above
-4. **Create an issue** with relevant log files
+1. **Enable debug mode**: `export DEBUG_MODE=true`
+2. **Check configuration**: Verify `config.yaml` settings
+3. **Test scripts individually**: Run scripts with error handling
+4. **Validate tools**: Check `opencode` and `bd` availability
+5. **Consult troubleshooting** section above
+6. **Create an issue** with relevant log files and debug output
 
 ---
 
