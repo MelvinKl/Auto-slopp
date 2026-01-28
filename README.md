@@ -1,27 +1,27 @@
 # Repository Automation System
 
-A comprehensive bash-based automation system for managing multiple Git repositories with dependency updates, task generation, and implementation workflows.
+A simple bash-based automation system for managing multiple Git repositories with dependency updates, task generation, and implementation.
 
 ## 🎯 Overview
 
-This automation system provides intelligent management of multiple repositories through a coordinated set of scripts that:
+This automation system provides straightforward management of multiple repositories through simple scripts that:
 
 - **Automatically handles dependency updates** from Renovate branches
-- **Creates and manages task files** for planned work
-- **Generates and implements bead tasks** using OpenCode CLI
-- **Maintains repository hygiene** through regular updates and branch merging
-- **Runs continuously** in an endless loop with configurable intervals
+- **Creates directories** for each repository
+- **Processes task files** and generates bead tasks
+- **Implements ready tasks** using OpenCode CLI
+- **Updates repositories** and merges branches
+- **Runs continuously** in an endless loop
 
 ## 🚀 Features
 
 - **🔄 Continuous Operation**: Runs in endless loop with 30-minute cycles
-- **🛠️ Dependency Management**: Automatically fixes failed Renovate updates
-- **📋 Task Automation**: Generates bead tasks from text files
-- **🔧 Code Generation**: Integrates with OpenCode CLI for intelligent fixes
-- **📊 Progress Tracking**: Uses Beads CLI for task management
-- **📝 Comprehensive Logging**: Structured logging with multiple levels
-- **⚡ Error Recovery**: Retry mechanisms and graceful error handling
-- **🎛️ Configurable**: Flexible configuration system
+- **🛠️ Dependency Management**: Fixes failed Renovate updates with OpenCode
+- **📋 Task Processing**: Generates bead tasks from text files
+- **🔧 Code Generation**: Uses OpenCode CLI for implementation
+- **📊 Task Tracking**: Uses Beads CLI for task management
+- **📝 Simple Logging**: Basic echo output for easy debugging
+- **🎛️ Easy Configuration**: Simple config file
 
 ## 📋 Prerequisites
 
@@ -67,12 +67,10 @@ $HOME/projects/project2
 Edit `config.sh` to adjust settings:
 
 ```bash
-# Key settings to review
-REPO_DIRECTORY="$HOME/repositories"     # Directory containing your repos
-MAIN_SLEEP_DURATION="1800"              # Sleep duration in seconds (30 min)
-OPencode_CLI="opencode"                 # Path to OpenCode CLI
-BEADS_CLI="bd"                          # Path to Beads CLI
-LOG_LEVEL="INFO"                        # Log level (DEBUG/INFO/WARN/ERROR)
+# Key settings
+SLEEP_DURATION=1800        # Sleep duration in seconds (30 min)
+OPencode_CMD="opencode"    # OpenCode CLI command
+BEADS_CMD="bd"            # Beads CLI command
 ```
 
 ## 🎯 Quick Start
@@ -109,17 +107,15 @@ LOG_LEVEL="INFO"                        # Log level (DEBUG/INFO/WARN/ERROR)
 ```
 Auto-slopp/
 ├── main.sh                    # Main orchestration script
-├── config.sh                  # Configuration file
+├── config.sh                  # Simple configuration file
 ├── repos.txt                  # Repository list
 ├── logs/                      # Log files
 ├── scripts/                   # Core scripts
-│   ├── common.sh             # Shared functions (logging, error handling)
-│   ├── file_numbering.sh      # File numbering system
-│   ├── update_fixer.sh       # Renovate branch management
-│   ├── creator.sh            # Directory structure creation
-│   ├── planner.sh            # Task file processing
-│   ├── updater.sh            # Repository updates
-│   └── implementer.sh        # Bead task implementation
+│   ├── update_fixer.sh       # Fix failed dependency updates
+│   ├── creator.sh            # Create directory structures
+│   ├── planner.sh            # Process task files
+│   ├── updater.sh            # Update repositories
+│   └── implementer.sh        # Implement bead tasks
 ├── <repo-name>/              # Auto-created per repository
 │   ├── tasks/               # Task files to process
 │   ├── logs/                # Repository-specific logs
@@ -291,27 +287,14 @@ BEADS_CLI="/path/to/bd"
 
 ### Debug Mode
 
-Enable debug logging:
+The scripts use simple echo statements for output. To debug:
 
 ```bash
-# In config.sh
-LOG_LEVEL="DEBUG"
+# Run scripts individually to see output
+./scripts/update_fixer.sh
 
-# Or temporarily override
-LOG_LEVEL="DEBUG" ./main.sh
-```
-
-### Log Files
-
-Check logs for troubleshooting:
-
-```bash
-# Main logs
-tail -f logs/main.sh.log
-
-# Script-specific logs
-tail -f scripts/update_fixer.sh.log
-tail -f logs/implementer.sh.log
+# Check what commands are being run
+bash -x ./main.sh
 ```
 
 ### Manual Testing
