@@ -1,0 +1,13 @@
+# Auto-slopp Configuration File
+# This file contains the configuration settings for the Auto-slopp automation system
+
+# Duration between cycles in seconds (sleep duration)
+sleep_duration: 1000
+
+# Path where all repositories are located
+# Each subdirectory in this path is treated as a git repository
+managed_repo_path: '~/git/managed'
+
+# Separate repository path for task descriptions 
+# Used by planner.sh script for storing and processing task files
+managed_repo_task_path: '~/git/repo_task_path'
