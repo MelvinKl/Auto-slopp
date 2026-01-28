@@ -6,22 +6,49 @@ A simple bash-based automation system for managing multiple Git repositories wit
 
 This automation system provides straightforward management of multiple repositories through simple scripts that:
 
+- **Dynamically discovers and runs scripts** from scripts directory
 - **Automatically handles dependency updates** from Renovate branches
 - **Creates directories** for each repository
 - **Processes task files** and generates bead tasks
-- **Implements ready tasks** using OpenCode CLI
+- **Implements ready tasks** using OpenAgent delegation
 - **Updates repositories** and merges branches
 - **Runs continuously** in an endless loop
 
+## 🔄 Recent Improvements
+
+The system has been recently enhanced with:
+
+### 🤖 OpenAgent Integration
+- All opencode operations now use `task` tool with `subagent_type='OpenAgent'`
+- Proper delegation pattern for code generation and fixes
+- Centralized interface through specialized OpenAgent
+
+### 📁 Dynamic Script Discovery
+- main.sh automatically discovers all `.sh` files in `scripts/` directory
+- Scripts executed in alphabetical order
+- Add new scripts without modifying main.sh
+
+### 📤 Simplified Task Management
+- Removed direct beads CLI calls from all scripts
+- Beads operations delegated to opencode internally
+- Single interface through OpenAgent
+
+### 🎯 Proper Working Directory
+- All operations execute in correct repository context
+- OpenAgent calls use proper `workdir` parameter
+- Maintains directory context throughout execution
+
 ## 🚀 Features
 
-- **🔄 Continuous Operation**: Runs in endless loop with 30-minute cycles
-- **🛠️ Dependency Management**: Fixes failed Renovate updates with OpenCode
+- **🔄 Dynamic Script Discovery**: Automatically discovers and runs all .sh files in scripts/ directory
+- **🤖 OpenAgent Integration**: Uses proper agent delegation for all opencode operations
 - **📋 Task Processing**: Generates bead tasks from text files
-- **🔧 Code Generation**: Uses OpenCode CLI for implementation
-- **📊 Task Tracking**: Uses Beads CLI for task management
+- **🔧 Code Generation**: Uses OpenAgent with opencode for implementation
+- **📊 Task Management**: Delegates beads operations to opencode
 - **📝 Simple Logging**: Basic echo output for easy debugging
+- **📁 Proper Context**: Executes operations in correct repository directories
 - **🎛️ Easy Configuration**: Simple config file
+- **🔌 Modular Design**: Add new scripts without modifying main.sh
 
 ## 📋 Prerequisites
 
@@ -70,7 +97,16 @@ Edit `config.sh` to adjust settings:
 # Key settings
 SLEEP_DURATION=1800        # Sleep duration in seconds (30 min)
 OPencode_CMD="opencode"    # OpenCode CLI command
-BEADS_CMD="bd"            # Beads CLI command
+BEADS_CMD="bd"            # Beads CLI command (now handled by opencode)
+```
+
+### 5. Verify OpenAgent Integration
+
+The system uses OpenAgent delegation for all opencode operations. Ensure OpenAgent is available:
+
+```bash
+# Test OpenAgent delegation
+task subagent_type="OpenAgent" description="Test" prompt="Test message" workdir="."
 ```
 
 ## 🎯 Quick Start
@@ -106,16 +142,17 @@ BEADS_CMD="bd"            # Beads CLI command
 
 ```
 Auto-slopp/
-├── main.sh                    # Main orchestration script
+├── main.sh                    # Main orchestration script (dynamic discovery)
 ├── config.sh                  # Simple configuration file
 ├── repos.txt                  # Repository list
 ├── logs/                      # Log files
-├── scripts/                   # Core scripts
+├── scripts/                   # Core scripts (auto-discovered)
 │   ├── update_fixer.sh       # Fix failed dependency updates
 │   ├── creator.sh            # Create directory structures
 │   ├── planner.sh            # Process task files
 │   ├── updater.sh            # Update repositories
-│   └── implementer.sh        # Implement bead tasks
+│   ├── implementer.sh        # Implement bead tasks
+│   └── [add new scripts here] # Automatically picked up!
 ├── <repo-name>/              # Auto-created per repository
 │   ├── tasks/               # Task files to process
 │   ├── logs/                # Repository-specific logs
@@ -295,7 +332,25 @@ The scripts use simple echo statements for output. To debug:
 
 # Check what commands are being run
 bash -x ./main.sh
+
+# Test OpenAgent delegation
+task subagent_type="OpenAgent" description="Debug test" prompt="Test message" workdir="."
 ```
+
+### Troubleshooting OpenAgent
+
+If OpenAgent operations fail:
+
+1. **Check OpenAgent availability**:
+   ```bash
+   task subagent_type="OpenAgent" description="Test" prompt="Test" workdir="."
+   ```
+
+2. **Verify workdir parameter**: Ensure the working directory is correct
+
+3. **Check prompts**: Verify OpenAgent can understand the instructions
+
+4. **Repository access**: Ensure the script can access target repositories
 
 ### Manual Testing
 
@@ -318,10 +373,28 @@ Test individual scripts:
 
 ```bash
 # Run every hour
-MAIN_SLEEP_DURATION="3600" ./main.sh
+SLEEP_DURATION="3600" ./main.sh
 
 # Run every 10 minutes
-MAIN_SLEEP_DURATION="600" ./main.sh
+SLEEP_DURATION="600" ./main.sh
+```
+
+### Adding New Scripts
+
+Simply add new `.sh` files to the `scripts/` directory:
+
+```bash
+# Create a new script
+cat > scripts/new_script.sh << 'EOF'
+#!/bin/bash
+echo "Running new script"
+# Your code here
+EOF
+
+# Make it executable
+chmod +x scripts/new_script.sh
+
+# It will be automatically picked up by main.sh!
 ```
 
 ### Selective Script Execution
@@ -359,6 +432,19 @@ jobs:
           ./main.sh
 ```
 
+### OpenAgent Customization
+
+Customize OpenAgent prompts by modifying the scripts:
+
+```bash
+# Example: Custom implementer prompt
+task \
+  subagent_type="OpenAgent" \
+  description="Custom task implementation" \
+  prompt="Implement with specific coding standards and testing requirements" \
+  workdir="$repo"
+```
+
 ## 🤝 Contributing
 
 When adding new functionality:
@@ -375,9 +461,10 @@ When adding new functionality:
 
 ## 🔗 Related Tools
 
-- **OpenCode CLI**: [Documentation link]
-- **Beads CLI**: [Documentation link] 
-- **Renovate**: [Documentation link]
+- **OpenAgent**: Specialized agent for OpenCode operations
+- **OpenCode CLI**: Code generation and automation
+- **Beads CLI**: Task management (handled internally by OpenCode)
+- **Renovate**: Dependency update automation
 
 ---
 
