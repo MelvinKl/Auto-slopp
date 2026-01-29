@@ -39,15 +39,17 @@ load_config() {
     SLEEP_DURATION=$(read_yaml_config "$config_file" "sleep_duration" "1000")
     MANAGED_REPO_PATH=$(read_yaml_config "$config_file" "managed_repo_path" "~/git/managed")
     MANAGED_REPO_TASK_PATH=$(read_yaml_config "$config_file" "managed_repo_task_path" "~/git/repo_task_path")
+    LOG_DIRECTORY=$(read_yaml_config "$config_file" "log_directory" "")
     
     # Expand tilde paths
     MANAGED_REPO_PATH="${MANAGED_REPO_PATH/#\~/$HOME}"
     MANAGED_REPO_TASK_PATH="${MANAGED_REPO_TASK_PATH/#\~/$HOME}"
+    LOG_DIRECTORY="${LOG_DIRECTORY/#\~/$HOME}"
     
     # CLI commands
     OPencode_CMD="opencode"
     BEADS_CMD="bd"
     
     # Export variables
-    export SLEEP_DURATION MANAGED_REPO_PATH MANAGED_REPO_TASK_PATH OPencode_CMD BEADS_CMD
+    export SLEEP_DURATION MANAGED_REPO_PATH MANAGED_REPO_TASK_PATH LOG_DIRECTORY OPencode_CMD BEADS_CMD
 }
