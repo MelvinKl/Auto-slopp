@@ -19,6 +19,11 @@ validate_env_vars MANAGED_REPO_PATH MANAGED_REPO_TASK_PATH
 # Check if directories exist and are accessible
 check_directory "$MANAGED_REPO_PATH" "managed_repo_path"
 
+# Ensure repository is up to date before proceeding
+log "INFO" "Updating repository with git pull..."
+safe_git "pull"
+log "SUCCESS" "Repository updated successfully"
+
 # Create managed_repo_task_path if it doesn't exist
 if [ ! -d "$MANAGED_REPO_TASK_PATH" ]; then
     log "INFO" "Creating managed_repo_task_path: $MANAGED_REPO_TASK_PATH"
