@@ -11,3 +11,4 @@
 [INFO] 2026-01-29 22:02:22 : Processing repository: job_scraper
 [INFO] 2026-01-29 22:02:22 : Task directory already exists: /root/git/repo_task_path/job_scraper
 [INFO] 2026-01-29 22:02:22 : Committing new task directories...
+[INFO] 2026-01-29 22:02:25 : Using opencode CLI to find and implement next ready task
