@@ -16,8 +16,11 @@ log() {
     shift
     local message="$*"
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    local script_name=$(basename "${BASH_SOURCE[2]}")
+    local script_name=${SCRIPT_NAME:-$(basename "${BASH_SOURCE[2]}")}
     
+    local log_entry="[${level}] ${timestamp} ${script_name}: $message"
+    
+    # Output to console with colors
     case "$level" in
         "INFO")
             echo -e "${BLUE}[INFO]${NC} ${timestamp} ${script_name}: $message"
@@ -37,6 +40,12 @@ log() {
             fi
             ;;
     esac
+    
+    # Write to log file if log_directory is configured
+    if [[ -n "${LOG_DIRECTORY}" && -d "${LOG_DIRECTORY}" ]]; then
+        local log_file="${LOG_DIRECTORY}/${script_name}.log"
+        echo "$log_entry" >> "$log_file"
+    fi
 }
 
 # Error handling function
@@ -139,5 +148,26 @@ safe_git() {
     fi
 }
 
-export -f log handle_error setup_error_handling script_success command_exists validate_env_vars check_directory safe_execute safe_git
+# Function to initialize log directory
+setup_log_directory() {
+    if [[ -n "${LOG_DIRECTORY}" ]]; then
+        if [[ ! -d "${LOG_DIRECTORY}" ]]; then
+            mkdir -p "${LOG_DIRECTORY}" || {
+                echo "WARNING: Failed to create log directory: ${LOG_DIRECTORY}" >&2
+                return 1
+            }
+            echo "INFO: Created log directory: ${LOG_DIRECTORY}"
+        fi
+        
+        # Test write permissions
+        if [[ ! -w "${LOG_DIRECTORY}" ]]; then
+            echo "WARNING: Log directory is not writable: ${LOG_DIRECTORY}" >&2
+            return 1
+        fi
+        
+        echo "INFO: Log directory configured: ${LOG_DIRECTORY}"
+    fi
+}
+
+export -f log handle_error setup_error_handling script_success command_exists validate_env_vars check_directory safe_execute safe_git setup_log_directory
 export RED GREEN YELLOW BLUE NC DEBUG_MODE

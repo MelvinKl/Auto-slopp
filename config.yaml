@@ -11,3 +11,4 @@ managed_repo_path: '~/git/managed'
 # Separate repository path for task descriptions 
 # Used by planner.sh script for storing and processing task files
 managed_repo_task_path: '~/git/repo_task_path'
+log_directory: '~/git/managed/Auto-slopp/logs'
