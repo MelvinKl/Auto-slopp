@@ -2,7 +2,7 @@
 # This file contains the configuration settings for the Auto-slopp automation system
 
 # Duration between cycles in seconds (sleep duration)
-sleep_duration: 1000
+sleep_duration: 100
 
 # Path where all repositories are located
 # Each subdirectory in this path is treated as a git repository
