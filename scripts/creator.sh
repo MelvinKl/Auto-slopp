@@ -93,7 +93,18 @@ log "INFO" "Committing new task directories..."
 cd "$MANAGED_REPO_TASK_PATH"
 safe_git "add ."
 safe_git "commit -m \"Add task directories for repositories by creator.sh\"" || true
-safe_git "push"
+
+# Handle potential push rejections by pulling first if needed
+log "INFO" "Pushing changes to remote..."
+if ! safe_git "push"; then
+    log "WARNING" "Push failed, attempting to pull remote changes first..."
+    safe_git "pull --rebase"
+    log "INFO" "Retrying push after pulling remote changes..."
+    if ! safe_git "push"; then
+        log "ERROR" "Push failed even after pulling remote changes. Manual intervention may be required."
+        exit 1
+    fi
+fi
 log "SUCCESS" "Task directories committed and pushed."
 
 script_success
