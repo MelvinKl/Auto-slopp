@@ -84,15 +84,11 @@ EOF
 done
 
 # Commit and push changes if any directories were created
-if [ "$DIRECTORIES_CREATED" = true ]; then
-    log "INFO" "Committing new task directories..."
-    cd "$MANAGED_REPO_TASK_PATH"
-    safe_git "add ."
-    safe_git "commit -m \"Add task directories for repositories by creator.sh\"" || true
-    safe_git "push"
-    log "SUCCESS" "Task directories committed and pushed."
-else
-    log "INFO" "No new directories were created."
-fi
+log "INFO" "Committing new task directories..."
+cd "$MANAGED_REPO_TASK_PATH"
+safe_git "add ."
+safe_git "commit -m \"Add task directories for repositories by creator.sh\"" || true
+safe_git "push"
+log "SUCCESS" "Task directories committed and pushed."
 
 script_success
