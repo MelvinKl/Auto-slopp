@@ -370,5 +370,213 @@ EOF
     return $exit_code
 }
 
-export -f log strip_colors should_log rotate_log_if_needed cleanup_old_logs handle_error setup_error_handling script_success command_exists validate_env_vars check_directory safe_execute safe_git setup_log_directory execute_with_capture
+# Function to merge origin/main into current ai branch safely
+merge_origin_main_to_ai() {
+    local repo_dir="${GIT_REPO_DIR:-$(pwd)}"
+    local current_branch
+    
+    log "INFO" "Starting merge of origin/main into ai branch"
+    
+    # Change to repository directory
+    cd "$repo_dir" || {
+        log "ERROR" "Cannot change to directory: $repo_dir"
+        return 1
+    }
+    
+    # Get current branch to verify we're on ai branch
+    current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || {
+        log "ERROR" "Failed to determine current branch"
+        return 1
+    }
+    
+    if [[ "$current_branch" != "ai" ]]; then
+        log "ERROR" "Not on ai branch (current: $current_branch)"
+        return 1
+    fi
+    
+    # Fetch latest changes from origin
+    log "DEBUG" "Fetching latest changes from origin"
+    if ! safe_git "fetch origin"; then
+        log "ERROR" "Failed to fetch from origin"
+        return 1
+    fi
+    
+    # Check if there are any changes to merge
+    local ai_commit=$(git rev-parse HEAD 2>/dev/null)
+    local main_commit=$(git rev-parse origin/main 2>/dev/null)
+    
+    if [[ "$ai_commit" == "$main_commit" ]]; then
+        log "INFO" "ai branch is already up to date with origin/main"
+        return 0
+    fi
+    
+    # Check if merge would cause conflicts
+    log "DEBUG" "Checking for potential merge conflicts"
+    local merge_base=$(git merge-base HEAD origin/main 2>/dev/null)
+    local ai_tree=$(git rev-parse "${merge_base}:." 2>/dev/null)
+    local main_tree=$(git rev-parse "origin/main:." 2>/dev/null)
+    
+    if [[ "$ai_tree" != "$main_tree" ]]; then
+        # Trees differ - check if merge would be clean
+        local merge_result
+        if ! merge_result=$(git merge-tree "$(git merge-base HEAD origin/main 2>/dev/null)" HEAD origin/main 2>&1); then
+            if echo "$merge_result" | grep -q "<<<<<<< \|======= \|>>>>>>>"; then
+                log "WARNING" "Potential merge conflicts detected between ai and origin/main"
+                log "INFO" "Proceeding with merge attempt - conflicts will be resolved if needed"
+            fi
+        fi
+    fi
+    
+    # Perform the merge
+    log "INFO" "Merging origin/main into ai branch"
+    if git merge origin/main -m "Merge origin/main into ai branch (automated)"; then
+        log "SUCCESS" "Successfully merged origin/main into ai branch"
+        return 0
+    else
+        local exit_code=$?
+        log "ERROR" "Failed to merge origin/main into ai branch (exit code: $exit_code)"
+        
+        # Check if merge failed due to conflicts
+        if git status --porcelain 2>/dev/null | grep -q "^UU\|^AA\|^DD"; then
+            log "ERROR" "Merge conflicts detected - automatic resolution needed"
+            log "INFO" "Conflict files: $(git diff --name-only --diff-filter=U 2>/dev/null | tr '\n' ' ')"
+            
+            # Abort the merge to clean up
+            git merge --abort 2>/dev/null || true
+        fi
+        
+        return $exit_code
+    fi
+}
+
+# Function to detect merge conflicts and create structured report for opencode
+detect_merge_conflicts() {
+    local repo_dir="${GIT_REPO_DIR:-$(pwd)}"
+    local conflict_report_file="/tmp/opencode_conflict_report.json"
+    
+    cd "$repo_dir" || return 1
+    
+    log "INFO" "Detecting merge conflicts for opencode escalation"
+    
+    # Check if we're in a merge state
+    if ! git status --porcelain 2>/dev/null | grep -q "^UU\|^AA\|^DD\|^##"; then
+        log "DEBUG" "No merge conflicts detected"
+        return 0
+    fi
+    
+    # Gather conflict information
+    local conflicted_files=($(git diff --name-only --diff-filter=U 2>/dev/null))
+    local conflict_count=${#conflicted_files[@]}
+    
+    if [[ $conflict_count -eq 0 ]]; then
+        log "DEBUG" "No conflicted files found"
+        return 0
+    fi
+    
+    log "WARNING" "Found $conflict_count conflicted files: ${conflicted_files[*]}"
+    
+    # Create structured conflict report for opencode
+    cat > "$conflict_report_file" << EOF
+{
+  "conflict_type": "merge_conflicts",
+  "conflict_count": $conflict_count,
+  "conflicted_files": [
+$(for file in "${conflicted_files[@]}"; do
+    echo "    \"$file\","
+done | sed '$s/,$//')
+  ],
+  "merge_details": {
+    "current_branch": "$(git rev-parse --abbrev-ref HEAD 2>/dev/null)",
+    "target_branch": "origin/main",
+    "ai_head": "$(git rev-parse HEAD 2>/dev/null)",
+    "main_head": "$(git rev-parse origin/main 2>/dev/null)",
+    "merge_base": "$(git merge-base HEAD origin/main 2>/dev/null)"
+  },
+  "resolution_suggestions": [
+    "Review conflicted files and resolve manually",
+    "Consider using 'git merge --abort' to cancel merge",
+    "Use 'git status' to see detailed conflict markers",
+    "Apply appropriate resolution strategy for each conflict"
+  ],
+  "escalation_required": true,
+  "timestamp": "$(date -Iseconds)"
+}
+EOF
+    
+    log "INFO" "Conflict report created: $conflict_report_file"
+    echo "$conflict_report_file"
+    return $conflict_count
+}
+
+# Enhanced merge function with opencode escalation support
+merge_origin_main_to_ai_with_escalation() {
+    local repo_dir="${GIT_REPO_DIR:-$(pwd)}"
+    local current_branch
+    local conflict_report_file
+    
+    log "INFO" "Starting merge of origin/main into ai branch with conflict detection"
+    
+    # Change to repository directory
+    cd "$repo_dir" || {
+        log "ERROR" "Cannot change to directory: $repo_dir"
+        return 1
+    }
+    
+    # Get current branch to verify we're on ai branch
+    current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || {
+        log "ERROR" "Failed to determine current branch"
+        return 1
+    }
+    
+    if [[ "$current_branch" != "ai" ]]; then
+        log "ERROR" "Not on ai branch (current: $current_branch)"
+        return 1
+    fi
+    
+    # Fetch latest changes from origin
+    log "DEBUG" "Fetching latest changes from origin"
+    if ! safe_git "fetch origin"; then
+        log "ERROR" "Failed to fetch from origin"
+        return 1
+    fi
+    
+    # Check if there are any changes to merge
+    local ai_commit=$(git rev-parse HEAD 2>/dev/null)
+    local main_commit=$(git rev-parse origin/main 2>/dev/null)
+    
+    if [[ "$ai_commit" == "$main_commit" ]]; then
+        log "INFO" "ai branch is already up to date with origin/main"
+        return 0
+    fi
+    
+    # Perform the merge with conflict detection
+    log "INFO" "Attempting merge of origin/main into ai branch"
+    if git merge origin/main -m "Merge origin/main into ai branch (automated)"; then
+        log "SUCCESS" "Successfully merged origin/main into ai branch"
+        return 0
+    else
+        local exit_code=$?
+        log "ERROR" "Merge failed with exit code: $exit_code"
+        
+        # Detect conflicts and create escalation report
+        conflict_report_file=$(detect_merge_conflicts)
+        local conflict_count=$?
+        
+        if [[ $conflict_count -gt 0 ]]; then
+            log "ERROR" "Merge conflicts detected - escalating to opencode for resolution"
+            log "INFO" "Conflict report available at: $conflict_report_file"
+            
+            # Preserve merge state for opencode to resolve
+            log "WARNING" "Merge state preserved - opencode intervention required"
+            return 2  # Special exit code for conflicts
+        else
+            # Non-conflict merge failure (network, permissions, etc.)
+            log "ERROR" "Merge failed for non-conflict reasons - cleaning up"
+            git merge --abort 2>/dev/null || true
+            return $exit_code
+        fi
+    fi
+}
+
+export -f log strip_colors should_log rotate_log_if_needed cleanup_old_logs handle_error setup_error_handling script_success command_exists validate_env_vars check_directory safe_execute safe_git setup_log_directory execute_with_capture merge_origin_main_to_ai detect_merge_conflicts merge_origin_main_to_ai_with_escalation
 export RED GREEN YELLOW BLUE NC DEBUG_MODE
