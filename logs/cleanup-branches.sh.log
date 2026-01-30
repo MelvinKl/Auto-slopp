@@ -1,0 +1,64 @@
+[INFO] 2026-01-30 11:07:33 cleanup-branches.sh: Starting branch cleanup script
+[INFO] 2026-01-30 11:07:33 cleanup-branches.sh: Using managed_repo_path: /root/git/managed
+[INFO] 2026-01-30 11:07:33 cleanup-branches.sh: Starting branch cleanup for all repositories
+[INFO] 2026-01-30 11:07:33 cleanup-branches.sh: Processing repository: Auto-slopp
+[DEBUG] 2026-01-30 11:07:33 cleanup-branches.sh: Current branch in Auto-slopp: ai
+[DEBUG] 2026-01-30 11:07:34 cleanup-branches.sh: Branch exists on remote: ai
+[DEBUG] 2026-01-30 11:07:34 cleanup-branches.sh: Branch exists on remote: main
+[INFO] 2026-01-30 11:07:34 cleanup-branches.sh: Found 0 branches to delete, 0 branches skipped in Auto-slopp
+[INFO] 2026-01-30 11:07:34 cleanup-branches.sh: No branches needed cleanup in Auto-slopp
+[ERROR] 2026-01-30 11:07:34 cleanup-branches.sh: Command failed with exit code 1 at line 206: ((TOTAL_REPOS_PROCESSED++))
+[ERROR] 2026-01-30 11:07:34 cleanup-branches.sh: Script execution failed
+[INFO] 2026-01-30 11:08:27 cleanup-branches.sh: Starting branch cleanup script
+[INFO] 2026-01-30 11:08:27 cleanup-branches.sh: Using managed_repo_path: /root/git/managed
+[INFO] 2026-01-30 11:08:27 cleanup-branches.sh: Starting branch cleanup for all repositories
+[INFO] 2026-01-30 11:08:27 cleanup-branches.sh: Processing repository: Auto-slopp
+[DEBUG] 2026-01-30 11:08:27 cleanup-branches.sh: Current branch in Auto-slopp: ai
+[DEBUG] 2026-01-30 11:08:28 cleanup-branches.sh: Branch exists on remote: ai
+[DEBUG] 2026-01-30 11:08:28 cleanup-branches.sh: Branch exists on remote: main
+[INFO] 2026-01-30 11:08:28 cleanup-branches.sh: Found 0 branches to delete, 0 branches skipped in Auto-slopp
+[INFO] 2026-01-30 11:08:28 cleanup-branches.sh: No branches needed cleanup in Auto-slopp
+[INFO] 2026-01-30 11:08:28 cleanup-branches.sh: Processing repository: BrueterApp
+[WARNING] 2026-01-30 11:08:28 cleanup-branches.sh: Skipping BrueterApp - not a git repository
+[INFO] 2026-01-30 11:08:28 cleanup-branches.sh: Processing repository: job_scraper
+[DEBUG] 2026-01-30 11:08:28 cleanup-branches.sh: Current branch in job_scraper: ai
+[DEBUG] 2026-01-30 11:08:29 cleanup-branches.sh: Branch exists on remote: ai
+[DEBUG] 2026-01-30 11:08:29 cleanup-branches.sh: Branch exists on remote: main
+[INFO] 2026-01-30 11:08:29 cleanup-branches.sh: Found 0 branches to delete, 0 branches skipped in job_scraper
+[INFO] 2026-01-30 11:08:29 cleanup-branches.sh: No branches needed cleanup in job_scraper
+[INFO] 2026-01-30 11:08:29 cleanup-branches.sh: Branch cleanup completed
+[INFO] 2026-01-30 11:08:29 cleanup-branches.sh: Repositories processed: 2
+[INFO] 2026-01-30 11:08:29 cleanup-branches.sh: Total branches cleaned: 0
+[INFO] 2026-01-30 11:08:29 cleanup-branches.sh: Total errors encountered: 0
+[SUCCESS] 2026-01-30 11:08:29 cleanup-branches.sh: Branch cleanup completed successfully
+[INFO] 2026-01-30 11:08:41 cleanup-branches.sh: Starting branch cleanup script
+[INFO] 2026-01-30 11:08:41 cleanup-branches.sh: Using managed_repo_path: /root/git/managed
+[INFO] 2026-01-30 11:08:41 cleanup-branches.sh: Starting branch cleanup for all repositories
+[INFO] 2026-01-30 11:08:41 cleanup-branches.sh: Processing repository: Auto-slopp
+[DEBUG] 2026-01-30 11:08:41 cleanup-branches.sh: Current branch in Auto-slopp: ai
+[DEBUG] 2026-01-30 11:08:43 cleanup-branches.sh: Branch exists on remote: ai
+[DEBUG] 2026-01-30 11:08:43 cleanup-branches.sh: Branch exists on remote: main
+[DEBUG] 2026-01-30 11:08:43 cleanup-branches.sh: Marked for deletion: test-branch-to-delete
+[INFO] 2026-01-30 11:08:43 cleanup-branches.sh: Found 1 branches to delete, 0 branches skipped in Auto-slopp
+[INFO] 2026-01-30 11:08:43 cleanup-branches.sh: Deleting local branch: test-branch-to-delete
+[DEBUG] 2026-01-30 11:08:43 cleanup-branches.sh: Git operation in /root/git/managed/Auto-slopp: branch -d 'test-branch-to-delete'
+[DEBUG] 2026-01-30 11:08:43 cleanup-branches.sh: Git command succeeded: branch -d 'test-branch-to-delete'
+[SUCCESS] 2026-01-30 11:08:43 cleanup-branches.sh: Successfully deleted branch: test-branch-to-delete
+[ERROR] 2026-01-30 11:08:43 cleanup-branches.sh: Command failed with exit code 1 at line 193: ((repo_cleaned_count++))
+[ERROR] 2026-01-30 11:08:43 cleanup-branches.sh: Script execution failed
+[INFO] 2026-01-30 11:09:04 cleanup-branches.sh: Starting branch cleanup script
+[INFO] 2026-01-30 11:09:04 cleanup-branches.sh: Using managed_repo_path: /root/git/managed
+[INFO] 2026-01-30 11:09:04 cleanup-branches.sh: Starting branch cleanup for all repositories
+[INFO] 2026-01-30 11:09:04 cleanup-branches.sh: Processing repository: Auto-slopp
+[INFO] 2026-01-30 11:09:05 cleanup-branches.sh: Found 0 branches to delete, 0 branches skipped in Auto-slopp
+[INFO] 2026-01-30 11:09:05 cleanup-branches.sh: No branches needed cleanup in Auto-slopp
+[INFO] 2026-01-30 11:09:05 cleanup-branches.sh: Processing repository: BrueterApp
+[WARNING] 2026-01-30 11:09:05 cleanup-branches.sh: Skipping BrueterApp - not a git repository
+[INFO] 2026-01-30 11:09:05 cleanup-branches.sh: Processing repository: job_scraper
+[INFO] 2026-01-30 11:09:06 cleanup-branches.sh: Found 0 branches to delete, 0 branches skipped in job_scraper
+[INFO] 2026-01-30 11:09:06 cleanup-branches.sh: No branches needed cleanup in job_scraper
+[INFO] 2026-01-30 11:09:06 cleanup-branches.sh: Branch cleanup completed
+[INFO] 2026-01-30 11:09:06 cleanup-branches.sh: Repositories processed: 2
+[INFO] 2026-01-30 11:09:06 cleanup-branches.sh: Total branches cleaned: 0
+[INFO] 2026-01-30 11:09:06 cleanup-branches.sh: Total errors encountered: 0
+[SUCCESS] 2026-01-30 11:09:06 cleanup-branches.sh: Branch cleanup completed successfully
