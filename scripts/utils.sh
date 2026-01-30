@@ -87,6 +87,64 @@ log() {
     fi
 }
 
+# Specialized logging function for change detection events
+log_change_detection() {
+    local repo_name="$1"
+    local changes_count="$2"
+    local reboot_triggered="$3"
+    
+    if [[ "$reboot_triggered" == "true" ]]; then
+        log "WARNING" "Change detection in $repo_name: $changes_count changes detected - REBOOT TRIGGERED"
+    else
+        log "INFO" "Change detection in $repo_name: $changes_count changes detected - no reboot needed"
+    fi
+}
+
+# Specialized logging function for system health checks
+log_system_health() {
+    local check_type="$1"
+    local status="$2"
+    local details="$3"
+    
+    if [[ "$status" == "pass" ]]; then
+        log "INFO" "System health check $check_type: PASSED"
+    else
+        log "ERROR" "System health check $check_type: FAILED - $details"
+    fi
+}
+
+# Specialized logging function for reboot events
+log_reboot_event() {
+    local reason="$1"
+    local scheduled_time="$2"
+    
+    log "WARNING" "REBOOT SCHEDULED: $reason"
+    log "INFO" "Reboot will occur at: $scheduled_time"
+    log_system_state_snapshot
+}
+
+# Function to capture system state snapshot before reboot
+log_system_state_snapshot() {
+    if [[ -z "${LOG_DIRECTORY}" || ! -d "${LOG_DIRECTORY}" ]]; then
+        return 0
+    fi
+    
+    local snapshot_file="${LOG_DIRECTORY}/system-state-$(date +%Y%m%d-%H%M%S).json"
+    
+    {
+        echo "{"
+        echo "  \"timestamp\": \"$(date -Iseconds)\","
+        echo "  \"uptime\": \"$(uptime)\","
+        echo "  \"disk_usage\": \"$(df -h / | tail -1 | awk '{print $5}')\","
+        echo "  \"memory_usage\": \"$(free -h | grep '^Mem:' | awk '{print $3"/"$2}')\","
+        echo "  \"load_average\": \"$(uptime | awk -F'load average:' '{print $2}')\","
+        echo "  \"git_status\": \"$(git status --porcelain 2>/dev/null | wc -l) files modified\""
+        echo "}"
+    } > "$snapshot_file"
+    
+    log "INFO" "System state snapshot saved: $snapshot_file"
+}
+
 # Error handling function
 handle_error() {
     local exit_code=$?
@@ -579,4 +637,5 @@ merge_origin_main_to_ai_with_escalation() {
 }
 
 export -f log strip_colors should_log rotate_log_if_needed cleanup_old_logs handle_error setup_error_handling script_success command_exists validate_env_vars check_directory safe_execute safe_git setup_log_directory execute_with_capture merge_origin_main_to_ai detect_merge_conflicts merge_origin_main_to_ai_with_escalation
+export -f log_change_detection log_system_health log_reboot_event log_system_state_snapshot
 export RED GREEN YELLOW BLUE NC DEBUG_MODE
