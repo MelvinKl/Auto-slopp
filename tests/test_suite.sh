@@ -87,11 +87,13 @@ main() {
     run_test "config.sh has valid syntax" "test_script_syntax 'config.sh'"
     
     # Test scripts in scripts directory
-    for script in scripts/*.sh; do
-        script_name=$(basename "$script")
-        run_test "$script_name exists" "test_script_exists '$script'"
-        run_test "$script_name is executable" "test_script_executable '$script'"
-        run_test "$script_name has valid syntax" "test_script_syntax '$script'"
+    for script_file in "$PROJECT_DIR"/scripts/*.sh; do
+        if [[ -f "$script_file" ]]; then
+            script_name=$(basename "$script_file")
+            run_test "$script_name exists" "test_script_exists 'scripts/$script_name'"
+            run_test "$script_name is executable" "test_script_executable 'scripts/$script_name'"
+            run_test "$script_name has valid syntax" "test_script_syntax 'scripts/$script_name'"
+        fi
     done
     
 # Test Makefile
@@ -105,6 +107,13 @@ fi
     # Test configuration files
     run_test "config.yaml exists" "test_script_exists 'config.yaml'"
     run_test "opencode.json exists" "test_script_exists 'opencode.json'"
+    
+    # Test merge functionality (comprehensive test)
+    if [[ "$1" != "--no-merge" ]]; then
+        run_test "Merge functionality tests" "cd '$TESTS_DIR' && ./test_merge_functionality.sh"
+    else
+        run_test "Merge functionality tests" "echo '✓ Merge functionality tests skipped'"
+    fi
     
     # Print results
     echo ""

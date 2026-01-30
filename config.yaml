@@ -11,4 +11,10 @@ managed_repo_path: '~/git/managed'
 # Separate repository path for task descriptions 
 # Used by planner.sh script for storing and processing task files
 managed_repo_task_path: '~/git/repo_task_path'
-log_directory: '~/git/auto-logs'
+
+# Logging configuration
+log_directory: '~/git/Auto-logs'
+log_max_size_mb: 10        # Maximum log file size before rotation (MB)
+log_max_files: 5           # Maximum number of rotated log files to keep
+log_retention_days: 30     # Maximum age of log files before cleanup (days)
+log_level: INFO           # Default log level (DEBUG, INFO, WARNING, ERROR, SUCCESS)

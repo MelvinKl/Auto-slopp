@@ -6,11 +6,16 @@ echo "Starting Repository Automation System"
 # Load configuration from YAML
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/config.sh"
+source "$SCRIPT_DIR/scripts/utils.sh"
 
 echo "Configuration loaded:"
 echo "  Sleep duration: $SLEEP_DURATION seconds"
 echo "  Managed repo path: $MANAGED_REPO_PATH"
 echo "  Task path: $MANAGED_REPO_TASK_PATH"
+echo "  Log directory: ${LOG_DIRECTORY:-'Not configured'}"
+
+# Initialize log directory
+setup_log_directory
 
 while true; do
     echo "=== Running automation cycle at $(date) ==="
@@ -26,18 +31,17 @@ while true; do
     else
         echo "Found ${#scripts_found[@]} scripts to execute"
         
-        # Execute each script
+        # Execute each script with stdout capture
         for script in "${scripts_found[@]}"; do
             script_name=$(basename "$script")
-            echo "Executing: $script_name"
             
-            # Execute script and capture exit status
-            if "$script"; then
-                echo "✓ $script_name completed successfully"
+            # Execute script with capture mechanism
+            if execute_with_capture "$script"; then
+                echo "--- $script_name execution completed ---"
             else
-                echo "✗ $script_name failed with exit code $?"
+                echo "--- $script_name execution failed ---"
             fi
-            echo "---"
+            echo ""
         done
     fi
     
