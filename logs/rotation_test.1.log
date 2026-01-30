@@ -1,0 +1,5 @@
+[INFO] 2026-01-30 08:22:49 rotation_test: Test rotation entry 1 - This is a test message to fill up the log file and trigger rotation
+[INFO] 2026-01-30 08:22:49 rotation_test: Test rotation entry 2 - This is a test message to fill up the log file and trigger rotation
+[INFO] 2026-01-30 08:22:49 rotation_test: Test rotation entry 3 - This is a test message to fill up the log file and trigger rotation
+[INFO] 2026-01-30 08:22:49 rotation_test: Test rotation entry 4 - This is a test message to fill up the log file and trigger rotation
+[INFO] 2026-01-30 08:22:49 rotation_test: Test rotation entry 5 - This is a test message to fill up the log file and trigger rotation
