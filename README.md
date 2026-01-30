@@ -37,9 +37,10 @@ The system has been recently enhanced with:
 - Git operation safety wrappers
 
 ### 📁 File Numbering System
-- Automatic numbering of task files (01-, 02-, 03-, etc.)
+- Automatic numbering of task files (0001-, 0002-, 0003-, etc.)
 - Sequential processing order guaranteed
 - Automatic assignment of numbers to unnumbered files
+- Support for up to 10,000 tasks (0000-9999)
 
 ### 📁 Dynamic Script Discovery
 - main.sh automatically discovers all `.sh` files in `scripts/` directory
@@ -181,9 +182,9 @@ Auto-slopp/
 ├── managed_repo_task_path/    # Directory for task files
 │   ├── repo1/               # Task files for repo1
 │   │   ├── .gitkeep
-│   │   ├── 01-task-name.txt
-│   │   ├── 02-another-task.txt
-│   │   └── 01-task-name.txt.used
+│   │   ├── 0001-task-name.txt
+│   │   ├── 0002-another-task.txt
+│   │   └── 0001-task-name.txt.used
 │   ├── repo2/               # Task files for repo2
 │   └── repo3/               # Task files for repo3
 └── README.md                # This documentation
@@ -232,7 +233,7 @@ For each repository in managed_repo_path:
 #### planner.sh
 ```bash
 For each repository with directory:
-    ├── Auto-number unnumbered task files (01-, 02-, etc.)
+    ├── Auto-number unnumbered task files (0001-, 0002-, etc.)
     ├── Process files in numerical order
     ├── Switch to ai branch (safe git operations)
     ├── OpenCode CLI with OpenAgent to generate bead tasks
@@ -268,12 +269,12 @@ Create task files in `managed_repo_task_path/<repo-name>/` with automatic number
 
 ```bash
 # Example task files (automatically numbered by planner.sh)
-managed_repo_task_path/repo1/01-add-user-authentication.txt
-managed_repo_task_path/repo1/02-improve-error-handling.txt
-managed_repo_task_path/repo1/03-optimize-database-queries.txt
+managed_repo_task_path/repo1/0001-add-user-authentication.txt
+managed_repo_task_path/repo1/0002-improve-error-handling.txt
+managed_repo_task_path/repo1/0003-optimize-database-queries.txt
 
 # Unnumbered files are automatically numbered:
-managed_repo_task_path/repo1/add-feature.txt  →  04-add-feature.txt
+managed_repo_task_path/repo1/add-feature.txt  →  0004-add-feature.txt
 ```
 
 Task file content:
@@ -283,10 +284,11 @@ Include proper error handling and security measures.
 ```
 
 **File Numbering System:**
-- Files are automatically numbered with two-digit prefixes (01-, 02-, 03-, etc.)
+- Files are automatically numbered with four-digit prefixes (0001-, 0002-, 0003-, etc.)
 - Unnumbered files are automatically assigned the next available number
 - Files are processed in numerical order
 - Processed files are renamed with `.used` suffix
+- Supports up to 10,000 tasks (0000-9999)
 - Ensures predictable and sequential task processing
 
 ## ⚙️ Configuration
