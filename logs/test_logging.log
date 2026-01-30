@@ -1,0 +1,5 @@
+[INFO] 2026-01-29 13:47:16 test_logging: This is an info message
+[SUCCESS] 2026-01-29 13:47:16 test_logging: This is a success message
+[WARNING] 2026-01-29 13:47:16 test_logging: This is a warning message
+[ERROR] 2026-01-29 13:47:16 test_logging: This is an error message
+[DEBUG] 2026-01-29 13:47:16 test_logging: This is a debug message

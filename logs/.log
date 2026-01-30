@@ -1,0 +1,13 @@
+[INFO] 2026-01-29 13:47:40 : Testing logging from bash
+[INFO] 2026-01-29 22:02:21 : Starting creator.sh
+[INFO] 2026-01-29 22:02:21 : Using managed_repo_path: /root/git/managed
+[INFO] 2026-01-29 22:02:21 : Using managed_repo_task_path: /root/git/repo_task_path
+[INFO] 2026-01-29 22:02:21 : Updating repository with git pull...
+[SUCCESS] 2026-01-29 22:02:22 : Repository updated successfully
+[INFO] 2026-01-29 22:02:22 : Processing repository: Auto-slopp
+[INFO] 2026-01-29 22:02:22 : Task directory already exists: /root/git/repo_task_path/Auto-slopp
+[INFO] 2026-01-29 22:02:22 : Processing repository: BrueterApp
+[INFO] 2026-01-29 22:02:22 : Task directory already exists: /root/git/repo_task_path/BrueterApp
+[INFO] 2026-01-29 22:02:22 : Processing repository: job_scraper
+[INFO] 2026-01-29 22:02:22 : Task directory already exists: /root/git/repo_task_path/job_scraper
+[INFO] 2026-01-29 22:02:22 : Committing new task directories...

@@ -169,5 +169,51 @@ setup_log_directory() {
     fi
 }
 
-export -f log handle_error setup_error_handling script_success command_exists validate_env_vars check_directory safe_execute safe_git setup_log_directory
+# Function to execute script with stdout/stderr capture
+execute_with_capture() {
+    local script_path="$1"
+    local script_name=$(basename "$script_path")
+    local timestamp=$(date '+%Y%m%d_%H%M%S')
+    local exit_code=0
+    
+    # Setup log directory if not already done
+    setup_log_directory >/dev/null 2>&1
+    
+    if [[ -n "${LOG_DIRECTORY}" && -d "${LOG_DIRECTORY}" && -w "${LOG_DIRECTORY}" ]]; then
+        # Create log file with timestamp
+        local log_file="${LOG_DIRECTORY}/${script_name}_${timestamp}.log"
+        
+        # Execute script, capturing stdout and stderr to log file
+        # Use tee to also show output on console
+        echo "Executing: $script_name (capturing output to: $log_file)" >&2
+        
+        # Capture both stdout and stderr, while still showing on console
+        if "$script_path" 2>&1 | tee "$log_file"; then
+            exit_code=0
+            echo "✓ $script_name completed successfully (captured to: $log_file)" >&2
+        else
+            exit_code=$?
+            echo "✗ $script_name failed with exit code $exit_code (captured to: $log_file)" >&2
+        fi
+        
+        # Create a symlink to the latest log for easy access
+        local latest_log="${LOG_DIRECTORY}/${script_name}_latest.log"
+        ln -sf "$(basename "$log_file")" "$latest_log" 2>/dev/null || true
+        
+    else
+        # Fallback to normal execution if log directory not available
+        echo "Log directory not available, executing without capture: $script_name" >&2
+        if "$script_path"; then
+            exit_code=0
+            echo "✓ $script_name completed successfully" >&2
+        else
+            exit_code=$?
+            echo "✗ $script_name failed with exit code $exit_code" >&2
+        fi
+    fi
+    
+    return $exit_code
+}
+
+export -f log handle_error setup_error_handling script_success command_exists validate_env_vars check_directory safe_execute safe_git setup_log_directory execute_with_capture
 export RED GREEN YELLOW BLUE NC DEBUG_MODE
