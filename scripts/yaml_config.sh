@@ -64,7 +64,7 @@ load_config() {
     LOG_DIRECTORY="${LOG_DIRECTORY/#\~/$HOME}"
     
     # CLI commands
-    OPencode_CMD="timeout -k 2h -v opencode"
+    OPencode_CMD="timeout -v -k 1m 2h opencode"
     BEADS_CMD="bd"
     
     # Export variables
