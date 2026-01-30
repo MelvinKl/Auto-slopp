@@ -13,7 +13,7 @@ managed_repo_path: '~/git/managed'
 managed_repo_task_path: '~/git/repo_task_path'
 
 # Logging configuration
-log_directory: '~/git/managed/Auto-slopp/logs'
+log_directory: '~/git/Auto-logs'
 log_max_size_mb: 10        # Maximum log file size before rotation (MB)
 log_max_files: 5           # Maximum number of rotated log files to keep
 log_retention_days: 30     # Maximum age of log files before cleanup (days)
