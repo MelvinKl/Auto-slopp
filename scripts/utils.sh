@@ -1,7 +1,17 @@
 #!/bin/bash
 
-# Error handling and logging utilities for Repository Automation System
-# Provides consistent error handling and logging across all scripts
+# Enhanced Error handling and logging utilities for Repository Automation System
+# Provides consistent error handling and configurable timestamped logging across all scripts
+# 
+# Configuration Variables (can be set in config.sh or environment):
+# - TIMESTAMP_FORMAT: "default", "iso8601", "compact", "readable", "debug", "microseconds"
+# - TIMESTAMP_TIMEZONE: "local" or "utc"
+# - LOG_LEVEL: "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR"
+# - LOG_DIRECTORY: Directory for log files (optional)
+# - LOG_MAX_SIZE_MB: Maximum log file size before rotation (default: 10)
+# - LOG_MAX_FILES: Number of rotated log files to keep (default: 5)
+# - LOG_RETENTION_DAYS: Days to keep old log files (default: 30)
+# - DEBUG_MODE: Enable debug logging (default: false)
 
 # Color codes for output
 RED='\033[0;31m'
@@ -9,6 +19,31 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Function to configure logging settings
+configure_logging() {
+    local timestamp_format="${1:-default}"
+    local timezone="${2:-local}"
+    
+    # Validate and set timestamp format
+    if validate_timestamp_format "$timestamp_format"; then
+        export TIMESTAMP_FORMAT="$timestamp_format"
+    else
+        export TIMESTAMP_FORMAT="default"
+    fi
+    
+    # Validate and set timezone
+    if [[ "$timezone" == "utc" || "$timezone" == "local" ]]; then
+        export TIMESTAMP_TIMEZONE="$timezone"
+    else
+        export TIMESTAMP_TIMEZONE="local"
+    fi
+    
+    # Log the configuration change if log function is available
+    if declare -f log >/dev/null 2>&1; then
+        log "DEBUG" "Logging configured: format=$TIMESTAMP_FORMAT, timezone=$TIMESTAMP_TIMEZONE"
+    fi
+}
 
 # Function to remove ANSI color codes from text
 strip_colors() {
@@ -38,20 +73,92 @@ should_log() {
     [[ $level_priority -ge $current_priority ]]
 }
 
-# Logging function
+# Pure function to generate timestamp in specified format
+generate_timestamp() {
+    local format="${1:-${TIMESTAMP_FORMAT:-default}}"
+    local timezone="${2:-${TIMESTAMP_TIMEZONE:-local}}"
+    
+    case "$format" in
+        "iso8601")
+            if command -v date >/dev/null 2>&1; then
+                if [[ "$timezone" == "utc" ]]; then
+                    date -u '+%Y-%m-%dT%H:%M:%SZ'
+                else
+                    date -Iseconds 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S%z'
+                fi
+            fi
+            ;;
+        "compact")
+            date '+%Y%m%d_%H%M%S'
+            ;;
+        "readable")
+            date '+%Y-%m-%d %H:%M:%S'
+            ;;
+        "debug"| "microseconds")
+            if command -v date >/dev/null 2>&1; then
+                # Try to get microseconds, fallback to seconds
+                date '+%Y-%m-%d %H:%M:%S.%6N' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S'
+            fi
+            ;;
+        "default"|*)
+            date '+%Y-%m-%d %H:%M:%S'
+            ;;
+    esac
+}
+
+# Pure function to validate timestamp format
+validate_timestamp_format() {
+    local format="$1"
+    local valid_formats=("default" "iso8601" "compact" "readable" "debug" "microseconds")
+    
+    for valid_format in "${valid_formats[@]}"; do
+        if [[ "$format" == "$valid_format" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Pure function to get script name with fallback
+get_script_name() {
+    local script_name="${SCRIPT_NAME:-$(basename "${BASH_SOURCE[2]:-${BASH_SOURCE[1]:-$0}}")}"
+    echo "$script_name"
+}
+
+# Pure function to format log entry
+format_log_entry() {
+    local level="$1"
+    local timestamp="$2"
+    local script_name="$3"
+    local message="$4"
+    
+    echo "[${level}] ${timestamp} ${script_name}: $message"
+}
+
+# Enhanced logging function with configurable timestamps
 log() {
     local level="$1"
     shift
     local message="$*"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    local script_name=${SCRIPT_NAME:-$(basename "${BASH_SOURCE[2]}")}
+    local timestamp_format="${TIMESTAMP_FORMAT:-default}"
+    local timezone="${TIMESTAMP_TIMEZONE:-local}"
+    
+    # Validate timestamp format
+    if ! validate_timestamp_format "$timestamp_format"; then
+        timestamp_format="default"
+    fi
+    
+    # Generate timestamp using pure function
+    local timestamp=$(generate_timestamp "$timestamp_format" "$timezone")
+    local script_name=$(get_script_name)
     
     # Check if we should log this level
     if ! should_log "$level"; then
         return 0
     fi
     
-    local log_entry="[${level}] ${timestamp} ${script_name}: $message"
+    # Format log entry using pure function
+    local log_entry=$(format_log_entry "$level" "$timestamp" "$script_name" "$message")
     local clean_log_entry=$(strip_colors "$log_entry")
     
     # Output to console with colors
@@ -638,4 +745,5 @@ merge_origin_main_to_ai_with_escalation() {
 
 export -f log strip_colors should_log rotate_log_if_needed cleanup_old_logs handle_error setup_error_handling script_success command_exists validate_env_vars check_directory safe_execute safe_git setup_log_directory execute_with_capture merge_origin_main_to_ai detect_merge_conflicts merge_origin_main_to_ai_with_escalation
 export -f log_change_detection log_system_health log_reboot_event log_system_state_snapshot
+export -f generate_timestamp validate_timestamp_format get_script_name format_log_entry configure_logging
 export RED GREEN YELLOW BLUE NC DEBUG_MODE

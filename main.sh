@@ -17,6 +17,9 @@ echo "  Log directory: ${LOG_DIRECTORY:-'Not configured'}"
 # Initialize log directory
 setup_log_directory
 
+# Configure enhanced logging with settings from config.yaml
+configure_logging "$TIMESTAMP_FORMAT" "$TIMESTAMP_TIMEZONE"
+
 while true; do
     echo "=== Running automation cycle at $(date) ==="
     

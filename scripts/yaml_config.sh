@@ -40,6 +40,14 @@ load_config() {
     MANAGED_REPO_PATH=$(read_yaml_config "$config_file" "managed_repo_path" "~/git/managed")
     MANAGED_REPO_TASK_PATH=$(read_yaml_config "$config_file" "managed_repo_task_path" "~/git/repo_task_path")
     LOG_DIRECTORY=$(read_yaml_config "$config_file" "log_directory" "")
+    LOG_MAX_SIZE_MB=$(read_yaml_config "$config_file" "log_max_size_mb" "10")
+    LOG_MAX_FILES=$(read_yaml_config "$config_file" "log_max_files" "5")
+    LOG_RETENTION_DAYS=$(read_yaml_config "$config_file" "log_retention_days" "30")
+    LOG_LEVEL=$(read_yaml_config "$config_file" "log_level" "INFO")
+    
+    # Enhanced timestamp configuration
+    TIMESTAMP_FORMAT=$(read_yaml_config "$config_file" "timestamp_format" "default")
+    TIMESTAMP_TIMEZONE=$(read_yaml_config "$config_file" "timestamp_timezone" "local")
     
     # Auto-update-reboot configuration
     AUTO_UPDATE_REBOOT_ENABLED=$(read_yaml_config "$config_file" "auto_update_reboot_enabled" "false")
@@ -63,4 +71,6 @@ load_config() {
     export SLEEP_DURATION MANAGED_REPO_PATH MANAGED_REPO_TASK_PATH LOG_DIRECTORY OPencode_CMD BEADS_CMD
     export AUTO_UPDATE_REBOOT_ENABLED REBOOT_COOLDOWN_MINUTES CHANGE_DETECTION_INTERVAL_MINUTES REBOOT_DELAY_SECONDS
     export MAX_REBOOT_ATTEMPTS_PER_DAY MAINTENANCE_MODE EMERGENCY_OVERRIDE
+    export LOG_MAX_SIZE_MB LOG_MAX_FILES LOG_RETENTION_DAYS LOG_LEVEL
+    export TIMESTAMP_FORMAT TIMESTAMP_TIMEZONE
 }
