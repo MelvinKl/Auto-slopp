@@ -122,6 +122,13 @@ fi
         run_test "Merge functionality tests" "echo '✓ Merge functionality tests skipped'"
     fi
     
+    # Test number tracking system (comprehensive test)
+    if [[ "$1" != "--no-number-tracking" ]]; then
+        run_test "Number tracking system tests" "cd '$TESTS_DIR/number_tracking' && ./test_suite_runner.sh --quick"
+    else
+        run_test "Number tracking system tests" "echo '✓ Number tracking system tests skipped'"
+    fi
+    
     # Print results
     echo ""
     echo "=== Test Results ==="
