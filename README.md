@@ -527,7 +527,7 @@ Customize OpenCode CLI prompts by modifying scripts:
 $OPencode_CMD run "Implement with specific coding standards and testing requirements" --agent OpenAgent
 
 # Custom error handling
-if command_exists "$OPencode_CMD"; then
+if command_exists "${OPencode_CMD##* }"; then
     safe_execute "$OPencode_CMD run \"Custom prompt\" --agent OpenAgent"
 else
     log "ERROR" "OpenCode CLI not available"
