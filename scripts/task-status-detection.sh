@@ -4,14 +4,16 @@
 # Monitors repository cleanup operations and provides comprehensive status reporting
 # Follows Auto-slopp patterns and integrates with existing infrastructure
 
+# Set script name for logging identification
+SCRIPT_NAME="task-status-detection"
+
 # Load utilities and configuration first
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/../config.sh"
 
-# Set up error handling and script identification
+# Set up error handling
 setup_error_handling
-export SCRIPT_NAME="task-status-detection.sh"
 
 log "INFO" "Starting task status detection script"
 

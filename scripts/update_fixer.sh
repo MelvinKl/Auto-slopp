@@ -1,6 +1,9 @@
 #!/bin/bash
 
 # Fix failed dependency updates in renovate branches using YAML configuration
+# Set script name for logging identification
+SCRIPT_NAME="update_fixer"
+
 # Load utilities and configuration first
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils.sh"

@@ -3,6 +3,8 @@
 # Beads Updater Script - Automated Repository Synchronization
 # CRITICAL P0: Provides automated sync engine for beads state across repositories
 # Integrates with existing logging, config, and error handling systems
+# Set script name for logging identification
+SCRIPT_NAME="beads_updater"
 
 # Load utilities and configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

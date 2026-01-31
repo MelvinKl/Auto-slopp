@@ -1,6 +1,9 @@
 #!/bin/bash
 
 # Implement ready bead tasks using YAML configuration
+# Set script name for logging identification
+SCRIPT_NAME="implementer"
+
 # Load utilities and configuration first
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils.sh"

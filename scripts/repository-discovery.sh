@@ -5,14 +5,16 @@
 # Provides repository filtering, validation, and metadata collection
 # Follows Auto-slopp patterns and integrates with existing infrastructure
 
+# Set script name for logging identification
+SCRIPT_NAME="repository-discovery"
+
 # Load utilities and configuration first
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/../config.sh"
 
-# Set up error handling and script identification
+# Set up error handling
 setup_error_handling
-export SCRIPT_NAME="repository-discovery.sh"
 
 log "INFO" "Starting repository discovery script"
 log "INFO" "Using managed_repo_path: $MANAGED_REPO_PATH"

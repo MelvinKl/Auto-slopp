@@ -1,6 +1,9 @@
 #!/bin/bash
 
 # Process task files and generate bead tasks using YAML configuration
+# Set script name for logging identification
+SCRIPT_NAME="planner"
+
 # Load utilities and configuration first
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils.sh"
@@ -15,12 +18,12 @@ log "INFO" "Using managed_repo_task_path: $MANAGED_REPO_TASK_PATH"
 
 # Check if managed directories exist
 if [ ! -d "$MANAGED_REPO_PATH" ]; then
-    echo "Error: managed_repo_path not found: $MANAGED_REPO_PATH"
+    log "ERROR" "managed_repo_path not found: $MANAGED_REPO_PATH"
     exit 1
 fi
 
 if [ ! -d "$MANAGED_REPO_TASK_PATH" ]; then
-    echo "Error: managed_repo_task_path not found: $MANAGED_REPO_TASK_PATH"
+    log "ERROR" "managed_repo_task_path not found: $MANAGED_REPO_TASK_PATH"
     exit 1
 fi
 
@@ -35,16 +38,16 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
     
     # Get repository name
     repo_name=$(basename "$repo_dir")
-    echo "Processing repository: $repo_name"
+    log "INFO" "Processing repository: $repo_name"
     
     # Check for matching task directory
     task_dir="$MANAGED_REPO_TASK_PATH/$repo_name"
     if [ ! -d "$task_dir" ]; then
-        echo "  No task directory found: $task_dir"
+        log "WARNING" "No task directory found: $task_dir"
         continue
     fi
     
-    echo "  Found task directory: $task_dir"
+    log "DEBUG" "Found task directory: $task_dir"
     
     # Ensure files are numbered, then process in numerical order
     # First, assign numbers to any unnumbered task files
@@ -68,7 +71,7 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
         for unnumbered_file in "${unnumbered_files[@]}"; do
             filename=$(basename "$unnumbered_file" .txt)
             new_filename=$(printf "%04d-%s.txt" "$next_num" "$filename")
-            echo "    Renaming $(basename "$unnumbered_file") to $new_filename"
+            log "INFO" "Renaming $(basename "$unnumbered_file") to $new_filename"
             mv "$unnumbered_file" "$task_dir/$new_filename"
             next_num=$((next_num + 1))
         done
@@ -82,41 +85,45 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
         
         # Skip files that already end with '.used'
         if [[ "$task_file" == *.used ]]; then
-            echo "    Skipping already used file: $(basename "$task_file")"
+            log "DEBUG" "Skipping already used file: $(basename "$task_file")"
             continue
         fi
         
         filename=$(basename "$task_file")
-        echo "    Processing: $filename"
+        log "INFO" "Processing task file: $filename"
         
         # Get file content
         content=$(cat "$task_file")
         
         # Switch to ai branch in the repository
         cd "$repo_dir"
-        git fetch origin
+        log "DEBUG" "Fetching latest changes from origin"
+        safe_git "fetch origin"
         
         # Create ai branch if it doesn't exist
         if ! git rev-parse --verify origin/ai >/dev/null 2>&1; then
-            git checkout -b ai origin/main
-            git push -u origin ai
+            log "INFO" "Creating ai branch from origin/main"
+            safe_git "checkout -b ai origin/main"
+            safe_git "push -u origin ai"
         else
-            git checkout ai
-            git reset --hard origin/ai
+            log "DEBUG" "Switching to existing ai branch"
+            safe_git "checkout ai"
+            safe_git "reset --hard origin/ai"
         fi
         
         # Generate bead tasks using opencode CLI
-        echo "    Generating bead tasks for: $content"
+        log "INFO" "Generating bead tasks for: $content"
         $OPencode_CMD run "Generate bead tasks for: $content" --agent OpenAgent
         
         # Commit and push changes in repository
-        git add .
-        git commit -m "Add bead tasks from $filename" || true
-        git push
+        log "DEBUG" "Committing and pushing generated bead tasks"
+        safe_git "add ."
+        safe_git "commit -m \"Add bead tasks from $filename\"" || true
+        safe_git "push"
         
         # Rename processed file to add '.used' suffix
         mv "$task_file" "$task_file.used"
-        echo "    Renamed $filename to $filename.used"
+        log "INFO" "Marked task file as used: $filename.used"
         
         # Mark that changes were made in task path
         TASK_PATH_CHANGES=true
@@ -125,14 +132,14 @@ done
 
 # Commit and push changes in managed_repo_task_path if any files were processed
 if [ "$TASK_PATH_CHANGES" = true ]; then
-    echo "Committing changes in task path..."
+    log "INFO" "Committing changes in task path..."
     cd "$MANAGED_REPO_TASK_PATH"
-    git add .
-    git commit -m "Mark task files as used by planner.sh" || true
-    git push
-    echo "Task path changes committed and pushed."
+    safe_git "add ."
+    safe_git "commit -m \"Mark task files as used by planner.sh\"" || true
+    safe_git "push"
+    log "SUCCESS" "Task path changes committed and pushed."
 else
-    echo "No task files were processed."
+    log "INFO" "No task files were processed in this cycle."
 fi
 
 script_success
