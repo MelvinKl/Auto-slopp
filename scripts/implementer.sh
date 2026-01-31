@@ -51,7 +51,7 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
             log "ERROR" "Opencode escalation required before continuing"
             
             # Update opencode prompt to include conflict resolution requirement
-            opencode_prompt="Find the next ready bead task and implement it. Use the beads CLI to discover ready tasks, then implement the task and manage the beads workflow (mark in progress, close when complete). FIRST: resolve merge conflicts from previous attempt using conflict report at $(echo $merge_result). Then commit all changes and push to the current branch. Ensure that the current branch has all changes from origin/main"
+            opencode_prompt="Find the next ready bead task and implement it. Do only one task, not multiple. Use the beads CLI to discover ready tasks, then implement the task and manage the beads workflow (mark in progress, close when complete). FIRST: resolve merge conflicts from previous attempt using conflict report at $(echo $merge_result). Then commit all changes and push to the current branch. Ensure that the current branch has all changes from origin/main"
             
             # Execute opencode with conflict resolution requirement
             safe_execute "$OPencode_CMD run \"$opencode_prompt\" --agent OpenAgent"
