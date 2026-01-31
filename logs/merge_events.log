@@ -1,0 +1,45 @@
+{
+    "event_type": "merge_attempt",
+    "operation": "test_merge",
+    "timestamp": "2026-01-31 12:24:11",
+    "repository": "Auto-slopp",
+    "source_branch": "test_branch",
+    "target_branch": "ai",
+    "source_commit": "abc123",
+    "target_commit": "def456",
+    "working_directory": "/root/git/managed/Auto-slopp"
+    }
+{
+    "event_type": "merge_conflict_detected",
+    "timestamp": "2026-01-31 12:24:11",
+    "repository": "Auto-slopp",
+    "conflict_count": 3,
+    "conflicted_files": [
+        "file1.txt","file2.txt","file3.txt"
+    ],
+    "ai_branch_head": "032d0801ce593b00e51422f98df24f5587aee86a",
+    "main_branch_head": "2c886f43cdb2d17e6112bd95efb3e475377ae7ae",
+    "merge_base": "2c886f43cdb2d17e6112bd95efb3e475377ae7ae"
+    }
+{
+    "event_type": "opencode_escalation",
+    "timestamp": "2026-01-31 12:24:11",
+    "repository": "Auto-slopp",
+    "escalation_reason": "test_escalation",
+    "operation_context": "test_context",
+    "conflict_report": "/tmp/test_conflict.json",
+    "current_branch": "ai",
+    "working_tree_clean": "6",
+    "git_status": " M .beads/issues.jsonl; M scripts/implementer.sh; M scripts/utils.sh;?? logs/merge_error_handling_test.log;?? logs/merge_events.log;"
+    }
+{
+    "event_type": "merge_resolution",
+    "timestamp": "2026-01-31 12:24:11",
+    "repository": "Auto-slopp",
+    "resolution_type": "test_resolution",
+    "resolved_files_count": 3,
+    "resolution_time_seconds": 45,
+    "operation_context": "test_operation",
+    "final_branch_head": "032d0801ce593b00e51422f98df24f5587aee86a",
+    "merge_successful": "true"
+    }
