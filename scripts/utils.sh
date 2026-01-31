@@ -4,8 +4,8 @@
 # Provides consistent error handling and configurable timestamped logging across all scripts
 # 
 # Configuration Variables (can be set in config.sh or environment):
-# - TIMESTAMP_FORMAT: "default", "iso8601", "compact", "readable", "debug", "microseconds"
-# - TIMESTAMP_TIMEZONE: "local" or "utc"
+# - TIMESTAMP_FORMAT: "default", "iso8601", "compact", "readable", "debug", "microseconds", "rfc3339", "syslog"
+# - TIMESTAMP_TIMEZONE: "local", "utc", or specific timezone (e.g., "America/New_York")
 # - LOG_LEVEL: "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR"
 # - LOG_DIRECTORY: Directory for log files (optional)
 # - LOG_MAX_SIZE_MB: Maximum log file size before rotation (default: 10)
@@ -30,19 +30,78 @@ configure_logging() {
         export TIMESTAMP_FORMAT="$timestamp_format"
     else
         export TIMESTAMP_FORMAT="default"
+        echo "WARNING: Invalid timestamp format '$timestamp_format', using 'default'" >&2
     fi
     
-    # Validate and set timezone
-    if [[ "$timezone" == "utc" || "$timezone" == "local" ]]; then
+    # Validate and set timezone with enhanced support
+    if validate_timezone "$timezone"; then
         export TIMESTAMP_TIMEZONE="$timezone"
     else
         export TIMESTAMP_TIMEZONE="local"
+        echo "WARNING: Invalid timezone '$timezone', using 'local'" >&2
+    fi
+    
+    # Test timestamp generation to catch issues early
+    local test_timestamp
+    if ! test_timestamp=$(generate_timestamp "$TIMESTAMP_FORMAT" "$TIMESTAMP_TIMEZONE" 2>/dev/null); then
+        export TIMESTAMP_FORMAT="default"
+        export TIMESTAMP_TIMEZONE="local"
+        echo "WARNING: Timestamp generation failed, falling back to default format and local timezone" >&2
     fi
     
     # Log the configuration change if log function is available
     if declare -f log >/dev/null 2>&1; then
         log "DEBUG" "Logging configured: format=$TIMESTAMP_FORMAT, timezone=$TIMESTAMP_TIMEZONE"
+        
+        # Show example timestamp in debug mode
+        if [[ "${DEBUG_MODE:-false}" == "true" ]]; then
+            local example_timestamp=$(generate_timestamp "$TIMESTAMP_FORMAT" "$TIMESTAMP_TIMEZONE")
+            log "DEBUG" "Example timestamp format: $example_timestamp"
+        fi
     fi
+}
+
+# Function to recommend timestamp format based on use case
+recommend_timestamp_format() {
+    local use_case="${1:-general}"
+    
+    case "$use_case" in
+        "production"|"prod")
+            echo "Recommended format: iso8601"
+            echo "Reason: Standardized, timezone-aware, machine-readable"
+            echo "Usage: configure_logging 'iso8601' 'utc'"
+            ;;
+        "development"|"dev")
+            echo "Recommended format: readable-precise"
+            echo "Reason: Human-readable with millisecond precision for debugging"
+            echo "Usage: configure_logging 'readable-precise' 'local'"
+            ;;
+        "debugging"|"debug")
+            echo "Recommended format: debug"
+            echo "Reason: Microsecond precision for detailed analysis"
+            echo "Usage: configure_logging 'debug' 'local'"
+            ;;
+        "system"|"syslog")
+            echo "Recommended format: syslog"
+            echo "Reason: Compatible with system log management tools"
+            echo "Usage: configure_logging 'syslog' 'local'"
+            ;;
+        "api"|"web")
+            echo "Recommended format: rfc3339"
+            echo "Reason: Web standard, JSON-friendly, precise"
+            echo "Usage: configure_logging 'rfc3339' 'utc'"
+            ;;
+        "compact"|"space")
+            echo "Recommended format: compact-precise"
+            echo "Reason: Minimal space usage with precision"
+            echo "Usage: configure_logging 'compact-precise' 'utc'"
+            ;;
+        "general"|*)
+            echo "Recommended format: readable"
+            echo "Reason: Good balance of readability and functionality"
+            echo "Usage: configure_logging 'readable' 'local'"
+            ;;
+    esac
 }
 
 # Function to remove ANSI color codes from text
@@ -78,38 +137,89 @@ generate_timestamp() {
     local format="${1:-${TIMESTAMP_FORMAT:-default}}"
     local timezone="${2:-${TIMESTAMP_TIMEZONE:-local}}"
     
+    # Handle timezone setting
+    local tz_flag=""
+    if [[ "$timezone" == "utc" ]]; then
+        tz_flag="-u"
+    elif [[ "$timezone" != "local" && -n "$timezone" ]]; then
+        # Try to set specific timezone (requires TZ environment variable)
+        export TZ="$timezone"
+    fi
+    
     case "$format" in
         "iso8601")
             if command -v date >/dev/null 2>&1; then
                 if [[ "$timezone" == "utc" ]]; then
-                    date -u '+%Y-%m-%dT%H:%M:%SZ'
+                    date $tz_flag '+%Y-%m-%dT%H:%M:%SZ'
                 else
-                    date -Iseconds 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S%z'
+                    date $tz_flag '-Iseconds' 2>/dev/null || date $tz_flag '+%Y-%m-%dT%H:%M:%S%z'
                 fi
             fi
             ;;
+        "rfc3339")
+            # RFC 3339 format (more strict than ISO 8601)
+            if command -v date >/dev/null 2>&1; then
+                if [[ "$timezone" == "utc" ]]; then
+                    date $tz_flag '+%Y-%m-%dT%H:%M:%S.%3NZ'
+                else
+                    date $tz_flag '+%Y-%m-%dT%H:%M:%S.%3N%:z' 2>/dev/null || \
+                    date $tz_flag '+%Y-%m-%dT%H:%M:%S%z'
+                fi
+            fi
+            ;;
+        "syslog")
+            # Standard syslog format for system integration
+            if command -v date >/dev/null 2>&1; then
+                date $tz_flag '+%b %d %H:%M:%S'
+            fi
+            ;;
         "compact")
-            date '+%Y%m%d_%H%M%S'
+            date $tz_flag '+%Y%m%d_%H%M%S'
+            ;;
+        "compact-precise")
+            # Compact format with milliseconds for high-frequency logging
+            if command -v date >/dev/null 2>&1; then
+                date $tz_flag '+%Y%m%d_%H%M%S.%3N' 2>/dev/null || \
+                date $tz_flag '+%Y%m%d_%H%M%S'
+            fi
             ;;
         "readable")
-            date '+%Y-%m-%d %H:%M:%S'
+            date $tz_flag '+%Y-%m-%d %H:%M:%S'
             ;;
-        "debug"| "microseconds")
+        "readable-precise")
+            # Readable format with milliseconds
             if command -v date >/dev/null 2>&1; then
-                # Try to get microseconds, fallback to seconds
-                date '+%Y-%m-%d %H:%M:%S.%6N' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S'
+                date $tz_flag '+%Y-%m-%d %H:%M:%S.%3N' 2>/dev/null || \
+                date $tz_flag '+%Y-%m-%d %H:%M:%S'
+            fi
+            ;;
+        "debug"|"microseconds")
+            if command -v date >/dev/null 2>&1; then
+                # Try to get microseconds, fallback to milliseconds, then seconds
+                date $tz_flag '+%Y-%m-%d %H:%M:%S.%6N' 2>/dev/null || \
+                date $tz_flag '+%Y-%m-%d %H:%M:%S.%3N' 2>/dev/null || \
+                date $tz_flag '+%Y-%m-%d %H:%M:%S'
             fi
             ;;
         "default"|*)
-            date '+%Y-%m-%d %H:%M:%S'
+            date $tz_flag '+%Y-%m-%d %H:%M:%S'
             ;;
     esac
+    
+    # Reset TZ if we modified it
+    if [[ "$timezone" != "local" && "$timezone" != "utc" && -n "$timezone" ]]; then
+        unset TZ 2>/dev/null || true
+    fi
 }
 
 # Pure function to validate timestamp format
 validate_timestamp_format() {
     local format="$1"
-    local valid_formats=("default" "iso8601" "compact" "readable" "debug" "microseconds")
+    local valid_formats=(
+        "default" "iso8601" "rfc3339" "syslog" 
+        "compact" "compact-precise" "readable" "readable-precise"
+        "debug" "microseconds"
+    )
     
     for valid_format in "${valid_formats[@]}"; do
         if [[ "$format" == "$valid_format" ]]; then
@@ -117,6 +227,72 @@ validate_timestamp_format() {
         fi
     done
     return 1
+}
+
+# Pure function to validate timezone format
+validate_timezone() {
+    local timezone="$1"
+    
+    # Accept common timezone identifiers
+    case "$timezone" in
+        "local"|"utc"|"UTC"|"+0000"|"-0000"|"Z")
+            return 0
+            ;;
+        *)
+            # Check if it looks like a timezone identifier (e.g., America/New_York)
+            if [[ "$timezone" =~ ^[A-Za-z_]+/[A-Za-z_]+$ ]] || \
+               [[ "$timezone" =~ ^[+-][0-9]{2}:?[0-9]{2}$ ]]; then
+                return 0
+            fi
+            return 1
+            ;;
+    esac
+}
+
+# Pure function to get supported timestamp formats with descriptions
+get_supported_timestamp_formats() {
+    cat << 'EOF'
+default: Standard format (2026-01-31 08:58:01)
+iso8601: ISO 8601 with timezone (2026-01-31T08:58:01+00:00)
+rfc3339: RFC 3339 with milliseconds (2026-01-31T08:58:01.123Z)
+syslog: Syslog format (Jan 31 08:58:01)
+compact: Compact format (20260131_085801)
+compact-precise: Compact with milliseconds (20260131_085801.123)
+readable: Human-readable (2026-01-31 08:58:01)
+readable-precise: Readable with milliseconds (2026-01-31 08:58:01.123)
+debug: Debug with microseconds (2026-01-31 08:58:01.123456)
+microseconds: Alias for debug format
+EOF
+}
+
+# Pure function to test timestamp performance
+benchmark_timestamp_generation() {
+    local format="${1:-default}"
+    local iterations="${2:-100}"
+    local timezone="${3:-local}"
+    
+    if ! command -v time >/dev/null 2>&1; then
+        echo "time command not available, cannot benchmark"
+        return 1
+    fi
+    
+    # Warm up
+    generate_timestamp "$format" "$timezone" >/dev/null
+    
+    # Benchmark
+    local start_time=$(date +%s.%N 2>/dev/null || date +%s)
+    for ((i=1; i<=iterations; i++)); do
+        generate_timestamp "$format" "$timezone" >/dev/null
+    done
+    local end_time=$(date +%s.%N 2>/dev/null || date +%s)
+    
+    local duration=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0")
+    local avg_time=$(echo "scale=6; $duration / $iterations" | bc 2>/dev/null || echo "0")
+    
+    echo "Benchmark results for '$format' format ($iterations iterations):"
+    echo "  Total time: ${duration}s"
+    echo "  Average per call: ${avg_time}s"
+    echo "  Calls per second: $(echo "scale=0; $iterations / $duration" | bc 2>/dev/null || echo "0")"
 }
 
 # Pure function to get script name with fallback
@@ -745,5 +921,6 @@ merge_origin_main_to_ai_with_escalation() {
 
 export -f log strip_colors should_log rotate_log_if_needed cleanup_old_logs handle_error setup_error_handling script_success command_exists validate_env_vars check_directory safe_execute safe_git setup_log_directory execute_with_capture merge_origin_main_to_ai detect_merge_conflicts merge_origin_main_to_ai_with_escalation
 export -f log_change_detection log_system_health log_reboot_event log_system_state_snapshot
-export -f generate_timestamp validate_timestamp_format get_script_name format_log_entry configure_logging
+export -f generate_timestamp validate_timestamp_format validate_timezone get_script_name format_log_entry configure_logging
+export -f get_supported_timestamp_formats benchmark_timestamp_generation recommend_timestamp_format
 export RED GREEN YELLOW BLUE NC DEBUG_MODE
