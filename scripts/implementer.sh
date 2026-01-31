@@ -64,7 +64,7 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
     
     # Use opencode CLI to find and implement next ready task
     log "INFO" "Using opencode CLI to find and implement next ready task"
-    if command_exists "$OPencode_CMD"; then
+    if command_exists "${OPencode_CMD##* }"; then
         safe_execute "$OPencode_CMD run \"Find the next ready bead task and implement it. Use the beads CLI to discover ready tasks, then implement the task and manage the beads workflow (mark in progress, close when complete). Commit all changes and push to the current branch. Ensure that the current branch has all changes from origin/main\" --agent OpenAgent"
         
         # After opencode completes, validate and push changes with conflict detection
@@ -108,7 +108,7 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
             exit 1
         fi
     else
-        log "ERROR" "OpenCode CLI not found: $OPencode_CMD"
+        log "ERROR" "OpenCode CLI not found: ${OPencode_CMD##* }"
         exit 1
     fi
 done
