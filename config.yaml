@@ -18,3 +18,16 @@ log_max_size_mb: 10        # Maximum log file size before rotation (MB)
 log_max_files: 5           # Maximum number of rotated log files to keep
 log_retention_days: 30     # Maximum age of log files before cleanup (days)
 log_level: INFO           # Default log level (DEBUG, INFO, WARNING, ERROR, SUCCESS)
+
+# Enhanced timestamp configuration
+timestamp_format: default  # Timestamp format: "default", "iso8601", "compact", "readable", "debug", "microseconds"
+timestamp_timezone: local   # Timezone for timestamps: "local" or "utc"
+
+# Auto-update-reboot configuration
+auto_update_reboot_enabled: false        # Enable/disable the auto-update-reboot functionality
+reboot_cooldown_minutes: 60             # Minimum time between reboots
+change_detection_interval_minutes: 5   # How often to check for changes (currently runs with main.sh cycle)
+reboot_delay_seconds: 30                # Grace period before reboot
+max_reboot_attempts_per_day: 3          # Daily limit on reboot attempts
+maintenance_mode: false                  # Manual override to disable all reboots
+emergency_override: false               # Emergency override for forced reboots

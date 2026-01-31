@@ -14,7 +14,7 @@ log "INFO" "Using managed_repo_path: $MANAGED_REPO_PATH"
 
 # Check if managed_repo_path exists
 if [ ! -d "$MANAGED_REPO_PATH" ]; then
-    echo "Error: managed_repo_path not found: $MANAGED_REPO_PATH"
+    log "ERROR" "managed_repo_path not found: $MANAGED_REPO_PATH"
     exit 1
 fi
 
@@ -24,14 +24,14 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
         continue
     fi
     
-    echo "Processing: $repo_dir"
+    log "INFO" "Processing: $repo_dir"
     cd "$repo_dir"
     
     # Get renovate branches
     branches=$(git branch -r --list 'origin/renovate*' 2>/dev/null | sed 's/^[[:space:]]*origin\///')
     
     for branch in $branches; do
-        echo "  Branch: $branch"
+        log "DEBUG" "Branch: $branch"
         
         # Update branch
         git fetch origin
@@ -41,7 +41,7 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
         # Run tests
         if [ -f "Makefile" ]; then
             if ! make test; then
-                echo "  Tests failed, using opencode CLI to fix"
+                log "WARNING" "Tests failed, using opencode CLI to fix"
                 $OPencode_CMD run "Fix the branch '$branch' that contains updates to dependencies and push them to the branch. The tests are currently failing, so identify and fix any issues preventing the tests from passing, then push the fixes to the branch." --agent OpenAgent
             fi
         fi
