@@ -108,6 +108,13 @@ fi
     run_test "config.yaml exists" "test_script_exists 'config.yaml'"
     run_test "opencode.json exists" "test_script_exists 'opencode.json'"
     
+    # Test timestamp logging functionality (comprehensive test)
+    if [[ "$1" != "--no-logging" ]]; then
+        run_test "Timestamp logging functionality tests" "cd '$TESTS_DIR' && ./test_timestamp_logging.sh"
+    else
+        run_test "Timestamp logging functionality tests" "echo '✓ Timestamp logging tests skipped'"
+    fi
+    
     # Test merge functionality (comprehensive test)
     if [[ "$1" != "--no-merge" ]]; then
         run_test "Merge functionality tests" "cd '$TESTS_DIR' && ./test_merge_functionality.sh"
