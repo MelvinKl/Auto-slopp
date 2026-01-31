@@ -27,9 +27,11 @@ test_enhanced_numbering() {
     mkdir -p "$task_dir"
     
     # Create some test task files
+    log "DEBUG" "Creating test task files in $task_dir"
     echo "Test task 1" > "$task_dir/task1.txt"
     echo "Test task 2" > "$task_dir/task2.txt"
     echo "Test task 3" > "$task_dir/task3.txt"
+    log "DEBUG" "Created 3 test task files"
     
     # Initialize number state
     export MANAGED_REPO_PATH="$test_dir"

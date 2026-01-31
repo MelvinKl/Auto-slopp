@@ -3,6 +3,16 @@
 # YAML Configuration Parser for Repository Automation System
 # Provides functions to read config.yaml values
 
+# Set script name for logging identification
+SCRIPT_NAME="yaml_config"
+
+# Load utilities first
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
+
+# Set up error handling
+setup_error_handling
+
 # Function to get script directory
 get_script_dir() {
     cd "$(dirname "${BASH_SOURCE[1]}")" && pwd
@@ -15,7 +25,7 @@ read_yaml_config() {
     local default_value="$3"
     
     if [[ ! -f "$config_file" ]]; then
-        echo "Error: Configuration file $config_file not found" >&2
+        log "ERROR" "Configuration file $config_file not found"
         echo "$default_value"
         return 1
     fi
@@ -25,8 +35,10 @@ read_yaml_config() {
     local value=$(grep "^[[:space:]]*$key:" "$config_file" | grep -v "#" | sed "s/^[[:space:]]*$key:[[:space:]]*//" | sed 's/[[:space:]]*#.*//' | sed 's/^["'"'"']//' | sed 's/["'"'"']$//' | sed 's/[[:space:]]*$//')
     
     if [[ -z "$value" ]]; then
+        log "DEBUG" "Using default value for key: $key"
         echo "$default_value"
     else
+        log "DEBUG" "Found configuration value: $key = $value"
         echo "$value"
     fi
 }

@@ -40,7 +40,7 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
     safe_git "clean -fd"
     
     # Get branches to update
-    branches=$(git branch -r | grep -v 'HEAD' | sed 's/^[[:space:]]*origin\///')
+    branches=$(safe_git "branch -r" 2>/dev/null | grep -v 'HEAD' | sed 's/^[[:space:]]*origin\///')
     
     for branch in $branches; do
         # Only update renovate and ai branches

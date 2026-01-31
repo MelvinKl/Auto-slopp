@@ -4,7 +4,15 @@
 # Provides atomic, concurrent-safe number assignment operations
 # Part of the unique number tracking system design
 
+# Set script name for logging identification
 SCRIPT_NAME="number_manager"
+
+# Load utilities first
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
+
+# Set up error handling
+setup_error_handling
 
 # Configuration defaults
 NUMBER_STATE_DIR="${MANAGED_REPO_PATH:-.}/.number_state"
