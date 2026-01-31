@@ -31,3 +31,13 @@ reboot_delay_seconds: 30                # Grace period before reboot
 max_reboot_attempts_per_day: 3          # Daily limit on reboot attempts
 maintenance_mode: false                  # Manual override to disable all reboots
 emergency_override: false               # Emergency override for forced reboots
+
+# Beads updater configuration (CRITICAL P0 - Automated Repository Synchronization)
+beads_updater:
+  default_sync_mode: "incremental"      # "incremental" or "full" - sync mode preference
+  default_conflict_strategy: "newest"   # "newest", "manual", "keep_local", "keep_remote"
+  default_max_retries: 3               # Maximum retry attempts for failed syncs
+  backup_retention_days: 30            # Days to keep automatic backups
+  enable_detailed_reporting: true       # Generate detailed JSON sync reports
+  cleanup_temp_files: true             # Clean up temporary files after sync
+  lock_timeout_minutes: 30            # Lock file timeout to prevent deadlocks
