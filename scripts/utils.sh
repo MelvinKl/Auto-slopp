@@ -1435,6 +1435,160 @@ EOF
     fi
 }
 
+# =============================================================================
+# BEADS QUERY FUNCTIONS
+# =============================================================================
+
+# Function to check if there are any open bead tasks for a repository
+# Returns: 0 if open tasks exist, 1 if no open tasks, 2 if error occurred
+has_open_bead_tasks() {
+    local repo_dir="${1:-$(pwd)}"
+    local timeout_seconds="${2:-30}"
+    
+    log "DEBUG" "Checking for open bead tasks in repository: $(basename "$repo_dir")"
+    
+    # Change to repository directory if specified
+    if [[ -n "$1" ]]; then
+        cd "$repo_dir" || {
+            log "ERROR" "Cannot change to directory: $repo_dir"
+            return 2
+        }
+    fi
+    
+    # Check if this is a beads-enabled repository
+    if [[ ! -d ".beads" ]]; then
+        log "DEBUG" "No .beads directory found - not a beads-enabled repository"
+        return 1
+    fi
+    
+    # Check if bd command is available
+    if ! command_exists bd; then
+        log "ERROR" "bd command not found - beads CLI is required"
+        return 2
+    fi
+    
+    # Query for open tasks with timeout
+    local open_tasks_json
+    local start_time=$(date +%s)
+    
+    log "DEBUG" "Querying beads for open tasks (timeout: ${timeout_seconds}s)"
+    
+    # Use timeout to prevent hanging
+    if command -v timeout >/dev/null 2>&1; then
+        open_tasks_json=$(timeout "$timeout_seconds" bd list --status=open --json 2>/dev/null) || {
+            local exit_code=$?
+            if [[ $exit_code -eq 124 ]]; then
+                log "WARNING" "Beads query timed out after ${timeout_seconds}s"
+            else
+                log "ERROR" "Beads query failed with exit code: $exit_code"
+            fi
+            return 2
+        }
+    else
+        # Fallback without timeout command
+        open_tasks_json=$(bd list --status=open --json 2>/dev/null) || {
+            local exit_code=$?
+            log "ERROR" "Beads query failed with exit code: $exit_code"
+            return 2
+        }
+    fi
+    
+    local query_time=$(($(date +%s) - start_time))
+    log "DEBUG" "Beads query completed in ${query_time}s"
+    
+    # Parse JSON response to count open tasks
+    local open_tasks_count=0
+    if [[ -n "$open_tasks_json" ]]; then
+        # Extract count from JSON array (simplified parsing)
+        if echo "$open_tasks_json" | jq -e '. | length' >/dev/null 2>&1; then
+            open_tasks_count=$(echo "$open_tasks_json" | jq '. | length' 2>/dev/null || echo 0)
+        else
+            # Fallback parsing without jq
+            open_tasks_count=$(echo "$open_tasks_json" | grep -o '"id"' | wc -l)
+        fi
+    fi
+    
+    log "INFO" "Found $open_tasks_count open bead tasks in $(basename "$repo_dir")"
+    
+    # Return based on count
+    if [[ $open_tasks_count -gt 0 ]]; then
+        return 0  # Open tasks exist
+    else
+        return 1  # No open tasks
+    fi
+}
+
+# Function to get count of open bead tasks
+# Returns: number of open tasks, or -1 on error
+get_open_bead_tasks_count() {
+    local repo_dir="${1:-$(pwd)}"
+    local timeout_seconds="${2:-30}"
+    
+    # Change to repository directory if specified
+    if [[ -n "$1" ]]; then
+        cd "$repo_dir" || {
+            log "ERROR" "Cannot change to directory: $repo_dir"
+            echo "-1"
+            return 1
+        }
+    fi
+    
+    # Check if this is a beads-enabled repository
+    if [[ ! -d ".beads" ]]; then
+        log "DEBUG" "No .beads directory found - not a beads-enabled repository"
+        echo "0"
+        return 1
+    fi
+    
+    # Check if bd command is available
+    if ! command_exists bd; then
+        log "ERROR" "bd command not found - beads CLI is required"
+        echo "-1"
+        return 2
+    fi
+    
+    # Query for open tasks
+    local open_tasks_json
+    if command -v timeout >/dev/null 2>&1; then
+        open_tasks_json=$(timeout "$timeout_seconds" bd list --status=open --json 2>/dev/null) || {
+            echo "-1"
+            return 2
+        }
+    else
+        open_tasks_json=$(bd list --status=open --json 2>/dev/null) || {
+            echo "-1"
+            return 2
+        }
+    fi
+    
+    # Parse and return count
+    if [[ -n "$open_tasks_json" ]]; then
+        if echo "$open_tasks_json" | jq -e '. | length' >/dev/null 2>&1; then
+            echo "$open_tasks_json" | jq '. | length' 2>/dev/null || echo "0"
+        else
+            # Fallback parsing
+            echo "$open_tasks_json" | grep -o '"id"' | wc -l
+        fi
+    else
+        echo "0"
+    fi
+}
+
+# Function to log task availability decisions
+log_task_availability_decision() {
+    local repo_name="$1"
+    local has_tasks="$2"
+    local task_count="${3:-0}"
+    local decision="${4:-proceed}"
+    local reason="${5:-}"
+    
+    if [[ "$has_tasks" == "true" ]]; then
+        log "INFO" "Task availability check for $repo_name: FOUND $task_count open tasks - decision: $decision"
+    else
+        log "INFO" "Task availability check for $repo_name: NO open tasks found - decision: $decision ${reason:+($reason)}"
+    fi
+}
+
 export -f log strip_colors should_log rotate_log_if_needed cleanup_old_logs handle_error setup_error_handling script_success command_exists validate_env_vars check_directory safe_execute safe_git setup_log_directory execute_with_capture merge_origin_main_to_ai detect_merge_conflicts merge_origin_main_to_ai_with_escalation
 export -f log_change_detection log_system_health log_reboot_event log_system_state_snapshot
 export -f generate_timestamp validate_timestamp_format validate_timezone get_script_name format_log_entry configure_logging
@@ -1442,4 +1596,5 @@ export -f get_supported_timestamp_formats benchmark_timestamp_generation recomme
 export -f classify_merge_error log_merge_attempt log_merge_conflict_detection log_opencode_escalation log_merge_resolution_outcome
 export -f rollback_merge_on_failure preserve_state_for_opencode retry_merge_after_opencode_resolution
 export -f validate_repository_state get_repository_health_status
+export -f has_open_bead_tasks get_open_bead_tasks_count log_task_availability_decision
 export RED GREEN YELLOW BLUE NC DEBUG_MODE

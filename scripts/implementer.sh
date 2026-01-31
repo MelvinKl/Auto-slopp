@@ -75,9 +75,18 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
         fi
     fi
     
-    # Use opencode CLI to find and implement next ready task
-    log "INFO" "Using opencode CLI to find and implement next ready task"
-    if command_exists "${OPencode_CMD##* }"; then
+    # Check if there are open bead tasks before calling opencode
+    log "INFO" "Checking for available open bead tasks before calling opencode"
+    repo_name=$(basename "$repo_dir")
+    
+    if has_open_bead_tasks "$repo_dir"; then
+        open_tasks_count=$(get_open_bead_tasks_count "$repo_dir")
+        log_task_availability_decision "$repo_name" "true" "$open_tasks_count" "proceed" "tasks found"
+        
+        # Use opencode CLI to find and implement next ready task
+        log "INFO" "Using opencode CLI to find and implement next ready task"
+        
+        if command_exists "${OPencode_CMD##* }"; then
         safe_execute "$OPencode_CMD run \"Find the next ready bead task and implement it. Use the beads CLI to discover ready tasks, then implement the task and manage the beads workflow (mark in progress, close when complete). Commit all changes and push to the current branch. Ensure that the current branch has all changes from origin/main\" --agent OpenAgent"
         
         # After opencode completes, validate and push changes with conflict detection
@@ -138,9 +147,13 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
             log "ERROR" "OpenCode CLI execution failed with exit code: $opencode_exit_code"
             exit 1
         fi
+        else
+            log "ERROR" "OpenCode CLI not found: ${OPencode_CMD##* }"
+            exit 1
+        fi
     else
-        log "ERROR" "OpenCode CLI not found: ${OPencode_CMD##* }"
-        exit 1
+        log_task_availability_decision "$repo_name" "false" "0" "skip" "no open tasks found"
+        log "INFO" "Skipping opencode call for $repo_name - no open bead tasks available"
     fi
 done
 
