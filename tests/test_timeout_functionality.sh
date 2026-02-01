@@ -17,12 +17,10 @@ TEST_CONFIG_FILE="$TEST_TEMP_DIR/test_config.yaml"
 TEST_REPO_DIR="$TEST_TEMP_DIR/test_repo"
 
 # Test results tracking
-declare -A TEST_RESULTS=(
-    ["total"]=0
-    ["passed"]=0
-    ["failed"]=0
-    ["skipped"]=0
-)
+TEST_RESULTS_total=0
+TEST_RESULTS_passed=0
+TEST_RESULTS_failed=0
+TEST_RESULTS_skipped=0
 
 # =============================================================================
 # TEST FRAMEWORK UTILITIES
