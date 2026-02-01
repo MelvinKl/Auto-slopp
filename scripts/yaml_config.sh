@@ -46,6 +46,97 @@ read_yaml_config() {
     fi
 }
 
+# Function to read YAML array with a simpler direct approach
+read_yaml_array() {
+    local config_file="$1"
+    local key="$2"
+    local -n array_ref=$3
+    
+    if [[ ! -f "$config_file" ]]; then
+        log "ERROR" "Configuration file $config_file not found"
+        return 1
+    fi
+    
+    # Use mapfile to avoid subshell issues
+    local temp_array=()
+    
+    # Simple approach: find the array section and extract items
+    # This works for the specific structure in config.yaml
+    case "$key" in
+        "branch_protection.protected_branches")
+            # Extract lines after "protected_branches:" and before the next key
+            mapfile -t temp_array < <(awk '
+            /^#/ { next }
+            /protected_branches:/ { 
+                in_array = 1
+                next 
+            }
+            in_array && /^[[:space:]]+[a-zA-Z_]/ { 
+                in_array = 0
+                next 
+            }
+            in_array && /^[[:space:]]+-/ {
+                gsub(/^[[:space:]]+-[[:space:]]*["'"'"']/, "")
+                gsub(/["'"'"'][[:space:]]*$/, "")
+                gsub(/^[[:space:]]+-[[:space:]]*/, "")
+                gsub(/[[:space:]]+$/, "")
+                if (length($0) > 0) print $0
+            }
+            ' "$config_file")
+            ;;
+        "branch_protection.protection_patterns")
+            mapfile -t temp_array < <(awk '
+            /^#/ { next }
+            /protection_patterns:/ { 
+                in_array = 1
+                next 
+            }
+            in_array && /^[[:space:]]+[a-zA-Z_]/ { 
+                in_array = 0
+                next 
+            }
+            in_array && /^[[:space:]]+-/ {
+                gsub(/^[[:space:]]+-[[:space:]]*["'"'"']/, "")
+                gsub(/["'"'"'][[:space:]]*$/, "")
+                gsub(/^[[:space:]]+-[[:space:]]*/, "")
+                gsub(/[[:space:]]+$/, "")
+                if (length($0) > 0) print $0
+            }
+            ' "$config_file")
+            ;;
+        "branch_protection.require_explicit_confirmation_for")
+            mapfile -t temp_array < <(awk '
+            /^#/ { next }
+            /require_explicit_confirmation_for:/ { 
+                in_array = 1
+                next 
+            }
+            in_array && /^[[:space:]]+[a-zA-Z_]/ { 
+                in_array = 0
+                next 
+            }
+            in_array && /^[[:space:]]+-/ {
+                gsub(/^[[:space:]]+-[[:space:]]*["'"'"']/, "")
+                gsub(/["'"'"'][[:space:]]*$/, "")
+                gsub(/^[[:space:]]+-[[:space:]]*/, "")
+                gsub(/[[:space:]]+$/, "")
+                if (length($0) > 0) print $0
+            }
+            ' "$config_file")
+            ;;
+        *)
+            log "WARNING" "Unknown array key: $key"
+            ;;
+    esac
+    
+    # Copy temp array to reference array
+    for item in "${temp_array[@]}"; do
+        [[ -n "$item" ]] && array_ref+=("$item")
+    done
+    
+    log "DEBUG" "Loaded ${#array_ref[@]} items for array: $key"
+}
+
 # Function to load all configuration
 load_config() {
     local config_file="${1:-$(get_script_dir)/config.yaml}"
@@ -73,6 +164,22 @@ load_config() {
     MAINTENANCE_MODE=$(read_yaml_config "$config_file" "maintenance_mode" "false")
     EMERGENCY_OVERRIDE=$(read_yaml_config "$config_file" "emergency_override" "false")
     
+    # Branch protection configuration
+    branch_protection_enable_protection=$(read_yaml_config "$config_file" "branch_protection.enable_protection" "true")
+    branch_protection_require_confirmation=$(read_yaml_config "$config_file" "branch_protection.require_confirmation" "true")
+    branch_protection_show_warnings=$(read_yaml_config "$config_file" "branch_protection.show_warnings" "true")
+    branch_protection_protect_current_branch=$(read_yaml_config "$config_file" "branch_protection.protect_current_branch" "true")
+    
+    # Load branch protection arrays
+    declare -g -a branch_protection_protected_branches=()
+    read_yaml_array "$config_file" "branch_protection.protected_branches" branch_protection_protected_branches
+    
+    declare -g -a branch_protection_protection_patterns=()
+    read_yaml_array "$config_file" "branch_protection.protection_patterns" branch_protection_protection_patterns
+    
+    declare -g -a branch_protection_require_explicit_confirmation_for=()
+    read_yaml_array "$config_file" "branch_protection.require_explicit_confirmation_for" branch_protection_require_explicit_confirmation_for
+    
     # Expand tilde paths
     MANAGED_REPO_PATH="${MANAGED_REPO_PATH/#\~/$HOME}"
     MANAGED_REPO_TASK_PATH="${MANAGED_REPO_TASK_PATH/#\~/$HOME}"
@@ -88,4 +195,10 @@ load_config() {
     export MAX_REBOOT_ATTEMPTS_PER_DAY MAINTENANCE_MODE EMERGENCY_OVERRIDE
     export LOG_MAX_SIZE_MB LOG_MAX_FILES LOG_RETENTION_DAYS LOG_LEVEL
     export TIMESTAMP_FORMAT TIMESTAMP_TIMEZONE
+    
+    # Export branch protection variables
+    export branch_protection_enable_protection branch_protection_require_confirmation branch_protection_show_warnings
+    export branch_protection_protect_current_branch
+    export branch_protection_protected_branches branch_protection_protection_patterns
+    export branch_protection_require_explicit_confirmation_for
 }

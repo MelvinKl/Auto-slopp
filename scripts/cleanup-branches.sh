@@ -9,11 +9,19 @@ SCRIPT_NAME="cleanup-branches"
 
 # Load utilities and configuration first
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/utils.sh"
-source "$SCRIPT_DIR/../config.sh"
+source "$SCRIPT_DIR/branch_protection.sh"
+source "$PROJECT_DIR/config.sh"
 
 # Set up error handling
 setup_error_handling
+
+# Initialize branch protection system
+if ! initialize_branch_protection; then
+    log "ERROR" "Failed to initialize branch protection system"
+    exit 1
+fi
 
 log "INFO" "Starting branch cleanup script"
 log "INFO" "Using managed_repo_path: $MANAGED_REPO_PATH"
@@ -87,28 +95,20 @@ is_protected_branch() {
     return 1  # Not protected
 }
 
-# Function to safely delete a local branch
+# Function to safely delete a local branch (with enhanced protection)
 safe_delete_branch() {
     local branch="$1"
     local repo_dir="$2"
     
-    cd "$repo_dir" || return 1
+    log "INFO" "Attempting to delete local branch: $branch"
     
-    log "INFO" "Deleting local branch: $branch"
-    
-    if safe_git "branch -d '$branch'"; then
+    # Use enhanced branch protection for deletion
+    if safe_delete_branch_with_protection "$branch" "$repo_dir" "false"; then
         log "SUCCESS" "Successfully deleted branch: $branch"
         return 0
     else
-        # Try force delete if regular delete fails
-        log "WARNING" "Regular delete failed for $branch, trying force delete..."
-        if safe_git "branch -D '$branch'"; then
-            log "SUCCESS" "Successfully force deleted branch: $branch"
-            return 0
-        else
-            log "ERROR" "Failed to delete branch: $branch"
-            return 1
-        fi
+        log "ERROR" "Failed to delete branch: $branch (may be protected)"
+        return 1
     fi
 }
 
@@ -164,13 +164,15 @@ cleanup_repository_branches() {
         
         # Check if branch exists on remote
         if [[ -z "${remote_branch_map[$local_branch]:-}" ]]; then
-            # Branch doesn't exist on remote
-            if is_protected_branch "$local_branch" "$current_branch"; then
-                branches_skipped+=("$local_branch (protected)")
-                log "DEBUG" "Skipping protected branch: $local_branch"
-            else
+            # Branch doesn't exist on remote - check protection before marking for deletion
+            if check_branch_protection "$local_branch" "$repo_dir" "delete"; then
+                # Branch is not protected, mark for deletion
                 branches_to_delete+=("$local_branch")
                 log "DEBUG" "Marked for deletion: $local_branch"
+            else
+                # Branch is protected
+                branches_skipped+=("$local_branch (protected)")
+                log "DEBUG" "Skipping protected branch: $local_branch"
             fi
         else
             log "DEBUG" "Branch exists on remote: $local_branch"

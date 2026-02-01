@@ -9,11 +9,18 @@ SCRIPT_NAME="cleanup-branches-enhanced"
 
 # Load core architecture modules
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/utils.sh"
-source "$SCRIPT_DIR/core/error_recovery.sh"
-source "$SCRIPT_DIR/core/system_state.sh"
-source "$SCRIPT_DIR/core/configuration_validator.sh"
-source "$SCRIPT_DIR/../config.sh"
+source "$SCRIPT_DIR/branch_protection.sh"
+
+# Only load core modules if they exist (for testing without full system)
+if [[ -f "$SCRIPT_DIR/core/error_recovery.sh" ]]; then
+    source "$SCRIPT_DIR/core/error_recovery.sh"
+    source "$SCRIPT_DIR/core/system_state.sh"
+    source "$SCRIPT_DIR/core/configuration_validator.sh"
+fi
+
+source "$PROJECT_DIR/config.sh"
 
 # =============================================================================
 # ENHANCED CONFIGURATION AND INITIALIZATION
@@ -26,37 +33,43 @@ SAFETY_MODE="${SAFETY_MODE:-true}"  # Enable all safety checks by default
 BACKUP_BEFORE_DELETE="${BACKUP_BEFORE_DELETE:-true}"
 MAX_BRANCHES_PER_RUN="${MAX_BRANCHES_PER_RUN:-50}"
 
-# Initialize enhanced systems
-initialize_enhanced_cleanup_system() {
-    log "INFO" "Initializing enhanced cleanup system (operation: $CLEANUP_OPERATION_ID)"
-    
-    # Initialize system state management
-    initialize_state_management
-    
-    # Validate configuration
-    if ! validate_configuration "" "strict"; then
-        log "ERROR" "Configuration validation failed, attempting repair"
-        attempt_configuration_repair "safe"
+    # Initialize enhanced systems
+    initialize_enhanced_cleanup_system() {
+        log "INFO" "Initializing enhanced cleanup system (operation: $CLEANUP_OPERATION_ID)"
         
-        # Re-validate after repair
-        if ! validate_configuration "" "permissive"; then
-            log "ERROR" "Configuration still invalid after repair attempt"
+        # Initialize branch protection system
+        if ! initialize_branch_protection; then
+            log "ERROR" "Failed to initialize branch protection system"
             return 1
         fi
-    fi
-    
-    # Set up enhanced error handling
-    setup_enhanced_error_handling
-    
-    # Perform initial health check
-    perform_health_check "" "startup"
-    
-    # Record operation start
-    record_operation_performance "cleanup_branches_startup" 0 true
-    
-    log "SUCCESS" "Enhanced cleanup system initialized"
-    return 0
-}
+        
+        # Initialize system state management
+        initialize_state_management
+        
+        # Validate configuration
+        if ! validate_configuration "" "strict"; then
+            log "ERROR" "Configuration validation failed, attempting repair"
+            attempt_configuration_repair "safe"
+            
+            # Re-validate after repair
+            if ! validate_configuration "" "permissive"; then
+                log "ERROR" "Configuration still invalid after repair attempt"
+                return 1
+            fi
+        fi
+        
+        # Set up enhanced error handling
+        setup_enhanced_error_handling
+        
+        # Perform initial health check
+        perform_health_check "" "startup"
+        
+        # Record operation start
+        record_operation_performance "cleanup_branches_startup" 0 true
+        
+        log "SUCCESS" "Enhanced cleanup system initialized"
+        return 0
+    }
 
 # =============================================================================
 # ENHANCED BRANCH ANALYSIS ALGORITHMS
@@ -570,12 +583,14 @@ cleanup_repository_enhanced() {
     local repo_errors_count=0
     
     for branch in "${branches_to_delete[@]}"; do
-        # Verify safety before deletion
+        # Verify safety before deletion (including branch protection)
         if verify_branch_safety_comprehensive "$branch" "$repo_dir" "$analysis_data"; then
-            if safe_delete_branch_enhanced "$branch" "$repo_dir" "$analysis_data"; then
+            # Use enhanced branch protection for deletion
+            if safe_delete_branch_with_protection "$branch" "$repo_dir" "false"; then
                 ((repo_cleaned_count++))
             else
                 ((repo_errors_count++))
+                branches_skipped+=("$branch (protected)")
             fi
         else
             log "INFO" "Skipping branch due to safety concerns: $branch"
