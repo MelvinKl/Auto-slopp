@@ -506,6 +506,116 @@ safe_execute() {
     fi
 }
 
+# Function to execute opencode calls with enhanced timeout handling
+safe_execute_opencode() {
+    local opencode_cmd="$*"
+    local start_time=$(date +%s)
+    local timeout_action="${OPENCODE_TIMEOUT_ACTION:-terminate}"
+    
+    log "INFO" "Executing OpenCode call with timeout monitoring"
+    log "DEBUG" "OpenCode command: $opencode_cmd"
+    
+    # Check if this is an opencode call
+    if [[ "$opencode_cmd" != *"opencode"* ]]; then
+        log "WARNING" "safe_execute_opencode called with non-opencode command, using safe_execute"
+        safe_execute "$opencode_cmd"
+        return $?
+    fi
+    
+    # Track the process for timeout handling
+    local temp_pid_file="/tmp/opencode_pid_$$"
+    local temp_timeout_file="/tmp/opencode_timeout_$$"
+    
+    # Set up timeout monitoring
+    if [[ "${OPENCODE_TIMEOUT_ENABLED:-true}" == "true" ]]; then
+        log "DEBUG" "OpenCode timeout enabled: ${OPENCODE_TIMEOUT_SECONDS:-7200}s"
+        
+        # Execute the opencode command and capture its exit code
+        local exit_code=0
+        local timed_out=false
+        
+        # Use the configured OPencode_CMD which already includes timeout
+        if eval "$opencode_cmd"; then
+            exit_code=0
+            log "DEBUG" "OpenCode command completed successfully"
+        else
+            exit_code=$?
+            
+            # Check if this was a timeout
+            if [[ $exit_code -eq 124 ]]; then  # timeout command exit code
+                timed_out=true
+                log "ERROR" "OpenCode call timed out after ${OPENCODE_TIMEOUT_SECONDS:-7200} seconds"
+                
+                # Log timeout event if enabled
+                if [[ "${OPENCODE_LOG_TIMEOUTS:-true}" == "true" ]]; then
+                    local end_time=$(date +%s)
+                    local duration=$((end_time - start_time))
+                    log_timeout_event "$opencode_cmd" "$duration" "$start_time"
+                fi
+                
+                # Handle timeout based on configured action
+                case "$timeout_action" in
+                    "terminate")
+                        log "ERROR" "OpenCode call terminated due to timeout"
+                        ;;
+                    "escalate")
+                        log "ERROR" "OpenCode call timed out - escalation needed"
+                        # Create escalation marker file
+                        echo "{\"timestamp\": $(date +%s), \"command\": \"$opencode_cmd\", \"duration\": $duration, \"action\": \"escalate\"}" > "$temp_timeout_file"
+                        ;;
+                    "retry")
+                        log "WARNING" "OpenCode call timed out - retry logic not implemented"
+                        ;;
+                    *)
+                        log "ERROR" "Unknown timeout action: $timeout_action"
+                        ;;
+                esac
+            else
+                log "ERROR" "OpenCode command failed with exit code $exit_code"
+            fi
+        fi
+        
+        # Cleanup temporary files
+        rm -f "$temp_pid_file" "$temp_timeout_file"
+        
+        return $exit_code
+    else
+        # Timeout disabled, use regular safe_execute
+        log "DEBUG" "OpenCode timeout disabled, using regular execution"
+        safe_execute "$opencode_cmd"
+        return $?
+    fi
+}
+
+# Function to log timeout events
+log_timeout_event() {
+    local command="$1"
+    local duration="$2"
+    local start_timestamp="$3"
+    
+    if [[ "${OPENCODE_LOG_TIMEOUTS:-true}" == "true" ]]; then
+        local log_entry="{
+            \"event_type\": \"opencode_timeout\",
+            \"timestamp\": $(date +%s),
+            \"start_timestamp\": $start_timestamp,
+            \"duration_seconds\": $duration,
+            \"command\": \"$command\",
+            \"timeout_seconds\": ${OPENCODE_TIMEOUT_SECONDS:-7200},
+            \"action\": \"${OPENCODE_TIMEOUT_ACTION:-terminate}\"
+        }"
+        
+        # Log to both regular log and dedicated timeout log if available
+        log "ERROR" "OpenCode timeout: $duration seconds exceeded limit of ${OPENCODE_TIMEOUT_SECONDS:-7200}s"
+        
+        # Write to timeout log file if log directory is configured
+        if [[ -n "${LOG_DIRECTORY:-}" && -d "$LOG_DIRECTORY" ]]; then
+            local timeout_log="$LOG_DIRECTORY/opencode_timeouts.log"
+            echo "$log_entry" >> "$timeout_log"
+            log "DEBUG" "Timeout event logged to: $timeout_log"
+        fi
+    fi
+}
+
 # Function to handle git operations safely
 safe_git() {
     local git_cmd="$*"
@@ -1589,11 +1699,11 @@ log_task_availability_decision() {
     fi
 }
 
-export -f log strip_colors should_log rotate_log_if_needed cleanup_old_logs handle_error setup_error_handling script_success command_exists validate_env_vars check_directory safe_execute safe_git setup_log_directory execute_with_capture merge_origin_main_to_ai detect_merge_conflicts merge_origin_main_to_ai_with_escalation
+export -f log strip_colors should_log rotate_log_if_needed cleanup_old_logs handle_error setup_error_handling script_success command_exists validate_env_vars check_directory safe_execute safe_execute_opencode safe_git setup_log_directory execute_with_capture merge_origin_main_to_ai detect_merge_conflicts merge_origin_main_to_ai_with_escalation
 export -f log_change_detection log_system_health log_reboot_event log_system_state_snapshot
 export -f generate_timestamp validate_timestamp_format validate_timezone get_script_name format_log_entry configure_logging
 export -f get_supported_timestamp_formats benchmark_timestamp_generation recommend_timestamp_format
-export -f classify_merge_error log_merge_attempt log_merge_conflict_detection log_opencode_escalation log_merge_resolution_outcome
+export -f classify_merge_error log_merge_attempt log_merge_conflict_detection log_opencode_escalation log_merge_resolution_outcome log_timeout_event
 export -f rollback_merge_on_failure preserve_state_for_opencode retry_merge_after_opencode_resolution
 export -f validate_repository_state get_repository_health_status
 export -f has_open_bead_tasks get_open_bead_tasks_count log_task_availability_decision

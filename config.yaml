@@ -41,3 +41,27 @@ beads_updater:
   enable_detailed_reporting: true       # Generate detailed JSON sync reports
   cleanup_temp_files: true             # Clean up temporary files after sync
   lock_timeout_minutes: 30            # Lock file timeout to prevent deadlocks
+
+# Enhanced branch protection configuration
+branch_protection:
+  enable_protection: true              # Enable branch protection mechanisms
+  require_confirmation: true           # Require explicit confirmation for protected branches
+  show_warnings: true                  # Show warnings before deleting any branch
+  protected_branches:                  # List of branches that are always protected
+    - "main"
+    - "master"
+    - "develop"
+    - "staging"
+    - "production"
+  protect_current_branch: true        # Always protect the currently checked-out branch
+  protection_patterns:                 # Branch name patterns that are protected
+    - "keep-*"
+    - "protected-*"
+    - "temp-*"
+    - "backup-*"
+  require_explicit_confirmation_for:   # Branch types requiring explicit confirmation
+    - "main"
+    - "master"
+    - "develop"
+    - "staging"
+    - "production"

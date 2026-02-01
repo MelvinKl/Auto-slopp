@@ -1,312 +1,425 @@
-# Test Suite Documentation
+# Enhanced Testing Framework Documentation
 
 ## Overview
 
-The Repository Automation System includes a comprehensive test suite that validates all scripts, configuration, and functionality.
+The Auto-slopp project uses an enhanced testing framework that follows modern testing standards and best practices. The framework is designed to provide comprehensive coverage, maintainability, and ease of use while following the AAA pattern (Arrange → Act → Assert).
 
-## Test Suite Structure
+## Framework Components
 
-```
-tests/
-├── test_suite.sh           # Main test runner
-├── test_scripts.sh          # Individual script tests
-├── test_config.sh           # Configuration tests
-└── test_integration.sh      # Integration tests
-```
+### 1. Test Framework (`tests/test_framework.sh`)
 
-## Running Tests
+The core testing framework provides:
 
-### Quick Test
+- **AAA Pattern Implementation**: Arrange → Act → Assert
+- **Comprehensive Coverage Tracking**: Critical, High, Medium, Low levels
+- **Performance Analysis**: Execution time tracking and analysis
+- **Mocking and Stubbing**: Test isolation capabilities
+- **Rich Reporting**: Detailed test results with recommendations
 
-```bash
-# Run all tests
-./tests/test_suite.sh
+### 2. Enhanced Test Suite (`tests/test_suite_enhanced.sh`)
 
-# Run via Makefile
-make test
-```
+The main test runner includes:
 
-### Individual Test Categories
+- **Unit Tests**: Isolated function testing
+- **Integration Tests**: Component interaction testing
+- **System Tests**: End-to-end workflow testing
+- **Performance Tests**: Speed and resource usage testing
+- **Security Tests**: Input validation and security testing
+- **Regression Tests**: Backward compatibility testing
 
-```bash
-# Test script syntax and existence
-./tests/test_scripts.sh
+### 3. Legacy Test Suite (`tests/test_suite.sh`)
 
-# Test configuration loading
-./tests/test_config.sh
-
-# Test integration scenarios
-./tests/test_integration.sh
-```
+Maintained for backward compatibility with existing test scripts.
 
 ## Test Categories
 
-### 1. Script Existence Tests
+### Unit Tests
+- **Purpose**: Test individual functions and components in isolation
+- **Coverage**: Critical and High priority
+- **Examples**: Script syntax validation, configuration loading, utility functions
 
-Validates that all required scripts exist:
-- `main.sh`
-- `config.sh`
-- `scripts/*.sh` (all scripts in scripts directory)
+### Integration Tests
+- **Purpose**: Test interaction between components
+- **Coverage**: High and Medium priority
+- **Examples**: Main script integration, planner integration, repository discovery
 
-### 2. Script Executability Tests
+### System Tests
+- **Purpose**: Test complete workflows end-to-end
+- **Coverage**: High priority
+- **Examples**: Complete automation cycles, system state consistency
 
-Ensures all scripts have proper execute permissions:
-- Checks `+x` permission on all script files
-- Validates scripts can be executed
+### Performance Tests
+- **Purpose**: Ensure acceptable performance characteristics
+- **Coverage**: Medium priority
+- **Examples**: Script loading time, number manager performance
 
-### 3. Script Syntax Tests
+### Security Tests
+- **Purpose**: Validate security measures and input handling
+- **Coverage**: High priority
+- **Examples**: Input validation, file permissions, malicious input handling
 
-Validates bash syntax for all scripts:
-- Uses `bash -n` for syntax checking
-- Catches syntax errors before execution
+### Regression Tests
+- **Purpose**: Ensure backward compatibility and prevent regressions
+- **Coverage**: High priority
+- **Examples**: Legacy configuration support, migration scenarios
 
-### 4. Configuration Tests
+## Coverage Levels
 
-Validates configuration system:
-- `config.yaml` exists and is valid YAML
-- Configuration loads successfully
-- Required variables are set
-- Paths are accessible
+### Critical (100% required)
+- Business logic
+- Data transformations
+- Core functionality
+- Error handling
 
-### 5. Makefile Tests
+### High (90%+ required)
+- Public APIs
+- User-facing features
+- Integration points
+- Security functions
 
-Validates Makefile functionality:
-- Makefile exists
-- Test target executes successfully
-- Exit code is 0 (success)
+### Medium (80%+ recommended)
+- Utility functions
+- Helper functions
+- Configuration management
+- Logging functions
 
-### 6. Integration Tests
+### Low (optional)
+- Simple wrappers
+- Configuration files
+- Static data
+- Documentation
 
-Tests end-to-end functionality:
-- Configuration loading in scripts
-- Script discovery and execution
-- Error handling and logging
+## Running Tests
 
-## Test Output
-
-The test suite provides colored output:
-
+### Quick Test (Critical Only)
+```bash
+make test-quick
+# or
+./tests/test_suite_enhanced.sh --quick
 ```
-=== Auto-slopp Test Suite ===
-Testing directory: /root/git/Auto-slopp
 
-[INFO] Running test: main.sh exists
-[PASS] main.sh exists
-[INFO] Running test: main.sh is executable
-[PASS] main.sh is executable
-[INFO] Running test: main.sh has valid syntax
-[PASS] main.sh has valid syntax
-...
-
-=== Test Results ===
-Total tests: 31
-Passed: 31
-Failed: 0
-✓ All tests passed!
+### Comprehensive Test Suite
+```bash
+make test
+# or
+./tests/test_suite_enhanced.sh
 ```
 
-### Color Legend
+### Specific Test Categories
+```bash
+make test-unit          # Unit tests only
+make test-integration   # Integration tests only
+make test-system        # System tests only
+make test-performance   # Performance tests only
+make test-security      # Security tests only
+make test-regression    # Regression tests only
+```
 
-- **[INFO]** (Yellow): Test execution information
-- **[PASS]** (Green): Test passed successfully
-- **[FAIL]** (Red): Test failed
+### Verbose Output
+```bash
+./tests/test_suite_enhanced.sh --verbose
+```
 
-## Test Functions
+### Help and Options
+```bash
+./tests/test_suite_enhanced.sh --help
+```
 
-The test suite provides reusable test functions:
+### Legacy Tests
+```bash
+make test-legacy
+# or
+./tests/test_suite.sh
+```
 
-### `run_test()`
+## Writing Tests
 
-Execute a test with proper logging and result tracking.
+### Test Structure
+
+Follow the AAA pattern in your test functions:
 
 ```bash
-run_test "test name" "test command"
-```
-
-### `test_script_exists()`
-
-Check if a script file exists.
-
-```bash
-test_script_exists "main.sh"
-test_script_exists "scripts/utils.sh"
-```
-
-### `test_script_executable()`
-
-Check if a script has execute permissions.
-
-```bash
-test_script_executable "main.sh"
-test_script_executable "scripts/creator.sh"
-```
-
-### `test_script_syntax()`
-
-Validate bash syntax of a script.
-
-```bash
-test_script_syntax "main.sh"
-test_script_syntax "scripts/planner.sh"
-```
-
-## Adding New Tests
-
-To add tests for new functionality:
-
-### 1. Add Test Functions
-
-Create new test functions in `test_suite.sh`:
-
-```bash
-# Test new functionality
-test_new_feature() {
-    local feature="$1"
-    # Your test logic here
-    [[ -f "$PROJECT_DIR/$feature" ]]
-}
-
-# Test new script integration
-test_new_script_integration() {
-    local script="$1"
-    # Test script loads and runs correctly
-    cd "$PROJECT_DIR" && "./$script" --test
+test_my_function() {
+    arrange "Setup test data and mocks" "
+        local test_input='test_value'
+        local expected_output='expected_value'
+        create_mock 'dependency_function' 0 'mock_output'
+    "
+    
+    act "Execute the function under test" "
+        local actual_output
+        actual_output=\$(my_function \"\$test_input\")
+    "
+    
+    assert "Verify the results" "
+        assert_equals \"\$actual_output\" \"\$expected_value\" \"Function should return expected value\"
+        assert_contains \"\$(cat mock_log_file)\" 'dependency_function called' \"Dependency should be called\"
+    "
 }
 ```
 
-### 2. Add Test Cases
+### Using Assertions
 
-Add new test cases to the `main()` function:
+The framework provides comprehensive assertion helpers:
 
 ```bash
-# Test new script
-run_test "new_script.sh exists" "test_script_exists 'scripts/new_script.sh'"
-run_test "new_script.sh is executable" "test_script_executable 'scripts/new_script.sh'"
-run_test "new_script.sh has valid syntax" "test_script_syntax 'scripts/new_script.sh'"
-run_test "new_script.sh integration" "test_new_script_integration 'scripts/new_script.sh'"
+# Equality assertions
+assert_equals "$actual" "$expected" "Custom message"
+assert_not_equals "$actual" "$unexpected" "Custom message"
+
+# String assertions
+assert_contains "$haystack" "$needle" "Custom message"
+assert_not_contains "$haystack" "$needle" "Custom message"
+
+# File assertions
+assert_file_exists "$file_path" "Custom message"
+assert_file_not_exists "$file_path" "Custom message"
+
+# Command assertions
+assert_command_success "command to run" "Custom message"
+assert_command_failure "command to run" "Custom message"
+assert_exit_code "command to run" expected_code "Custom message"
 ```
 
-### 3. Update Test Counters
+### Performance Testing
 
-The test suite automatically tracks:
-- `TESTS_TOTAL`: Total number of tests run
-- `TESTS_PASSED`: Number of tests passed
-- `TESTS_FAILED`: Number of tests failed
+```bash
+test_performance_critical_function() {
+    arrange "Setup performance test" "
+        local test_data=\$(generate_large_dataset)
+    "
+    
+    act "Measure performance" "
+        local execution_time
+        execution_time=\$(measure_time "critical_function '\$test_data'" 10)
+    "
+    
+    assert "Performance within acceptable limits" "
+        assert_performance "critical_function '\$test_data'" 100  # Max 100ms
+    "
+}
+```
+
+### Mocking and Stubbing
+
+```bash
+test_with_dependency() {
+    arrange "Setup mocks" "
+        local call_log_file='$TEST_TMP_DIR/calls.log'
+        create_mock 'external_api_call' 0 'success_response'
+        create_stub 'logger_function' '$call_log_file'
+    "
+    
+    act "Test function that uses mocked dependencies" "
+        local result
+        result=\$(function_with_dependencies 'test_input')
+    "
+    
+    assert "Function works correctly with mocks" "
+        assert_equals \"\$result\" 'expected_result'
+        assert_file_contains '$call_log_file' 'logger_function called'
+    "
+}
+```
+
+## Test Standards
+
+### Naming Conventions
+- Test functions: `test_<feature>_<scenario>`
+- Test files: `test_<component>.sh`
+- Descriptive names explaining what is being tested and the expected outcome
+
+### Test Independence
+- Each test should be independent
+- No shared state between tests
+- Tests should run in any order
+- Cleanup after each test
+
+### Error Handling
+- Tests should handle expected errors gracefully
+- Use proper assertions for error conditions
+- Test both success and failure paths
+
+### Coverage Requirements
+- Critical functionality: 100% coverage
+- Public APIs: 90%+ coverage
+- Utilities: 80%+ coverage
+- Simple wrappers: optional coverage
 
 ## Continuous Integration
 
-Add tests to your CI pipeline:
+### Quality Gates
+The test framework enforces quality gates:
+
+1. **No Test Failures**: All tests must pass
+2. **Minimum Coverage**: Critical + High coverage must be ≥ 60%
+3. **Performance**: Total test time must be < 5 minutes
+4. **Dependencies**: All required dependencies must be available
+
+### CI Integration
+
+Add to your CI pipeline:
 
 ```yaml
-# .github/workflows/test.yml
-name: Test Suite
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Run tests
-        run: |
-          chmod +x tests/test_suite.sh
-          ./tests/test_suite.sh
-      - name: Run Makefile tests
-        run: make test
+# Example CI configuration
+test:
+  stage: test
+  script:
+    - make install-deps
+    - make test-quick  # Fast feedback
+    - make test         # Full validation
+  coverage: '/Coverage: \d+\.\d+%/'
+  artifacts:
+    reports:
+      junit: test-results.xml
 ```
 
-## Test Coverage
+## Troubleshooting
 
-The current test suite covers:
+### Common Issues
 
-- ✅ All script files (existence, permissions, syntax)
-- ✅ Configuration files (YAML validation, loading)
-- ✅ Makefile functionality
-- ✅ Directory structure
-- ✅ Basic integration scenarios
-
-### Future Test Enhancements
-
-- Mock external dependencies (opencode, bd)
-- Test error handling scenarios
-- Performance and load testing
-- Security vulnerability scanning
-- End-to-end automation testing
-
-## Troubleshooting Tests
-
-### Common Test Failures
-
-1. **Permission Denied**:
+1. **Permission Denied**: Ensure test scripts are executable
    ```bash
-   # Fix script permissions
-   chmod +x main.sh scripts/*.sh
+   chmod +x tests/test_suite_enhanced.sh
    ```
 
-2. **Syntax Errors**:
+2. **Missing Dependencies**: Install required tools
    ```bash
-   # Check script syntax manually
-   bash -n script_with_error.sh
+   make install-deps
    ```
 
-3. **Missing Files**:
+3. **Test Failures**: Check logs for detailed error messages
    ```bash
-   # Check what files are missing
-   ls -la main.sh scripts/ config.yaml
+   ./tests/test_suite_enhanced.sh --verbose
    ```
 
-4. **Configuration Issues**:
+4. **Performance Issues**: Run performance tests to identify bottlenecks
    ```bash
-   # Test configuration loading
-   source scripts/yaml_config.sh && load_config
+   make test-performance
    ```
 
 ### Debug Mode
 
-Enable debug mode for verbose test output:
+Enable debug output for troubleshooting:
 
 ```bash
-# Enable debug mode
-export DEBUG_MODE=true
-
-# Run tests with debug output
-./tests/test_suite.sh
+DEBUG=true ./tests/test_suite_enhanced.sh --verbose
 ```
 
-### Manual Testing
+### Test Isolation
 
-Test individual components manually:
+If tests interfere with each other:
 
-```bash
-# Test script loading
-source scripts/utils.sh
-source scripts/yaml_config.sh
+1. Check for shared state in test variables
+2. Ensure proper cleanup in `cleanup_test_environment()`
+3. Use separate test data directories
 
-# Test configuration
-load_config config.yaml
-echo "Configuration loaded: $SLEEP_DURATION"
+## Maintenance
 
-# Test script execution
-./scripts/creator.sh --dry-run
-```
+### Adding New Tests
+
+1. Choose appropriate category (unit/integration/system)
+2. Follow AAA pattern
+3. Use appropriate coverage level
+4. Add to test suite execution
+5. Update documentation
+
+### Updating Framework
+
+1. Test framework changes with existing tests
+2. Maintain backward compatibility
+3. Update documentation
+4. Communicate changes to team
+
+### Test Data Management
+
+1. Use temporary directories for test data
+2. Clean up test artifacts
+3. Use deterministic test data
+4. Version test fixtures if needed
 
 ## Best Practices
 
-1. **Run tests before changes**: Ensure baseline passes
-2. **Test after modifications**: Catch regressions early
-3. **Use CI/CD**: Automate testing in pipeline
-4. **Add tests for new features**: Maintain coverage
-5. **Update documentation**: Keep test docs current
-6. **Mock external dependencies**: Ensure reliable tests
+1. **Test Early**: Write tests alongside code
+2. **Test Often**: Run tests frequently during development
+3. **Keep Tests Simple**: One assertion per test when possible
+4. **Use Descriptive Names**: Test names should explain what they test
+5. **Mock External Dependencies**: Isolate code from external systems
+6. **Test Edge Cases**: Don't just test happy path
+7. **Maintain Coverage**: Keep test coverage at required levels
+8. **Review Test Code**: Apply same quality standards to test code
 
-## Test Metrics
+## Framework Features
 
-Track test metrics over time:
+### Test Environment Isolation
+- Automatic setup/cleanup of test directories
+- Isolated environment variables
+- Temporary file management
+- Process cleanup
 
-- Test execution time
-- Pass/fail rates
-- Code coverage percentage
-- Number of tests per feature
-- Test flakiness (intermittent failures)
+### Performance Monitoring
+- Individual test timing
+- Category-wise performance analysis
+- Slow test identification
+- Performance trend tracking
 
-Use these metrics to improve test quality and reliability.
+### Coverage Analysis
+- Coverage level distribution
+- Gap identification
+- Recommendations for improvement
+- Quality gate enforcement
+
+### Rich Reporting
+- Colored output with categories
+- Detailed failure analysis
+- Performance metrics
+- Actionable recommendations
+
+## Migration from Legacy Tests
+
+To migrate from the legacy test suite:
+
+1. **Start with Enhanced Framework**: Use `test_suite_enhanced.sh` for new tests
+2. **Gradual Migration**: Port existing tests one by one
+3. **Maintain Compatibility**: Keep legacy tests during transition
+4. **Update CI**: Switch to enhanced test suite when ready
+
+### Example Migration
+
+**Legacy Test**:
+```bash
+test_script_exists() {
+    [[ -f "$PROJECT_DIR/$script" ]]
+}
+```
+
+**Enhanced Test**:
+```bash
+test_script_exists_enhanced() {
+    arrange "Setup script paths" "
+        local scripts=('$SCRIPTS_DIR'/*.sh)
+        local failed_scripts=()
+    "
+    
+    act "Check script existence" "
+        for script in \"${scripts[@]}\"; do
+            if [[ ! -f \"\$script\" ]]; then
+                failed_scripts+=(\"\$(basename \"\$script\")\")
+            fi
+        done
+    "
+    
+    assert "All scripts exist" "
+        [[ \${#failed_scripts[@]} -eq 0 ]]
+    "
+}
+```
+
+## Resources
+
+- [Testing Standards](/root/.config/opencode/context/core/standards/test-coverage.md)
+- [Makefile Targets](#running-tests)
+- [Assertion Helpers](#using-assertions)
+- [Mock Framework](#mocking-and-stubbing)
+
+For questions or issues with the testing framework, consult the test files or run `./tests/test_suite_enhanced.sh --help`.
