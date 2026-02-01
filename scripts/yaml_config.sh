@@ -6,9 +6,12 @@
 # Set script name for logging identification
 SCRIPT_NAME="yaml_config"
 
-# Load utilities first
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/utils.sh"
+# Load utilities first - use existing SCRIPT_DIR or compute relative to this file
+if [[ -z "$SCRIPT_DIR" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+# Since utils.sh is in the same directory as this script, we can source it directly
+source "$(dirname "${BASH_SOURCE[0]}")/utils.sh"
 
 # Set up error handling
 setup_error_handling
