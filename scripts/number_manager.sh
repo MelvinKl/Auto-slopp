@@ -35,6 +35,8 @@ init_number_state() {
     "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
     "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
     "context_assignments": {},
+    "assignments": [],
+    "releases": [],
     "version": "1.0",
     "metadata": {
         "creator": "number_manager.sh",
@@ -68,7 +70,7 @@ validate_state_file() {
     fi
     
     # Check required fields
-    local required_fields=("used_numbers" "last_assigned" "context_assignments")
+    local required_fields=("used_numbers" "last_assigned" "context_assignments" "assignments" "releases")
     for field in "${required_fields[@]}"; do
         if ! jq -e ".$field" "$state_file" >/dev/null; then
             log "ERROR" "Missing required field in state file: $field"
@@ -261,9 +263,10 @@ release_number() {
     update_result=$(jq \
         --argjson num "$number" \
         --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --arg context "$task_context" \
         '.used_numbers -= [$num] |
          .updated_at = $timestamp |
-         .releases += [{"number": $num, "context": "'$task_context'", "timestamp": $timestamp}]' \
+         .releases += [{"number": $num, "context": $context, "timestamp": $timestamp}]' \
         "$state_file" > "$temp_file" 2>&1)
     
     if [ $? -eq 0 ]; then
@@ -381,7 +384,7 @@ sync_state_with_files() {
     local update_result
     
     update_result=$(jq \
-        --argjson actual "$(printf '%s\n' "${actual_numbers[@]}" | sort -n | jq -R . | jq -s .)" \
+        --argjson actual "$(printf '%s\n' "${actual_numbers[@]}" | sort -n | jq -R . | jq 'tonumber' | jq -s .)" \
         --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         --arg context "$context_name" \
         '.used_numbers = $actual |
