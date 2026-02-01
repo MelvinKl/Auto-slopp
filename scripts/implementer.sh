@@ -58,7 +58,7 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
             opencode_prompt="Find the next ready bead task and implement it. Use the beads CLI to discover ready tasks, then implement the task and manage the beads workflow (mark in progress, close when complete). FIRST: resolve merge conflicts from previous attempt using conflict report at $(echo $merge_result). Use the comprehensive error handling system to log all resolution steps. Then commit all changes and push to the current branch. Ensure that the current branch has all changes from origin/main. Log all merge operations using the enhanced logging functions."
             
             # Execute opencode with conflict resolution requirement
-            safe_execute "$OPencode_CMD run \"$opencode_prompt\" --agent OpenAgent"
+            safe_execute_opencode "$OPencode_CMD run \"$opencode_prompt\" --agent OpenAgent"
             
             # After opencode resolution, verify and log the outcome
             local opencode_exit_code=$?
@@ -90,7 +90,7 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
         log "INFO" "Using opencode CLI to find and implement next ready task"
         
         if command_exists "${OPencode_CMD##* }"; then
-        safe_execute "$OPencode_CMD run \"Find the next ready bead task and implement it. Use the beads CLI to discover ready tasks, then implement the task and manage the beads workflow (mark in progress, close when complete). Commit all changes and push to the current branch. Ensure that the current branch has all changes from origin/main\" --agent OpenAgent"
+        safe_execute_opencode "$OPencode_CMD run \"Find the next ready bead task and implement it. Use the beads CLI to discover ready tasks, then implement the task and manage the beads workflow (mark in progress, close when complete). Commit all changes and push to the current branch. Ensure that the current branch has all changes from origin/main\" --agent OpenAgent"
         
         # After opencode completes, validate and push changes with conflict detection
         opencode_exit_code=$?
@@ -119,7 +119,7 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
                     opencode_prompt="Resolve merge conflicts from push validation using conflict report at $(echo $merge_result). Use the comprehensive error handling system to log all resolution steps. Then commit all changes and push to the current branch. Ensure that the current branch has all changes from origin/main. Document all merge resolution actions using the enhanced logging functions."
                     
                     # Execute opencode for conflict resolution
-                    safe_execute "$OPencode_CMD run \"$opencode_prompt\" --agent OpenAgent"
+                    safe_execute_opencode "$OPencode_CMD run \"$opencode_prompt\" --agent OpenAgent"
                     
                     # After opencode resolution, verify and log the outcome
                     local opencode_exit_code=$?

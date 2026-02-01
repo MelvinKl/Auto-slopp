@@ -33,6 +33,12 @@ read_yaml_config() {
         return 1
     fi
     
+    # Check if this is a nested key
+    if [[ "$key" == *.* ]]; then
+        read_yaml_nested_config "$config_file" "$key" "$default_value"
+        return $?
+    fi
+    
     # Simple YAML parsing using grep and sed
     # This handles basic key: value pairs, ignoring comments
     local value=$(grep "^[[:space:]]*$key:" "$config_file" | grep -v "#" | sed "s/^[[:space:]]*$key:[[:space:]]*//" | sed 's/[[:space:]]*#.*//' | sed 's/^["'"'"']//' | sed 's/["'"'"']$//' | sed 's/[[:space:]]*$//')
@@ -42,6 +48,52 @@ read_yaml_config() {
         echo "$default_value"
     else
         log "DEBUG" "Found configuration value: $key = $value"
+        echo "$value"
+    fi
+}
+
+# Function to read nested YAML configuration (handles parent.child keys)
+read_yaml_nested_config() {
+    local config_file="$1"
+    local nested_key="$2"
+    local default_value="$3"
+    
+    # Split the nested key into parts
+    IFS='.' read -ra key_parts <<< "$nested_key"
+    local parent_key="${key_parts[0]}"
+    local child_key="${key_parts[1]}"
+    
+    # Find the section for the parent key
+    local in_section=false
+    local value=""
+    
+    while IFS= read -r line; do
+        # Skip comments and empty lines
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "${line// }" ]] && continue
+        
+        # Check if we found the parent section (with or without colon)
+        if [[ "$line" =~ ^[[:space:]]*$parent_key:[[:space:]]*$ ]]; then
+            in_section=true
+            continue
+        fi
+        
+        # Check if we've left the parent section (new top-level key without indentation)
+        if [[ "$in_section" == true && "$line" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*:[[:space:]] ]]; then
+            in_section=false
+            break
+        fi
+        
+        # Look for the child key within the section (must be indented)
+        if [[ "$in_section" == true && "$line" =~ ^[[:space:]]+[[:space:]]*$child_key:[[:space:]] ]]; then
+            value=$(echo "$line" | sed "s/^[[:space:]]*$child_key:[[:space:]]*//" | sed 's/[[:space:]]*#.*//' | sed 's/^["'"'"']//' | sed 's/["'"'"']$//' | sed 's/[[:space:]]*$//')
+            break
+        fi
+    done < "$config_file"
+    
+    if [[ -z "$value" ]]; then
+        echo "$default_value"
+    else
         echo "$value"
     fi
 }
@@ -185,8 +237,27 @@ load_config() {
     MANAGED_REPO_TASK_PATH="${MANAGED_REPO_TASK_PATH/#\~/$HOME}"
     LOG_DIRECTORY="${LOG_DIRECTORY/#\~/$HOME}"
     
-    # CLI commands
-    OPencode_CMD="timeout -v -k 1m 2h opencode"
+    # OpenCode timeout configuration
+    OPENCODE_TIMEOUT_ENABLED=$(read_yaml_config "$config_file" "opencode_timeout.enabled" "true")
+    OPENCODE_TIMEOUT_SECONDS=$(read_yaml_config "$config_file" "opencode_timeout.timeout_seconds" "7200")
+    OPENCODE_TIMEOUT_SIGNAL=$(read_yaml_config "$config_file" "opencode_timeout.timeout_signal" "15")
+    OPENCODE_KILL_SIGNAL=$(read_yaml_config "$config_file" "opencode_timeout.kill_signal" "9")
+    OPENCODE_GRACE_PERIOD_SECONDS=$(read_yaml_config "$config_file" "opencode_timeout.grace_period_seconds" "30")
+    OPENCODE_CLEANUP_TEMP_FILES=$(read_yaml_config "$config_file" "opencode_timeout.cleanup_temp_files" "true")
+    OPENCODE_LOG_TIMEOUTS=$(read_yaml_config "$config_file" "opencode_timeout.log_timeouts" "true")
+    OPENCODE_TIMEOUT_ACTION=$(read_yaml_config "$config_file" "opencode_timeout.timeout_action" "escalate")
+    
+    # CLI commands with configurable timeout
+    if [[ "$OPENCODE_TIMEOUT_ENABLED" == "true" ]]; then
+        # Build timeout command with configured values
+        local timeout_duration="${OPENCODE_TIMEOUT_SECONDS}s"
+        local kill_duration="${OPENCODE_GRACE_PERIOD_SECONDS}s"
+        OPencode_CMD="timeout -v -s ${OPENCODE_TIMEOUT_SIGNAL} -k ${kill_duration} ${timeout_duration} opencode"
+        log "DEBUG" "OpenCode timeout enabled: ${timeout_duration} with signal ${OPENCODE_TIMEOUT_SIGNAL}"
+    else
+        OPencode_CMD="opencode"
+        log "DEBUG" "OpenCode timeout disabled"
+    fi
     BEADS_CMD="bd"
     
     # Export variables
@@ -201,4 +272,8 @@ load_config() {
     export branch_protection_protect_current_branch
     export branch_protection_protected_branches branch_protection_protection_patterns
     export branch_protection_require_explicit_confirmation_for
+    
+    # Export OpenCode timeout variables
+    export OPENCODE_TIMEOUT_ENABLED OPENCODE_TIMEOUT_SECONDS OPENCODE_TIMEOUT_SIGNAL OPENCODE_KILL_SIGNAL
+    export OPENCODE_GRACE_PERIOD_SECONDS OPENCODE_CLEANUP_TEMP_FILES OPENCODE_LOG_TIMEOUTS OPENCODE_TIMEOUT_ACTION
 }

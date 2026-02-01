@@ -45,7 +45,7 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
         if [ -f "Makefile" ]; then
             if ! make test; then
                 log "WARNING" "Tests failed, using opencode CLI to fix"
-                $OPencode_CMD run "Fix the branch '$branch' that contains updates to dependencies and push them to the branch. The tests are currently failing, so identify and fix any issues preventing the tests from passing, then push the fixes to the branch." --agent OpenAgent
+                safe_execute_opencode "$OPencode_CMD run \"Fix the branch '$branch' that contains updates to dependencies and push them to the branch. The tests are currently failing, so identify and fix any issues preventing the tests from passing, then push the fixes to the branch.\" --agent OpenAgent"
             fi
         fi
     done

@@ -113,7 +113,7 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
         
         # Generate bead tasks using opencode CLI
         log "INFO" "Generating bead tasks for: $content"
-        $OPencode_CMD run "Generate bead tasks for: $content" --agent OpenAgent
+        safe_execute_opencode "$OPencode_CMD run \"Generate bead tasks for: $content\" --agent OpenAgent"
         
         # Commit and push changes in repository
         log "DEBUG" "Committing and pushing generated bead tasks"
