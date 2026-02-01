@@ -4,14 +4,16 @@
 # Identifies and safely removes local branches that no longer exist on the remote repository
 # Integrates with Auto-slopp system architecture and follows established patterns
 
+# Set script name for logging identification
+SCRIPT_NAME="cleanup-branches"
+
 # Load utilities and configuration first
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/../config.sh"
 
-# Set up error handling and script identification
+# Set up error handling
 setup_error_handling
-export SCRIPT_NAME="cleanup-branches.sh"
 
 log "INFO" "Starting branch cleanup script"
 log "INFO" "Using managed_repo_path: $MANAGED_REPO_PATH"

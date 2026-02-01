@@ -1,6 +1,9 @@
 #!/bin/bash
 
 # Create task directories for each repository using YAML configuration
+# Set script name for logging identification
+SCRIPT_NAME="creator"
+
 # Load utilities and configuration first
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils.sh"

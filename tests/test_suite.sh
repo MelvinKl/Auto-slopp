@@ -108,11 +108,25 @@ fi
     run_test "config.yaml exists" "test_script_exists 'config.yaml'"
     run_test "opencode.json exists" "test_script_exists 'opencode.json'"
     
+    # Test timestamp logging functionality (comprehensive test)
+    if [[ "$1" != "--no-logging" ]]; then
+        run_test "Timestamp logging functionality tests" "cd '$TESTS_DIR' && ./test_timestamp_logging.sh"
+    else
+        run_test "Timestamp logging functionality tests" "echo '✓ Timestamp logging tests skipped'"
+    fi
+    
     # Test merge functionality (comprehensive test)
     if [[ "$1" != "--no-merge" ]]; then
         run_test "Merge functionality tests" "cd '$TESTS_DIR' && ./test_merge_functionality.sh"
     else
         run_test "Merge functionality tests" "echo '✓ Merge functionality tests skipped'"
+    fi
+    
+    # Test number tracking system (comprehensive test)
+    if [[ "$1" != "--no-number-tracking" ]]; then
+        run_test "Number tracking system tests" "cd '$TESTS_DIR/number_tracking' && ./test_suite_runner.sh --quick"
+    else
+        run_test "Number tracking system tests" "echo '✓ Number tracking system tests skipped'"
     fi
     
     # Print results

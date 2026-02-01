@@ -1,6 +1,9 @@
 #!/bin/bash
 
 # Fix failed dependency updates in renovate branches using YAML configuration
+# Set script name for logging identification
+SCRIPT_NAME="update_fixer"
+
 # Load utilities and configuration first
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils.sh"
@@ -28,15 +31,15 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
     cd "$repo_dir"
     
     # Get renovate branches
-    branches=$(git branch -r --list 'origin/renovate*' 2>/dev/null | sed 's/^[[:space:]]*origin\///')
+    branches=$(safe_git "branch -r --list 'origin/renovate*'" 2>/dev/null | sed 's/^[[:space:]]*origin\///')
     
     for branch in $branches; do
         log "DEBUG" "Branch: $branch"
         
         # Update branch
-        git fetch origin
-        git reset --hard origin/"$branch"
-        git clean -fd
+        safe_git "fetch origin"
+        safe_git "reset --hard origin/$branch"
+        safe_git "clean -fd"
         
         # Run tests
         if [ -f "Makefile" ]; then

@@ -849,73 +849,743 @@ EOF
     return $conflict_count
 }
 
+# =============================================================================
+# REPOSITORY STATE VALIDATION FUNCTIONS
+# =============================================================================
+
+# Function to validate repository state before merge operations
+validate_repository_state() {
+    local repo_dir="${GIT_REPO_DIR:-$(pwd)}"
+    local operation_context="$1"
+    
+    log "DEBUG" "Validating repository state for operation: $operation_context"
+    
+    local validation_errors=()
+    
+    # Check if we're in a git repository
+    if ! git rev-parse --git-dir >/dev/null 2>&1; then
+        validation_errors+=("Not in a git repository")
+    fi
+    
+    # Check for lock files
+    if [[ -f "$repo_dir/.git/index.lock" ]]; then
+        validation_errors+=("Git index lock file exists")
+    fi
+    
+    # Check if repository is in a valid state
+    if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
+        validation_errors+=("Invalid HEAD reference")
+    fi
+    
+    # Check for detached HEAD (may be okay depending on context)
+    local current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+    if [[ "$current_branch" == "HEAD" ]]; then
+        validation_errors+=("Repository in detached HEAD state")
+    fi
+    
+    # Check git directory permissions
+    if [[ ! -r "$repo_dir/.git" || ! -w "$repo_dir/.git" ]]; then
+        validation_errors+=("Git directory permission issues")
+    fi
+    
+    # Check disk space (basic check)
+    local available_space=$(df "$repo_dir" | awk 'NR==2 {print $4}')
+    if [[ $available_space -lt 1024 ]]; then  # Less than 1MB
+        validation_errors+=("Insufficient disk space")
+    fi
+    
+    # Log validation results
+    if [[ ${#validation_errors[@]} -eq 0 ]]; then
+        log "DEBUG" "Repository state validation passed for: $operation_context"
+        return 0
+    else
+        log "ERROR" "Repository state validation failed for: $operation_context"
+        for error in "${validation_errors[@]}"; do
+            log "ERROR" "  - $error"
+        done
+        return 1
+    fi
+}
+
+# Function to get comprehensive repository health status
+get_repository_health_status() {
+    local repo_dir="${GIT_REPO_DIR:-$(pwd)}"
+    
+    local health_status="{
+        \"repository\": \"$(basename "$repo_dir")\",
+        \"timestamp\": \"$(date -Iseconds)\",
+        \"git_status\": \"$(git status --porcelain 2>/dev/null | wc -l)\",
+        \"current_branch\": \"$(git rev-parse --abbrev-ref HEAD 2>/dev/null)\",
+        \"head_commit\": \"$(git rev-parse HEAD 2>/dev/null)\",
+        \"origin_status\": \"$(git remote -v 2>/dev/null | grep -c origin || echo 0)\",
+        \"staged_files\": \"$(git diff --cached --name-only 2>/dev/null | wc -l)\",
+        \"modified_files\": \"$(git diff --name-only 2>/dev/null | wc -l)\",
+        \"untracked_files\": \"$(git ls-files --others --exclude-standard 2>/dev/null | wc -l)\",
+        \"last_commit_time\": \"$(git log -1 --format=%ci 2>/dev/null)\",
+        \"lock_files\": \"$(find "$repo_dir/.git" -name "*.lock" 2>/dev/null | wc -l)\",
+        \"disk_usage\": \"$(du -sh "$repo_dir" 2>/dev/null | cut -f1)\"
+    }"
+    
+    echo "$health_status"
+}
+
+# =============================================================================
+# MERGE ERROR HANDLING AND LOGGING SYSTEM
+# =============================================================================
+
+# Merge error type definitions
+declare -A MERGE_ERROR_TYPES=(
+    ["NETWORK_FAILURE"]="Network connectivity issues preventing git operations"
+    ["PERMISSION_DENIED"]="Insufficient permissions to perform git operations"
+    ["REPOSITORY_CORRUPT"]="Git repository in corrupted state, needs repair"
+    ["MERGE_CONFLICT"]="Merge conflicts requiring manual resolution"
+    ["FAST_FORWARD_FAILED"]="Fast-forward merge failed unexpectedly"
+    ["BRANCH_NOT_FOUND"]="Target or source branch does not exist"
+    ["DETACHED_HEAD"]="Repository in detached HEAD state"
+    ["LOCK_FILE_EXISTS"]="Git lock files indicating concurrent operations"
+    ["DISK_FULL"]="Insufficient disk space for git operations"
+    ["TIMEOUT"]="Operation timed out during execution"
+    ["UNKNOWN"]="Unknown or unexpected error during merge operation"
+)
+
+# Function to classify merge error type
+classify_merge_error() {
+    local exit_code="$1"
+    local error_output="$2"
+    local repo_dir="${GIT_REPO_DIR:-$(pwd)}"
+    
+    log "DEBUG" "Classifying merge error (exit code: $exit_code) in $repo_dir"
+    
+    # Check for specific error patterns
+    if [[ "$error_output" =~ (connection|refused|timeout|network|unable to access) ]]; then
+        echo "NETWORK_FAILURE"
+    elif [[ "$error_output" =~ (permission|denied|access denied|read-only) ]]; then
+        echo "PERMISSION_DENIED"
+    elif [[ "$error_output" =~ (corrupt|broken|invalid|object not found) ]]; then
+        echo "REPOSITORY_CORRUPT"
+    elif [[ "$error_output" =~ (conflict|CONFLICT|merge|<<<<<<<<) ]]; then
+        echo "MERGE_CONFLICT"
+    elif [[ "$error_output" =~ (fast-forward|fast-forward only) ]]; then
+        echo "FAST_FORWARD_FAILED"
+    elif [[ "$error_output" =~ (not found|doesnt exist|branch.*not found) ]]; then
+        echo "BRANCH_NOT_FOUND"
+    elif [[ "$error_output" =~ (detached head|detached HEAD) ]]; then
+        echo "DETACHED_HEAD"
+    elif [[ "$error_output" =~ (lock file|index.lock|unable to create) ]]; then
+        echo "LOCK_FILE_EXISTS"
+    elif [[ "$error_output" =~ (no space left|disk full|insufficient space) ]]; then
+        echo "DISK_FULL"
+    elif [[ "$exit_code" -eq 124 ]]; then
+        echo "TIMEOUT"
+    else
+        echo "UNKNOWN"
+    fi
+}
+
+# Function to log merge attempt details
+log_merge_attempt() {
+    local operation="$1"
+    local source_branch="$2"
+    local target_branch="$3"
+    local source_commit="$4"
+    local target_commit="$5"
+    local repo_dir="${GIT_REPO_DIR:-$(pwd)}"
+    
+    local timestamp=$(generate_timestamp "${TIMESTAMP_FORMAT:-default}" "${TIMESTAMP_TIMEZONE:-local}")
+    local script_name=$(get_script_name)
+    
+    # Create structured merge event log
+    local merge_event="{
+    \"event_type\": \"merge_attempt\",
+    \"operation\": \"$operation\",
+    \"timestamp\": \"$timestamp\",
+    \"repository\": \"$(basename "$repo_dir")\",
+    \"source_branch\": \"$source_branch\",
+    \"target_branch\": \"$target_branch\",
+    \"source_commit\": \"$source_commit\",
+    \"target_commit\": \"$target_commit\",
+    \"working_directory\": \"$repo_dir\"
+    }"
+    
+    log "INFO" "MERGE ATTEMPT: $operation - $source_branch -> $target_branch"
+    log "DEBUG" "Merge event details: $merge_event"
+    
+    # Log to file if directory is configured
+    if [[ -n "${LOG_DIRECTORY}" && -d "${LOG_DIRECTORY}" ]]; then
+        local merge_log="${LOG_DIRECTORY}/merge_events.log"
+        echo "$merge_event" >> "$merge_log"
+    fi
+}
+
+# Function to log merge conflict detection results
+log_merge_conflict_detection() {
+    local conflicted_files=("$@")
+    local repo_dir="${GIT_REPO_DIR:-$(pwd)}"
+    local conflict_count=${#conflicted_files[@]}
+    
+    local timestamp=$(generate_timestamp "${TIMESTAMP_FORMAT:-default}" "${TIMESTAMP_TIMEZONE:-local}")
+    
+    log "WARNING" "MERGE CONFLICT DETECTED: $conflict_count conflicted files"
+    
+    # Create structured conflict detection log
+    local conflict_event="{
+    \"event_type\": \"merge_conflict_detected\",
+    \"timestamp\": \"$timestamp\",
+    \"repository\": \"$(basename "$repo_dir")\",
+    \"conflict_count\": $conflict_count,
+    \"conflicted_files\": [
+        $(printf '"%s",' "${conflicted_files[@]}" | sed 's/,$//')
+    ],
+    \"ai_branch_head\": \"$(git rev-parse HEAD 2>/dev/null)\",
+    \"main_branch_head\": \"$(git rev-parse origin/main 2>/dev/null)\",
+    \"merge_base\": \"$(git merge-base HEAD origin/main 2>/dev/null)\"
+    }"
+    
+    log "DEBUG" "Conflict detection details: $conflict_event"
+    
+    # Log to file if directory is configured
+    if [[ -n "${LOG_DIRECTORY}" && -d "${LOG_DIRECTORY}" ]]; then
+        local merge_log="${LOG_DIRECTORY}/merge_events.log"
+        echo "$conflict_event" >> "$merge_log"
+    fi
+    
+    # Log individual conflicted files
+    for file in "${conflicted_files[@]}"; do
+        log "DEBUG" "Conflicted file: $file"
+    done
+}
+
+# Function to log opencode escalation trigger
+log_opencode_escalation() {
+    local escalation_reason="$1"
+    local conflict_report_file="$2"
+    local operation_context="$3"
+    local repo_dir="${GIT_REPO_DIR:-$(pwd)}"
+    
+    local timestamp=$(generate_timestamp "${TIMESTAMP_FORMAT:-default}" "${TIMESTAMP_TIMEZONE:-local}")
+    
+    log "ERROR" "OPENCODE ESCALATION TRIGGERED: $escalation_reason"
+    log "INFO" "Escalation context: $operation_context"
+    
+    if [[ -n "$conflict_report_file" && -f "$conflict_report_file" ]]; then
+        log "INFO" "Conflict report generated: $conflict_report_file"
+    fi
+    
+    # Create structured escalation log
+    local escalation_event="{
+    \"event_type\": \"opencode_escalation\",
+    \"timestamp\": \"$timestamp\",
+    \"repository\": \"$(basename "$repo_dir")\",
+    \"escalation_reason\": \"$escalation_reason\",
+    \"operation_context\": \"$operation_context\",
+    \"conflict_report\": \"$conflict_report_file\",
+    \"current_branch\": \"$(git rev-parse --abbrev-ref HEAD 2>/dev/null)\",
+    \"working_tree_clean\": \"$(git status --porcelain 2>/dev/null | wc -l)\",
+    \"git_status\": \"$(git status --porcelain 2>/dev/null | head -5 | tr '\n' ';')\"
+    }"
+    
+    log "DEBUG" "Escalation details: $escalation_event"
+    
+    # Log to file if directory is configured
+    if [[ -n "${LOG_DIRECTORY}" && -d "${LOG_DIRECTORY}" ]]; then
+        local merge_log="${LOG_DIRECTORY}/merge_events.log"
+        echo "$escalation_event" >> "$merge_log"
+    fi
+}
+
+# Function to log merge resolution outcomes
+log_merge_resolution_outcome() {
+    local resolution_type="$1"
+    local resolved_files_count="$2"
+    local resolution_time_seconds="$3"
+    local operation_context="$4"
+    local repo_dir="${GIT_REPO_DIR:-$(pwd)}"
+    
+    local timestamp=$(generate_timestamp "${TIMESTAMP_FORMAT:-default}" "${TIMESTAMP_TIMEZONE:-local}")
+    
+    log "SUCCESS" "MERGE RESOLUTION: $resolution_type - $resolved_files_count files resolved"
+    
+    # Create structured resolution log
+    local resolution_event="{
+    \"event_type\": \"merge_resolution\",
+    \"timestamp\": \"$timestamp\",
+    \"repository\": \"$(basename "$repo_dir")\",
+    \"resolution_type\": \"$resolution_type\",
+    \"resolved_files_count\": $resolved_files_count,
+    \"resolution_time_seconds\": $resolution_time_seconds,
+    \"operation_context\": \"$operation_context\",
+    \"final_branch_head\": \"$(git rev-parse HEAD 2>/dev/null)\",
+    \"merge_successful\": \"$(git status --porcelain 2>/dev/null | grep -q "^UU" && echo "false" || echo "true")\"
+    }"
+    
+    log "DEBUG" "Resolution details: $resolution_event"
+    
+    # Log to file if directory is configured
+    if [[ -n "${LOG_DIRECTORY}" && -d "${LOG_DIRECTORY}" ]]; then
+        local merge_log="${LOG_DIRECTORY}/merge_events.log"
+        echo "$resolution_event" >> "$merge_log"
+    fi
+}
+
+# Function to perform automatic rollback on merge failures
+rollback_merge_on_failure() {
+    local error_type="$1"
+    local operation_context="$2"
+    local repo_dir="${GIT_REPO_DIR:-$(pwd)}"
+    
+    log "WARNING" "Initiating rollback due to $error_type failure"
+    log "DEBUG" "Rollback context: $operation_context"
+    
+    local rollback_successful=true
+    local rollback_actions=()
+    
+    # Check if we're in a merge state and abort if necessary
+    if git status --porcelain 2>/dev/null | grep -q "^UU\|^AA\|^DD"; then
+        log "INFO" "Aborting merge to clean up conflict state"
+        if git merge --abort 2>/dev/null; then
+            rollback_actions+=("merge_aborted")
+            log "DEBUG" "Merge successfully aborted"
+        else
+            rollback_successful=false
+            rollback_actions+=("merge_abort_failed")
+            log "ERROR" "Failed to abort merge"
+        fi
+    fi
+    
+    # Reset to known good state if needed
+    if [[ "$error_type" == "REPOSITORY_CORRUPT" || "$rollback_successful" == false ]]; then
+        log "INFO" "Resetting to HEAD to ensure clean state"
+        if git reset --hard HEAD 2>/dev/null; then
+            rollback_actions+=("reset_to_head")
+            log "DEBUG" "Successfully reset to HEAD"
+        else
+            rollback_successful=false
+            rollback_actions+=("reset_failed")
+            log "ERROR" "Failed to reset to HEAD"
+        fi
+    fi
+    
+    # Clean up any stray lock files
+    local lock_file="$repo_dir/.git/index.lock"
+    if [[ -f "$lock_file" ]]; then
+        log "INFO" "Removing git lock file: $lock_file"
+        rm -f "$lock_file" 2>/dev/null && rollback_actions+=("lock_removed")
+    fi
+    
+    # Log rollback outcome
+    if [[ "$rollback_successful" == true ]]; then
+        log "SUCCESS" "Rollback completed successfully: ${rollback_actions[*]}"
+        return 0
+    else
+        log "ERROR" "Rollback partially failed: ${rollback_actions[*]}"
+        return 1
+    fi
+}
+
+# Function to preserve state for opencode intervention
+preserve_state_for_opencode() {
+    local operation_context="$1"
+    local error_type="$2"
+    local repo_dir="${GIT_REPO_DIR:-$(pwd)}"
+    
+    local state_dir="/tmp/opencode_state_$(basename "$repo_dir")_$(date +%s)"
+    mkdir -p "$state_dir"
+    
+    log "INFO" "Preserving state for opencode intervention in: $state_dir"
+    
+    # Save current git state
+    git status > "$state_dir/git_status.txt" 2>/dev/null
+    git log --oneline -10 > "$state_dir/git_history.txt" 2>/dev/null
+    git diff --cached > "$state_dir/staged_changes.diff" 2>/dev/null || true
+    git diff > "$state_dir/working_changes.diff" 2>/dev/null || true
+    
+    # Save conflict files if any
+    if git status --porcelain 2>/dev/null | grep -q "^UU"; then
+        local conflicted_files=($(git diff --name-only --diff-filter=U 2>/dev/null))
+        for file in "${conflicted_files[@]}"; do
+            cp "$file" "$state_dir/" 2>/dev/null || true
+        done
+    fi
+    
+    # Create state metadata
+    cat > "$state_dir/metadata.json" << EOF
+{
+    "timestamp": "$(date -Iseconds)",
+    "repository": "$(basename "$repo_dir")",
+    "operation_context": "$operation_context",
+    "error_type": "$error_type",
+    "current_branch": "$(git rev-parse --abbrev-ref HEAD 2>/dev/null)",
+    "current_commit": "$(git rev-parse HEAD 2>/dev/null)",
+    "origin_main_commit": "$(git rev-parse origin/main 2>/dev/null)",
+    "merge_base": "$(git merge-base HEAD origin/main 2>/dev/null)",
+    "working_tree_clean": $(git status --porcelain 2>/dev/null | wc -l),
+    "preserved_files": $(ls "$state_dir" | wc -l)
+}
+EOF
+    
+    log "INFO" "State preservation completed: $state_dir"
+    echo "$state_dir"
+}
+
+# Function to implement clean retry logic after opencode resolution
+retry_merge_after_opencode_resolution() {
+    local operation_context="$1"
+    local repo_dir="${GIT_REPO_DIR:-$(pwd)}"
+    local max_attempts="${2:-3}"
+    
+    log "INFO" "Attempting retry after opencode resolution: $operation_context"
+    
+    for ((attempt=1; attempt<=max_attempts; attempt++)); do
+        log "INFO" "Retry attempt $attempt of $max_attempts"
+        
+        # Check if repository is in a clean state
+        if git status --porcelain 2>/dev/null | grep -q "^UU\|^AA\|^DD"; then
+            log "WARNING" "Still in conflict state, cannot retry (attempt $attempt)"
+            return 2
+        fi
+        
+        # Fetch latest changes
+        if ! safe_git "fetch origin"; then
+            log "ERROR" "Failed to fetch from origin during retry $attempt"
+            continue
+        fi
+        
+        # Attempt the merge
+        if git merge origin/main -m "Merge origin/main into ai branch (retry after opencode resolution - attempt $attempt)"; then
+            log "SUCCESS" "Retry successful on attempt $attempt"
+            log_merge_resolution_outcome "automatic_retry" "0" "0" "$operation_context"
+            return 0
+        else
+            local exit_code=$?
+            log "WARNING" "Retry $attempt failed with exit code: $exit_code"
+            
+            # Clean up and continue to next attempt
+            git merge --abort 2>/dev/null || true
+        fi
+    done
+    
+    log "ERROR" "All retry attempts failed after opencode resolution"
+    return 1
+}
+
 # Enhanced merge function with opencode escalation support
 merge_origin_main_to_ai_with_escalation() {
     local repo_dir="${GIT_REPO_DIR:-$(pwd)}"
     local current_branch
     local conflict_report_file
+    local operation_start_time=$(date +%s)
     
-    log "INFO" "Starting merge of origin/main into ai branch with conflict detection"
+    log "INFO" "Starting enhanced merge of origin/main into ai branch with comprehensive error handling"
+    
+    # Validate repository state before proceeding
+    if ! validate_repository_state "pre_merge_validation"; then
+        local error_type="REPOSITORY_CORRUPT"
+        log "ERROR" "Repository state validation failed, cannot proceed with merge"
+        
+        # Attempt to get health status for debugging
+        local health_status=$(get_repository_health_status)
+        log "DEBUG" "Repository health status: $health_status"
+        
+        return 1
+    fi
     
     # Change to repository directory
     cd "$repo_dir" || {
+        local error_type="REPOSITORY_CORRUPT"
         log "ERROR" "Cannot change to directory: $repo_dir"
+        log_merge_attempt "merge_origin_main_to_ai" "origin/main" "ai" "unknown" "unknown"
         return 1
     }
     
     # Get current branch to verify we're on ai branch
     current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || {
+        local error_type="DETACHED_HEAD"
         log "ERROR" "Failed to determine current branch"
+        log_merge_attempt "merge_origin_main_to_ai" "origin/main" "ai" "unknown" "unknown"
         return 1
     }
     
     if [[ "$current_branch" != "ai" ]]; then
+        local error_type="BRANCH_NOT_FOUND"
         log "ERROR" "Not on ai branch (current: $current_branch)"
+        log_merge_attempt "merge_origin_main_to_ai" "origin/main" "ai" "unknown" "unknown"
         return 1
     fi
     
     # Fetch latest changes from origin
     log "DEBUG" "Fetching latest changes from origin"
     if ! safe_git "fetch origin"; then
+        local error_type="NETWORK_FAILURE"
         log "ERROR" "Failed to fetch from origin"
+        log_merge_attempt "merge_origin_main_to_ai" "origin/main" "ai" "unknown" "unknown"
         return 1
     fi
     
-    # Check if there are any changes to merge
+    # Get commit information for logging
     local ai_commit=$(git rev-parse HEAD 2>/dev/null)
     local main_commit=$(git rev-parse origin/main 2>/dev/null)
     
+    # Log the merge attempt
+    log_merge_attempt "merge_origin_main_to_ai" "origin/main" "ai" "$main_commit" "$ai_commit"
+    
+    # Check if there are any changes to merge
     if [[ "$ai_commit" == "$main_commit" ]]; then
         log "INFO" "ai branch is already up to date with origin/main"
+        log_merge_resolution_outcome "no_merge_needed" "0" "0" "up_to_date"
         return 0
     fi
     
-    # Perform the merge with conflict detection
+    # Perform the merge with enhanced error handling
     log "INFO" "Attempting merge of origin/main into ai branch"
-    if git merge origin/main -m "Merge origin/main into ai branch (automated)"; then
-        log "SUCCESS" "Successfully merged origin/main into ai branch"
+    local merge_output
+    local merge_exit_code
+    
+    if merge_output=$(git merge origin/main -m "Merge origin/main into ai branch (automated)" 2>&1); then
+        local operation_time=$(($(date +%s) - operation_start_time))
+        log "SUCCESS" "Successfully merged origin/main into ai branch in ${operation_time}s"
+        log_merge_resolution_outcome "automatic_merge" "0" "$operation_time" "initial_attempt"
         return 0
     else
-        local exit_code=$?
-        log "ERROR" "Merge failed with exit code: $exit_code"
+        merge_exit_code=$?
+        local error_type=$(classify_merge_error "$merge_exit_code" "$merge_output")
+        local operation_time=$(($(date +%s) - operation_start_time))
         
-        # Detect conflicts and create escalation report
-        conflict_report_file=$(detect_merge_conflicts)
-        local conflict_count=$?
+        log "ERROR" "Merge failed with exit code: $merge_exit_code, error type: $error_type"
+        log "DEBUG" "Merge error output: $merge_output"
         
-        if [[ $conflict_count -gt 0 ]]; then
-            log "ERROR" "Merge conflicts detected - escalating to opencode for resolution"
-            log "INFO" "Conflict report available at: $conflict_report_file"
-            
-            # Preserve merge state for opencode to resolve
-            log "WARNING" "Merge state preserved - opencode intervention required"
-            return 2  # Special exit code for conflicts
+        # Handle different error types appropriately
+        case "$error_type" in
+            "MERGE_CONFLICT")
+                # Detect conflicts and create escalation report
+                conflict_report_file=$(detect_merge_conflicts)
+                local conflict_count=$?
+                
+                if [[ $conflict_count -gt 0 ]]; then
+                    local conflicted_files=($(git diff --name-only --diff-filter=U 2>/dev/null))
+                    log_merge_conflict_detection "${conflicted_files[@]}"
+                    
+                    log "ERROR" "Merge conflicts detected - escalating to opencode for resolution"
+                    log_opencode_escalation "merge_conflicts_detected" "$conflict_report_file" "initial_merge_attempt"
+                    
+                    # Preserve state for opencode intervention
+                    local state_dir=$(preserve_state_for_opencode "initial_merge_attempt" "$error_type")
+                    
+                    # Log to conflict report the state directory
+                    if [[ -n "$conflict_report_file" && -f "$conflict_report_file" ]]; then
+                        # Add state directory to conflict report
+                        sed -i "s/}/,  \"state_directory\": \"$state_dir\"}/" "$conflict_report_file"
+                    fi
+                    
+                    log "WARNING" "Merge state preserved - opencode intervention required"
+                    return 2  # Special exit code for conflicts
+                else
+                    log "WARNING" "No conflicts found despite merge failure - treating as other error"
+                fi
+                ;;
+                
+            "NETWORK_FAILURE"|"TIMEOUT")
+                log "ERROR" "Merge failed due to $error_type - will retry"
+                rollback_merge_on_failure "$error_type" "merge_attempt"
+                return $merge_exit_code
+                ;;
+                
+            "LOCK_FILE_EXISTS")
+                log "WARNING" "Git lock file detected - attempting cleanup"
+                local lock_file="$repo_dir/.git/index.lock"
+                if [[ -f "$lock_file" ]]; then
+                    rm -f "$lock_file" && log "INFO" "Git lock file removed"
+                    # Retry after cleanup
+                    if git merge origin/main -m "Merge origin/main into ai branch (after lock cleanup)"; then
+                        log "SUCCESS" "Merge succeeded after lock cleanup"
+                        return 0
+                    fi
+                fi
+                ;;
+                
+            *)
+                log "ERROR" "Unhandled merge error type: $error_type"
+                ;;
+        esac
+        
+        # For non-conflict failures, attempt rollback and clean up
+        rollback_merge_on_failure "$error_type" "merge_attempt"
+        
+        # Create error report for debugging
+        local error_report_file="/tmp/merge_error_report_$(date +%s).json"
+        cat > "$error_report_file" << EOF
+{
+    "error_type": "$error_type",
+    "exit_code": $merge_exit_code,
+    "operation_time_seconds": $operation_time,
+    "error_output": "$merge_output",
+    "repository": "$(basename "$repo_dir")",
+    "current_branch": "$current_branch",
+    "ai_commit": "$ai_commit",
+    "main_commit": "$main_commit",
+    "timestamp": "$(date -Iseconds)",
+    "git_status": "$(git status --porcelain 2>/dev/null | tr '\n' ';')",
+    "error_description": "${MERGE_ERROR_TYPES[$error_type]}"
+}
+EOF
+        
+        log "INFO" "Error report created: $error_report_file"
+        log "ERROR" "Merge failed for $error_type reasons - cleanup completed"
+        
+        return $merge_exit_code
+    fi
+}
+
+# =============================================================================
+# BEADS QUERY FUNCTIONS
+# =============================================================================
+
+# Function to check if there are any open bead tasks for a repository
+# Returns: 0 if open tasks exist, 1 if no open tasks, 2 if error occurred
+has_open_bead_tasks() {
+    local repo_dir="${1:-$(pwd)}"
+    local timeout_seconds="${2:-30}"
+    
+    log "DEBUG" "Checking for open bead tasks in repository: $(basename "$repo_dir")"
+    
+    # Change to repository directory if specified
+    if [[ -n "$1" ]]; then
+        cd "$repo_dir" || {
+            log "ERROR" "Cannot change to directory: $repo_dir"
+            return 2
+        }
+    fi
+    
+    # Check if this is a beads-enabled repository
+    if [[ ! -d ".beads" ]]; then
+        log "DEBUG" "No .beads directory found - not a beads-enabled repository"
+        return 1
+    fi
+    
+    # Check if bd command is available
+    if ! command_exists bd; then
+        log "ERROR" "bd command not found - beads CLI is required"
+        return 2
+    fi
+    
+    # Query for open tasks with timeout
+    local open_tasks_json
+    local start_time=$(date +%s)
+    
+    log "DEBUG" "Querying beads for open tasks (timeout: ${timeout_seconds}s)"
+    
+    # Use timeout to prevent hanging
+    if command -v timeout >/dev/null 2>&1; then
+        open_tasks_json=$(timeout "$timeout_seconds" bd list --status=open --json 2>/dev/null) || {
+            local exit_code=$?
+            if [[ $exit_code -eq 124 ]]; then
+                log "WARNING" "Beads query timed out after ${timeout_seconds}s"
+            else
+                log "ERROR" "Beads query failed with exit code: $exit_code"
+            fi
+            return 2
+        }
+    else
+        # Fallback without timeout command
+        open_tasks_json=$(bd list --status=open --json 2>/dev/null) || {
+            local exit_code=$?
+            log "ERROR" "Beads query failed with exit code: $exit_code"
+            return 2
+        }
+    fi
+    
+    local query_time=$(($(date +%s) - start_time))
+    log "DEBUG" "Beads query completed in ${query_time}s"
+    
+    # Parse JSON response to count open tasks
+    local open_tasks_count=0
+    if [[ -n "$open_tasks_json" ]]; then
+        # Extract count from JSON array (simplified parsing)
+        if echo "$open_tasks_json" | jq -e '. | length' >/dev/null 2>&1; then
+            open_tasks_count=$(echo "$open_tasks_json" | jq '. | length' 2>/dev/null || echo 0)
         else
-            # Non-conflict merge failure (network, permissions, etc.)
-            log "ERROR" "Merge failed for non-conflict reasons - cleaning up"
-            git merge --abort 2>/dev/null || true
-            return $exit_code
+            # Fallback parsing without jq
+            open_tasks_count=$(echo "$open_tasks_json" | grep -o '"id"' | wc -l)
         fi
+    fi
+    
+    log "INFO" "Found $open_tasks_count open bead tasks in $(basename "$repo_dir")"
+    
+    # Return based on count
+    if [[ $open_tasks_count -gt 0 ]]; then
+        return 0  # Open tasks exist
+    else
+        return 1  # No open tasks
+    fi
+}
+
+# Function to get count of open bead tasks
+# Returns: number of open tasks, or -1 on error
+get_open_bead_tasks_count() {
+    local repo_dir="${1:-$(pwd)}"
+    local timeout_seconds="${2:-30}"
+    
+    # Change to repository directory if specified
+    if [[ -n "$1" ]]; then
+        cd "$repo_dir" || {
+            log "ERROR" "Cannot change to directory: $repo_dir"
+            echo "-1"
+            return 1
+        }
+    fi
+    
+    # Check if this is a beads-enabled repository
+    if [[ ! -d ".beads" ]]; then
+        log "DEBUG" "No .beads directory found - not a beads-enabled repository"
+        echo "0"
+        return 1
+    fi
+    
+    # Check if bd command is available
+    if ! command_exists bd; then
+        log "ERROR" "bd command not found - beads CLI is required"
+        echo "-1"
+        return 2
+    fi
+    
+    # Query for open tasks
+    local open_tasks_json
+    if command -v timeout >/dev/null 2>&1; then
+        open_tasks_json=$(timeout "$timeout_seconds" bd list --status=open --json 2>/dev/null) || {
+            echo "-1"
+            return 2
+        }
+    else
+        open_tasks_json=$(bd list --status=open --json 2>/dev/null) || {
+            echo "-1"
+            return 2
+        }
+    fi
+    
+    # Parse and return count
+    if [[ -n "$open_tasks_json" ]]; then
+        if echo "$open_tasks_json" | jq -e '. | length' >/dev/null 2>&1; then
+            echo "$open_tasks_json" | jq '. | length' 2>/dev/null || echo "0"
+        else
+            # Fallback parsing
+            echo "$open_tasks_json" | grep -o '"id"' | wc -l
+        fi
+    else
+        echo "0"
+    fi
+}
+
+# Function to log task availability decisions
+log_task_availability_decision() {
+    local repo_name="$1"
+    local has_tasks="$2"
+    local task_count="${3:-0}"
+    local decision="${4:-proceed}"
+    local reason="${5:-}"
+    
+    if [[ "$has_tasks" == "true" ]]; then
+        log "INFO" "Task availability check for $repo_name: FOUND $task_count open tasks - decision: $decision"
+    else
+        log "INFO" "Task availability check for $repo_name: NO open tasks found - decision: $decision ${reason:+($reason)}"
     fi
 }
 
@@ -923,4 +1593,8 @@ export -f log strip_colors should_log rotate_log_if_needed cleanup_old_logs hand
 export -f log_change_detection log_system_health log_reboot_event log_system_state_snapshot
 export -f generate_timestamp validate_timestamp_format validate_timezone get_script_name format_log_entry configure_logging
 export -f get_supported_timestamp_formats benchmark_timestamp_generation recommend_timestamp_format
+export -f classify_merge_error log_merge_attempt log_merge_conflict_detection log_opencode_escalation log_merge_resolution_outcome
+export -f rollback_merge_on_failure preserve_state_for_opencode retry_merge_after_opencode_resolution
+export -f validate_repository_state get_repository_health_status
+export -f has_open_bead_tasks get_open_bead_tasks_count log_task_availability_decision
 export RED GREEN YELLOW BLUE NC DEBUG_MODE
