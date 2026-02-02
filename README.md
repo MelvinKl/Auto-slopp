@@ -54,6 +54,7 @@ The system has been recently enhanced with:
 - **📋 Task Processing**: Generates bead tasks from numbered text files
 - **🔧 Code Generation**: Uses OpenCode CLI for implementation and fixes
 - **📊 Task Management**: Delegates beads operations to opencode internally
+- **🔄 Auto-Update-Reboot**: Monitors repository changes and triggers conditional system reboots with comprehensive safety mechanisms
 - **📝 Comprehensive Logging**: Colored logging with multiple levels and error handling
 - **📁 File Numbering**: Automatic sequential numbering and ordering of task files
 - **📁 Proper Context**: Executes operations in correct repository directories
@@ -115,6 +116,34 @@ managed_repo_path: ~/git/managed    # Path containing repository subdirectories
 managed_repo_task_path: ~/git/repo_task_path  # Path for task description files
 ```
 
+### Auto-Update-Reboot Configuration
+
+The auto-update-reboot functionality monitors repository changes and triggers conditional system reboots with comprehensive safety mechanisms:
+
+```yaml
+# Auto-update-reboot configuration
+auto_update_reboot_enabled: false        # Enable/disable the functionality
+reboot_cooldown_minutes: 60             # Minimum time between reboots
+change_detection_interval_minutes: 5   # How often to check for changes
+reboot_delay_seconds: 30                # Grace period before reboot
+max_reboot_attempts_per_day: 3          # Daily limit on reboot attempts
+maintenance_mode: false                  # Manual override to disable reboots
+emergency_override: false               # Emergency override for forced reboots
+```
+
+**Key Safety Features:**
+- **Cooldown Protection**: Prevents reboot loops with configurable minimum intervals
+- **Daily Limits**: Caps the number of reboots per day to prevent excessive reboots
+- **Health Checks**: Validates system health (disk space, memory) before rebooting
+- **Maintenance Mode**: Manual override to disable all reboots during maintenance
+- **Change Detection**: Only reboots for critical file changes (scripts, configuration)
+
+**What Triggers Reboots:**
+- Script changes (`scripts/*.sh`)
+- Configuration changes (`config.yaml`)
+- Main orchestration changes (`main.sh`)
+- Core utility changes (`scripts/utils.sh`)
+
 The configuration system uses `yaml_config.sh` to automatically load and validate these values for all scripts. Tilde paths (~) are automatically expanded to your home directory.
 
 ### 5. Verify OpenCode CLI Integration
@@ -144,6 +173,7 @@ echo "Configuration loaded successfully"
 ./scripts/planner.sh         # Process task files
 ./scripts/updater.sh         # Update repositories
 ./scripts/implementer.sh     # Implement bead tasks
+./scripts/auto-update-reboot.sh # Monitor changes and trigger conditional reboots
 ```
 
 ### First Time Setup
@@ -169,6 +199,7 @@ Auto-slopp/
 ├── scripts/                   # Core scripts (auto-discovered)
 │   ├── utils.sh              # Error handling and logging utilities
 │   ├── yaml_config.sh        # YAML configuration utilities
+│   ├── auto-update-reboot.sh # Monitor changes and trigger conditional reboots
 │   ├── update_fixer.sh       # Fix failed dependency updates
 │   ├── creator.sh            # Create task directories
 │   ├── planner.sh            # Process task files (with numbering)
@@ -261,6 +292,34 @@ For each repository:
     ├── Comprehensive error handling and logging
     ├── Commit and push changes
     └── Close completed task
+```
+
+#### auto-update-reboot.sh
+```bash
+# Comprehensive safety checks before any operations
+├── Check if auto-update-reboot is enabled in config
+├── Verify maintenance mode status
+├── Validate reboot cooldown period
+└── Check daily reboot limits
+
+# System health validation
+├── Disk space check (must have < 90% usage)
+├── Memory usage check (must have < 90% usage)
+└── Critical services status check
+
+# Repository change detection
+├── Store current HEAD commit
+├── git pull latest changes
+├── Compare HEAD before/after pull
+├── Analyze changed files for triggers
+└── Update state tracking
+
+# Conditional reboot execution
+├── Send pre-reboot notifications
+├── Capture system state snapshot
+├── Wait configured delay period
+├── Execute reboot with fallback methods
+└── Update reboot state and history
 ```
 
 ## 📝 Task File Format
@@ -536,6 +595,15 @@ else
     exit 1
 fi
 ```
+
+## 🏗️ Architecture Documentation
+
+For detailed technical specifications and design decisions, see:
+
+- **[Auto-Update-Reboot Architecture](AUTO_UPDATE_REBOOT_ARCHITECTURE.md)** - Comprehensive design documentation for the auto-update-reboot functionality, including safety mechanisms, state management, and integration patterns
+- **[Repository Cleanup Architecture](REPOSITORY_CLEANUP_ARCHITECTURE.md)** - Design documentation for repository cleanup operations
+
+These documents provide in-depth technical details for developers and system administrators who need to understand the internal architecture, security considerations, and extensibility of the system components.
 
 ## 🤝 Contributing
 
