@@ -30,21 +30,16 @@ trap cleanup_test EXIT
 
 # Function to create test configuration
 create_test_config() {
-    # Use the existing config.yaml but ensure telegram section exists
-    if [[ -f "$PROJECT_ROOT/config.yaml" ]]; then
-        cp "$PROJECT_ROOT/config.yaml" "$TEST_CONFIG"
-    else
-        # Create minimal config with telegram section
-        cat > "$TEST_CONFIG" << 'EOF'
+    # Create a clean test config (don't copy existing config to avoid conflicts)
+    cat > "$TEST_CONFIG" << 'EOF'
+# Test configuration for Telegram Bot API
 sleep_duration: 100
 managed_repo_path: "~/git/managed"
 log_directory: "~/git/Auto-logs"
 log_level: INFO
-EOF
-    fi
-    
-    # Append telegram configuration
-    cat >> "$TEST_CONFIG" << 'EOF'
+
+# Telegram Bot logging configuration
+telegram:
 
 # Telegram Bot logging configuration
 telegram:
@@ -186,7 +181,7 @@ test_security_validation() {
     source "${PROJECT_ROOT}/scripts/core/telegram_security.sh"
     
     # Test token format validation
-    if validate_bot_token_format "123456789:ABCdefGHIjklMNOpqrsTUVwxyz-123456789"; then
+    if validate_bot_token_format "123456789:ABCdefGHIjklMNOpqrsTUVwxyz12345abcd"; then
         log "SUCCESS" "Valid token format accepted"
     else
         log "ERROR" "Valid token format rejected"
@@ -305,6 +300,7 @@ test_utils_integration() {
     # Set up test environment
     export TELEGRAM_ENABLED="true"
     export TELEGRAM_FILTERS_LOG_LEVELS="ERROR,WARNING,SUCCESS"
+    export TELEGRAM_FILTERS_SCRIPTS="main.sh,updater.sh,implementer.sh,planner.sh"
     export TELEGRAM_BOT_TOKEN="test_token"
     export TELEGRAM_CHAT_ID="@test"
     
@@ -313,11 +309,19 @@ test_utils_integration() {
     source "${PROJECT_ROOT}/scripts/core/telegram_security.sh"
     source "${PROJECT_ROOT}/scripts/core/telegram_queue.sh"
     
-    # Test should_send_to_telegram function
-    if should_send_to_telegram "ERROR" "test_script"; then
+# Test should_send_to_telegram function
+    if should_send_to_telegram "ERROR" "main.sh"; then
         log "SUCCESS" "should_send_to_telegram correctly allows ERROR messages"
     else
         log "ERROR" "should_send_to_telegram incorrectly blocks ERROR messages"
+        return 1
+    fi
+    
+    # Test filtered levels
+    if ! should_send_to_telegram "DEBUG" "main.sh"; then
+        log "SUCCESS" "should_send_to_telegram correctly blocks DEBUG messages"
+    else
+        log "ERROR" "should_send_to_telegram incorrectly allows DEBUG messages"
         return 1
     fi
     

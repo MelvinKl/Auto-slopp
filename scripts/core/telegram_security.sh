@@ -14,10 +14,10 @@ source "${SCRIPT_DIR}/../utils.sh"
 # Set up error handling
 setup_error_handling
 
-# Security configuration constants
-CONFIG_VALIDATION_STRICT="strict"
-CONFIG_VALIDATION_WARN="warn"
-CONFIG_VALIDATION_RELAXED="relaxed"
+# Security configuration constants (declare if not already set)
+[[ -z "$CONFIG_VALIDATION_STRICT" ]] && readonly CONFIG_VALIDATION_STRICT="strict"
+[[ -z "$CONFIG_VALIDATION_WARN" ]] && readonly CONFIG_VALIDATION_WARN="warn"
+[[ -z "$CONFIG_VALIDATION_RELAXED" ]] && readonly CONFIG_VALIDATION_RELAXED="relaxed"
 TELEGRAM_TOKEN_FILE_DEFAULT="/etc/telegram/token"
 TELEGRAM_CONFIG_PERMISSIONS=600
 TELEGRAM_DIR_PERMISSIONS=700

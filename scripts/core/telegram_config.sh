@@ -16,10 +16,10 @@ source "${SCRIPT_DIR}/telegram_security.sh"
 # Set up error handling
 setup_error_handling
 
-# Configuration validation constants
-readonly CONFIG_VALIDATION_STRICT="strict"
-readonly CONFIG_VALIDATION_WARN="warn"
-readonly CONFIG_VALIDATION_RELAXED="relaxed"
+# Configuration validation constants (declare if not already set)
+[[ -z "$CONFIG_VALIDATION_STRICT" ]] && readonly CONFIG_VALIDATION_STRICT="strict"
+[[ -z "$CONFIG_VALIDATION_WARN" ]] && readonly CONFIG_VALIDATION_WARN="warn"
+[[ -z "$CONFIG_VALIDATION_RELAXED" ]] && readonly CONFIG_VALIDATION_RELAXED="relaxed"
 
 # Global configuration state
 declare -g TELEGRAM_CONFIG_FILE=""
@@ -182,7 +182,21 @@ validate_telegram_configuration() {
     
     for key in "${telegram_keys[@]}"; do
         local value
-        value=$(read_yaml_nested_config "$config_file" "$key" "")
+        # Use specific grep patterns for known keys
+        case "$key" in
+            "telegram.rate_limiting.messages_per_second")
+                value=$(grep -A5 "rate_limiting:" "$config_file" | grep "messages_per_second:" | sed 's/^[[:space:]]*messages_per_second:[[:space:]]*//' | sed 's/[[:space:]]*#.*//' | sed 's/^["'"'"']//' | sed 's/["'"'"']$//' | sed 's/[[:space:]]*$//')
+                ;;
+            "telegram.formatting.max_message_length")
+                value=$(grep -A5 "formatting:" "$config_file" | grep "max_message_length:" | sed 's/^[[:space:]]*max_message_length:[[:space:]]*//' | sed 's/[[:space:]]*#.*//' | sed 's/^["'"'"']//' | sed 's/["'"'"']$//' | sed 's/[[:space:]]*$//')
+                ;;
+            "telegram.retry.max_attempts")
+                value=$(grep -A5 "retry:" "$config_file" | grep "max_attempts:" | sed 's/^[[:space:]]*max_attempts:[[:space:]]*//' | sed 's/[[:space:]]*#.*//' | sed 's/^["'"'"']//' | sed 's/["'"'"']$//' | sed 's/[[:space:]]*$//')
+                ;;
+            *)
+                value=$(read_yaml_nested_config "$config_file" "$key" "")
+                ;;
+        esac
         
         if [[ -z "$value" ]]; then
             case "$validation_level" in
