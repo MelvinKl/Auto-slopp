@@ -1,79 +1,100 @@
-# Repository Automation System
+# Auto-slopp: Advanced Repository Automation System
 
-A robust bash-based automation system for managing multiple Git repositories with dependency updates, task generation, and implementation.
+A sophisticated bash-based automation system for managing multiple Git repositories with intelligent task processing, dependency updates, and comprehensive monitoring capabilities.
 
 ## 🎯 Overview
 
-This automation system provides comprehensive management of multiple repositories through sophisticated scripts that:
+Auto-slopp is an enterprise-grade automation system that provides comprehensive management of multiple repositories through intelligent scripts that:
 
-- **Dynamically discovers and runs scripts** from scripts directory
-- **Uses YAML configuration** for flexible settings management
-- **Automatically handles dependency updates** from Renovate branches
-- **Creates structured task directories** for each repository
-- **Processes numbered task files** with sequential ordering
-- **Generates and implements bead tasks** using OpenCode CLI
-- **Updates repositories** and merges branches safely
-- **Provides comprehensive error handling** and colored logging
-- **Runs continuously** in an endless loop
+### 🔄 Core Automation
+- **Dynamic Script Discovery**: Automatically discovers and executes all `.sh` files in `scripts/` directory
+- **YAML Configuration System**: Flexible, validated configuration with environment variable support
+- **Dependency Update Management**: Automated handling of Renovate branch updates with conflict resolution
+- **Structured Task Processing**: Intelligent task directory creation and sequential file processing
+- **Beads Integration**: Native task management through beads CLI with OpenCode automation
+- **Safe Git Operations**: Atomic operations with comprehensive error handling and rollback
 
-## 🔄 Recent Improvements
+### 🚀 Advanced Features
+- **Number State Management**: Atomic, concurrent-safe number assignment for unique tracking
+- **Auto-Update-Reboot**: Intelligent system reboot management with comprehensive safety mechanisms
+- **Telegram Bot Integration**: Real-time monitoring and alerting with rate limiting and security
+- **Branch Protection**: Advanced branch safety with configurable protection rules
+- **Beads Synchronization**: Cross-repository state synchronization with conflict resolution
+- **Comprehensive Logging**: Multi-level colored logging with rotation and archival
+- **Health Monitoring**: System health checks with automated recovery mechanisms
 
-The system has been recently enhanced with:
+### 🏗️ Architecture
+The system operates as a distributed automation engine with:
+- **Modular Design**: Each component operates independently with clear interfaces
+- **State Management**: Persistent state tracking across restarts and failures
+- **Concurrent Safety**: Atomic operations with proper locking mechanisms
+- **Error Recovery**: Comprehensive error handling with retry logic and fallback strategies
 
-### 🤖 OpenCode CLI Integration
-- All opencode operations now use `opencode` CLI with `--agent OpenAgent`
-- Direct integration with OpenCode for code generation and fixes
-- Consistent interface through OpenCode CLI
+## 🚀 Key Features
 
-### 📋 YAML Configuration System
-- Replaced old config.sh with flexible `config.yaml`
-- Centralized settings management with yaml_config.sh
-- Environment variable validation and expansion
+### 🔄 Core Automation Engine
+- **Dynamic Script Discovery**: Automatically discovers and runs all `.sh` files in `scripts/` directory
+- **Sequential Processing**: Scripts executed in alphabetical order with dependency tracking
+- **Modular Architecture**: Add new functionality without modifying core components
 
-### 🔧 Comprehensive Error Handling
-- Added utils.sh with robust error handling and logging
-- Colored output with different log levels (INFO, SUCCESS, WARNING, ERROR, DEBUG)
-- Safe command execution with detailed error reporting
-- Git operation safety wrappers
+### 🤖 Intelligent Task Management
+- **OpenCode CLI Integration**: Direct integration with OpenAgent for code generation and fixes
+- **Beads Task Processing**: Native task management with automated workflow
+- **File Numbering System**: Automatic sequential numbering (0001-9999) with conflict resolution
+- **Task State Tracking**: Persistent task state across system restarts
 
-### 📁 File Numbering System
-- Automatic numbering of task files (0001-, 0002-, 0003-, etc.)
-- Sequential processing order guaranteed
-- Automatic assignment of numbers to unnumbered files
-- Support for up to 10,000 tasks (0000-9999)
+### 📊 Advanced Configuration
+- **YAML Configuration System**: Flexible, validated configuration with environment variables
+- **Multi-environment Support**: Environment-specific settings with inheritance
+- **Runtime Validation**: Configuration validation with detailed error reporting
+- **Hot Reloading**: Configuration changes without system restart
 
-### 📁 Dynamic Script Discovery
-- main.sh automatically discovers all `.sh` files in `scripts/` directory
-- Scripts executed in alphabetical order
-- Add new scripts without modifying main.sh
+### 🔧 Comprehensive Tooling
+- **Number State Manager**: Atomic, concurrent-safe number assignment and tracking
+- **Auto-Update-Reboot**: Intelligent system reboot management with safety mechanisms
+- **Branch Protection**: Advanced branch safety with configurable rules and validation
+- **Beads Synchronization**: Cross-repository state sync with conflict resolution
 
-## 🚀 Features
+### 📡 Monitoring & Alerting
+- **Telegram Bot Integration**: Real-time monitoring with rate limiting and security
+- **Comprehensive Logging**: Multi-level colored logging with rotation and archival
+- **Health Monitoring**: System health checks with automated recovery
+- **Performance Metrics**: Detailed reporting and performance tracking
 
-- **🔄 Dynamic Script Discovery**: Automatically discovers and runs all .sh files in scripts/ directory
-- **🤖 OpenCode CLI Integration**: Direct integration with opencode CLI and OpenAgent
-- **📋 Task Processing**: Generates bead tasks from numbered text files
-- **🔧 Code Generation**: Uses OpenCode CLI for implementation and fixes
-- **📊 Task Management**: Delegates beads operations to opencode internally
-- **🔄 Auto-Update-Reboot**: Monitors repository changes and triggers conditional system reboots with comprehensive safety mechanisms
-- **📝 Comprehensive Logging**: Colored logging with multiple levels and error handling
-- **📁 File Numbering**: Automatic sequential numbering and ordering of task files
-- **📁 Proper Context**: Executes operations in correct repository directories
-- **🎛️ YAML Configuration**: Flexible configuration system with validation
-- **🔌 Modular Design**: Add new scripts without modifying main.sh
-- **⚡ Error Recovery**: Robust error handling with safe command execution
+### 🛡️ Enterprise Features
+- **Error Recovery**: Robust error handling with retry logic and fallback strategies
+- **Concurrent Safety**: Atomic operations with proper locking mechanisms
+- **Audit Trail**: Complete audit logging for compliance and debugging
+- **Security Hardening**: Token encryption, access validation, and secure storage
 
 ## 📋 Prerequisites
 
-Before using this system, ensure you have:
-- [Opencode](https://opencode.ai/docs/#install)
-- [Beads](https://github.com/steveyegge/beads)
-- [OpenAgentsControl](https://github.com/darrenhinde/OpenAgentsControl) (I reccommend the full installation)
- 
+### Required Tools
 ```bash
-# Required tools
-git                # Git version control
+# Core dependencies
+git                # Git version control (v2.25+)
 opencode           # OpenCode CLI for code generation
 bd                # Beads CLI for task management
+
+# Optional but recommended
+jq                 # JSON processing for configuration validation
+curl               # HTTP client for API integrations
+```
+
+### System Requirements
+- **Operating System**: Linux (Ubuntu 20.04+, CentOS 8+, RHEL 8+)
+- **Shell**: Bash 4.4+ with extended globbing
+- **Memory**: Minimum 512MB RAM (1GB+ recommended)
+- **Disk**: 100MB free space for logs and state management
+- **Network**: Internet access for git operations and optional Telegram integration
+
+### Environment Setup
+```bash
+# Set up environment (optional)
+export DEBUG_MODE=true                    # Enable verbose logging
+export TELEGRAM_BOT_TOKEN="your_token"    # Telegram bot token
+export OPencode_CMD="/usr/local/bin/opencode"  # Custom OpenCode path
+export BEADS_CMD="/usr/local/bin/bd"      # Custom beads path
 ```
 
 ## 🛠️ Installation
@@ -85,35 +106,85 @@ git clone <repository-url>
 cd Auto-slopp
 ```
 
-### 2. Make Scripts Executable
+### 2. Install Dependencies
+
+```bash
+# Install required tools (Ubuntu/Debian)
+sudo apt update
+sudo apt install -y git curl jq
+
+# Install OpenCode CLI (if not already installed)
+curl -fsSL https://opencode.ai/install.sh | bash
+
+# Install Beads CLI (if not already installed)
+go install github.com/steveyegge/beads@latest
+```
+
+### 3. Make Scripts Executable
 
 ```bash
 chmod +x main.sh config.sh
 chmod +x scripts/*.sh
+chmod +x scripts/core/*.sh
 ```
 
-### 3. Configure Repositories
+### 4. Configure Repository Structure
 
-Edit `config.yaml` to configure your repository automation:
+```bash
+# Create managed directories
+mkdir -p ~/git/managed
+mkdir -p ~/git/repo_task_path
 
-```yaml
-# config.yaml
-sleep_duration: 1000
-managed_repo_path: ~/git/managed
-managed_repo_task_path: ~/git/repo_task_path
+# Add your repositories as subdirectories
+cd ~/git/managed
+git clone <repo1-url> repo1
+git clone <repo2-url> repo2
+# Add more repositories as needed
 ```
 
-Create managed directories and add your repositories as subdirectories under `managed_repo_path`.
+### 5. Configure System
 
-### 4. Configure Settings
-
-Edit `config.yaml` to adjust settings:
+Edit `config.yaml` with your settings:
 
 ```yaml
-# Key settings
-sleep_duration: 1000                # Sleep duration in seconds between cycles
-managed_repo_path: ~/git/managed    # Path containing repository subdirectories
-managed_repo_task_path: ~/git/repo_task_path  # Path for task description files
+# Basic configuration
+sleep_duration: 100                  # Duration between cycles (seconds)
+managed_repo_path: '~/git/managed'  # Path containing repository subdirectories
+managed_repo_task_path: '~/git/repo_task_path'  # Path for task description files
+
+# Logging configuration
+log_level: INFO                     # DEBUG, INFO, WARNING, ERROR, SUCCESS
+log_directory: '~/git/Auto-logs'     # Log file location
+log_max_size_mb: 10                 # Maximum log file size before rotation
+log_retention_days: 30              # Maximum age of log files before cleanup
+```
+
+### 6. First Time Setup
+
+```bash
+# Test configuration loading
+source scripts/yaml_config.sh && load_config
+
+# Initialize number management system
+./scripts/number_manager.sh init
+
+# Create task directories
+./scripts/creator.sh
+
+# Test individual components
+./scripts/updater.sh
+./scripts/planner.sh
+```
+
+## ⚙️ Configuration
+
+### Core Configuration
+
+```yaml
+# Repository automation configuration
+sleep_duration: 100                  # Duration between cycles (seconds)
+managed_repo_path: '~/git/managed'  # Path containing repository subdirectories
+managed_repo_task_path: '~/git/repo_task_path'  # Path for task description files
 ```
 
 ### Auto-Update-Reboot Configuration
@@ -138,11 +209,99 @@ emergency_override: false               # Emergency override for forced reboots
 - **Maintenance Mode**: Manual override to disable all reboots during maintenance
 - **Change Detection**: Only reboots for critical file changes (scripts, configuration)
 
-**What Triggers Reboots:**
-- Script changes (`scripts/*.sh`)
-- Configuration changes (`config.yaml`)
-- Main orchestration changes (`main.sh`)
-- Core utility changes (`scripts/utils.sh`)
+### Beads Updater Configuration (CRITICAL P0)
+
+Advanced configuration for automated repository synchronization:
+
+```yaml
+# Beads updater configuration (CRITICAL P0 - Automated Repository Synchronization)
+beads_updater:
+  default_sync_mode: "incremental"      # "incremental" or "full" - sync mode preference
+  default_conflict_strategy: "newest"   # "newest", "manual", "keep_local", "keep_remote"
+  default_max_retries: 3               # Maximum retry attempts for failed syncs
+  backup_retention_days: 30            # Days to keep automatic backups
+  enable_detailed_reporting: true       # Generate detailed JSON sync reports
+  cleanup_temp_files: true             # Clean up temporary files after sync
+  lock_timeout_minutes: 30            # Lock file timeout to prevent deadlocks
+```
+
+### Branch Protection Configuration
+
+Advanced branch protection and safety mechanisms:
+
+```yaml
+# Enhanced branch protection configuration
+branch_protection:
+  enable_protection: true              # Enable branch protection mechanisms
+  require_confirmation: true           # Require explicit confirmation for protected branches
+  show_warnings: true                  # Show warnings before deleting any branch
+  protected_branches:                  # List of branches that are always protected
+    - "main"
+    - "master"
+    - "develop"
+    - "staging"
+    - "production"
+  protect_current_branch: true        # Always protect the currently checked-out branch
+  protection_patterns:                 # Branch name patterns that are protected
+    - "keep-*"
+    - "protected-*"
+    - "temp-*"
+    - "backup-*"
+  require_explicit_confirmation_for:   # Branch types requiring explicit confirmation
+    - "main"
+    - "master"
+    - "develop"
+    - "staging"
+    - "production"
+```
+
+### Telegram Bot Configuration (P0 Critical)
+
+Real-time monitoring and alerting through Telegram:
+
+```yaml
+# Telegram Bot logging configuration (P0 Critical)
+telegram:
+  enabled: false                        # Enable/disable Telegram logging globally
+  bot_token: "${TELEGRAM_BOT_TOKEN}"    # Environment variable for bot token (NEVER store in plain text)
+  default_chat_id: "@logs_channel"      # Default channel/chat for sending messages
+  api_timeout_seconds: 10               # Timeout for Telegram API requests
+  connection_retries: 3                 # Maximum retry attempts for failed connections
+  
+  # Rate limiting configuration
+  rate_limiting:
+    messages_per_second: 5              # Conservative rate limit (far below Telegram's 30/sec)
+    burst_size: 20                     # Burst capacity for handling logs
+    rate_limit_window_seconds: 60      # Time window for rate limiting calculations
+    backoff_multiplier: 2              # Multiplier for exponential backoff
+    max_backoff_seconds: 30             # Maximum backoff delay
+  
+  # Message formatting configuration
+  formatting:
+    parse_mode: "HTML"                  # Message format: "HTML", "Markdown", or "plain"
+    max_message_length: 4000            # Safe message length (below Telegram's 4096 limit)
+    include_timestamp: true             # Include timestamps in messages
+    include_log_level: true             # Include log level indicators
+    include_script_name: true           # Include script name for context
+    use_emoji_indicators: true          # Use emoji for log levels (🔴🟡🟢🔵)
+```
+
+### Logging Configuration
+
+Comprehensive logging with rotation and archival:
+
+```yaml
+# Logging configuration
+log_directory: '~/git/Auto-logs'         # Log file location
+log_max_size_mb: 10                     # Maximum log file size before rotation (MB)
+log_max_files: 5                        # Maximum number of rotated log files to keep
+log_retention_days: 30                  # Maximum age of log files before cleanup (days)
+log_level: INFO                         # Default log level (DEBUG, INFO, WARNING, ERROR, SUCCESS)
+
+# Enhanced timestamp configuration
+timestamp_format: default               # Timestamp format: "default", "iso8601", "compact", "readable", "debug", "microseconds"
+timestamp_timezone: local                # Timezone for timestamps: "local" or "utc"
+```
 
 The configuration system uses `yaml_config.sh` to automatically load and validate these values for all scripts. Tilde paths (~) are automatically expanded to your home directory.
 
@@ -168,21 +327,39 @@ echo "Configuration loaded successfully"
 ./main.sh
 
 # Or run individual components
-./scripts/update_fixer.sh    # Fix failed dependency updates
-./scripts/creator.sh         # Setup directory structures
-./scripts/planner.sh         # Process task files
-./scripts/updater.sh         # Update repositories
-./scripts/implementer.sh     # Implement bead tasks
-./scripts/auto-update-reboot.sh # Monitor changes and trigger conditional reboots
+./scripts/update_fixer.sh          # Fix failed dependency updates
+./scripts/creator.sh               # Setup directory structures
+./scripts/planner.sh               # Process task files with numbering
+./scripts/updater.sh               # Update repositories
+./scripts/implementer.sh           # Implement bead tasks
+./scripts/auto-update-reboot.sh    # Monitor changes and trigger conditional reboots
+./scripts/beads_updater.sh         # Synchronize beads across repositories
+./scripts/number_manager.sh        # Manage unique number assignments
+```
+
+### Advanced Components
+
+```bash
+# Branch management and protection
+./scripts/branch_protection.sh    # Advanced branch safety rules
+./scripts/cleanup-branches.sh     # Clean up old branches
+./scripts/cleanup-automation-engine.sh  # System cleanup operations
+
+# Monitoring and alerting
+./scripts/core/telegram_logger.sh  # Telegram bot integration
+./scripts/repository-discovery.sh  # Discover and analyze repositories
+./scripts/task-status-detection.sh # Monitor task completion status
 ```
 
 ### First Time Setup
 
 1. **Configure repositories** in `config.yaml`
 2. **Create managed directories** and add repositories as subdirectories
-3. **Run creator.sh** to create task directories:
+3. **Initialize advanced features**:
    ```bash
-   ./scripts/creator.sh
+   ./scripts/number_manager.sh init    # Initialize number tracking
+   ./scripts/creator.sh                 # Create task directories
+   ./scripts/beads_updater.sh init      # Initialize beads sync
    ```
 4. **Start main system**:
    ```bash
@@ -193,32 +370,61 @@ echo "Configuration loaded successfully"
 
 ```
 Auto-slopp/
-├── main.sh                    # Main orchestration script (dynamic discovery)
-├── config.yaml                # YAML configuration file
-├── config.sh                  # Configuration loader (uses yaml_config.sh)
-├── scripts/                   # Core scripts (auto-discovered)
-│   ├── utils.sh              # Error handling and logging utilities
-│   ├── yaml_config.sh        # YAML configuration utilities
-│   ├── auto-update-reboot.sh # Monitor changes and trigger conditional reboots
-│   ├── update_fixer.sh       # Fix failed dependency updates
-│   ├── creator.sh            # Create task directories
-│   ├── planner.sh            # Process task files (with numbering)
-│   ├── updater.sh            # Update repositories
-│   ├── implementer.sh        # Implement bead tasks
-│   └── [add new scripts here] # Automatically picked up!
-├── managed_repo_path/         # Directory containing repositories
-│   ├── repo1/               # Repository 1
-│   ├── repo2/               # Repository 2
-│   └── repo3/               # Repository 3
-├── managed_repo_task_path/    # Directory for task files
-│   ├── repo1/               # Task files for repo1
+├── main.sh                           # Main orchestration script (dynamic discovery)
+├── config.yaml                       # YAML configuration file
+├── config.sh                         # Configuration loader (uses yaml_config.sh)
+├── scripts/                          # Core scripts (auto-discovered)
+│   ├── utils.sh                     # Error handling and logging utilities
+│   ├── yaml_config.sh               # YAML configuration utilities
+│   │
+│   ├── Core Automation Scripts/
+│   ├── auto-update-reboot.sh        # Monitor changes and trigger conditional reboots
+│   ├── update_fixer.sh              # Fix failed dependency updates
+│   ├── creator.sh                   # Create task directories
+│   ├── planner.sh                   # Process task files (with numbering)
+│   ├── updater.sh                   # Update repositories
+│   ├── implementer.sh               # Implement bead tasks
+│   │
+│   ├── Advanced Management Scripts/
+│   ├── number_manager.sh             # Atomic number assignment and tracking
+│   ├── beads_updater.sh             # Cross-repository beads synchronization
+│   ├── branch_protection.sh         # Advanced branch safety rules
+│   ├── cleanup-branches.sh          # Clean up old branches
+│   ├── cleanup-automation-engine.sh # System cleanup operations
+│   │
+│   ├── Monitoring & Discovery Scripts/
+│   ├── repository-discovery.sh      # Discover and analyze repositories
+│   ├── task-status-detection.sh     # Monitor task completion status
+│   ├── test_merge_error_handling.sh # Test merge conflict handling
+│   │
+│   └── core/                         # Core system modules
+│       ├── telegram_logger.sh        # Telegram bot integration
+│       ├── telegram_config.sh        # Telegram configuration management
+│       ├── telegram_health.sh        # Telegram health monitoring
+│       ├── telegram_queue.sh         # Telegram message queuing
+│       ├── telegram_security.sh      # Telegram security features
+│       ├── configuration_validator.sh # Configuration validation
+│       ├── error_recovery.sh         # Error recovery mechanisms
+│       └── system_state.sh           # System state management
+│
+├── managed_repo_path/                # Directory containing repositories
+│   ├── repo1/                       # Repository 1
+│   ├── repo2/                       # Repository 2
+│   └── repo3/                       # Repository 3
+│
+├── managed_repo_task_path/           # Directory for task files
+│   ├── repo1/                       # Task files for repo1
 │   │   ├── .gitkeep
 │   │   ├── 0001-task-name.txt
 │   │   ├── 0002-another-task.txt
 │   │   └── 0001-task-name.txt.used
-│   ├── repo2/               # Task files for repo2
-│   └── repo3/               # Task files for repo3
-└── README.md                # This documentation
+│   ├── repo2/                       # Task files for repo2
+│   └── repo3/                       # Task files for repo3
+│
+├── logs/                            # System logs (auto-created)
+├── docs/                            # Additional documentation
+├── tests/                           # Test scripts and suites
+└── README.md                        # This documentation
 ```
 
 ## 🔄 Workflow
@@ -322,6 +528,99 @@ For each repository:
 └── Update reboot state and history
 ```
 
+#### number_manager.sh
+```bash
+# Initialize number state management
+├── Create state directory structure (.number_state/)
+├── Initialize JSON state file with metadata
+├── Set up locking mechanisms for concurrent access
+└── Validate existing state integrity
+
+# Atomic number assignment
+├── Acquire exclusive lock on state file
+├── Read current state and calculate next available number
+├── Update state with new assignment and timestamp
+├── Create backup of previous state
+├── Release lock and return assigned number
+└── Handle concurrent access conflicts gracefully
+
+# State management and cleanup
+├── Backup state files with rotation
+├── Cleanup stale locks and temporary files
+├── Validate state consistency on startup
+└── Generate state reports and statistics
+```
+
+#### beads_updater.sh
+```bash
+# Initialize beads synchronization
+├── Validate beads CLI availability and configuration
+├── Create temporary working directory
+├── Set up backup retention policies
+└── Initialize conflict resolution strategy
+
+# Cross-repository synchronization
+├── Discover all managed repositories
+├── Pull latest beads state from each repository
+├── Detect conflicts and apply resolution strategy
+├── Merge changes according to sync mode (incremental/full)
+├── Generate detailed sync reports (JSON format)
+├── Update repositories with synchronized state
+└── Cleanup temporary files and locks
+
+# Error handling and recovery
+├── Retry failed operations with exponential backoff
+├── Rollback changes on sync failure
+├── Maintain backup of previous states
+└── Log detailed error information for debugging
+```
+
+#### branch_protection.sh
+```bash
+# Initialize branch protection
+├── Load protection configuration from config.yaml
+├── Validate current git repository state
+├── Identify protected branches and patterns
+└── Set up protection rules and warnings
+
+# Branch operation validation
+├── Check if branch matches protection patterns
+├── Verify current branch protection status
+├── Request explicit confirmation for protected operations
+├── Log all protection decisions and actions
+└── Prevent accidental deletion of critical branches
+
+# Advanced protection features
+├── Pattern-based protection (wildcard matching)
+├── Current branch automatic protection
+├── Configurable confirmation requirements
+└── Detailed protection logging and audit trail
+```
+
+#### telegram_logger.sh
+```bash
+# Initialize Telegram integration
+├── Validate Telegram configuration and credentials
+├── Set up rate limiting and message queuing
+├── Initialize security features and token validation
+└── Test API connectivity and permissions
+
+# Message processing and delivery
+├── Filter messages by log level and script name
+├── Apply rate limiting with exponential backoff
+├── Format messages according to configuration (HTML/Markdown/Plain)
+├── Queue messages for batch delivery
+├── Handle API errors and retry failed deliveries
+└── Maintain message delivery statistics
+
+# Security and monitoring
+├── Encrypt sensitive configuration data
+├── Audit all token access attempts
+├── Monitor rate limiting status and queue size
+├── Perform periodic health checks
+└── Generate security and delivery reports
+```
+
 ## 📝 Task File Format
 
 Create task files in `managed_repo_task_path/<repo-name>/` with automatic numbering:
@@ -415,7 +714,7 @@ managed_repo_task_path/
 #### 1. Permission Denied
 ```bash
 # Fix: Make scripts executable
-chmod +x main.sh scripts/*.sh
+chmod +x main.sh scripts/*.sh scripts/core/*.sh
 ```
 
 #### 2. Repository Not Found
@@ -423,6 +722,7 @@ chmod +x main.sh scripts/*.sh
 # Check managed_repo_path in config.yaml
 # Ensure repositories exist as subdirectories
 # Verify paths are accessible
+grep -E "(managed_repo_path|managed_repo_task_path)" config.yaml
 ```
 
 #### 3. OpenCode CLI Not Found
@@ -430,8 +730,11 @@ chmod +x main.sh scripts/*.sh
 # Check if opencode is in PATH
 which opencode
 
-# Or update path in config.sh
-OPencode_CLI="/path/to/opencode"
+# Test OpenCode integration
+opencode run "Test message" --agent OpenAgent
+
+# Or update path in config.yaml
+export OPencode_CMD="/path/to/opencode"
 ```
 
 #### 4. Beads CLI Not Found
@@ -439,8 +742,149 @@ OPencode_CLI="/path/to/opencode"
 # Check if bd is in PATH
 which bd
 
-# Or update path in config.sh
-BEADS_CLI="/path/to/bd"
+# Test beads functionality
+bd ready
+
+# Or update path in config.yaml
+export BEADS_CMD="/path/to/bd"
+```
+
+### Advanced Troubleshooting
+
+#### Number Manager Issues
+
+**Problem**: Number assignment conflicts or state corruption
+```bash
+# Check number manager state
+ls -la .number_state/
+cat .number_state/state.json
+
+# Reset number manager state (CAUTION: This will lose current numbering)
+rm -rf .number_state/
+./scripts/number_manager.sh init
+
+# Check for stale locks
+find /tmp -name "*number_manager*" -type f
+```
+
+**Problem**: Concurrent access conflicts
+```bash
+# Check active locks
+lsof | grep number_manager
+
+# Force release stale locks
+find /tmp -name "*number_manager*lock*" -delete
+```
+
+#### Beads Updater Issues
+
+**Problem**: Sync conflicts or failed synchronization
+```bash
+# Check sync status
+./scripts/beads_updater.sh status
+
+# Force full sync
+./scripts/beads_updater.sh full
+
+# Check sync logs
+grep "beads_updater" ~/git/Auto-logs/*.log
+
+# Reset sync state
+rm -rf ~/.beads_updater_backups/
+./scripts/beads_updater.sh init
+```
+
+#### Telegram Integration Issues
+
+**Problem**: Messages not being sent
+```bash
+# Check Telegram configuration
+./scripts/core/telegram_config.sh validate
+
+# Test Telegram connectivity
+./scripts/core/telegram_health.sh test
+
+# Check rate limiting status
+./scripts/core/telegram_logger.sh status
+
+# Verify bot token format
+echo "$TELEGRAM_BOT_TOKEN" | grep -E '^[0-9]+:[a-zA-Z0-9_-]{35}$'
+```
+
+**Problem**: API rate limiting
+```bash
+# Check current rate limit status
+./scripts/core/telegram_logger.sh rate-limit-status
+
+# Clear rate limit cache (emergency only)
+rm -f /tmp/telegram_rate_limit_*
+```
+
+#### Auto-Update-Reboot Issues
+
+**Problem**: Unexpected reboots
+```bash
+# Check reboot state
+cat ~/.auto_update_reboot_state.json
+
+# Check reboot history
+cat ~/.auto_update_reboot_history.json
+
+# Disable auto-reboot temporarily
+sed -i 's/auto_update_reboot_enabled: true/auto_update_reboot_enabled: false/' config.yaml
+
+# Put system in maintenance mode
+sed -i 's/maintenance_mode: false/maintenance_mode: true/' config.yaml
+```
+
+#### Configuration Issues
+
+**Problem**: Invalid YAML configuration
+```bash
+# Validate configuration syntax
+python3 -c "import yaml; yaml.safe_load(open('config.yaml'))"
+
+# Check configuration loading
+source scripts/yaml_config.sh && load_config && echo "Configuration loaded successfully"
+
+# Check for missing required variables
+set | grep -E "(SLEEP_DURATION|MANAGED_REPO_PATH)"
+```
+
+### Debug Mode
+
+Enable comprehensive debugging:
+
+```bash
+# Enable debug mode for verbose logging
+export DEBUG_MODE=true
+
+# Run scripts with detailed output
+DEBUG_MODE=true ./main.sh
+
+# Check what commands are being run
+bash -x ./main.sh
+
+# Test configuration loading with debug
+DEBUG_MODE=true source scripts/yaml_config.sh && load_config
+```
+
+### Log Analysis
+
+Analyze system logs for issues:
+
+```bash
+# Recent log entries
+tail -f ~/git/Auto-logs/$(date +%Y-%m-%d).log
+
+# Search for errors
+grep -i error ~/git/Auto-logs/*.log
+
+# Check specific script logs
+grep "script_name=number_manager" ~/git/Auto-logs/*.log
+
+# Analyze performance
+grep "elapsed_time" ~/git/Auto-logs/*.log | tail -20
 ```
 
 ### Debug Mode
@@ -598,6 +1042,99 @@ fi
 
 ## 🏗️ Architecture Documentation
 
+### Core Architecture
+
+Auto-slopp follows a **microservices architecture** with loosely coupled components that communicate through standardized interfaces:
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   main.sh       │    │  Configuration  │    │   State Store   │
+│  (Orchestrator) │◄──►│    Manager      │◄──►│  (JSON Files)   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Script Engine │    │   Logging Core  │    │  Error Recovery │
+│ (Dynamic Loader) │    │ (Colored Out)   │    │   Manager       │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Advanced Modules Layer                       │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌───────────┐ │
+│  │Number Mgr   │ │Beads Updater│ │Telegram Bot │ │Auto-Reboot│ │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └───────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Component Communication
+
+**Synchronous Communication:**
+- Direct function calls between core utilities
+- Configuration access through `yaml_config.sh`
+- Error handling through `utils.sh`
+
+**Asynchronous Communication:**
+- State management through JSON files
+- Message queuing for Telegram integration
+- Lock files for concurrent access control
+
+### Data Flow
+
+```
+1. Configuration Load
+   ↓
+2. Script Discovery & Loading
+   ↓
+3. State Initialization
+   ↓
+4. Component Execution Loop
+   ↓
+5. Error Recovery & Cleanup
+   ↓
+6. State Persistence & Logging
+```
+
+### Security Model
+
+**Token Management:**
+- Environment variable storage for sensitive data
+- In-memory encryption for runtime protection
+- Audit logging for all token access
+
+**Access Control:**
+- File permission checks before operations
+- Branch protection rules for Git operations
+- Rate limiting for external API calls
+
+### Concurrency Model
+
+**Locking Strategy:**
+- File-based locks for critical sections
+- Timeout-based lock acquisition
+- Deadlock detection and recovery
+
+**State Synchronization:**
+- Atomic operations for state updates
+- Version tracking for change detection
+- Backup and rollback mechanisms
+
+### Design Patterns
+
+**Observer Pattern:**
+- Logging system observes all script activities
+- Telegram integration subscribes to log events
+
+**State Pattern:**
+- Number manager maintains assignment state
+- Auto-reboot tracks system reboot state
+
+**Strategy Pattern:**
+- Configurable conflict resolution strategies
+- Multiple sync modes for beads updater
+
+### Technical Specifications
+
 For detailed technical specifications and design decisions, see:
 
 - **[Auto-Update-Reboot Architecture](AUTO_UPDATE_REBOOT_ARCHITECTURE.md)** - Comprehensive design documentation for the auto-update-reboot functionality, including safety mechanisms, state management, and integration patterns
@@ -605,7 +1142,36 @@ For detailed technical specifications and design decisions, see:
 
 These documents provide in-depth technical details for developers and system administrators who need to understand the internal architecture, security considerations, and extensibility of the system components.
 
+## 🧪 Testing
+
+### Running Tests
+
+```bash
+# Test individual components
+./test_logging_system.sh              # Test logging functionality
+./test_planner_4digit.sh               # Test 4-digit numbering system
+./test_telegram_integration.sh        # Test Telegram bot integration
+
+# Test error handling
+./scripts/test_merge_error_handling.sh # Test merge conflict resolution
+
+# Run all tests
+make test  # If Makefile is configured
+```
+
+### Test Coverage
+
+The system includes comprehensive test coverage for:
+- **Logging System**: Multi-level logging with rotation and formatting
+- **Number Management**: Concurrent-safe number assignment and state management
+- **Git Operations**: Merge conflict handling and branch management
+- **Telegram Integration**: Bot API communication with rate limiting
+- **Configuration Validation**: YAML parsing and validation logic
+- **Error Recovery**: System resilience and recovery mechanisms
+
 ## 🤝 Contributing
+
+### Development Guidelines
 
 When adding new functionality:
 
@@ -618,6 +1184,215 @@ When adding new functionality:
 7. **Use safe_git()** for git operations
 8. **Update this README** with new features
 9. **Test thoroughly** before deployment
+
+### Adding New Scripts
+
+Create new scripts with the standard template:
+
+```bash
+#!/bin/bash
+
+# Your Script Description
+# Brief one-line description of the script's purpose
+
+# Set script name for logging identification
+SCRIPT_NAME="your_script_name"
+
+# Load utilities and configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
+source "$SCRIPT_DIR/../config.sh"
+
+# Set up error handling
+setup_error_handling
+
+# Your script functions here
+main() {
+    log "INFO" "Starting your_script_name"
+    
+    # Your logic here
+    
+    log "SUCCESS" "your_script_name completed successfully"
+}
+
+# Run main function
+main "$@"
+```
+
+### Configuration Integration
+
+Add new configuration options to `config.yaml`:
+
+```yaml
+# Your new configuration section
+your_feature:
+  enabled: true
+  setting_one: "value"
+  setting_two: 123
+  
+# Optional: Add to core configuration for validation
+```
+
+Update `yaml_config.sh` if validation is needed:
+
+```bash
+# Add validation for your configuration section
+validate_your_feature_config() {
+    local config="$1"
+    
+    # Validate required fields
+    if [[ -z "${your_feature_enabled:-}" ]]; then
+        log "ERROR" "your_feature.enabled is required"
+        return 1
+    fi
+    
+    # Add custom validation logic
+    return 0
+}
+```
+
+### Testing Your Changes
+
+1. **Unit Tests**: Create test scripts for individual functions
+2. **Integration Tests**: Test with full system workflows
+3. **Error Handling**: Test failure scenarios and recovery
+4. **Configuration**: Test with various configuration combinations
+5. **Performance**: Test with realistic workloads
+
+### Code Review Checklist
+
+Before submitting changes:
+
+- [ ] Script follows standard template and error handling patterns
+- [ ] Configuration options are documented and validated
+- [ ] Logging is appropriate and uses consistent formatting
+- [ ] Error conditions are handled gracefully
+- [ ] Documentation is updated (README, config examples)
+- [ ] Tests are added for new functionality
+- [ ] Security implications are considered
+- [ ] Performance impact is assessed
+
+## 📊 Performance & Monitoring
+
+### Performance Metrics
+
+The system automatically tracks performance metrics for all operations:
+
+```bash
+# View performance statistics
+grep "elapsed_time" ~/git/Auto-logs/*.log | tail -20
+
+# Generate performance report
+./scripts/repository-discovery.sh --performance-report
+
+# Check system resource usage
+./scripts/core/system_state.sh --resource-usage
+```
+
+### Key Performance Indicators
+
+**Script Execution Time:**
+- Target: < 60 seconds for individual scripts
+- Warning: > 300 seconds for complex operations
+- Critical: > 900 seconds for any operation
+
+**Memory Usage:**
+- Target: < 100MB for core processes
+- Warning: 100-500MB for intensive operations
+- Critical: > 500MB memory consumption
+
+**Disk I/O:**
+- Target: < 10MB/s for normal operations
+- Warning: 10-50MB/s for bulk operations
+- Critical: > 50MBs sustained I/O
+
+### Monitoring Commands
+
+```bash
+# Real-time system monitoring
+watch -n 5 'ps aux | grep -E "(main\.sh|number_manager|beads_updater)"'
+
+# Monitor log file growth
+watch -n 10 'du -sh ~/git/Auto-logs/'
+
+# Check lock file status
+find /tmp -name "*Auto-slopp*" -ls
+
+# Monitor queue sizes
+ls -la /tmp/telegram_queue_*
+```
+
+### Health Checks
+
+The system includes comprehensive health monitoring:
+
+```bash
+# Run complete health check
+./scripts/core/system_state.sh --full-health-check
+
+# Check individual components
+./scripts/core/telegram_health.sh --check-all
+./scripts/beads_updater.sh --health-check
+./scripts/number_manager.sh --validate-state
+```
+
+### Performance Optimization
+
+**Configuration Tuning:**
+```yaml
+# Optimize for performance
+sleep_duration: 60                    # Reduce cycle time for faster response
+log_level: WARNING                    # Reduce logging overhead
+telegram:
+  enabled: false                      # Disable for maximum performance
+  rate_limiting:
+    messages_per_second: 10           # Increase for high-volume systems
+```
+
+**Resource Limits:**
+```bash
+# Set process limits
+ulimit -u 1024    # Max user processes
+ulimit -f 100    # Max file size (MB)
+ulimit -n 4096   # Max open files
+```
+
+## 🔒 Security Considerations
+
+### Data Protection
+
+**Sensitive Information:**
+- Bot tokens stored in environment variables only
+- Configuration encryption in memory
+- Audit logging for all sensitive operations
+- Token redaction in log files
+
+**Access Control:**
+- File permission validation before operations
+- Branch protection for critical Git operations
+- Rate limiting for external API calls
+- Input validation for all user inputs
+
+### Security Best Practices
+
+```bash
+# Regular security checks
+./scripts/core/telegram_security.sh --audit
+
+# Validate configuration security
+./scripts/core/configuration_validator.sh --security-check
+
+# Monitor for unauthorized access
+grep -i "access_denied\|permission_denied" ~/git/Auto-logs/*.log
+```
+
+### Network Security
+
+**API Communication:**
+- HTTPS enforcement for all external calls
+- Certificate validation for Telegram API
+- Timeout configuration for network operations
+- Retry limits to prevent abuse
 
 ## 📄 License
 
@@ -632,8 +1407,6 @@ When adding new functionality:
 - **Error Handling Utils**: Robust logging and error recovery
 - **File Numbering System**: Sequential task processing
 
----
-
 ## 📞 Support
 
 For issues and questions:
@@ -645,7 +1418,25 @@ For issues and questions:
 5. **Consult troubleshooting** section above
 6. **Create an issue** with relevant log files and debug output
 
+### Reporting Issues
+
+When creating issues, please include:
+
+- **System Information**: OS version, Bash version, available memory
+- **Configuration**: Sanitized `config.yaml` (remove tokens/passwords)
+- **Logs**: Relevant log entries from `~/git/Auto-logs/`
+- **Steps to Reproduce**: Clear reproduction steps
+- **Expected vs Actual Behavior**: Detailed description of the issue
+
+### Community Resources
+
+- **Documentation**: Check this README and architecture documents
+- **Troubleshooting**: Use the comprehensive troubleshooting section
+- **Examples**: Review configuration examples in the repository
+- **Tests**: Examine test scripts for usage patterns
+
 ---
 
 *Generated by Repository Automation System*  
-*Last updated: $(date)*
+*Last updated: $(date)*  
+*Version: 2.0*
