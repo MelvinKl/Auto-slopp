@@ -32,6 +32,18 @@ max_reboot_attempts_per_day: 3          # Daily limit on reboot attempts
 maintenance_mode: false                  # Manual override to disable all reboots
 emergency_override: false               # Emergency override for forced reboots
 
+# Enhanced git change detection configuration
+git_timeout_seconds: 30                  # Timeout for individual git operations
+git_retry_attempts: 3                    # Number of retry attempts for failed git operations
+git_retry_delay_seconds: 5               # Delay between retry attempts (exponential backoff)
+network_timeout_seconds: 60              # Network operation timeout
+
+# Change significance filtering
+reboot_trigger_patterns: "scripts/*.sh|config.yaml|main.sh|scripts/utils.sh|scripts/core/*.sh"  # File patterns that trigger reboot
+ignore_change_patterns: "*.md|*.txt|*.log|tests/*.sh|.*"  # File patterns to ignore
+min_changed_files_for_reboot: 1          # Minimum number of significant changes to trigger reboot
+max_change_count_for_reboot: 100         # Maximum number of changes before manual review is required
+
 # Beads updater configuration (CRITICAL P0 - Automated Repository Synchronization)
 beads_updater:
   default_sync_mode: "incremental"      # "incremental" or "full" - sync mode preference

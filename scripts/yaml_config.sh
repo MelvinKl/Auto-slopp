@@ -216,6 +216,18 @@ load_config() {
     MAINTENANCE_MODE=$(read_yaml_config "$config_file" "maintenance_mode" "false")
     EMERGENCY_OVERRIDE=$(read_yaml_config "$config_file" "emergency_override" "false")
     
+    # Enhanced git change detection configuration
+    GIT_TIMEOUT_SECONDS=$(read_yaml_config "$config_file" "git_timeout_seconds" "30")
+    GIT_RETRY_ATTEMPTS=$(read_yaml_config "$config_file" "git_retry_attempts" "3")
+    GIT_RETRY_DELAY_SECONDS=$(read_yaml_config "$config_file" "git_retry_delay_seconds" "5")
+    NETWORK_TIMEOUT_SECONDS=$(read_yaml_config "$config_file" "network_timeout_seconds" "60")
+    
+    # Change significance filtering
+    REBOOT_TRIGGER_PATTERNS=$(read_yaml_config "$config_file" "reboot_trigger_patterns" "scripts/*.sh|config.yaml|main.sh|scripts/utils.sh|scripts/core/*.sh")
+    IGNORE_CHANGE_PATTERNS=$(read_yaml_config "$config_file" "ignore_change_patterns" "*.md|*.txt|*.log|tests/*.sh|.*")
+    MIN_CHANGED_FILES_FOR_REBOOT=$(read_yaml_config "$config_file" "min_changed_files_for_reboot" "1")
+    MAX_CHANGE_COUNT_FOR_REBOOT=$(read_yaml_config "$config_file" "max_change_count_for_reboot" "100")
+    
     # Branch protection configuration
     branch_protection_enable_protection=$(read_yaml_config "$config_file" "branch_protection.enable_protection" "true")
     branch_protection_require_confirmation=$(read_yaml_config "$config_file" "branch_protection.require_confirmation" "true")
@@ -266,6 +278,10 @@ load_config() {
     export MAX_REBOOT_ATTEMPTS_PER_DAY MAINTENANCE_MODE EMERGENCY_OVERRIDE
     export LOG_MAX_SIZE_MB LOG_MAX_FILES LOG_RETENTION_DAYS LOG_LEVEL
     export TIMESTAMP_FORMAT TIMESTAMP_TIMEZONE
+    
+    # Export enhanced git change detection variables
+    export GIT_TIMEOUT_SECONDS GIT_RETRY_ATTEMPTS GIT_RETRY_DELAY_SECONDS NETWORK_TIMEOUT_SECONDS
+    export REBOOT_TRIGGER_PATTERNS IGNORE_CHANGE_PATTERNS MIN_CHANGED_FILES_FOR_REBOOT MAX_CHANGE_COUNT_FOR_REBOOT
     
     # Export branch protection variables
     export branch_protection_enable_protection branch_protection_require_confirmation branch_protection_show_warnings
