@@ -368,6 +368,23 @@ log() {
         # Write clean log entry (without colors)
         echo "$clean_log_entry" >> "$log_file"
     fi
+    
+    # Send to Telegram if enabled and configured
+    if [[ "${TELEGRAM_ENABLED:-false}" == "true" ]]; then
+        # Load Telegram modules if not already loaded
+        if ! declare -F send_log_to_telegram >/dev/null 2>&1; then
+            local telegram_module_dir
+            telegram_module_dir="$(dirname "${BASH_SOURCE[0]}")/core"
+            if [[ -f "${telegram_module_dir}/telegram_logger.sh" ]]; then
+                source "${telegram_module_dir}/telegram_logger.sh"
+            fi
+        fi
+        
+        # Send log to Telegram asynchronously
+        if declare -F send_log_to_telegram >/dev/null 2>&1; then
+            send_log_to_telegram "$level" "$message" "$script_name" &
+        fi
+    fi
 }
 
 # Specialized logging function for change detection events

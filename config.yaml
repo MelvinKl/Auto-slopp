@@ -65,3 +65,65 @@ branch_protection:
     - "develop"
     - "staging"
     - "production"
+
+# Telegram Bot logging configuration (P0 Critical)
+telegram:
+  enabled: false                        # Enable/disable Telegram logging globally
+  bot_token: "${TELEGRAM_BOT_TOKEN}"    # Environment variable for bot token (NEVER store in plain text)
+  default_chat_id: "@logs_channel"      # Default channel/chat for sending messages
+  api_timeout_seconds: 10               # Timeout for Telegram API requests
+  connection_retries: 3                 # Maximum retry attempts for failed connections
+  
+  # Rate limiting configuration
+  rate_limiting:
+    messages_per_second: 5              # Conservative rate limit (far below Telegram's 30/sec)
+    burst_size: 20                     # Burst capacity for handling logs
+    rate_limit_window_seconds: 60      # Time window for rate limiting calculations
+    backoff_multiplier: 2              # Multiplier for exponential backoff
+    max_backoff_seconds: 30             # Maximum backoff delay
+  
+  # Message formatting configuration
+  formatting:
+    parse_mode: "HTML"                  # Message format: "HTML", "Markdown", or "plain"
+    max_message_length: 4000            # Safe message length (below Telegram's 4096 limit)
+    include_timestamp: true             # Include timestamps in messages
+    include_log_level: true             # Include log level indicators
+    include_script_name: true           # Include script name for context
+    use_emoji_indicators: true          # Use emoji for log levels (🔴🟡🟢🔵)
+  
+  # Retry and error handling configuration
+  retry:
+    max_attempts: 3                     # Maximum retry attempts for failed messages
+    base_delay: 1.0                     # Base delay in seconds for exponential backoff
+    max_delay: 30.0                     # Maximum delay in seconds
+    jitter: true                        # Add randomness to prevent thundering herd
+  
+  # Message filtering configuration
+  filters:
+    log_levels: ["ERROR", "WARNING", "SUCCESS"]  # Log levels to forward to Telegram
+    scripts: ["main.sh", "updater.sh", "implementer.sh", "planner.sh"]  # Scripts to monitor
+    exclude_patterns: []                # Regex patterns to exclude from Telegram
+    include_patterns: []                # Regex patterns to include (if specified, acts as whitelist)
+  
+  # Security configuration
+  security:
+    validate_bot_token: true            # Validate bot token format and connectivity
+    encrypt_config_storage: true         # Encrypt sensitive configuration in memory
+    audit_token_access: true            # Log all token access attempts
+    hide_tokens_in_logs: true           # Redact tokens in log outputs
+    require_https: true                 # Enforce HTTPS for all API calls
+  
+  # Health monitoring configuration
+  health:
+    enable_health_checks: true          # Periodic health checks for Telegram integration
+    health_check_interval_minutes: 15   # How often to run health checks
+    api_connectivity_test: true         # Test API connectivity during health checks
+    rate_limit_monitoring: true          # Monitor rate limiting status
+    queue_size_monitoring: true         # Monitor message queue size
+  
+  # Configuration management
+  config:
+    auto_reload: true                   # Reload configuration without restart
+    config_file_watch_interval_seconds: 30  # How often to check for config changes
+    validation_strictness: "strict"     # Validation level: "strict", "warn", or "relaxed"
+    backup_configuration: true          # Backup configuration changes

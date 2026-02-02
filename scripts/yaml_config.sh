@@ -276,4 +276,73 @@ load_config() {
     # Export OpenCode timeout variables
     export OPENCODE_TIMEOUT_ENABLED OPENCODE_TIMEOUT_SECONDS OPENCODE_TIMEOUT_SIGNAL OPENCODE_KILL_SIGNAL
     export OPENCODE_GRACE_PERIOD_SECONDS OPENCODE_CLEANUP_TEMP_FILES OPENCODE_LOG_TIMEOUTS OPENCODE_TIMEOUT_ACTION
+    
+    # Telegram Bot logging configuration
+    TELEGRAM_ENABLED=$(read_yaml_config "$config_file" "telegram.enabled" "false")
+    TELEGRAM_BOT_TOKEN=$(read_yaml_config "$config_file" "telegram.bot_token" "")
+    TELEGRAM_CHAT_ID=$(read_yaml_config "$config_file" "telegram.default_chat_id" "")
+    TELEGRAM_API_TIMEOUT_SECONDS=$(read_yaml_config "$config_file" "telegram.api_timeout_seconds" "10")
+    TELEGRAM_CONNECTION_RETRIES=$(read_yaml_config "$config_file" "telegram.connection_retries" "3")
+    
+    # Rate limiting configuration
+    TELEGRAM_RATE_LIMITING_MESSAGES_PER_SECOND=$(read_yaml_config "$config_file" "telegram.rate_limiting.messages_per_second" "5")
+    TELEGRAM_RATE_LIMITING_BURST_SIZE=$(read_yaml_config "$config_file" "telegram.rate_limiting.burst_size" "20")
+    TELEGRAM_RATE_LIMITING_RATE_LIMIT_WINDOW_SECONDS=$(read_yaml_config "$config_file" "telegram.rate_limiting.rate_limit_window_seconds" "60")
+    TELEGRAM_RATE_LIMITING_BACKOFF_MULTIPLIER=$(read_yaml_config "$config_file" "telegram.rate_limiting.backoff_multiplier" "2")
+    TELEGRAM_RATE_LIMITING_MAX_BACKOFF_SECONDS=$(read_yaml_config "$config_file" "telegram.rate_limiting.max_backoff_seconds" "30")
+    
+    # Formatting configuration
+    TELEGRAM_FORMATTING_PARSE_MODE=$(read_yaml_config "$config_file" "telegram.formatting.parse_mode" "HTML")
+    TELEGRAM_FORMATTING_MAX_MESSAGE_LENGTH=$(read_yaml_config "$config_file" "telegram.formatting.max_message_length" "4000")
+    TELEGRAM_FORMATTING_INCLUDE_TIMESTAMP=$(read_yaml_config "$config_file" "telegram.formatting.include_timestamp" "true")
+    TELEGRAM_FORMATTING_INCLUDE_LOG_LEVEL=$(read_yaml_config "$config_file" "telegram.formatting.include_log_level" "true")
+    TELEGRAM_FORMATTING_INCLUDE_SCRIPT_NAME=$(read_yaml_config "$config_file" "telegram.formatting.include_script_name" "true")
+    TELEGRAM_FORMATTING_USE_EMOJI_INDICATORS=$(read_yaml_config "$config_file" "telegram.formatting.use_emoji_indicators" "true")
+    
+    # Retry configuration
+    TELEGRAM_RETRY_MAX_ATTEMPTS=$(read_yaml_config "$config_file" "telegram.retry.max_attempts" "3")
+    TELEGRAM_RETRY_BASE_DELAY=$(read_yaml_config "$config_file" "telegram.retry.base_delay" "1.0")
+    TELEGRAM_RETRY_MAX_DELAY=$(read_yaml_config "$config_file" "telegram.retry.max_delay" "30.0")
+    TELEGRAM_RETRY_JITTER=$(read_yaml_config "$config_file" "telegram.retry.jitter" "true")
+    
+    # Filter configuration (comma-separated lists)
+    TELEGRAM_FILTERS_LOG_LEVELS=$(read_yaml_config "$config_file" "telegram.filters.log_levels" "ERROR,WARNING,SUCCESS")
+    TELEGRAM_FILTERS_SCRIPTS=$(read_yaml_config "$config_file" "telegram.filters.scripts" "main.sh,updater.sh,implementer.sh,planner.sh")
+    TELEGRAM_FILTERS_EXCLUDE_PATTERNS=$(read_yaml_config "$config_file" "telegram.filters.exclude_patterns" "")
+    TELEGRAM_FILTERS_INCLUDE_PATTERNS=$(read_yaml_config "$config_file" "telegram.filters.include_patterns" "")
+    
+    # Security configuration
+    TELEGRAM_SECURITY_VALIDATE_BOT_TOKEN=$(read_yaml_config "$config_file" "telegram.security.validate_bot_token" "true")
+    TELEGRAM_SECURITY_ENCRYPT_CONFIG_STORAGE=$(read_yaml_config "$config_file" "telegram.security.encrypt_config_storage" "true")
+    TELEGRAM_SECURITY_AUDIT_TOKEN_ACCESS=$(read_yaml_config "$config_file" "telegram.security.audit_token_access" "true")
+    TELEGRAM_SECURITY_HIDE_TOKENS_IN_LOGS=$(read_yaml_config "$config_file" "telegram.security.hide_tokens_in_logs" "true")
+    TELEGRAM_SECURITY_REQUIRE_HTTPS=$(read_yaml_config "$config_file" "telegram.security.require_https" "true")
+    
+    # Health monitoring configuration
+    TELEGRAM_HEALTH_ENABLE_HEALTH_CHECKS=$(read_yaml_config "$config_file" "telegram.health.enable_health_checks" "true")
+    TELEGRAM_HEALTH_HEALTH_CHECK_INTERVAL_MINUTES=$(read_yaml_config "$config_file" "telegram.health.health_check_interval_minutes" "15")
+    TELEGRAM_HEALTH_API_CONNECTIVITY_TEST=$(read_yaml_config "$config_file" "telegram.health.api_connectivity_test" "true")
+    TELEGRAM_HEALTH_RATE_LIMIT_MONITORING=$(read_yaml_config "$config_file" "telegram.health.rate_limit_monitoring" "true")
+    TELEGRAM_HEALTH_QUEUE_SIZE_MONITORING=$(read_yaml_config "$config_file" "telegram.health.queue_size_monitoring" "true")
+    
+    # Configuration management
+    TELEGRAM_CONFIG_AUTO_RELOAD=$(read_yaml_config "$config_file" "telegram.config.auto_reload" "true")
+    TELEGRAM_CONFIG_CONFIG_FILE_WATCH_INTERVAL_SECONDS=$(read_yaml_config "$config_file" "telegram.config.config_file_watch_interval_seconds" "30")
+    TELEGRAM_CONFIG_VALIDATION_STRICTNESS=$(read_yaml_config "$config_file" "telegram.config.validation_strictness" "strict")
+    TELEGRAM_CONFIG_BACKUP_CONFIGURATION=$(read_yaml_config "$config_file" "telegram.config.backup_configuration" "true")
+    
+    # Export Telegram configuration variables
+    export TELEGRAM_ENABLED TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID TELEGRAM_API_TIMEOUT_SECONDS TELEGRAM_CONNECTION_RETRIES
+    export TELEGRAM_RATE_LIMITING_MESSAGES_PER_SECOND TELEGRAM_RATE_LIMITING_BURST_SIZE TELEGRAM_RATE_LIMITING_RATE_LIMIT_WINDOW_SECONDS
+    export TELEGRAM_RATE_LIMITING_BACKOFF_MULTIPLIER TELEGRAM_RATE_LIMITING_MAX_BACKOFF_SECONDS
+    export TELEGRAM_FORMATTING_PARSE_MODE TELEGRAM_FORMATTING_MAX_MESSAGE_LENGTH TELEGRAM_FORMATTING_INCLUDE_TIMESTAMP
+    export TELEGRAM_FORMATTING_INCLUDE_LOG_LEVEL TELEGRAM_FORMATTING_INCLUDE_SCRIPT_NAME TELEGRAM_FORMATTING_USE_EMOJI_INDICATORS
+    export TELEGRAM_RETRY_MAX_ATTEMPTS TELEGRAM_RETRY_BASE_DELAY TELEGRAM_RETRY_MAX_DELAY TELEGRAM_RETRY_JITTER
+    export TELEGRAM_FILTERS_LOG_LEVELS TELEGRAM_FILTERS_SCRIPTS TELEGRAM_FILTERS_EXCLUDE_PATTERNS TELEGRAM_FILTERS_INCLUDE_PATTERNS
+    export TELEGRAM_SECURITY_VALIDATE_BOT_TOKEN TELEGRAM_SECURITY_ENCRYPT_CONFIG_STORAGE TELEGRAM_SECURITY_AUDIT_TOKEN_ACCESS
+    export TELEGRAM_SECURITY_HIDE_TOKENS_IN_LOGS TELEGRAM_SECURITY_REQUIRE_HTTPS
+    export TELEGRAM_HEALTH_ENABLE_HEALTH_CHECKS TELEGRAM_HEALTH_HEALTH_CHECK_INTERVAL_MINUTES
+    export TELEGRAM_HEALTH_API_CONNECTIVITY_TEST TELEGRAM_HEALTH_RATE_LIMIT_MONITORING TELEGRAM_HEALTH_QUEUE_SIZE_MONITORING
+    export TELEGRAM_CONFIG_AUTO_RELOAD TELEGRAM_CONFIG_CONFIG_FILE_WATCH_INTERVAL_SECONDS
+    export TELEGRAM_CONFIG_VALIDATION_STRICTNESS TELEGRAM_CONFIG_BACKUP_CONFIGURATION
 }
