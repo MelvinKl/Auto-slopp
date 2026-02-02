@@ -115,6 +115,26 @@ branch_protection:
     - "staging"
     - "production"
 
+# Enhanced branch cleanup configuration (Auto-683)
+branch_cleanup:
+  # Dry-run and interactive mode settings
+  dry_run_mode: false                  # Enable dry-run mode by default
+  interactive_mode: true               # Enable interactive prompts
+  confirm_before_delete: true          # Confirm before each branch deletion
+  show_dry_run_summary: true           # Show detailed summary in dry-run mode
+  batch_confirmation: false            # Confirm all operations at once vs individual
+  confirmation_timeout: 60            # Timeout for confirmation prompts (seconds)
+  
+  # Safety and operational settings
+  safety_mode: true                    # Enable all safety checks by default
+  backup_before_delete: true           # Create backup patches before deletion
+  max_branches_per_run: 50            # Maximum branches to delete in one run
+  
+  # Dry-run specific settings
+  show_branch_details: true            # Show detailed branch info in dry-run
+  show_safety_info: true               # Show safety configuration in dry-run
+  show_skipped_branches: true          # Show why branches are skipped in dry-run
+
 # Telegram Bot logging configuration (P0 Critical)
 telegram:
   enabled: false                        # Enable/disable Telegram logging globally

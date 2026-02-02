@@ -33,6 +33,13 @@ SAFETY_MODE="${SAFETY_MODE:-true}"  # Enable all safety checks by default
 BACKUP_BEFORE_DELETE="${BACKUP_BEFORE_DELETE:-true}"
 MAX_BRANCHES_PER_RUN="${MAX_BRANCHES_PER_RUN:-50}"
 
+# Enhanced dry-run and confirmation configuration
+INTERACTIVE_MODE="${INTERACTIVE_MODE:-true}"  # Enable interactive prompts
+CONFIRM_BEFORE_DELETE="${CONFIRM_BEFORE_DELETE:-true}"  # Confirm before each deletion
+SHOW_DRY_RUN_SUMMARY="${SHOW_DRY_RUN_SUMMARY:-true}"  # Show summary in dry-run mode
+BATCH_CONFIRMATION="${BATCH_CONFIRMATION:-false}"  # Confirm all operations at once
+CONFIRMATION_TIMEOUT="${CONFIRMATION_TIMEOUT:-60}"  # Timeout for confirmation prompts
+
     # Initialize enhanced systems
     initialize_enhanced_cleanup_system() {
         log "INFO" "Initializing enhanced cleanup system (operation: $CLEANUP_OPERATION_ID)"
@@ -43,33 +50,362 @@ MAX_BRANCHES_PER_RUN="${MAX_BRANCHES_PER_RUN:-50}"
             return 1
         fi
         
-        # Initialize system state management
-        initialize_state_management
-        
-        # Validate configuration
-        if ! validate_configuration "" "strict"; then
-            log "ERROR" "Configuration validation failed, attempting repair"
-            attempt_configuration_repair "safe"
-            
-            # Re-validate after repair
-            if ! validate_configuration "" "permissive"; then
-                log "ERROR" "Configuration still invalid after repair attempt"
-                return 1
-            fi
+        # Initialize system state management if available
+        if command -v initialize_state_management >/dev/null 2>&1; then
+            initialize_state_management
+        else
+            log "DEBUG" "State management not available, continuing without it"
         fi
         
-        # Set up enhanced error handling
-        setup_enhanced_error_handling
+        # Validate configuration if available
+        if command -v validate_configuration >/dev/null 2>&1; then
+            if ! validate_configuration "" "strict"; then
+                log "ERROR" "Configuration validation failed, attempting repair"
+                if command -v attempt_configuration_repair >/dev/null 2>&1; then
+                    attempt_configuration_repair "safe"
+                    
+                    # Re-validate after repair
+                    if ! validate_configuration "" "permissive"; then
+                        log "ERROR" "Configuration still invalid after repair attempt"
+                        return 1
+                    fi
+                else
+                    log "WARNING" "Configuration repair not available, proceeding with validation failure"
+                fi
+            fi
+        else
+            log "DEBUG" "Configuration validation not available, continuing without it"
+        fi
         
-        # Perform initial health check
-        perform_health_check "" "startup"
+        # Set up enhanced error handling if available
+        if command -v setup_enhanced_error_handling >/dev/null 2>&1; then
+            setup_enhanced_error_handling
+        fi
         
-        # Record operation start
-        record_operation_performance "cleanup_branches_startup" 0 true
+        # Perform initial health check if available
+        if command -v perform_health_check >/dev/null 2>&1; then
+            perform_health_check "" "startup"
+        fi
+        
+        # Record operation start if available
+        if command -v record_operation_performance >/dev/null 2>&1; then
+            record_operation_performance "cleanup_branches_startup" 0 true
+        fi
         
         log "SUCCESS" "Enhanced cleanup system initialized"
         return 0
     }
+
+# =============================================================================
+# ENHANCED DRY-RUN AND CONFIRMATION SYSTEM
+# =============================================================================
+
+# Display comprehensive dry-run analysis
+show_dry_run_analysis() {
+    local repo_dir="$1"
+    local branches_to_delete=()
+    local branches_skipped=()
+    local analysis_data="$2"
+    local repo_name=$(basename "$repo_dir")
+    
+    log "INFO" "DRY RUN ANALYSIS: Repository: $repo_name"
+    
+    echo
+    echo "${BLUE}🔍 DRY RUN ANALYSIS${NC}"
+    echo "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
+    echo
+    echo "Repository: ${YELLOW}$repo_name${NC}"
+    echo "Operation: Branch Cleanup (SIMULATION)"
+    echo "Date: $(date '+%Y-%m-%d %H:%M:%S')"
+    echo
+    
+    # Determine branches for deletion (without actually deleting)
+    if ! determine_branches_for_deletion "$repo_dir" analysis_data branches_to_delete branches_skipped; then
+        echo "${RED}❌ Failed to analyze branches${NC}"
+        return 1
+    fi
+    
+    # Apply safety limits
+    local original_count=${#branches_to_delete[@]}
+    if [[ ${#branches_to_delete[@]} -gt $MAX_BRANCHES_PER_RUN ]]; then
+        branches_to_delete=("${branches_to_delete[@]:0:$MAX_BRANCHES_PER_RUN}")
+        echo "${YELLOW}⚠️  Limiting to $MAX_BRANCHES_PER_RUN branches (found $original_count)${NC}"
+        echo
+    fi
+    
+    # Show branches that would be deleted
+    if [[ ${#branches_to_delete[@]} -gt 0 ]]; then
+        echo "${RED}🗑️  Branches that would be DELETED:${NC}"
+        echo
+        local count=1
+        for branch in "${branches_to_delete[@]}"; do
+            show_branch_deletion_preview "$branch" "$repo_dir" "$count"
+            ((count++))
+        done
+        echo
+        echo "${RED}Total branches to delete: ${#branches_to_delete[@]}${NC}"
+    else
+        echo "${GREEN}✅ No branches would be deleted${NC}"
+    fi
+    
+    echo
+    
+    # Show skipped branches
+    if [[ ${#branches_skipped[@]} -gt 0 ]]; then
+        echo "${YELLOW}🛡️  Branches that would be SKIPPED:${NC}"
+        echo
+        for reason in "${branches_skipped[@]}"; do
+            echo "  • $reason"
+        done
+        echo
+        echo "${YELLOW}Total branches skipped: ${#branches_skipped[@]}${NC}"
+        echo
+    fi
+    
+    # Show safety information
+    echo "${BLUE}🔒 Safety Information:${NC}"
+    echo "  • Backup before delete: $BACKUP_BEFORE_DELETE"
+    echo "  • Safety mode: $SAFETY_MODE"
+    echo "  • Max branches per run: $MAX_BRANCHES_PER_RUN"
+    echo
+    
+    if [[ "$SHOW_DRY_RUN_SUMMARY" == "true" ]]; then
+        show_dry_run_summary "${branches_to_delete[@]}" "${branches_skipped[@]}"
+    fi
+    
+    return 0
+}
+
+# Show detailed preview of what would happen to a branch
+show_branch_deletion_preview() {
+    local branch="$1"
+    local repo_dir="$2"
+    local display_num="$3"
+    
+    cd "$repo_dir" || return 1
+    
+    # Get branch information
+    local last_commit
+    local commit_age
+    local is_merged_status
+    local has_untracked_status
+    
+    last_commit=$(git log -1 --format="%h | %an | %ad | %s" --date=short "$branch" 2>/dev/null || echo "Unable to retrieve")
+    
+    local commit_timestamp
+    if commit_timestamp=$(git log -1 --format=%ct "$branch" 2>/dev/null); then
+        commit_age=$((( $(date +%s) - commit_timestamp ) / 86400))
+        commit_age="${commit_age} days old"
+    else
+        commit_age="unknown age"
+    fi
+    
+    if git merge-base --is-ancestor "$branch" "main" 2>/dev/null || \
+       git merge-base --is-ancestor "$branch" "master" 2>/dev/null; then
+        is_merged_status="✅ Merged"
+    else
+        is_merged_status="⚠️  Unmerged"
+    fi
+    
+    if git diff --name-only "$branch" 2>/dev/null | grep -q .; then
+        has_untracked_status="⚠️  Has untracked changes"
+    else
+        has_untracked_status="✅ No untracked changes"
+    fi
+    
+    printf "${RED}%2d. %s${NC}\n" "$display_num" "$branch"
+    echo "     Last commit: $last_commit"
+    echo "     Age: $commit_age"
+    echo "     Status: $is_merged_status | $has_untracked_status"
+    
+    if [[ "$BACKUP_BEFORE_DELETE" == "true" ]]; then
+        echo "     📦 Backup: Would create patch backup before deletion"
+    fi
+    echo
+}
+
+# Show comprehensive dry-run summary
+show_dry_run_summary() {
+    local branches_to_delete=("$@")
+    local total_delete=${#branches_to_delete[@]}
+    
+    echo "${BLUE}📊 DRY RUN SUMMARY${NC}"
+    echo "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
+    echo
+    echo "This is a DRY RUN. No branches will be deleted."
+    echo
+    echo "${GREEN}Next steps:${NC}"
+    if [[ $total_delete -gt 0 ]]; then
+        echo "1. Review the branches listed above carefully"
+        echo "2. If you want to proceed, run: DRY_RUN_MODE=false $0"
+        echo "3. Or use interactive mode: INTERACTIVE_MODE=true $0"
+    else
+        echo "✅ No action needed - no branches to clean up"
+    fi
+    echo
+    echo "${YELLOW}💡 Tip: Use CONFIRM_BEFORE_DELETE=true to confirm each deletion${NC}"
+    echo "═══════════════════════════════════════════════════════════════"
+    echo
+}
+
+# Request confirmation for batch operations
+request_batch_confirmation() {
+    local total_branches="$1"
+    local repo_name="$2"
+    
+    if [[ "$BATCH_CONFIRMATION" != "true" ]]; then
+        return 0
+    fi
+    
+    echo
+    echo "${YELLOW}🔄 BATCH CONFIRMATION REQUIRED${NC}"
+    echo "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+    echo
+    echo "${RED}You are about to delete $total_branches branches${NC}"
+    echo "Repository: ${BLUE}$repo_name${NC}"
+    echo
+    echo "${YELLOW}This will:${NC}"
+    if [[ "$BACKUP_BEFORE_DELETE" == "true" ]]; then
+        echo "  • Create backup patches for each branch"
+    fi
+    echo "  • Delete $total_branches local branches"
+    echo "  • This operation cannot be undone!"
+    echo
+    
+    if ! request_user_confirmation "Delete $total_branches branches in $repo_name?"; then
+        log "INFO" "User cancelled batch deletion operation"
+        echo "${GREEN}✅ Operation cancelled by user${NC}"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Interactive confirmation for individual branch deletion
+request_branch_deletion_confirmation() {
+    local branch="$1"
+    local repo_dir="$2"
+    local repo_name=$(basename "$repo_dir")
+    
+    if [[ "$CONFIRM_BEFORE_DELETE" != "true" ]]; then
+        return 0
+    fi
+    
+    echo
+    echo "${YELLOW}🔄 BRANCH DELETION CONFIRMATION${NC}"
+    echo "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+    echo
+    echo "${RED}About to delete branch: $branch${NC}"
+    echo "Repository: ${BLUE}$repo_name${NC}"
+    
+    # Show quick branch info
+    cd "$repo_dir" || return 1
+    local last_commit=$(git log -1 --format="%h | %s" --date=short "$branch" 2>/dev/null || echo "Unknown")
+    echo "Last commit: $last_commit"
+    echo
+    
+    echo "Options:"
+    echo "  ${GREEN}yes${NC}     - Delete this branch"
+    echo "  ${YELLOW}skip${NC}    - Skip this branch"
+    echo "  ${YELLOW}info${NC}    - Show detailed branch information"
+    echo "  ${RED}cancel${NC}  - Cancel all operations"
+    echo
+    
+    local user_input
+    if [[ "$INTERACTIVE_MODE" == "true" ]]; then
+        echo -n "Your choice [yes]: "
+        if ! read -t "$CONFIRMATION_TIMEOUT" -r user_input; then
+            echo
+            echo "${YELLOW}Timeout reached, defaulting to 'yes'${NC}"
+            user_input="yes"
+        fi
+    else
+        user_input="yes"  # Default to yes in non-interactive mode
+    fi
+    
+    echo
+    
+    case "$user_input" in
+        "yes"|"YES"|"y"|"Y"|"")
+            log "INFO" "User confirmed deletion of branch: $branch"
+            return 0
+            ;;
+        "skip"|"SKIP"|"s"|"S")
+            log "INFO" "User skipped deletion of branch: $branch"
+            echo "${YELLOW}Skipping branch: $branch${NC}"
+            return 1
+            ;;
+        "info"|"INFO"|"i"|"I")
+            show_branch_detailed_info "$branch" "$repo_dir"
+            return request_branch_deletion_confirmation "$branch" "$repo_dir"
+            ;;
+        "cancel"|"CANCEL"|"c"|"C")
+            log "WARNING" "User cancelled all operations at branch: $branch"
+            echo "${RED}Cancelling all operations${NC}"
+            return 2
+            ;;
+        *)
+            echo "${RED}Invalid choice. Skipping branch for safety.${NC}"
+            return 1
+            ;;
+    esac
+}
+
+# Generic user confirmation function
+request_user_confirmation() {
+    local prompt="$1"
+    local default="${2:-no}"
+    
+    if [[ "$INTERACTIVE_MODE" != "true" ]]; then
+        return 0  # Auto-confirm in non-interactive mode
+    fi
+    
+    echo -n "${YELLOW}$prompt [$default]: ${NC}"
+    
+    local user_input
+    if ! read -t "$CONFIRMATION_TIMEOUT" -r user_input; then
+        echo
+        echo "${YELLOW}Timeout reached, defaulting to '$default'${NC}"
+        user_input="$default"
+    fi
+    
+    echo
+    
+    case "$user_input" in
+        "yes"|"YES"|"y"|"Y")
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# Check if we should proceed with the operation
+should_proceed_with_cleanup() {
+    local total_repos="$1"
+    local total_branches="$2"
+    
+    if [[ "$DRY_RUN_MODE" == "true" ]]; then
+        return 0  # Always proceed in dry-run mode
+    fi
+    
+    if [[ "$INTERACTIVE_MODE" != "true" ]]; then
+        return 0  # Auto-proceed in non-interactive mode
+    fi
+    
+    echo
+    echo "${BLUE}🚀 CLEANUP OPERATION SUMMARY${NC}"
+    echo "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
+    echo
+    echo "Repositories to process: ${YELLOW}$total_repos${NC}"
+    echo "Total branches to delete: ${RED}$total_branches${NC}"
+    echo "Backup before delete: ${GREEN}$BACKUP_BEFORE_DELETE${NC}"
+    echo "Safety mode: ${GREEN}$SAFETY_MODE${NC}"
+    echo
+    
+    return $(request_user_confirmation "Proceed with cleanup operation?")
+}
 
 # =============================================================================
 # ENHANCED BRANCH ANALYSIS ALGORITHMS
@@ -502,11 +838,15 @@ safe_delete_branch_enhanced() {
     local duration=$(echo "$end_time - $start_time" | bc -l 2>/dev/null || echo "0")
     record_operation_performance "branch_delete_$branch" "$duration" $([[ $deletion_exit_code -eq 0 ]] && echo true || echo false)
     
-    # Update system state
+    # Update system state if available
     if [[ $deletion_exit_code -eq 0 ]]; then
-        update_system_state "system.successful_operations" $(($(get_state_value "system.successful_operations" 0) + 1))
+        if command -v update_system_state >/dev/null 2>&1 && command -v get_state_value >/dev/null 2>&1; then
+            update_system_state "system.successful_operations" $(($(get_state_value "system.successful_operations" 0) + 1))
+        fi
     else
-        update_system_state "system.consecutive_failures" $(($(get_state_value "system.consecutive_failures" 0) + 1))
+        if command -v update_system_state >/dev/null 2>&1 && command -v get_state_value >/dev/null 2>&1; then
+            update_system_state "system.consecutive_failures" $(($(get_state_value "system.consecutive_failures" 0) + 1))
+        fi
     fi
     
     return $deletion_exit_code
@@ -578,6 +918,24 @@ cleanup_repository_enhanced() {
         branches_to_delete=("${branches_to_delete[@]:0:$MAX_BRANCHES_PER_RUN}")
     fi
     
+    # If in dry-run mode, show analysis and return
+    if [[ "$DRY_RUN_MODE" == "true" ]]; then
+        show_dry_run_analysis "$repo_dir" branches_to_delete branches_skipped "$analysis_data"
+        # Update counters for reporting but don't actually delete
+        TOTAL_REPOS_PROCESSED=$((TOTAL_REPOS_PROCESSED + 1))
+        TOTAL_BRANCHES_CLEANED=$((TOTAL_BRANCHES_CLEANED + ${#branches_to_delete[@]}))
+        return 0
+    fi
+    
+    # Request batch confirmation if enabled and there are branches to delete
+    if [[ ${#branches_to_delete[@]} -gt 0 ]]; then
+        if ! request_batch_confirmation "${#branches_to_delete[@]}" "$repo_name"; then
+            log "INFO" "Batch operation cancelled by user for: $repo_name"
+            TOTAL_REPOS_PROCESSED=$((TOTAL_REPOS_PROCESSED + 1))
+            return 0
+        fi
+    fi
+    
     # Process branches for deletion
     local repo_cleaned_count=0
     local repo_errors_count=0
@@ -585,12 +943,46 @@ cleanup_repository_enhanced() {
     for branch in "${branches_to_delete[@]}"; do
         # Verify safety before deletion (including branch protection)
         if verify_branch_safety_comprehensive "$branch" "$repo_dir" "$analysis_data"; then
-            # Use enhanced branch protection for deletion
-            if safe_delete_branch_with_protection "$branch" "$repo_dir" "false"; then
-                ((repo_cleaned_count++))
-            else
-                ((repo_errors_count++))
-                branches_skipped+=("$branch (protected)")
+            # Request individual confirmation if enabled
+            local should_delete=true
+            if [[ "$CONFIRM_BEFORE_DELETE" == "true" ]]; then
+                local confirmation_result
+                request_branch_deletion_confirmation "$branch" "$repo_dir"
+                confirmation_result=$?
+                
+                case $confirmation_result in
+                    0) # Confirmed deletion
+                        should_delete=true
+                        ;;
+                    1) # Skipped this branch
+                        should_delete=false
+                        branches_skipped+=("$branch (user skipped)")
+                        ;;
+                    2) # Cancelled all operations
+                        log "WARNING" "User cancelled all operations for: $repo_name"
+                        break
+                        ;;
+                esac
+            fi
+            
+            if [[ "$should_delete" == "true" ]]; then
+                # Use enhanced branch protection for deletion
+                if command -v safe_delete_branch_with_protection >/dev/null 2>&1; then
+                    if safe_delete_branch_with_protection "$branch" "$repo_dir" "false"; then
+                        ((repo_cleaned_count++))
+                    else
+                        ((repo_errors_count++))
+                        branches_skipped+=("$branch (protected)")
+                    fi
+                else
+                    # Fallback to enhanced deletion
+                    if safe_delete_branch_enhanced "$branch" "$repo_dir" "$analysis_data"; then
+                        ((repo_cleaned_count++))
+                    else
+                        ((repo_errors_count++))
+                        branches_skipped+=("$branch (deletion failed)")
+                    fi
+                fi
             fi
         else
             log "INFO" "Skipping branch due to safety concerns: $branch"
@@ -601,7 +993,9 @@ cleanup_repository_enhanced() {
     # Record repository cleanup completion
     local end_time=$(date +%s.%N)
     local duration=$(echo "$end_time - $start_time" | bc -l 2>/dev/null || echo "0")
-    record_operation_performance "repository_cleanup_$repo_name" "$duration" $([[ $repo_errors_count -eq 0 ]] && echo true || echo false)
+    if command -v record_operation_performance >/dev/null 2>&1; then
+        record_operation_performance "repository_cleanup_$repo_name" "$duration" $([[ $repo_errors_count -eq 0 ]] && echo true || echo false)
+    fi
     
     # Report results
     log "INFO" "Repository cleanup completed for $repo_name:"
@@ -733,10 +1127,17 @@ is_branch_protected() {
 main_enhanced_cleanup() {
     local start_time=$(date +%s)
     
+    # Initialize global counters
+    TOTAL_REPOS_PROCESSED=0
+    TOTAL_BRANCHES_CLEANED=0
+    TOTAL_ERRORS=0
+    
     log "INFO" "Starting enhanced branch cleanup system"
     log "INFO" "Operation ID: $CLEANUP_OPERATION_ID"
     log "INFO" "Safety mode: $SAFETY_MODE"
     log "INFO" "Dry run mode: $DRY_RUN_MODE"
+    log "INFO" "Interactive mode: $INTERACTIVE_MODE"
+    log "INFO" "Confirm before delete: $CONFIRM_BEFORE_DELETE"
     
     # Initialize enhanced systems
     if ! initialize_enhanced_cleanup_system; then
@@ -744,10 +1145,14 @@ main_enhanced_cleanup() {
         exit 1
     fi
     
-    # Validate runtime configuration
-    if ! validate_runtime_configuration "cleanup"; then
-        log "ERROR" "Runtime configuration validation failed"
-        exit 1
+    # Validate runtime configuration if available
+    if command -v validate_runtime_configuration >/dev/null 2>&1; then
+        if ! validate_runtime_configuration "cleanup"; then
+            log "ERROR" "Runtime configuration validation failed"
+            exit 1
+        fi
+    else
+        log "DEBUG" "Runtime configuration validation not available, continuing without it"
     fi
     
     # Check if managed_repo_path exists
@@ -756,16 +1161,73 @@ main_enhanced_cleanup() {
         exit 1
     fi
     
+    # Count repositories and do initial scan
+    declare -i repo_count=0
+    declare -i total_branches_for_deletion=0
+    
+    for repo_dir in "$MANAGED_REPO_PATH"/*; do
+        # Skip non-directories
+        if [[ ! -d "$repo_dir" ]]; then
+            continue
+        fi
+        
+        # Skip if operation should be isolated (if function available)
+        if command -v should_isolate_operation >/dev/null 2>&1; then
+            if should_isolate_operation "cleanup_$(basename "$repo_dir")"; then
+                log "WARNING" "Skipping isolated repository: $(basename "$repo_dir")"
+                continue
+            fi
+        fi
+        
+        # Count repositories safely
+        ((repo_count++)) || {
+            log "ERROR" "Failed to increment repo_count, repo_dir: $repo_dir"
+            continue
+        }
+        
+        # Quick scan to count branches for deletion (only if not in dry-run mode)
+        if [[ "$DRY_RUN_MODE" != "true" ]]; then
+            local analysis_data
+            if analysis_data=$(analyze_branches_comprehensive "$repo_dir" 2>/dev/null); then
+                local branches_to_delete=()
+                local branches_skipped=()
+                if determine_branches_for_deletion "$repo_dir" analysis_data branches_to_delete branches_skipped 2>/dev/null; then
+                    total_branches_for_deletion=$((total_branches_for_deletion + ${#branches_to_delete[@]}))
+                fi
+            fi
+        fi
+    done
+    
+    # Show initial summary and request confirmation (if not in dry-run mode)
+    if [[ "$DRY_RUN_MODE" != "true" ]]; then
+        if ! should_proceed_with_cleanup "$repo_count" "$total_branches_for_deletion"; then
+            log "INFO" "Cleanup cancelled by user"
+            echo "${GREEN}✅ Cleanup cancelled by user${NC}"
+            exit 0
+        fi
+    fi
+    
+    # Show dry-run mode header if enabled
+    if [[ "$DRY_RUN_MODE" == "true" ]]; then
+        echo
+        echo "${BLUE}🔍 DRY RUN MODE ENABLED${NC}"
+        echo "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
+        echo "${YELLOW}No actual deletions will be performed. This is a simulation.${NC}"
+        echo
+    fi
+    
     # Process each repository
     for repo_dir in "$MANAGED_REPO_PATH"/*; do
         if [[ ! -d "$repo_dir" ]]; then
             continue
         fi
         
-        # Skip if operation should be isolated
-        if should_isolate_operation "cleanup_$(basename "$repo_dir")"; then
-            log "WARNING" "Skipping isolated repository: $(basename "$repo_dir")"
-            continue
+        # Skip if operation should be isolated (if function available)
+        if command -v should_isolate_operation >/dev/null 2>&1; then
+            if should_isolate_operation "cleanup_$(basename "$repo_dir")"; then
+                log "WARNING" "Skipping isolated repository: $(basename "$repo_dir")"
+                continue
+            fi
         fi
         
         cleanup_repository_enhanced "$repo_dir"
@@ -782,8 +1244,28 @@ main_enhanced_cleanup() {
     log "INFO" "Total duration: ${total_duration}s"
     log "INFO" "Operation ID: $CLEANUP_OPERATION_ID"
     
-    # Perform final health check
-    perform_health_check "" "completion"
+    # Show completion message based on mode
+    if [[ "$DRY_RUN_MODE" == "true" ]]; then
+        echo
+        echo "${GREEN}✅ DRY RUN COMPLETED${NC}"
+        echo "${GREEN}To perform actual deletion, run: DRY_RUN_MODE=false $0${NC}"
+        echo
+    elif [[ "$INTERACTIVE_MODE" == "true" ]]; then
+        echo
+        echo "${GREEN}✅ INTERACTIVE CLEANUP COMPLETED${NC}"
+        echo "${GREEN}Branches deleted: $TOTAL_BRANCHES_CLEANED${NC}"
+        echo
+    else
+        echo
+        echo "${GREEN}✅ AUTOMATIC CLEANUP COMPLETED${NC}"
+        echo "${GREEN}Branches deleted: $TOTAL_BRANCHES_CLEANED${NC}"
+        echo
+    fi
+    
+    # Perform final health check if available
+    if command -v perform_health_check >/dev/null 2>&1; then
+        perform_health_check "" "completion"
+    fi
     
     # Generate final report
     generate_cleanup_summary_report
@@ -814,7 +1296,7 @@ generate_cleanup_summary_report() {
         "safety_mode": "$SAFETY_MODE",
         "dry_run_mode": "$DRY_RUN_MODE"
     },
-    "system_health": "$(get_system_health_status)",
+    "system_health": "$(command -v get_system_health_status >/dev/null 2>&1 && get_system_health_status || echo "unknown")",
     "configuration_status": "valid"
 }
 EOF

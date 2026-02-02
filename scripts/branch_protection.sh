@@ -25,6 +25,17 @@ PROTECT_CURRENT_BRANCH="${branch_protection_protect_current_branch:-true}"
 PROTECTION_PATTERNS=("${branch_protection_protection_patterns[@]}")
 EXPLICIT_CONFIRMATION_BRANCHES=("${branch_protection_require_explicit_confirmation_for[@]}")
 
+# Enhanced branch cleanup configuration (Auto-683)
+DRY_RUN_MODE="${branch_cleanup_dry_run_mode:-false}"
+INTERACTIVE_MODE="${branch_cleanup_interactive_mode:-true}"
+CONFIRM_BEFORE_DELETE="${branch_cleanup_confirm_before_delete:-true}"
+SHOW_DRY_RUN_SUMMARY="${branch_cleanup_show_dry_run_summary:-true}"
+BATCH_CONFIRMATION="${branch_cleanup_batch_confirmation:-false}"
+CONFIRMATION_TIMEOUT="${branch_cleanup_confirmation_timeout:-60}"
+SHOW_BRANCH_DETAILS="${branch_cleanup_show_branch_details:-true}"
+SHOW_SAFETY_INFO="${branch_cleanup_show_safety_info:-true}"
+SHOW_SKIPPED_BRANCHES="${branch_cleanup_show_skipped_branches:-true}"
+
 # =============================================================================
 # CORE BRANCH PROTECTION FUNCTIONS
 # =============================================================================

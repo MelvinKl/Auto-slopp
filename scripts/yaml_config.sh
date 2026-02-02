@@ -244,6 +244,17 @@ load_config() {
     declare -g -a branch_protection_require_explicit_confirmation_for=()
     read_yaml_array "$config_file" "branch_protection.require_explicit_confirmation_for" branch_protection_require_explicit_confirmation_for
     
+    # Enhanced branch cleanup configuration (Auto-683)
+    branch_cleanup_dry_run_mode="${branch_cleanup_dry_run_mode:-$(read_yaml_config "$config_file" "branch_cleanup.dry_run_mode" "false")}"
+    branch_cleanup_interactive_mode="${branch_cleanup_interactive_mode:-$(read_yaml_config "$config_file" "branch_cleanup.interactive_mode" "true")}"
+    branch_cleanup_confirm_before_delete="${branch_cleanup_confirm_before_delete:-$(read_yaml_config "$config_file" "branch_cleanup.confirm_before_delete" "true")}"
+    branch_cleanup_show_dry_run_summary="${branch_cleanup_show_dry_run_summary:-$(read_yaml_config "$config_file" "branch_cleanup.show_dry_run_summary" "true")}"
+    branch_cleanup_batch_confirmation="${branch_cleanup_batch_confirmation:-$(read_yaml_config "$config_file" "branch_cleanup.batch_confirmation" "false")}"
+    branch_cleanup_confirmation_timeout="${branch_cleanup_confirmation_timeout:-$(read_yaml_config "$config_file" "branch_cleanup.confirmation_timeout" "60")}"
+    branch_cleanup_show_branch_details="${branch_cleanup_show_branch_details:-$(read_yaml_config "$config_file" "branch_cleanup.show_branch_details" "true")}"
+    branch_cleanup_show_safety_info="${branch_cleanup_show_safety_info:-$(read_yaml_config "$config_file" "branch_cleanup.show_safety_info" "true")}"
+    branch_cleanup_show_skipped_branches="${branch_cleanup_show_skipped_branches:-$(read_yaml_config "$config_file" "branch_cleanup.show_skipped_branches" "true")}"
+    
     # Expand tilde paths
     MANAGED_REPO_PATH="${MANAGED_REPO_PATH/#\~/$HOME}"
     MANAGED_REPO_TASK_PATH="${MANAGED_REPO_TASK_PATH/#\~/$HOME}"
@@ -288,6 +299,11 @@ load_config() {
     export branch_protection_protect_current_branch
     export branch_protection_protected_branches branch_protection_protection_patterns
     export branch_protection_require_explicit_confirmation_for
+    
+    # Export branch cleanup variables (Auto-683)
+    export branch_cleanup_dry_run_mode branch_cleanup_interactive_mode branch_cleanup_confirm_before_delete
+    export branch_cleanup_show_dry_run_summary branch_cleanup_batch_confirmation branch_cleanup_confirmation_timeout
+    export branch_cleanup_show_branch_details branch_cleanup_show_safety_info branch_cleanup_show_skipped_branches
     
     # Export OpenCode timeout variables
     export OPENCODE_TIMEOUT_ENABLED OPENCODE_TIMEOUT_SECONDS OPENCODE_TIMEOUT_SIGNAL OPENCODE_KILL_SIGNAL
