@@ -6,8 +6,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/../config.sh"
 
-# Set up error handling
+# Set up error handling with enhanced logging
 setup_error_handling
+
+# Enhanced error categorization and logging
+# Error levels: CRITICAL (system failure), ERROR (operation failure), WARNING (potential issue), INFO (normal), DEBUG (troubleshooting)
 
 # Configure script-specific variables
 SCRIPT_NAME="auto-update-reboot"
@@ -52,6 +55,13 @@ GIT_RETRY_ATTEMPTS=${GIT_RETRY_ATTEMPTS:-3}
 GIT_RETRY_DELAY_SECONDS=${GIT_RETRY_DELAY_SECONDS:-5}
 NETWORK_TIMEOUT_SECONDS=${NETWORK_TIMEOUT_SECONDS:-60}
 
+# Enhanced error handling configuration
+ERROR_LOG_RETENTION_DAYS=${ERROR_LOG_RETENTION_DAYS:-30}
+ERROR_MAX_LOG_SIZE_MB=${ERROR_MAX_LOG_SIZE_MB:-50}
+ENABLE_DETAILED_ERROR_TRACKING=${ENABLE_DETAILED_ERROR_TRACKING:-true}
+ENABLE_OPERATION_LOGGING=${ENABLE_OPERATION_LOGGING:-true}
+ENABLE_SYSTEM_STATE_LOGGING=${ENABLE_SYSTEM_STATE_LOGGING:-true}
+
 # Change significance filtering (default patterns that trigger reboot)
 REBOOT_TRIGGER_PATTERNS=${REBOOT_TRIGGER_PATTERNS:-"scripts/*.sh|config.yaml|main.sh|scripts/utils.sh|scripts/core/*.sh"}
 IGNORE_CHANGE_PATTERNS=${IGNORE_CHANGE_PATTERNS:-"*.md|*.txt|*.log|tests/*.sh|.*"}
@@ -60,8 +70,234 @@ IGNORE_CHANGE_PATTERNS=${IGNORE_CHANGE_PATTERNS:-"*.md|*.txt|*.log|tests/*.sh|.*
 MIN_CHANGED_FILES_FOR_REBOOT=${MIN_CHANGED_FILES_FOR_REBOOT:-1}
 MAX_CHANGE_COUNT_FOR_REBOOT=${MAX_CHANGE_COUNT_FOR_REBOOT:-100}
 
-log "INFO" "Starting auto-update-reboot.sh"
+# Enhanced error handling and logging functions
+log_operation_start() {
+    local operation="$1"
+    local context="${2:-}"
+    local start_time=$(date +%s)
+    
+    if [[ "${ENABLE_OPERATION_LOGGING:-true}" == "true" ]]; then
+        log "INFO" "=== OPERATION START: $operation ==="
+        [[ -n "$context" ]] && log "DEBUG" "Operation context: $context"
+        log "DEBUG" "Start timestamp: $(date -Iseconds)"
+    fi
+    
+    # Set global operation tracking
+    export CURRENT_OPERATION="$operation"
+    export OPERATION_START_TIME="$start_time"
+}
+
+log_operation_end() {
+    local operation="$1"
+    local status="${2:-success}"
+    local error_message="${3:-}"
+    local end_time=$(date +%s)
+    local duration=0
+    
+    if [[ -n "${OPERATION_START_TIME:-}" ]]; then
+        duration=$((end_time - OPERATION_START_TIME))
+    fi
+    
+    if [[ "${ENABLE_OPERATION_LOGGING:-true}" == "true" ]]; then
+        case "$status" in
+            "success")
+                log "INFO" "=== OPERATION SUCCESS: $operation (duration: ${duration}s) ==="
+                ;;
+            "warning")
+                log "WARNING" "=== OPERATION WARNING: $operation (duration: ${duration}s) ==="
+                [[ -n "$error_message" ]] && log "WARNING" "Warning details: $error_message"
+                ;;
+            "error")
+                log "ERROR" "=== OPERATION FAILED: $operation (duration: ${duration}s) ==="
+                [[ -n "$error_message" ]] && log "ERROR" "Error details: $error_message"
+                ;;
+            "critical")
+                log "CRITICAL" "=== OPERATION CRITICAL FAILURE: $operation (duration: ${duration}s) ==="
+                [[ -n "$error_message" ]] && log "CRITICAL" "Critical error: $error_message"
+                ;;
+        esac
+    fi
+    
+    # Clear operation tracking
+    unset CURRENT_OPERATION
+    unset OPERATION_START_TIME
+}
+
+log_error_with_context() {
+    local error_level="$1"  # WARNING, ERROR, CRITICAL
+    local error_message="$2"
+    local operation_context="${3:-}"
+    local system_context="${4:-false}"
+    local recovery_suggestion="${5:-}"
+    
+    # Enhanced error logging with actionable information
+    log "$error_level" "ERROR: $error_message"
+    
+    if [[ -n "$operation_context" ]]; then
+        log "$error_level" "Operation context: $operation_context"
+    fi
+    
+    if [[ "$system_context" == "true" ]]; then
+        log_system_state_snapshot "error_context"
+    fi
+    
+    if [[ -n "$recovery_suggestion" ]]; then
+        log "$error_level" "Recovery suggestion: $recovery_suggestion"
+    fi
+    
+    # Track error statistics if detailed tracking is enabled
+    if [[ "${ENABLE_DETAILED_ERROR_TRACKING:-true}" == "true" ]]; then
+        track_error_statistics "$error_level" "$error_message" "$operation_context"
+    fi
+}
+
+track_error_statistics() {
+    local error_level="$1"
+    local error_message="$2"
+    local operation_context="${3:-}"
+    local error_stats_file="${LOG_DIRECTORY}/error-statistics.json"
+    
+    mkdir -p "${LOG_DIRECTORY}"
+    
+    # Create error entry
+    local error_entry=$(cat << EOF
+{
+  "timestamp": "$(date -Iseconds)",
+  "level": "$error_level",
+  "message": "$error_message",
+  "operation": "${operation_context:-unknown}",
+  "system_uptime": "$(uptime)",
+  "memory_usage": "$(free -h | grep '^Mem:' | awk '{print $3"/"$2}')"
+}
+EOF
+)
+    
+    # Append to error statistics file
+    if [[ ! -f "$error_stats_file" ]]; then
+        echo '{"errors": []}' > "$error_stats_file"
+    fi
+    
+    # Simple JSON append (in production, use proper JSON tool)
+    if command -v jq >/dev/null 2>&1; then
+        local temp_file="${error_stats_file}.tmp"
+        jq --argjson entry "$error_entry" '.errors += [$entry]' "$error_stats_file" > "$temp_file" && mv "$temp_file" "$error_stats_file"
+    else
+        # Fallback: simple append for systems without jq
+        echo "$error_entry" >> "${error_stats_file}.raw"
+    fi
+}
+
+log_system_state_snapshot() {
+    local context_label="${1:-snapshot}"
+    local snapshot_file="${LOG_DIRECTORY}/system-state-${context_label}-$(date +%Y%m%d-%H%M%S).json"
+    
+    if [[ "${ENABLE_SYSTEM_STATE_LOGGING:-true}" != "true" ]]; then
+        return 0
+    fi
+    
+    mkdir -p "${LOG_DIRECTORY}"
+    
+    # Create comprehensive system state snapshot
+    {
+        echo "{"
+        echo "  \"timestamp\": \"$(date -Iseconds)\","
+        echo "  \"context\": \"$context_label\","
+        echo "  \"system\": {"
+        echo "    \"hostname\": \"$(hostname)\","
+        echo "    \"uptime\": \"$(uptime)\","
+        echo "    \"kernel\": \"$(uname -r)\","
+        echo "    \"load_average\": \"$(uptime | awk -F'load average:' '{print $2}' | sed 's/^[ \t]*//')\""
+        echo "  },"
+        echo "  \"resources\": {"
+        echo "    \"disk_root\": \"$(df -h / | tail -1 | awk '{print $5}' | sed 's/%//')\","
+        echo "    \"memory_usage_percent\": \"$(free | awk 'NR==2{printf "%.0f", $3*100/$2}')\","
+        echo "    \"memory_details\": \"$(free -h | grep '^Mem:' | awk '{print $3"/"$2}')\","
+        echo "    \"swap_usage\": \"$(free -h | grep '^Swap:' | awk '{print $3"/"$2" 2>/dev/null || echo "0/0"}')\""
+        echo "  },"
+        echo "  \"processes\": {"
+        echo "    \"total\": \"$(ps aux | wc -l)\","
+        echo "    \"running\": \"$(ps aux | awk '$8 ~ /^R/ {count++} END {print count+0}')\""
+        echo "  },"
+        echo "  \"services\": {"
+        if command -v systemctl >/dev/null 2>&1; then
+            echo "    \"running\": \"$(systemctl list-units --type=service --state=running --no-legend | wc -l)\","
+            echo "    \"failed\": \"$(systemctl list-units --type=service --state=failed --no-legend | wc -l)\""
+        else
+            echo "    \"systemd\": \"not_available\""
+        fi
+        echo "  }"
+        echo "}"
+    } > "$snapshot_file"
+    
+    log "DEBUG" "System state snapshot saved: $snapshot_file"
+}
+
+handle_network_error() {
+    local operation="$1"
+    local error_code="${2:-unknown}"
+    local retry_count="${3:-0}"
+    local max_retries="${4:-3}"
+    
+    case "$error_code" in
+        "timeout")
+            log_error_with_context "ERROR" "Network timeout during $operation" "$operation" "false" "Check network connectivity and firewall settings"
+            ;;
+        "dns")
+            log_error_with_context "ERROR" "DNS resolution failed during $operation" "$operation" "false" "Check DNS configuration and try alternative DNS servers"
+            ;;
+        "connection_refused")
+            log_error_with_context "ERROR" "Connection refused during $operation" "$operation" "false" "Verify remote service is running and accessible"
+            ;;
+        "ssl")
+            log_error_with_context "ERROR" "SSL/TLS error during $operation" "$operation" "false" "Check certificate validity and system time"
+            ;;
+        *)
+            log_error_with_context "ERROR" "Network error during $operation (code: $error_code)" "$operation" "false" "Check network connectivity and retry operation"
+            ;;
+    esac
+    
+    if [[ $retry_count -lt $max_retries ]]; then
+        local next_retry_delay=$((GIT_RETRY_DELAY_SECONDS * retry_count))
+        log "INFO" "Will retry $operation in ${next_retry_delay}s (attempt $((retry_count + 1))/$max_retries)"
+        sleep $next_retry_delay
+        return 0  # Indicate retry should happen
+    else
+        log_error_with_context "CRITICAL" "Network operation failed after $max_retries attempts: $operation" "$operation" "true" "Manual intervention required"
+        return 1  # Indicate no more retries
+    fi
+}
+
+handle_git_error() {
+    local operation="$1"
+    local exit_code="$2"
+    local repo_path="${3:-unknown}"
+    local error_output="${4:-}"
+    
+    case "$exit_code" in
+        1)
+            log_error_with_context "ERROR" "Git operation failed: $operation in $repo_path" "$operation" "false" "Check repository status and permissions"
+            ;;
+        128)
+            log_error_with_context "CRITICAL" "Git repository corruption detected: $repo_path" "$operation" "true" "Run git fsck and consider repository recovery"
+            ;;
+        255)
+            log_error_with_context "ERROR" "Git network error during $operation" "$operation" "false" "Check remote connectivity and authentication"
+            ;;
+        *)
+            log_error_with_context "ERROR" "Unknown git error during $operation (exit code: $exit_code)" "$operation" "false" "Review git configuration and repository state"
+            ;;
+    esac
+    
+    if [[ -n "$error_output" ]]; then
+        log "DEBUG" "Git error output: $error_output"
+    fi
+}
+
+log "INFO" "Starting auto-update-reboot.sh with enhanced error handling"
 log "INFO" "Auto-update-reboot enabled: $AUTO_UPDATE_REBOOT_ENABLED"
+log "DEBUG" "Error tracking enabled: ${ENABLE_DETAILED_ERROR_TRACKING:-true}"
+log "DEBUG" "Operation logging enabled: ${ENABLE_OPERATION_LOGGING:-true}"
+log "DEBUG" "System state logging enabled: ${ENABLE_SYSTEM_STATE_LOGGING:-true}"
 
 # Check if auto-update-reboot functionality is enabled
 if [[ "$AUTO_UPDATE_REBOOT_ENABLED" != "true" ]]; then
@@ -306,113 +542,253 @@ check_daily_limit() {
     return 0
 }
 
-# Enhanced system health checks with comprehensive safeguards
+# Enhanced system health checks with comprehensive safeguards and error handling
 check_system_health() {
-    log "INFO" "Performing comprehensive system health checks"
+    local operation_name="system_health_check"
+    log_operation_start "$operation_name" "Comprehensive system health assessment"
     
     local health_issues=0
+    local health_warnings=0
+    local health_details=()
     
-    # Check disk space on multiple critical mount points
+    # Check disk space on multiple critical mount points with enhanced error handling
     local critical_mounts=("/" "/home" "/var" "/tmp")
+    log "DEBUG" "Checking disk space on critical mount points"
+    
     for mount in "${critical_mounts[@]}"; do
         if [[ -d "$mount" ]]; then
-            local disk_usage=$(df "$mount" | awk 'NR==2 {print $5}' | sed 's/%//' 2>/dev/null || echo "0")
-        if [[ $disk_usage -gt ${SAFE_REBOOT_MAX_DISK_USAGE:-85} ]]; then
-            log "ERROR" "Disk usage too high on $mount: ${disk_usage}% (must be < ${SAFE_REBOOT_MAX_DISK_USAGE:-85}%)"
-            health_issues=$((health_issues + 1))
+            local disk_usage=""
+            if ! disk_usage=$(df "$mount" | awk 'NR==2 {print $5}' | sed 's/%//' 2>/dev/null); then
+                log "WARNING" "Failed to get disk usage for $mount"
+                health_warnings=$((health_warnings + 1))
+                health_details+=("disk_check_failed_$mount")
+                continue
+            fi
+            
+            # Validate disk_usage is numeric
+            if ! [[ "$disk_usage" =~ ^[0-9]+$ ]]; then
+                log "WARNING" "Invalid disk usage value for $mount: $disk_usage"
+                health_warnings=$((health_warnings + 1))
+                health_details+=("disk_check_invalid_$mount")
+                disk_usage=0
+            fi
+            
+            local max_disk_usage=${SAFE_REBOOT_MAX_DISK_USAGE:-85}
+            if [[ $disk_usage -gt $max_disk_usage ]]; then
+                log_error_with_context "ERROR" "Disk usage too high on $mount: ${disk_usage}% (must be < ${max_disk_usage}%)" "$operation_name" "false" "Clean up disk space or increase threshold"
+                health_issues=$((health_issues + 1))
+                health_details+=("disk_critical_$mount")
             else
                 log_system_health "disk_space_$mount" "pass" "Disk usage on $mount: ${disk_usage}%"
+                log "DEBUG" "Disk usage on $mount: ${disk_usage}% (within threshold)"
             fi
+        else
+            log "DEBUG" "Mount point $mount not found, skipping disk check"
+            health_warnings=$((health_warnings + 1))
+            health_details+=("mount_missing_$mount")
         fi
     done
     
-    # Check memory usage with detailed analysis
+    # Check memory usage with detailed analysis and error handling
+    log "DEBUG" "Checking memory usage and system load"
     if command -v free >/dev/null 2>&1; then
-        local memory_usage=$(free | awk 'NR==2{printf "%.0f", $3*100/$2}')
-        local swap_usage=$(free | awk 'NR==3{printf "%.0f", $3*100/$2}' 2>/dev/null || echo "0")
+        local memory_usage=""
+        local swap_usage=""
         
-        if [[ $memory_usage -gt ${SAFE_REBOOT_MAX_MEMORY_USAGE:-85} ]]; then
-            log "ERROR" "Memory usage too high: ${memory_usage}% (must be < ${SAFE_REBOOT_MAX_MEMORY_USAGE:-85}%)"
+        if ! memory_usage=$(free | awk 'NR==2{printf "%.0f", $3*100/$2}' 2>/dev/null); then
+            log "WARNING" "Failed to calculate memory usage"
+            health_warnings=$((health_warnings + 1))
+            health_details+=("memory_check_failed")
+            memory_usage=0
+        fi
+        
+        if ! swap_usage=$(free | awk 'NR==3{printf "%.0f", $3*100/$2}' 2>/dev/null || echo "0"); then
+            log "DEBUG" "Swap usage check failed, assuming 0%"
+            swap_usage=0
+        fi
+        
+        # Validate memory usage values
+        if ! [[ "$memory_usage" =~ ^[0-9]+$ ]]; then
+            log "WARNING" "Invalid memory usage value: $memory_usage"
+            memory_usage=0
+            health_warnings=$((health_warnings + 1))
+        fi
+        
+        if ! [[ "$swap_usage" =~ ^[0-9]+$ ]]; then
+            log "DEBUG" "Invalid swap usage value: $swap_usage, defaulting to 0"
+            swap_usage=0
+        fi
+        
+        local max_memory_usage=${SAFE_REBOOT_MAX_MEMORY_USAGE:-85}
+        if [[ $memory_usage -gt $max_memory_usage ]]; then
+            log_error_with_context "ERROR" "Memory usage too high: ${memory_usage}% (must be < ${max_memory_usage}%)" "$operation_name" "false" "Free up memory or increase threshold"
             health_issues=$((health_issues + 1))
+            health_details+=("memory_critical")
         else
             log_system_health "memory_usage" "pass" "Memory usage: ${memory_usage}%"
+            log "DEBUG" "Memory usage: ${memory_usage}% (within threshold)"
         fi
         
         if [[ $swap_usage -gt 50 ]]; then
-            log "WARNING" "High swap usage: ${swap_usage}% (system may be under memory pressure)"
+            log_error_with_context "WARNING" "High swap usage: ${swap_usage}% (system may be under memory pressure)" "$operation_name" "false" "Investigate memory pressure and consider adding more RAM"
+            health_warnings=$((health_warnings + 1))
+            health_details+=("swap_high")
         fi
-    fi
-    
-    # Check system load averages
-    local load_avg=$(uptime | awk -F'load average:' '{print $2}' | sed 's/^[ \t]*//' | cut -d',' -f1 | sed 's/^[ \t]*//')
-    local cpu_count=$(nproc 2>/dev/null || echo "1")
-    local load_threshold=$((cpu_count * SAFE_REBOOT_MAX_LOAD_MULTIPLIER))
-    
-    # Convert load to integer for comparison (remove decimal)
-    local load_int=$(echo "$load_avg" | cut -d'.' -f1)
-    if [[ $load_int -gt $load_threshold ]]; then
-        log "WARNING" "High system load: $load_avg (threshold: $load_threshold)"
-        health_issues=$((health_issues + 1))
     else
-        log_system_health "system_load" "pass" "System load: $load_avg"
+        log "WARNING" "Free command not available, skipping memory checks"
+        health_warnings=$((health_warnings + 1))
+        health_details+=("memory_check_unavailable")
     fi
     
-    # Check critical services status
+    # Check system load averages with error handling
+    local load_avg=""
+    local cpu_count=""
+    
+    if ! load_avg=$(uptime | awk -F'load average:' '{print $2}' | sed 's/^[ \t]*//' | cut -d',' -f1 | sed 's/^[ \t]*//' 2>/dev/null); then
+        log "WARNING" "Failed to get system load average"
+        health_warnings=$((health_warnings + 1))
+        health_details+=("load_check_failed")
+        load_avg="0"
+    fi
+    
+    if ! cpu_count=$(nproc 2>/dev/null || echo "1"); then
+        log "DEBUG" "Failed to get CPU count, assuming 1"
+        cpu_count=1
+    fi
+    
+    # Validate and process load average
+    if [[ "$load_avg" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+        local load_threshold=$((cpu_count * SAFE_REBOOT_MAX_LOAD_MULTIPLIER))
+        local load_int=$(echo "$load_avg" | cut -d'.' -f1)
+        
+        if [[ $load_int -gt $load_threshold ]]; then
+            log_error_with_context "WARNING" "High system load: $load_avg (threshold: $load_threshold, CPUs: $cpu_count)" "$operation_name" "false" "Wait for load to decrease or investigate high CPU usage"
+            health_issues=$((health_issues + 1))
+            health_details+=("load_high")
+        else
+            log_system_health "system_load" "pass" "System load: $load_avg (CPUs: $cpu_count)"
+            log "DEBUG" "System load: $load_avg (within threshold)"
+        fi
+    else
+        log "WARNING" "Invalid load average value: $load_avg"
+        health_warnings=$((health_warnings + 1))
+        health_details+=("load_check_invalid")
+    fi
+    
+    # Check critical services status with enhanced error handling
+    log "DEBUG" "Checking critical services status"
     if command -v systemctl >/dev/null 2>&1; then
         local critical_services=("sshd" "networking" "systemd-journald")
-        local failed_services=$(systemctl list-units --failed --no-legend | wc -l)
+        local failed_services=0
         local degraded_services=0
         
+        # Get failed services count with error handling
+        if ! failed_services=$(systemctl list-units --failed --no-legend 2>/dev/null | wc -l); then
+            log "WARNING" "Failed to get failed services count"
+            health_warnings=$((health_warnings + 1))
+            health_details+=("services_check_failed")
+            failed_services=0
+        fi
+        
+        # Check each critical service
         for service in "${critical_services[@]}"; do
             if systemctl is-active --quiet "$service" 2>/dev/null; then
                 log_system_health "service_$service" "pass" "Service $service is running"
-            elif systemctl list-unit-files | grep -q "^$service.service"; then
-                log "WARNING" "Critical service $service is not active"
+                log "DEBUG" "Critical service $service: active"
+            elif systemctl list-unit-files 2>/dev/null | grep -q "^$service.service"; then
+                log_error_with_context "WARNING" "Critical service $service is not active" "$operation_name" "false" "Investigate why service is not running"
                 degraded_services=$((degraded_services + 1))
+                health_details+=("service_degraded_$service")
+            else
+                log "DEBUG" "Service $service not installed, skipping"
             fi
         done
         
-        if [[ $failed_services -gt ${SAFE_REBOOT_MAX_FAILED_SERVICES:-5} ]]; then
-            log "ERROR" "Too many failed services: $failed_services (threshold: ${SAFE_REBOOT_MAX_FAILED_SERVICES:-5})"
+        local max_failed_services=${SAFE_REBOOT_MAX_FAILED_SERVICES:-5}
+        local max_degraded_critical=${SAFE_REBOOT_MAX_DEGRADED_CRITICAL_SERVICES:-2}
+        
+        if [[ $failed_services -gt $max_failed_services ]]; then
+            log_error_with_context "ERROR" "Too many failed services: $failed_services (threshold: $max_failed_services)" "$operation_name" "false" "Investigate and fix failed services"
             health_issues=$((health_issues + 1))
+            health_details+=("services_failed_critical")
         elif [[ $failed_services -gt 0 ]]; then
             log "WARNING" "Found $failed_services failed services"
+            health_warnings=$((health_warnings + 1))
+            health_details+=("services_failed_minor")
         fi
         
-        if [[ $degraded_services -gt ${SAFE_REBOOT_MAX_DEGRADED_CRITICAL_SERVICES:-2} ]]; then
-            log "ERROR" "Too many degraded critical services: $degraded_services (threshold: ${SAFE_REBOOT_MAX_DEGRADED_CRITICAL_SERVICES:-2})"
+        if [[ $degraded_services -gt $max_degraded_critical ]]; then
+            log_error_with_context "ERROR" "Too many degraded critical services: $degraded_services (threshold: $max_degraded_critical)" "$operation_name" "false" "Start critical services or investigate startup failures"
             health_issues=$((health_issues + 1))
+            health_details+=("services_degraded_critical")
         fi
+    else
+        log "WARNING" "Systemctl not available, skipping service checks"
+        health_warnings=$((health_warnings + 1))
+        health_details+=("services_check_unavailable")
     fi
     
     # Check network connectivity
+    log "DEBUG" "Checking network connectivity"
     check_network_connectivity
     local network_status=$?
     if [[ $network_status -ne 0 ]]; then
-        log "WARNING" "Network connectivity issues detected"
+        log_error_with_context "WARNING" "Network connectivity issues detected" "$operation_name" "false" "Check network configuration and connectivity"
         health_issues=$((health_issues + 1))
+        health_details+=("network_issues")
+    else
+        log "DEBUG" "Network connectivity: OK"
     fi
     
     # Check for ongoing file operations that might be disrupted
+    log "DEBUG" "Checking for critical file operations"
     check_file_operations
     local file_ops_status=$?
     if [[ $file_ops_status -ne 0 ]]; then
-        log "WARNING" "Critical file operations in progress"
+        log_error_with_context "WARNING" "Critical file operations in progress" "$operation_name" "false" "Wait for file operations to complete or schedule reboot for later"
         health_issues=$((health_issues + 1))
+        health_details+=("file_operations_critical")
+    else
+        log "DEBUG" "No critical file operations detected"
     fi
     
-    # Overall health assessment
+    # Create comprehensive health report
+    local health_summary="Issues: $health_issues, Warnings: $health_warnings"
+    if [[ ${#health_details[@]} -gt 0 ]]; then
+        health_summary+=", Details: $(IFS=,; echo "${health_details[*]}")"
+    fi
+    
+    log "INFO" "System health check completed: $health_summary"
+    
+    # Overall health assessment with detailed logging
     if [[ $health_issues -eq 0 ]]; then
-        log_system_health "system_health" "pass" "All comprehensive health checks passed"
+        local status_msg="All comprehensive health checks passed"
+        [[ $health_warnings -gt 0 ]] && status_msg+=" (with $health_warnings warnings)"
+        
+        log_system_health "system_health" "pass" "$status_msg"
         set_state_value "system_health_status" "healthy"
+        log_operation_end "$operation_name" "success"
+        
+        # Log detailed health state in debug mode
+        if [[ "${DEBUG_MODE:-false}" == "true" ]]; then
+            log_system_state_snapshot "health_check_pass"
+        fi
+        
         return 0
     elif [[ $health_issues -le 2 ]]; then
-        log_system_health "system_health" "warning" "System has minor health issues ($health_issues)"
+        log_error_with_context "WARNING" "System has minor health issues ($health_issues issues, $health_warnings warnings)" "$operation_name" "false" "Monitor system and address issues before next reboot"
         set_state_value "system_health_status" "warning"
+        log_operation_end "$operation_name" "warning" "Minor health issues detected"
+        
         return 0  # Allow reboot with warnings
     else
-        log "ERROR" "System has too many health issues ($health_issues), reboot blocked"
+        log_error_with_context "ERROR" "System has too many health issues ($health_issues issues, $health_warnings warnings), reboot blocked" "$operation_name" "true" "Address critical health issues before attempting reboot"
         set_state_value "system_health_status" "critical"
+        log_operation_end "$operation_name" "error" "Too many health issues"
+        
+        # Create detailed failure snapshot
+        log_system_state_snapshot "health_check_fail"
+        
         return 1
     fi
 }
@@ -480,12 +856,17 @@ check_file_operations() {
     return $file_op_issues
 }
 
-# Enhanced reboot confirmation logic with multiple safety checks
+# Enhanced reboot confirmation logic with multiple safety checks and error handling
 confirm_reboot_safety() {
+    local operation_name="reboot_safety_confirmation"
+    log_operation_start "$operation_name" "Comprehensive reboot safety assessment"
+    
     log "INFO" "Performing comprehensive reboot safety confirmation"
     
     local confirmation_score=0
     local max_score=10
+    local failed_checks=()
+    local warning_checks=()
     
     # Check 1: Cooldown period (weight: 2)
     if check_cooldown; then
@@ -493,6 +874,7 @@ confirm_reboot_safety() {
         log "DEBUG" "Reboot safety check 1/10: Cooldown period - PASSED"
     else
         log "DEBUG" "Reboot safety check 1/10: Cooldown period - FAILED"
+        failed_checks+=("cooldown")
     fi
     
     # Check 2: Daily limit (weight: 2)
@@ -501,6 +883,7 @@ confirm_reboot_safety() {
         log "DEBUG" "Reboot safety check 2/10: Daily limit - PASSED"
     else
         log "DEBUG" "Reboot safety check 2/10: Daily limit - FAILED"
+        failed_checks+=("daily_limit")
     fi
     
     # Check 3: System health (weight: 3)
@@ -509,6 +892,7 @@ confirm_reboot_safety() {
         log "DEBUG" "Reboot safety check 3/10: System health - PASSED"
     else
         log "DEBUG" "Reboot safety check 3/10: System health - FAILED"
+        failed_checks+=("system_health")
     fi
     
     # Check 4: No active user sessions (weight: 1)
@@ -517,6 +901,7 @@ confirm_reboot_safety() {
         log "DEBUG" "Reboot safety check 4/10: Active sessions - PASSED"
     else
         log "DEBUG" "Reboot safety check 4/10: Active sessions - FAILED (warning)"
+        warning_checks+=("active_sessions")
     fi
     
     # Check 5: Power status (weight: 1)
@@ -525,6 +910,7 @@ confirm_reboot_safety() {
         log "DEBUG" "Reboot safety check 5/10: Power status - PASSED"
     else
         log "DEBUG" "Reboot safety check 5/10: Power status - FAILED"
+        failed_checks+=("power_status")
     fi
     
     # Check 6: Recent crash detection (weight: 1)
@@ -533,21 +919,37 @@ confirm_reboot_safety() {
         log "DEBUG" "Reboot safety check 6/10: Recent crashes - PASSED"
     else
         log "DEBUG" "Reboot safety check 6/10: Recent crashes - FAILED"
+        failed_checks+=("recent_crashes")
     fi
     
     # Calculate safety percentage
     local safety_percentage=$((confirmation_score * 100 / max_score))
     log "INFO" "Reboot safety score: $confirmation_score/$max_score ($safety_percentage%)"
     
-    # Decision logic
+    # Detailed logging of check results
+    if [[ ${#failed_checks[@]} -gt 0 ]]; then
+        log "WARNING" "Failed safety checks: $(IFS=,; echo "${failed_checks[*]}")"
+    fi
+    if [[ ${#warning_checks[@]} -gt 0 ]]; then
+        log "INFO" "Warning safety checks: $(IFS=,; echo "${warning_checks[*]}")"
+    fi
+    
+    # Decision logic with enhanced error handling and logging
     if [[ $safety_percentage -ge 80 ]]; then
         log "INFO" "Reboot safety confirmed: Safe to proceed ($safety_percentage%)"
+        log_operation_end "$operation_name" "success"
         return 0
     elif [[ $safety_percentage -ge 60 ]]; then
-        log "WARNING" "Reboot safety marginal: Proceeding with caution ($safety_percentage%)"
+        log_error_with_context "WARNING" "Reboot safety marginal: Proceeding with caution ($safety_percentage%)" "$operation_name" "false" "Monitor system closely after reboot"
+        log_operation_end "$operation_name" "warning" "Marginal safety score"
         return 0  # Allow but with warning
     else
-        log "ERROR" "Reboot safety failed: Too many safety issues ($safety_percentage%)"
+        log_error_with_context "ERROR" "Reboot safety failed: Too many safety issues ($safety_percentage%)" "$operation_name" "true" "Address failed safety checks before attempting reboot"
+        log_operation_end "$operation_name" "error" "Safety score too low"
+        
+        # Create detailed safety failure record
+        create_safety_failure_record
+        
         return 1
     fi
 }
@@ -677,7 +1079,7 @@ validate_git_repository() {
     return 0
 }
 
-# Execute git command with timeout and retry logic
+# Execute git command with timeout and enhanced retry logic
 execute_git_with_retry() {
     local git_command="$1"
     local repo_path="$2"
@@ -685,36 +1087,57 @@ execute_git_with_retry() {
     local attempt=1
     local max_attempts=${GIT_RETRY_ATTEMPTS:-3}
     local retry_delay=${GIT_RETRY_DELAY_SECONDS:-5}
+    local error_output=""
+    local operation_name="git_${git_command%% *}"
+    
+    log_operation_start "$operation_name" "Repository: $repo_name, Command: $git_command"
     
     cd "$repo_path" || {
-        log "ERROR" "Cannot access repository path: $repo_path"
+        log_error_with_context "CRITICAL" "Cannot access repository path: $repo_path" "$operation_name" "false" "Check repository directory exists and is readable"
+        log_operation_end "$operation_name" "critical" "Repository access failed"
         return 1
     }
     
     while [[ $attempt -le $max_attempts ]]; do
         log "DEBUG" "Git command attempt $attempt/$max_attempts for $repo_name: $git_command"
         
-        # Execute git command with timeout
-        if timeout ${GIT_TIMEOUT_SECONDS:-30} bash -c "$git_command" 2>/dev/null; then
+        # Execute git command with timeout and capture output
+        if error_output=$(timeout ${GIT_TIMEOUT_SECONDS:-30} bash -c "$git_command" 2>&1); then
             log "DEBUG" "Git command succeeded on attempt $attempt for $repo_name"
+            log_operation_end "$operation_name" "success"
             return 0
         else
             local exit_code=$?
             log "WARNING" "Git command failed (attempt $attempt/$max_attempts) for $repo_name: $git_command (exit code: $exit_code)"
             
+            # Handle different error types
+            if echo "$error_output" | grep -qi "timeout\|timed out"; then
+                handle_network_error "$operation_name" "timeout" $((attempt - 1)) "$max_attempts"
+            elif echo "$error_output" | grep -qi "dns\|name resolution\|could not resolve"; then
+                handle_network_error "$operation_name" "dns" $((attempt - 1)) "$max_attempts"
+            elif echo "$error_output" | grep -qi "connection refused\|unable to connect"; then
+                handle_network_error "$operation_name" "connection_refused" $((attempt - 1)) "$max_attempts"
+            elif echo "$error_output" | grep -qi "ssl\|certificate\|tls"; then
+                handle_network_error "$operation_name" "ssl" $((attempt - 1)) "$max_attempts"
+            else
+                handle_git_error "$operation_name" "$exit_code" "$repo_name" "$error_output"
+            fi
+            
             if [[ $attempt -lt $max_attempts ]]; then
                 log "INFO" "Retrying in ${retry_delay}s for $repo_name..."
                 sleep $retry_delay
                 attempt=$((attempt + 1))
-                # Exponential backoff
-                retry_delay=$((retry_delay * 2))
+                # Exponential backoff with jitter
+                retry_delay=$((retry_delay * 2 + (RANDOM % 5)))
             else
-                log "ERROR" "All git command attempts failed for $repo_name: $git_command"
+                log_error_with_context "ERROR" "All git command attempts failed for $repo_name: $git_command" "$operation_name" "true" "Check repository state and network connectivity"
+                log_operation_end "$operation_name" "error" "All attempts failed"
                 return $exit_code
             fi
         fi
     done
     
+    log_operation_end "$operation_name" "error" "Unexpected loop termination"
     return 1
 }
 
@@ -838,97 +1261,170 @@ analyze_change_significance() {
     fi
 }
 
-# Enhanced git change detection with comprehensive error handling
+# Enhanced git change detection with comprehensive error handling and logging
 detect_repository_changes() {
     local repo_path="$1"
     local repo_name="$2"
+    local operation_name="change_detection_$repo_name"
+    
+    log_operation_start "$operation_name" "Repository: $repo_path"
     
     if [[ ! -d "$repo_path" ]]; then
-        log "ERROR" "Repository path not found: $repo_path"
+        log_error_with_context "CRITICAL" "Repository path not found: $repo_path" "$operation_name" "false" "Verify repository path is correct and accessible"
+        log_operation_end "$operation_name" "critical" "Repository path not found"
         return 1
     fi
     
     log "INFO" "Starting enhanced change detection for repository: $repo_name"
+    update_detection_stats "check"
     
-    # Validate repository state
+    # Validate repository state with enhanced error reporting
     if ! validate_git_repository "$repo_path" "$repo_name"; then
-        log "ERROR" "Repository validation failed for $repo_name"
+        log_error_with_context "ERROR" "Repository validation failed for $repo_name" "$operation_name" "false" "Check repository status, permissions, and git configuration"
+        log_operation_end "$operation_name" "error" "Repository validation failed"
         return 1
     fi
     
-    cd "$repo_path" || return 1
+    cd "$repo_path" || {
+        log_error_with_context "ERROR" "Failed to change directory to: $repo_path" "$operation_name" "false" "Check directory permissions and existence"
+        log_operation_end "$operation_name" "error" "Directory change failed"
+        return 1
+    }
     
-    # Store current HEAD and state
-    local current_head=$(git rev-parse HEAD 2>/dev/null)
+    # Store current HEAD and state with error handling
+    local current_head=""
+    if ! current_head=$(git rev-parse HEAD 2>/dev/null); then
+        log_error_with_context "ERROR" "Failed to get current HEAD for $repo_name" "$operation_name" "true" "Repository may be corrupted or in invalid state"
+        log_operation_end "$operation_name" "error" "HEAD retrieval failed"
+        return 1
+    fi
+    
     if [[ -z "$current_head" ]]; then
-        log "ERROR" "Failed to get current HEAD for $repo_name"
+        log_error_with_context "ERROR" "Empty HEAD reference for $repo_name" "$operation_name" "true" "Repository may be empty or in invalid state"
+        log_operation_end "$operation_name" "error" "Empty HEAD reference"
         return 1
     fi
     
-    # Get last known HEAD from state
-    local last_known_head=$(get_state_value "last_known_heads" | grep -o "\"$repo_path\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | sed 's/.*: *"\([^"]*\)".*/\1/' || echo "")
+    # Get last known HEAD from state with error handling
+    local last_known_head=""
+    if ! last_known_head=$(get_state_value "last_known_heads" | grep -o "\"$repo_path\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | sed 's/.*: *"\([^"]*\)".*/\1/' || echo ""); then
+        log "DEBUG" "No previous HEAD state found for $repo_name, treating as fresh clone"
+    fi
     
-    # Fetch latest changes with retry logic
+    # Log repository state before operations
+    if [[ "${ENABLE_SYSTEM_STATE_LOGGING:-true}" == "true" ]]; then
+        log "DEBUG" "Repository state for $repo_name: current=$current_head, last_known=$last_known_head"
+    fi
+    
+    # Fetch latest changes with enhanced error handling
     log "INFO" "Fetching latest changes for $repo_name"
-    if ! execute_git_with_retry "git fetch origin" "$repo_path" "$repo_name"; then
-        log "WARNING" "Failed to fetch changes for $repo_name, continuing with local state"
+    if ! execute_git_with_retry "git fetch origin --prune" "$repo_path" "$repo_name"; then
+        log_error_with_context "WARNING" "Failed to fetch changes for $repo_name, continuing with local state" "$operation_name" "false" "Network issues or remote repository unavailable"
+        update_detection_stats "failed"
+        log_operation_end "$operation_name" "warning" "Fetch failed, using local state"
         return 1
     fi
     
-    # Pull latest changes with retry logic
+    # Pull latest changes with enhanced error handling
     log "INFO" "Pulling latest changes for $repo_name"
-    if ! execute_git_with_retry "git pull origin" "$repo_path" "$repo_name"; then
-        log "WARNING" "Git pull failed for $repo_name, continuing with current state"
-        return 1
+    local pull_success=false
+    if execute_git_with_retry "git pull origin" "$repo_path" "$repo_name"; then
+        pull_success=true
+    else
+        log_error_with_context "WARNING" "Git pull failed for $repo_name, analyzing local changes only" "$operation_name" "false" "Merge conflicts, network issues, or remote changes"
+        update_detection_stats "failed"
+        # Continue with local analysis instead of returning early
     fi
     
-    # Check for merge conflicts
-    local conflict_result
-    conflict_result=$(detect_merge_conflicts "$repo_path" "$repo_name")
-    local conflict_exit_code=$?
-    
-    if [[ $conflict_exit_code -eq 2 ]]; then
-        log "ERROR" "Critical merge conflict in $repo_name requiring manual intervention"
-        return 1
-    elif [[ $conflict_exit_code -eq 1 ]]; then
-        log "WARNING" "Merge conflict resolved by aborting merge in $repo_name"
-        return 1
+    # Check for merge conflicts if pull was attempted
+    if [[ "$pull_success" == "true" ]]; then
+        local conflict_result
+        conflict_result=$(detect_merge_conflicts "$repo_path" "$repo_name")
+        local conflict_exit_code=$?
+        
+        if [[ $conflict_exit_code -eq 2 ]]; then
+            log_error_with_context "CRITICAL" "Critical merge conflict in $repo_name requiring manual intervention" "$operation_name" "true" "Repository in inconsistent state, manual merge required"
+            log_operation_end "$operation_name" "critical" "Unresolvable merge conflicts"
+            return 1
+        elif [[ $conflict_exit_code -eq 1 ]]; then
+            log_error_with_context "WARNING" "Merge conflict resolved by aborting merge in $repo_name" "$operation_name" "false" "Automatic conflict resolution applied"
+            # Continue with current state
+        fi
     fi
     
-    # Get new HEAD after pull
-    local new_head=$(git rev-parse HEAD 2>/dev/null)
+    # Get new HEAD after operations
+    local new_head=""
+    if ! new_head=$(git rev-parse HEAD 2>/dev/null); then
+        log_error_with_context "ERROR" "Failed to get new HEAD for $repo_name after operations" "$operation_name" "true" "Repository state may be inconsistent"
+        log_operation_end "$operation_name" "error" "Post-operation HEAD retrieval failed"
+        return 1
+    fi
     
     # Check if HEAD changed
     if [[ "$current_head" != "$new_head" ]]; then
         log "INFO" "Repository $repo_name has updates: $current_head -> $new_head"
         
-        # Get comprehensive change information
-        local changed_files=$(git diff --name-only "$current_head" "$new_head")
-        local changes_count=$(echo "$changed_files" | wc -l)
-        local change_stats=$(git diff --stat "$current_head" "$new_head")
+        # Get comprehensive change information with error handling
+        local changed_files=""
+        local changes_count=0
+        local change_stats=""
+        
+        if ! changed_files=$(git diff --name-only "$current_head" "$new_head" 2>/dev/null); then
+            log_error_with_context "ERROR" "Failed to get changed files list for $repo_name" "$operation_name" "false" "Git diff operation failed"
+            log_operation_end "$operation_name" "error" "Change analysis failed"
+            return 1
+        fi
+        
+        changes_count=$(echo "$changed_files" | grep -c . || echo "0")
+        
+        if ! change_stats=$(git diff --stat "$current_head" "$new_head" 2>/dev/null); then
+            log "WARNING" "Failed to get change statistics for $repo_name"
+            change_stats="Statistics unavailable"
+        fi
         
         log "INFO" "Change statistics for $repo_name: $changes_count files changed"
         log "DEBUG" "Change details for $repo_name: $change_stats"
         
+        # Log detailed file changes in debug mode
+        if [[ "${DEBUG_MODE:-false}" == "true" ]] && [[ $changes_count -gt 0 ]]; then
+            log "DEBUG" "Changed files in $repo_name:"
+            while IFS= read -r file; do
+                [[ -n "$file" ]] && log "DEBUG" "  - $file"
+            done <<< "$changed_files"
+        fi
+        
         # Analyze change significance
+        local reboot_needed=false
         if analyze_change_significance "$changed_files" "$repo_name"; then
+            reboot_needed=true
             log_change_detection "$repo_name" "$changes_count" "true"
-            
-            # Update last known HEAD in state before returning
-            update_last_known_head "$repo_name" "$new_head"
-            
-            return 0  # Signal reboot needed
+            update_detection_stats "reboot"
         else
             log_change_detection "$repo_name" "$changes_count" "false"
-            log "INFO" "Changes detected in $repo_name but no reboot trigger found"
+            update_detection_stats "success"
+        fi
+        
+        # Update last known HEAD in state before returning
+        if ! update_last_known_head "$repo_name" "$new_head"; then
+            log "WARNING" "Failed to update last known HEAD for $repo_name"
+        fi
+        
+        log_operation_end "$operation_name" "success"
+        
+        if [[ "$reboot_needed" == "true" ]]; then
+            return 0  # Signal reboot needed
         fi
     else
         log "INFO" "No changes detected in $repo_name"
+        update_detection_stats "success"
+        
+        # Update last known HEAD in state even if no changes
+        if ! update_last_known_head "$repo_name" "$new_head"; then
+            log "WARNING" "Failed to update last known HEAD for $repo_name"
+        fi
     fi
     
-    # Update last known HEAD in state
-    update_last_known_head "$repo_name" "$new_head"
-    
+    log_operation_end "$operation_name" "success"
     return 1  # No reboot needed
 }
 
@@ -1656,49 +2152,75 @@ handle_reboot_failure() {
 # Enhanced main execution logic with comprehensive error handling
 main() {
     local start_time=$(date +%s)
+    local operation_name="auto_update_reboot_main"
+    
+    log_operation_start "$operation_name" "Enhanced auto-update-reboot cycle"
     log "INFO" "Starting enhanced auto-update-reboot cycle"
     
-    # Initialize components
-    initialize_state
+    # Log initial system state
+    if [[ "${ENABLE_SYSTEM_STATE_LOGGING:-true}" == "true" ]]; then
+        log_system_state_snapshot "cycle_start"
+    fi
+    
+    # Initialize components with error handling
+    if ! initialize_state; then
+        log_error_with_context "CRITICAL" "Failed to initialize state management" "$operation_name" "true" "Check permissions and disk space"
+        log_operation_end "$operation_name" "critical" "State initialization failed"
+        exit 1
+    fi
     
     # Update detection statistics
     update_detection_stats "check"
     
-    # Check safety mechanisms first
+    # Check safety mechanisms first with enhanced error handling
+    log "DEBUG" "Checking reboot cooldown and daily limits"
     if ! check_cooldown; then
         log "INFO" "Reboot cooldown active, exiting gracefully"
         update_detection_stats "success"
+        log_operation_end "$operation_name" "success" "Cooldown active"
         exit 0
     fi
     
     if ! check_daily_limit; then
         log "INFO" "Daily reboot limit reached, exiting gracefully"
         update_detection_stats "success"
+        log_operation_end "$operation_name" "success" "Daily limit reached"
         exit 0
     fi
     
-    # Check emergency override
+    # Check emergency override with enhanced error handling
     if [[ "$EMERGENCY_OVERRIDE" == "true" ]]; then
-        log "WARNING" "Emergency override active, bypassing change detection"
+        log_error_with_context "WARNING" "Emergency override active, bypassing change detection" "$operation_name" "false" "Use only in emergency situations"
         if check_system_health; then
+            log "INFO" "System health passed with emergency override, proceeding"
             send_pre_reboot_notifications
             execute_reboot
         else
-            log "ERROR" "System health check failed even with emergency override"
+            log_error_with_context "CRITICAL" "System health check failed even with emergency override" "$operation_name" "true" "Manual intervention required"
+            log_operation_end "$operation_name" "critical" "Emergency override blocked by health"
+            exit 1
         fi
-        exit $?
+        local exit_code=$?
+        log_operation_end "$operation_name" "success" "Emergency override completed"
+        exit $exit_code
     fi
     
-    # Enhanced repository checking with multiple fallback strategies
+    # Enhanced repository checking with multiple fallback strategies and error handling
     local primary_repo="${MANAGED_REPO_PATH}/Auto-slopp"
     local backup_repo=""  # Could be configured for backup checking
     local reboot_needed=false
     local detection_success=false
     
-    # Normalize repository path (expand ~)
-    primary_repo=$(eval echo "$primary_repo")
+    # Normalize repository path (expand ~) with error handling
+    if ! primary_repo=$(eval echo "$primary_repo" 2>/dev/null); then
+        log_error_with_context "ERROR" "Failed to normalize repository path: ${MANAGED_REPO_PATH}/Auto-slopp" "$operation_name" "false" "Check MANAGED_REPO_PATH environment variable"
+        log_operation_end "$operation_name" "error" "Path normalization failed"
+        exit 1
+    fi
     
-    # Primary repository detection
+    log "INFO" "Starting repository change detection for: $primary_repo"
+    
+    # Primary repository detection with enhanced error handling
     if detect_repository_changes "$primary_repo" "Auto-slopp"; then
         reboot_needed=true
         detection_success=true
@@ -1712,7 +2234,7 @@ main() {
             detection_success=true
             log "INFO" "Primary repository processed successfully (no reboot needed)"
         else
-            log "WARNING" "Primary repository detection encountered issues"
+            log_error_with_context "WARNING" "Primary repository detection encountered issues" "$operation_name" "false" "Check repository state and network connectivity"
             
             # Could implement fallback repositories here
             # if [[ -n "$backup_repo" ]]; then
@@ -1729,69 +2251,204 @@ main() {
     if [[ "$detection_success" == "true" ]]; then
         update_detection_stats "success"
     else
-        log "WARNING" "Repository detection failed, skipping this cycle"
+        log_error_with_context "ERROR" "Repository detection failed, skipping this cycle" "$operation_name" "false" "Check repository configuration and connectivity"
+        log_operation_end "$operation_name" "error" "Repository detection failed"
         exit 1
     fi
     
     # Enhanced reboot decision logic with comprehensive safety checks
     if [[ "$reboot_needed" == "true" ]]; then
-        log "WARNING" "Reboot conditions detected, initiating enhanced safety confirmation"
+        log_error_with_context "WARNING" "Reboot conditions detected, initiating enhanced safety confirmation" "$operation_name" "false" "System will undergo comprehensive safety checks"
         
         # Perform comprehensive reboot safety confirmation
         if confirm_reboot_safety; then
             log "INFO" "Reboot safety confirmed, proceeding with enhanced reboot sequence"
             update_detection_stats "reboot"
             
-            # Store reboot reason for logging
-            set_state_value "last_reboot_reason" "Repository changes detected"
+            # Store reboot reason for logging with error handling
+            if ! set_state_value "last_reboot_reason" "Repository changes detected"; then
+                log "WARNING" "Failed to store reboot reason in state"
+            fi
             
-            # Determine reboot type (scheduled vs immediate)
-            local reboot_type=$(determine_reboot_type)
+            # Determine reboot type (scheduled vs immediate) with error handling
+            local reboot_type=""
+            if ! reboot_type=$(determine_reboot_type); then
+                log "WARNING" "Failed to determine reboot type, defaulting to immediate"
+                reboot_type="immediate"
+            fi
             log "INFO" "Reboot type determined: $reboot_type"
             
-            # Send enhanced pre-reboot notifications
-            send_enhanced_pre_reboot_notifications "$reboot_type"
+            # Send enhanced pre-reboot notifications with error handling
+            if ! send_enhanced_pre_reboot_notifications "$reboot_type"; then
+                log "WARNING" "Failed to send some pre-reboot notifications"
+            fi
             
             # Execute enhanced reboot with comprehensive safeguards
             if ! execute_reboot; then
-                log "ERROR" "Enhanced reboot execution failed, initiating failure recovery"
+                log_error_with_context "CRITICAL" "Enhanced reboot execution failed, initiating failure recovery" "$operation_name" "true" "Check system logs and reboot failure records"
                 handle_reboot_failure "unknown" "main_execution"
+                log_operation_end "$operation_name" "critical" "Reboot execution failed"
                 exit 1
             fi
         else
-            log "WARNING" "Reboot safety confirmation failed, reboot aborted for safety"
+            log_error_with_context "WARNING" "Reboot safety confirmation failed, reboot aborted for safety" "$operation_name" "false" "Address safety issues before next attempt"
             
             # Create safety failure record
             create_safety_failure_record
             
             # Could implement alternative recovery strategies here
             log "INFO" "System will retry on next cycle with updated safety assessment"
+            log_operation_end "$operation_name" "warning" "Reboot aborted by safety checks"
             exit 1
         fi
     else
         log "INFO" "No reboot-triggering changes detected in this cycle"
         
-        # Perform periodic maintenance tasks on successful non-reboot cycles
-        perform_periodic_maintenance
+        # Perform periodic maintenance tasks on successful non-reboot cycles with error handling
+        if ! perform_periodic_maintenance; then
+            log "WARNING" "Some periodic maintenance tasks failed"
+        fi
     fi
     
-    # Log completion with timing
+    # Log completion with timing and final system state
     local end_time=$(date +%s)
     local duration=$((end_time - start_time))
     log "INFO" "Auto-update-reboot cycle completed successfully in ${duration}s"
+    
+    # Log final system state
+    if [[ "${ENABLE_SYSTEM_STATE_LOGGING:-true}" == "true" ]]; then
+        log_system_state_snapshot "cycle_end"
+    fi
+    
+    log_operation_end "$operation_name" "success"
 }
 
-# Perform periodic maintenance tasks
+# Perform periodic maintenance tasks with enhanced error handling
 perform_periodic_maintenance() {
+    local operation_name="periodic_maintenance"
+    log_operation_start "$operation_name" "Periodic system maintenance"
+    
     log "DEBUG" "Performing periodic maintenance tasks"
+    local maintenance_success=0
+    local maintenance_total=0
     
     # Clean up old state entries
-    cleanup_old_state_entries
+    maintenance_total=$((maintenance_total + 1))
+    if cleanup_old_state_entries; then
+        maintenance_success=$((maintenance_success + 1))
+        log "DEBUG" "State cleanup completed successfully"
+    else
+        log "WARNING" "State cleanup encountered issues"
+    fi
     
     # Log current statistics
-    log_detection_statistics
+    maintenance_total=$((maintenance_total + 1))
+    if log_detection_statistics; then
+        maintenance_success=$((maintenance_success + 1))
+        log "DEBUG" "Statistics logging completed successfully"
+    else
+        log "WARNING" "Statistics logging encountered issues"
+    fi
     
-    # Could add more maintenance tasks here
+    # Clean up old error logs if enabled
+    if [[ "${ERROR_LOG_RETENTION_DAYS:-30}" -gt 0 ]]; then
+        maintenance_total=$((maintenance_total + 1))
+        if cleanup_old_error_logs; then
+            maintenance_success=$((maintenance_success + 1))
+            log "DEBUG" "Error log cleanup completed successfully"
+        else
+            log "WARNING" "Error log cleanup encountered issues"
+        fi
+    fi
+    
+    # Log maintenance completion status
+    if [[ $maintenance_success -eq $maintenance_total ]]; then
+        log "INFO" "All periodic maintenance tasks completed successfully ($maintenance_success/$maintenance_total)"
+        log_operation_end "$operation_name" "success"
+        return 0
+    else
+        log "WARNING" "Some periodic maintenance tasks failed ($maintenance_success/$maintenance_total)"
+        log_operation_end "$operation_name" "warning" "Partial maintenance success"
+        return 1
+    fi
+}
+
+# Clean up old error logs to prevent log file bloat
+cleanup_old_error_logs() {
+    local retention_days=${ERROR_LOG_RETENTION_DAYS:-30}
+    local log_dir="${LOG_DIRECTORY}"
+    
+    if [[ ! -d "$log_dir" ]]; then
+        log "DEBUG" "Log directory does not exist, skipping cleanup: $log_dir"
+        return 0
+    fi
+    
+    log "DEBUG" "Cleaning up error logs older than $retention_days days"
+    
+    local files_deleted=0
+    local cleanup_errors=0
+    
+    # Clean up error statistics files
+    while IFS= read -r -d '' file; do
+        if [[ -f "$file" ]]; then
+            if rm "$file" 2>/dev/null; then
+                files_deleted=$((files_deleted + 1))
+                log "DEBUG" "Deleted old error log: $(basename "$file")"
+            else
+                cleanup_errors=$((cleanup_errors + 1))
+                log "WARNING" "Failed to delete old error log: $(basename "$file")"
+            fi
+        fi
+    done < <(find "$log_dir" -name "error-statistics*.json" -type f -mtime "+$retention_days" -print0 2>/dev/null)
+    
+    # Clean up system state snapshots
+    while IFS= read -r -d '' file; do
+        if [[ -f "$file" ]]; then
+            if rm "$file" 2>/dev/null; then
+                files_deleted=$((files_deleted + 1))
+                log "DEBUG" "Deleted old system state snapshot: $(basename "$file")"
+            else
+                cleanup_errors=$((cleanup_errors + 1))
+                log "WARNING" "Failed to delete old system state snapshot: $(basename "$file")"
+            fi
+        fi
+    done < <(find "$log_dir" -name "system-state-*.json" -type f -mtime "+$retention_days" -print0 2>/dev/null)
+    
+    # Clean up reboot attempt records
+    while IFS= read -r -d '' file; do
+        if [[ -f "$file" ]]; then
+            if rm "$file" 2>/dev/null; then
+                files_deleted=$((files_deleted + 1))
+                log "DEBUG" "Deleted old reboot record: $(basename "$file")"
+            else
+                cleanup_errors=$((cleanup_errors + 1))
+                log "WARNING" "Failed to delete old reboot record: $(basename "$file")"
+            fi
+        fi
+    done < <(find "$log_dir" -name "reboot-attempt-*.json" -type f -mtime "+$retention_days" -print0 2>/dev/null)
+    
+    # Clean up safety failure records
+    while IFS= read -r -d '' file; do
+        if [[ -f "$file" ]]; then
+            if rm "$file" 2>/dev/null; then
+                files_deleted=$((files_deleted + 1))
+                log "DEBUG" "Deleted old safety failure record: $(basename "$file")"
+            else
+                cleanup_errors=$((cleanup_errors + 1))
+                log "WARNING" "Failed to delete old safety failure record: $(basename "$file")"
+            fi
+        fi
+    done < <(find "$log_dir" -name "safety-failure-*.json" -type f -mtime "+$retention_days" -print0 2>/dev/null)
+    
+    if [[ $files_deleted -gt 0 ]]; then
+        log "INFO" "Error log cleanup completed: $files_deleted files deleted"
+    fi
+    
+    if [[ $cleanup_errors -gt 0 ]]; then
+        log "WARNING" "Error log cleanup encountered $cleanup_errors errors"
+        return 1
+    fi
+    
     return 0
 }
 
@@ -1828,6 +2485,18 @@ log_detection_statistics() {
     fi
 }
 
-# Execute main function
-main
-log "INFO" "Auto-update-reboot cycle completed"
+# Execute main function with comprehensive error handling
+if main; then
+    log "INFO" "Auto-update-reboot cycle completed successfully"
+    exit 0
+else
+    local exit_code=$?
+    log "ERROR" "Auto-update-reboot cycle completed with errors (exit code: $exit_code)"
+    
+    # Create final error state snapshot
+    if [[ "${ENABLE_SYSTEM_STATE_LOGGING:-true}" == "true" ]]; then
+        log_system_state_snapshot "cycle_error"
+    fi
+    
+    exit $exit_code
+fi
