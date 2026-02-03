@@ -288,7 +288,7 @@ telegram:
 
 ### Logging Configuration
 
-Comprehensive logging with rotation and archival:
+Comprehensive logging with rotation, archival, and enhanced timestamp support:
 
 ```yaml
 # Logging configuration
@@ -299,8 +299,42 @@ log_retention_days: 30                  # Maximum age of log files before cleanu
 log_level: INFO                         # Default log level (DEBUG, INFO, WARNING, ERROR, SUCCESS)
 
 # Enhanced timestamp configuration
-timestamp_format: default               # Timestamp format: "default", "iso8601", "compact", "readable", "debug", "microseconds"
-timestamp_timezone: local                # Timezone for timestamps: "local" or "utc"
+timestamp_format: readable-precise       # Timestamp format: "default", "iso8601", "rfc3339", "syslog", "compact", "compact-precise", "readable", "readable-precise", "debug", "microseconds"
+timestamp_timezone: local                # Timezone for timestamps: "local", "utc", or specific timezone (e.g., "America/New_York")
+```
+
+#### Available Timestamp Formats
+
+| Format | Example | Best For |
+|--------|---------|----------|
+| `default` | `2026-01-31 09:00:01` | General logging |
+| `iso8601` | `2026-01-31T09:00:01+00:00` | Production, API integration |
+| `rfc3339` | `2026-01-31T09:00:01.123Z` | Web services, JSON logs |
+| `syslog` | `Jan 31 09:00:01` | System integration |
+| `compact` | `20260131_090001` | Filenames, space-constrained |
+| `compact-precise` | `20260131_090001.123` | High-frequency logging |
+| `readable` | `2026-01-31 09:00:01` | Human-readable logs |
+| `readable-precise` | `2026-01-31 09:00:01.123` | Development (recommended) |
+| `debug` | `2026-01-31 09:00:01.123456` | Debugging, performance analysis |
+| `microseconds` | `2026-01-31 09:00:01.123456` | Microsecond precision (alias for debug) |
+
+#### Log Levels and Filtering
+
+- **DEBUG**: Detailed information for debugging (only shown when `DEBUG_MODE=true`)
+- **INFO**: General informational messages
+- **SUCCESS**: Successful operations
+- **WARNING**: Warning messages for potential issues
+- **ERROR**: Error messages for failed operations
+
+#### Environment Variables
+
+Override logging configuration via environment variables:
+
+```bash
+export TIMESTAMP_FORMAT="iso8601"       # Override timestamp format
+export TIMESTAMP_TIMEZONE="utc"          # Override timezone
+export LOG_LEVEL="DEBUG"                 # Override log level filtering
+export DEBUG_MODE="true"                 # Enable debug messages
 ```
 
 The configuration system uses `yaml_config.sh` to automatically load and validate these values for all scripts. Tilde paths (~) are automatically expanded to your home directory.
@@ -748,6 +782,28 @@ bd ready
 # Or update path in config.yaml
 export BEADS_CMD="/path/to/bd"
 ```
+
+#### 5. Logging Issues
+
+For comprehensive logging troubleshooting, see the **[Logging Troubleshooting Guide](docs/logging-troubleshooting.md)**.
+
+**Quick Logging Diagnostics:**
+```bash
+# Test basic logging
+source scripts/utils.sh && log "INFO" "Test message"
+
+# Check timestamp format
+validate_timestamp_format "$TIMESTAMP_FORMAT"
+
+# Test timestamp generation
+generate_timestamp "$TIMESTAMP_FORMAT" "$TIMESTAMP_TIMEZONE"
+```
+
+**Common Logging Problems:**
+- **No timestamps**: Ensure `utils.sh` is sourced before calling `log()`
+- **No colors**: Check terminal support with `echo -e "${RED}Red${NC}"`
+- **No log files**: Verify `LOG_DIRECTORY` permissions and accessibility
+- **Debug messages missing**: Set `DEBUG_MODE=true` and `LOG_LEVEL=DEBUG`
 
 ### Advanced Troubleshooting
 
@@ -1406,6 +1462,16 @@ grep -i "access_denied\|permission_denied" ~/git/Auto-logs/*.log
 - **YAML Configuration**: Flexible settings management
 - **Error Handling Utils**: Robust logging and error recovery
 - **File Numbering System**: Sequential task processing
+
+## 📚 Logging Documentation
+
+For detailed logging information and guidance:
+
+- **[Logging Best Practices](docs/logging-best-practices.md)** - Comprehensive usage guidelines
+- **[Logging Troubleshooting](docs/logging-troubleshooting.md)** - Diagnostic steps and solutions
+- **[Logging Examples](docs/logging-examples.md)** - Practical implementation examples
+- **[Enhanced Logging Features](docs/enhanced_logging.md)** - Feature documentation
+- **[Logging System Documentation](LOGGING_SYSTEM_DOCUMENTATION.md)** - Technical architecture
 
 ## 📞 Support
 

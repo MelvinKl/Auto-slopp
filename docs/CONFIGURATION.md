@@ -32,6 +32,8 @@ YAML configuration utilities that:
 
 ## Configuration Variables
 
+### Core System Variables
+
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
 | `SLEEP_DURATION` | Time between automation cycles (seconds) | 1000 | Yes |
@@ -39,6 +41,19 @@ YAML configuration utilities that:
 | `MANAGED_REPO_TASK_PATH` | Path for task description files | ~/git/repo_task_path | Yes |
 | `OPencode_CMD` | Path to OpenCode CLI executable | opencode | No |
 | `BEADS_CMD` | Path to Beads CLI executable | bd | No |
+
+### Enhanced Logging Variables
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `TIMESTAMP_FORMAT` | Timestamp format for logs | readable-precise | No |
+| `TIMESTAMP_TIMEZONE` | Timezone for timestamps | local | No |
+| `LOG_LEVEL` | Minimum log level to output | INFO | No |
+| `LOG_DIRECTORY` | Directory for log files | ~/git/Auto-logs | No |
+| `LOG_MAX_SIZE_MB` | Maximum log file size before rotation | 10 | No |
+| `LOG_MAX_FILES` | Number of rotated log files to keep | 5 | No |
+| `LOG_RETENTION_DAYS` | Days to keep old log files | 30 | No |
+| `DEBUG_MODE` | Enable debug messages regardless of log level | false | No |
 
 ## Path Expansion
 
@@ -65,6 +80,94 @@ export MANAGED_REPO_TASK_PATH=/custom/path/to/tasks
 # Override CLI commands
 export OPencode_CMD=/path/to/custom/opencode
 export BEADS_CMD=/path/to/custom/bd
+
+# Override logging settings
+export TIMESTAMP_FORMAT="iso8601"
+export TIMESTAMP_TIMEZONE="utc"
+export LOG_LEVEL="DEBUG"
+export DEBUG_MODE="true"
+export LOG_DIRECTORY="/custom/log/path"
+```
+
+## Enhanced Logging Configuration
+
+### Timestamp Formats
+
+Available timestamp formats and their use cases:
+
+| Format | Example | Best For |
+|--------|---------|----------|
+| `default` | `2026-01-31 09:00:01` | General logging |
+| `iso8601` | `2026-01-31T09:00:01+00:00` | Production, API integration |
+| `rfc3339` | `2026-01-31T09:00:01.123Z` | Web services, JSON logs |
+| `syslog` | `Jan 31 09:00:01` | System integration |
+| `compact` | `20260131_090001` | Filenames, space-constrained |
+| `compact-precise` | `20260131_090001.123` | High-frequency logging |
+| `readable` | `2026-01-31 09:00:01` | Human-readable logs |
+| `readable-precise` | `2026-01-31 09:00:01.123` | Development (recommended) |
+| `debug` | `2026-01-31 09:00:01.123456` | Debugging, performance analysis |
+| `microseconds` | `2026-01-31 09:00:01.123456` | Microsecond precision |
+
+### Timezone Options
+
+- `local`: Use system's local timezone (default)
+- `utc`: Use UTC timezone for consistent logs across systems
+- Specific timezone: `America/New_York`, `Europe/London`, etc.
+- Offset format: `+05:30`, `-08:00`, etc.
+
+### Log Levels
+
+Log levels in order of priority (higher numbers = more filtering):
+
+| Level | Priority | Use Case |
+|-------|----------|----------|
+| `DEBUG` | 0 | Detailed debugging information |
+| `INFO` | 1 | General informational messages |
+| `SUCCESS` | 1 | Successful operations |
+| `WARNING` | 2 | Warning messages for potential issues |
+| `ERROR` | 3 | Error messages for failed operations |
+
+Only messages at or above the configured `LOG_LEVEL` will be displayed.
+
+### Example Logging Configurations
+
+#### Production Environment
+```yaml
+# Production logging configuration
+timestamp_format: iso8601
+timestamp_timezone: utc
+log_level: INFO
+log_directory: /var/log/auto-slopp
+log_max_size_mb: 50
+log_max_files: 10
+log_retention_days: 90
+debug_mode: false
+```
+
+#### Development Environment
+```yaml
+# Development logging configuration
+timestamp_format: readable-precise
+timestamp_timezone: local
+log_level: DEBUG
+log_directory: ~/git/Auto-logs
+log_max_size_mb: 10
+log_max_files: 5
+log_retention_days: 7
+debug_mode: true
+```
+
+#### High-Performance Environment
+```yaml
+# High-performance logging configuration
+timestamp_format: compact-precise
+timestamp_timezone: utc
+log_level: WARNING
+log_directory: /var/log/auto-slopp
+log_max_size_mb: 100
+log_max_files: 3
+log_retention_days: 30
+debug_mode: false
 ```
 
 ## Configuration Loading
