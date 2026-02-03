@@ -216,6 +216,18 @@ load_config() {
     MAINTENANCE_MODE=$(read_yaml_config "$config_file" "maintenance_mode" "false")
     EMERGENCY_OVERRIDE=$(read_yaml_config "$config_file" "emergency_override" "false")
     
+    # Enhanced git change detection configuration
+    GIT_TIMEOUT_SECONDS=$(read_yaml_config "$config_file" "git_timeout_seconds" "30")
+    GIT_RETRY_ATTEMPTS=$(read_yaml_config "$config_file" "git_retry_attempts" "3")
+    GIT_RETRY_DELAY_SECONDS=$(read_yaml_config "$config_file" "git_retry_delay_seconds" "5")
+    NETWORK_TIMEOUT_SECONDS=$(read_yaml_config "$config_file" "network_timeout_seconds" "60")
+    
+    # Change significance filtering
+    REBOOT_TRIGGER_PATTERNS=$(read_yaml_config "$config_file" "reboot_trigger_patterns" "scripts/*.sh|config.yaml|main.sh|scripts/utils.sh|scripts/core/*.sh")
+    IGNORE_CHANGE_PATTERNS=$(read_yaml_config "$config_file" "ignore_change_patterns" "*.md|*.txt|*.log|tests/*.sh|.*")
+    MIN_CHANGED_FILES_FOR_REBOOT=$(read_yaml_config "$config_file" "min_changed_files_for_reboot" "1")
+    MAX_CHANGE_COUNT_FOR_REBOOT=$(read_yaml_config "$config_file" "max_change_count_for_reboot" "100")
+    
     # Branch protection configuration
     branch_protection_enable_protection=$(read_yaml_config "$config_file" "branch_protection.enable_protection" "true")
     branch_protection_require_confirmation=$(read_yaml_config "$config_file" "branch_protection.require_confirmation" "true")
@@ -231,6 +243,17 @@ load_config() {
     
     declare -g -a branch_protection_require_explicit_confirmation_for=()
     read_yaml_array "$config_file" "branch_protection.require_explicit_confirmation_for" branch_protection_require_explicit_confirmation_for
+    
+    # Enhanced branch cleanup configuration (Auto-683)
+    branch_cleanup_dry_run_mode="${branch_cleanup_dry_run_mode:-$(read_yaml_config "$config_file" "branch_cleanup.dry_run_mode" "false")}"
+    branch_cleanup_interactive_mode="${branch_cleanup_interactive_mode:-$(read_yaml_config "$config_file" "branch_cleanup.interactive_mode" "true")}"
+    branch_cleanup_confirm_before_delete="${branch_cleanup_confirm_before_delete:-$(read_yaml_config "$config_file" "branch_cleanup.confirm_before_delete" "true")}"
+    branch_cleanup_show_dry_run_summary="${branch_cleanup_show_dry_run_summary:-$(read_yaml_config "$config_file" "branch_cleanup.show_dry_run_summary" "true")}"
+    branch_cleanup_batch_confirmation="${branch_cleanup_batch_confirmation:-$(read_yaml_config "$config_file" "branch_cleanup.batch_confirmation" "false")}"
+    branch_cleanup_confirmation_timeout="${branch_cleanup_confirmation_timeout:-$(read_yaml_config "$config_file" "branch_cleanup.confirmation_timeout" "60")}"
+    branch_cleanup_show_branch_details="${branch_cleanup_show_branch_details:-$(read_yaml_config "$config_file" "branch_cleanup.show_branch_details" "true")}"
+    branch_cleanup_show_safety_info="${branch_cleanup_show_safety_info:-$(read_yaml_config "$config_file" "branch_cleanup.show_safety_info" "true")}"
+    branch_cleanup_show_skipped_branches="${branch_cleanup_show_skipped_branches:-$(read_yaml_config "$config_file" "branch_cleanup.show_skipped_branches" "true")}"
     
     # Expand tilde paths
     MANAGED_REPO_PATH="${MANAGED_REPO_PATH/#\~/$HOME}"
@@ -267,13 +290,91 @@ load_config() {
     export LOG_MAX_SIZE_MB LOG_MAX_FILES LOG_RETENTION_DAYS LOG_LEVEL
     export TIMESTAMP_FORMAT TIMESTAMP_TIMEZONE
     
+    # Export enhanced git change detection variables
+    export GIT_TIMEOUT_SECONDS GIT_RETRY_ATTEMPTS GIT_RETRY_DELAY_SECONDS NETWORK_TIMEOUT_SECONDS
+    export REBOOT_TRIGGER_PATTERNS IGNORE_CHANGE_PATTERNS MIN_CHANGED_FILES_FOR_REBOOT MAX_CHANGE_COUNT_FOR_REBOOT
+    
     # Export branch protection variables
     export branch_protection_enable_protection branch_protection_require_confirmation branch_protection_show_warnings
     export branch_protection_protect_current_branch
     export branch_protection_protected_branches branch_protection_protection_patterns
     export branch_protection_require_explicit_confirmation_for
     
+    # Export branch cleanup variables (Auto-683)
+    export branch_cleanup_dry_run_mode branch_cleanup_interactive_mode branch_cleanup_confirm_before_delete
+    export branch_cleanup_show_dry_run_summary branch_cleanup_batch_confirmation branch_cleanup_confirmation_timeout
+    export branch_cleanup_show_branch_details branch_cleanup_show_safety_info branch_cleanup_show_skipped_branches
+    
     # Export OpenCode timeout variables
     export OPENCODE_TIMEOUT_ENABLED OPENCODE_TIMEOUT_SECONDS OPENCODE_TIMEOUT_SIGNAL OPENCODE_KILL_SIGNAL
     export OPENCODE_GRACE_PERIOD_SECONDS OPENCODE_CLEANUP_TEMP_FILES OPENCODE_LOG_TIMEOUTS OPENCODE_TIMEOUT_ACTION
+    
+    # Telegram Bot logging configuration
+    TELEGRAM_ENABLED=$(read_yaml_config "$config_file" "telegram.enabled" "false")
+    TELEGRAM_BOT_TOKEN=$(read_yaml_config "$config_file" "telegram.bot_token" "")
+    TELEGRAM_CHAT_ID=$(read_yaml_config "$config_file" "telegram.default_chat_id" "")
+    TELEGRAM_API_TIMEOUT_SECONDS=$(read_yaml_config "$config_file" "telegram.api_timeout_seconds" "10")
+    TELEGRAM_CONNECTION_RETRIES=$(read_yaml_config "$config_file" "telegram.connection_retries" "3")
+    
+    # Rate limiting configuration
+    TELEGRAM_RATE_LIMITING_MESSAGES_PER_SECOND=$(read_yaml_config "$config_file" "telegram.rate_limiting.messages_per_second" "5")
+    TELEGRAM_RATE_LIMITING_BURST_SIZE=$(read_yaml_config "$config_file" "telegram.rate_limiting.burst_size" "20")
+    TELEGRAM_RATE_LIMITING_RATE_LIMIT_WINDOW_SECONDS=$(read_yaml_config "$config_file" "telegram.rate_limiting.rate_limit_window_seconds" "60")
+    TELEGRAM_RATE_LIMITING_BACKOFF_MULTIPLIER=$(read_yaml_config "$config_file" "telegram.rate_limiting.backoff_multiplier" "2")
+    TELEGRAM_RATE_LIMITING_MAX_BACKOFF_SECONDS=$(read_yaml_config "$config_file" "telegram.rate_limiting.max_backoff_seconds" "30")
+    
+    # Formatting configuration
+    TELEGRAM_FORMATTING_PARSE_MODE=$(read_yaml_config "$config_file" "telegram.formatting.parse_mode" "HTML")
+    TELEGRAM_FORMATTING_MAX_MESSAGE_LENGTH=$(read_yaml_config "$config_file" "telegram.formatting.max_message_length" "4000")
+    TELEGRAM_FORMATTING_INCLUDE_TIMESTAMP=$(read_yaml_config "$config_file" "telegram.formatting.include_timestamp" "true")
+    TELEGRAM_FORMATTING_INCLUDE_LOG_LEVEL=$(read_yaml_config "$config_file" "telegram.formatting.include_log_level" "true")
+    TELEGRAM_FORMATTING_INCLUDE_SCRIPT_NAME=$(read_yaml_config "$config_file" "telegram.formatting.include_script_name" "true")
+    TELEGRAM_FORMATTING_USE_EMOJI_INDICATORS=$(read_yaml_config "$config_file" "telegram.formatting.use_emoji_indicators" "true")
+    
+    # Retry configuration
+    TELEGRAM_RETRY_MAX_ATTEMPTS=$(read_yaml_config "$config_file" "telegram.retry.max_attempts" "3")
+    TELEGRAM_RETRY_BASE_DELAY=$(read_yaml_config "$config_file" "telegram.retry.base_delay" "1.0")
+    TELEGRAM_RETRY_MAX_DELAY=$(read_yaml_config "$config_file" "telegram.retry.max_delay" "30.0")
+    TELEGRAM_RETRY_JITTER=$(read_yaml_config "$config_file" "telegram.retry.jitter" "true")
+    
+    # Filter configuration (comma-separated lists)
+    TELEGRAM_FILTERS_LOG_LEVELS=$(read_yaml_config "$config_file" "telegram.filters.log_levels" "ERROR,WARNING,SUCCESS")
+    TELEGRAM_FILTERS_SCRIPTS=$(read_yaml_config "$config_file" "telegram.filters.scripts" "main.sh,updater.sh,implementer.sh,planner.sh")
+    TELEGRAM_FILTERS_EXCLUDE_PATTERNS=$(read_yaml_config "$config_file" "telegram.filters.exclude_patterns" "")
+    TELEGRAM_FILTERS_INCLUDE_PATTERNS=$(read_yaml_config "$config_file" "telegram.filters.include_patterns" "")
+    
+    # Security configuration
+    TELEGRAM_SECURITY_VALIDATE_BOT_TOKEN=$(read_yaml_config "$config_file" "telegram.security.validate_bot_token" "true")
+    TELEGRAM_SECURITY_ENCRYPT_CONFIG_STORAGE=$(read_yaml_config "$config_file" "telegram.security.encrypt_config_storage" "true")
+    TELEGRAM_SECURITY_AUDIT_TOKEN_ACCESS=$(read_yaml_config "$config_file" "telegram.security.audit_token_access" "true")
+    TELEGRAM_SECURITY_HIDE_TOKENS_IN_LOGS=$(read_yaml_config "$config_file" "telegram.security.hide_tokens_in_logs" "true")
+    TELEGRAM_SECURITY_REQUIRE_HTTPS=$(read_yaml_config "$config_file" "telegram.security.require_https" "true")
+    
+    # Health monitoring configuration
+    TELEGRAM_HEALTH_ENABLE_HEALTH_CHECKS=$(read_yaml_config "$config_file" "telegram.health.enable_health_checks" "true")
+    TELEGRAM_HEALTH_HEALTH_CHECK_INTERVAL_MINUTES=$(read_yaml_config "$config_file" "telegram.health.health_check_interval_minutes" "15")
+    TELEGRAM_HEALTH_API_CONNECTIVITY_TEST=$(read_yaml_config "$config_file" "telegram.health.api_connectivity_test" "true")
+    TELEGRAM_HEALTH_RATE_LIMIT_MONITORING=$(read_yaml_config "$config_file" "telegram.health.rate_limit_monitoring" "true")
+    TELEGRAM_HEALTH_QUEUE_SIZE_MONITORING=$(read_yaml_config "$config_file" "telegram.health.queue_size_monitoring" "true")
+    
+    # Configuration management
+    TELEGRAM_CONFIG_AUTO_RELOAD=$(read_yaml_config "$config_file" "telegram.config.auto_reload" "true")
+    TELEGRAM_CONFIG_CONFIG_FILE_WATCH_INTERVAL_SECONDS=$(read_yaml_config "$config_file" "telegram.config.config_file_watch_interval_seconds" "30")
+    TELEGRAM_CONFIG_VALIDATION_STRICTNESS=$(read_yaml_config "$config_file" "telegram.config.validation_strictness" "strict")
+    TELEGRAM_CONFIG_BACKUP_CONFIGURATION=$(read_yaml_config "$config_file" "telegram.config.backup_configuration" "true")
+    
+    # Export Telegram configuration variables
+    export TELEGRAM_ENABLED TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID TELEGRAM_API_TIMEOUT_SECONDS TELEGRAM_CONNECTION_RETRIES
+    export TELEGRAM_RATE_LIMITING_MESSAGES_PER_SECOND TELEGRAM_RATE_LIMITING_BURST_SIZE TELEGRAM_RATE_LIMITING_RATE_LIMIT_WINDOW_SECONDS
+    export TELEGRAM_RATE_LIMITING_BACKOFF_MULTIPLIER TELEGRAM_RATE_LIMITING_MAX_BACKOFF_SECONDS
+    export TELEGRAM_FORMATTING_PARSE_MODE TELEGRAM_FORMATTING_MAX_MESSAGE_LENGTH TELEGRAM_FORMATTING_INCLUDE_TIMESTAMP
+    export TELEGRAM_FORMATTING_INCLUDE_LOG_LEVEL TELEGRAM_FORMATTING_INCLUDE_SCRIPT_NAME TELEGRAM_FORMATTING_USE_EMOJI_INDICATORS
+    export TELEGRAM_RETRY_MAX_ATTEMPTS TELEGRAM_RETRY_BASE_DELAY TELEGRAM_RETRY_MAX_DELAY TELEGRAM_RETRY_JITTER
+    export TELEGRAM_FILTERS_LOG_LEVELS TELEGRAM_FILTERS_SCRIPTS TELEGRAM_FILTERS_EXCLUDE_PATTERNS TELEGRAM_FILTERS_INCLUDE_PATTERNS
+    export TELEGRAM_SECURITY_VALIDATE_BOT_TOKEN TELEGRAM_SECURITY_ENCRYPT_CONFIG_STORAGE TELEGRAM_SECURITY_AUDIT_TOKEN_ACCESS
+    export TELEGRAM_SECURITY_HIDE_TOKENS_IN_LOGS TELEGRAM_SECURITY_REQUIRE_HTTPS
+    export TELEGRAM_HEALTH_ENABLE_HEALTH_CHECKS TELEGRAM_HEALTH_HEALTH_CHECK_INTERVAL_MINUTES
+    export TELEGRAM_HEALTH_API_CONNECTIVITY_TEST TELEGRAM_HEALTH_RATE_LIMIT_MONITORING TELEGRAM_HEALTH_QUEUE_SIZE_MONITORING
+    export TELEGRAM_CONFIG_AUTO_RELOAD TELEGRAM_CONFIG_CONFIG_FILE_WATCH_INTERVAL_SECONDS
+    export TELEGRAM_CONFIG_VALIDATION_STRICTNESS TELEGRAM_CONFIG_BACKUP_CONFIGURATION
 }
