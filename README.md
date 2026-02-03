@@ -300,7 +300,7 @@ Real-time monitoring and alerting through Telegram:
 telegram:
   enabled: false                        # Enable/disable Telegram logging globally
   bot_token: "${TELEGRAM_BOT_TOKEN}"    # Environment variable for bot token (NEVER store in plain text)
-  default_chat_id: "@logs_channel"      # Default channel/chat for sending messages
+  default_chat_id: "@logs_channel"      # Default target for sending messages (see below for options)
   api_timeout_seconds: 10               # Timeout for Telegram API requests
   connection_retries: 3                 # Maximum retry attempts for failed connections
   
@@ -321,6 +321,83 @@ telegram:
     include_script_name: true           # Include script name for context
     use_emoji_indicators: true          # Use emoji for log levels (🔴🟡🟢🔵)
 ```
+
+#### Configuring Log Destination (User, Channel, or Group)
+
+The `default_chat_id` setting determines where Telegram logs are sent. You can configure it to send logs to:
+
+**1. Send to a specific user (by numeric ID)**
+```yaml
+telegram:
+  enabled: true
+  bot_token: "${TELEGRAM_BOT_TOKEN}"
+  default_chat_id: "123456789"         # Replace with your numeric Telegram user ID
+```
+
+**2. Send to a public channel**
+```yaml
+telegram:
+  enabled: true
+  bot_token: "${TELEGRAM_BOT_TOKEN}"
+  default_chat_id: "@my_logs_channel"    # Public channel username (must start with @)
+```
+
+**3. Send to a private group**
+```yaml
+telegram:
+  enabled: true
+  bot_token: "${TELEGRAM_BOT_TOKEN}"
+  default_chat_id: "-1001234567890"    # Private group ID (negative number)
+```
+
+#### How to Find Your Telegram User ID
+
+To send logs to your personal account, you need your numeric Telegram user ID:
+
+**Method 1: Using a bot**
+1. Start a conversation with `@userinfobot` on Telegram
+2. Send `/start`
+3. The bot will reply with your numeric user ID
+
+**Method 2: Using another bot**
+1. Start a conversation with `@MyTelegramID_bot` or `@JsonDumpBot`
+2. Send any message
+3. The bot will reply with your user ID
+
+**Method 3: Using curl and bot token**
+```bash
+# Get bot info (verifies token works)
+curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe"
+
+# Get updates to find chat IDs
+curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates"
+# Look for "chat":{"id":123456789,"type":"private"} in the response
+```
+
+#### Testing Telegram Configuration
+
+After configuring, test your setup:
+
+```bash
+# Test with current configuration
+source scripts/core/telegram_logger.sh
+send_log_to_telegram "INFO" "Test message from Auto-slopp"
+
+# Test with a specific user (temporary override)
+TELEGRAM_CHAT_ID="123456789" send_log_to_telegram "INFO" "Test message"
+
+# Test via main script
+DEBUG_MODE=true ./main.sh  # Watch for Telegram errors in logs
+```
+
+#### Important Notes
+
+- **User IDs are numeric** (e.g., `123456789`) - do not use `@username`
+- **Channel usernames** start with `@` (e.g., `@my_channel`)
+- **Private groups** have negative IDs (e.g., `-1001234567890`)
+- The bot must be a member of any channel or group you want to send logs to
+- Environment variable `TELEGRAM_CHAT_ID` overrides `default_chat_id` if set
+- Store bot token in environment variable, never in plain text config
 
 ### Logging Configuration
 

@@ -75,8 +75,8 @@ validate_chat_id() {
     fi
     
     # Chat ID can be:
-    # 1. Negative numbers (for private chats/groups)
-    # 2. Positive numbers (for channels)
+    # 1. Negative numbers (for private groups and supergroups)
+    # 2. Positive numbers (for individual users by user ID)
     # 3. @username (for public channels)
     
     if [[ ! "$chat_id" =~ ^-?[0-9]+$ ]] && [[ ! "$chat_id" =~ ^@[a-zA-Z0-9_]+$ ]]; then
