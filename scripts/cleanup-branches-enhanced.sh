@@ -23,22 +23,221 @@ fi
 source "$PROJECT_DIR/config.sh"
 
 # =============================================================================
+# COMMAND LINE ARGUMENT PARSING
+# =============================================================================
+
+# Show usage/help information
+show_usage() {
+    cat << EOF
+USAGE: $(basename "$0") [OPTIONS]
+
+Enhanced Branch Cleanup Script - Remove local branches that no longer exist on remote
+
+OPTIONS:
+    -h, --help                      Show this help message and exit
+    
+    -d, --dry-run                   Enable dry-run mode (simulation only)
+    -y, --no-confirmation           Skip all confirmation prompts (auto-confirm)
+    -i, --interactive               Enable interactive prompts for each operation
+    -b, --batch-confirmation        Enable batch confirmation vs individual confirmations
+    -t, --timeout SECONDS           Set confirmation prompt timeout (default: 60)
+    -m, --max-branches COUNT        Maximum branches to delete in one run (default: 50)
+    
+    --no-backup                     Disable creating backup patches before deletion
+    --no-safety                     Disable safety checks (DANGEROUS - use with caution)
+    --show-details                  Show detailed branch information during dry-run
+    --hide-summary                  Hide detailed summary in dry-run mode
+    
+CONFIGURATION OPTIONS:
+    Configuration is loaded from config.yaml under the 'branch_cleanup' section.
+    Command-line options override configuration file values.
+
+EXAMPLES:
+    $0                              # Run with default configuration
+    $0 --dry-run                   # Simulate without making changes
+    $0 --no-confirmation           # Run automatically without prompts
+    $0 --interactive --max-branches 10  # Interactive mode with limit of 10 branches
+    $0 --dry-run --show-details     # Dry-run with detailed branch information
+
+SAFETY:
+    Always run with --dry-run first to see what would be deleted.
+    Use --no-safety only when you understand the risks.
+
+EOF
+}
+
+# Parse command-line arguments
+parse_command_line_args() {
+    # Set local defaults that can be overridden by command line
+    local dry_run_mode_override=""
+    local interactive_mode_override=""
+    local confirm_before_delete_override=""
+    local batch_confirmation_override=""
+    local confirmation_timeout_override=""
+    local max_branches_override=""
+    local backup_before_delete_override=""
+    local safety_mode_override=""
+    local show_dry_run_summary_override=""
+    local show_branch_details_override=""
+    local show_safety_info_override=""
+    local show_skipped_branches_override=""
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_usage
+                exit 0
+                ;;
+            -d|--dry-run)
+                dry_run_mode_override="true"
+                shift
+                ;;
+            -y|--no-confirmation)
+                confirm_before_delete_override="false"
+                interactive_mode_override="false"
+                batch_confirmation_override="true"
+                shift
+                ;;
+            -i|--interactive)
+                interactive_mode_override="true"
+                shift
+                ;;
+            -b|--batch-confirmation)
+                batch_confirmation_override="true"
+                shift
+                ;;
+            -t|--timeout)
+                if [[ -n "$2" && "$2" =~ ^[0-9]+$ ]]; then
+                    confirmation_timeout_override="$2"
+                    shift 2
+                else
+                    echo "ERROR: --timeout requires a positive integer value"
+                    exit 1
+                fi
+                ;;
+            -m|--max-branches)
+                if [[ -n "$2" && "$2" =~ ^[0-9]+$ ]]; then
+                    max_branches_override="$2"
+                    shift 2
+                else
+                    echo "ERROR: --max-branches requires a positive integer value"
+                    exit 1
+                fi
+                ;;
+            --no-backup)
+                backup_before_delete_override="false"
+                shift
+                ;;
+            --no-safety)
+                safety_mode_override="false"
+                shift
+                ;;
+            --show-details)
+                show_branch_details_override="true"
+                shift
+                ;;
+            --hide-summary)
+                show_dry_run_summary_override="false"
+                shift
+                ;;
+            *)
+                echo "ERROR: Unknown option: $1"
+                echo "Use --help to see available options"
+                exit 1
+                ;;
+        esac
+    done
+    
+    # Apply command-line overrides (command line takes precedence over config)
+    if [[ -n "$dry_run_mode_override" ]]; then DRY_RUN_MODE="$dry_run_mode_override"; fi
+    if [[ -n "$interactive_mode_override" ]]; then INTERACTIVE_MODE="$interactive_mode_override"; fi
+    if [[ -n "$confirm_before_delete_override" ]]; then CONFIRM_BEFORE_DELETE="$confirm_before_delete_override"; fi
+    if [[ -n "$batch_confirmation_override" ]]; then BATCH_CONFIRMATION="$batch_confirmation_override"; fi
+    if [[ -n "$confirmation_timeout_override" ]]; then CONFIRMATION_TIMEOUT="$confirmation_timeout_override"; fi
+    if [[ -n "$max_branches_override" ]]; then MAX_BRANCHES_PER_RUN="$max_branches_override"; fi
+    if [[ -n "$backup_before_delete_override" ]]; then BACKUP_BEFORE_DELETE="$backup_before_delete_override"; fi
+    if [[ -n "$safety_mode_override" ]]; then SAFETY_MODE="$safety_mode_override"; fi
+    if [[ -n "$show_dry_run_summary_override" ]]; then SHOW_DRY_RUN_SUMMARY="$show_dry_run_summary_override"; fi
+    if [[ -n "$show_branch_details_override" ]]; then SHOW_BRANCH_DETAILS="$show_branch_details_override"; fi
+    if [[ -n "$show_safety_info_override" ]]; then SHOW_SAFETY_INFO="$show_safety_info_override"; fi
+    if [[ -n "$show_skipped_branches_override" ]]; then SHOW_SKIPPED_BRANCHES="$show_skipped_branches_override"; fi
+}
+
+# Validate configuration values
+validate_configuration_values() {
+    local errors=()
+    
+    # Validate timeout value
+    if ! [[ "$CONFIRMATION_TIMEOUT" =~ ^[0-9]+$ ]] || [[ "$CONFIRMATION_TIMEOUT" -lt 0 ]]; then
+        errors+=("CONFIRMATION_TIMEOUT must be a non-negative integer")
+    fi
+    
+    # Validate max branches value
+    if ! [[ "$MAX_BRANCHES_PER_RUN" =~ ^[0-9]+$ ]] || [[ "$MAX_BRANCHES_PER_RUN" -lt 1 ]]; then
+        errors+=("MAX_BRANCHES_PER_RUN must be a positive integer")
+    fi
+    
+    # Validate boolean values
+    for var in DRY_RUN_MODE SAFETY_MODE BACKUP_BEFORE_DELETE INTERACTIVE_MODE \
+                CONFIRM_BEFORE_DELETE SHOW_DRY_RUN_SUMMARY BATCH_CONFIRMATION \
+                SHOW_BRANCH_DETAILS SHOW_SAFETY_INFO SHOW_SKIPPED_BRANCHES; do
+        local value="${!var}"
+        if [[ "$value" != "true" && "$value" != "false" ]]; then
+            errors+=("$var must be 'true' or 'false' (got: $value)")
+        fi
+    done
+    
+    # Report errors if any
+    if [[ ${#errors[@]} -gt 0 ]]; then
+        echo "ERROR: Configuration validation failed:"
+        for error in "${errors[@]}"; do
+            echo "  - $error"
+        done
+        exit 1
+    fi
+}
+
+# Show current configuration (for debugging)
+show_configuration() {
+    log "INFO" "Current configuration:"
+    log "INFO" "  Dry run mode: $DRY_RUN_MODE"
+    log "INFO" "  Safety mode: $SAFETY_MODE"
+    log "INFO" "  Backup before delete: $BACKUP_BEFORE_DELETE"
+    log "INFO" "  Interactive mode: $INTERACTIVE_MODE"
+    log "INFO" "  Confirm before delete: $CONFIRM_BEFORE_DELETE"
+    log "INFO" "  Batch confirmation: $BATCH_CONFIRMATION"
+    log "INFO" "  Confirmation timeout: $CONFIRMATION_TIMEOUT"
+    log "INFO" "  Max branches per run: $MAX_BRANCHES_PER_RUN"
+    log "INFO" "  Show dry run summary: $SHOW_DRY_RUN_SUMMARY"
+    log "INFO" "  Show branch details: $SHOW_BRANCH_DETAILS"
+    log "INFO" "  Show safety info: $SHOW_SAFETY_INFO"
+    log "INFO" "  Show skipped branches: $SHOW_SKIPPED_BRANCHES"
+}
+
+# =============================================================================
 # ENHANCED CONFIGURATION AND INITIALIZATION
 # =============================================================================
 
 # Script-specific configuration
 CLEANUP_OPERATION_ID="cleanup_$(date +%s)"
-DRY_RUN_MODE="${DRY_RUN_MODE:-false}"
-SAFETY_MODE="${SAFETY_MODE:-true}"  # Enable all safety checks by default
-BACKUP_BEFORE_DELETE="${BACKUP_BEFORE_DELETE:-true}"
-MAX_BRANCHES_PER_RUN="${MAX_BRANCHES_PER_RUN:-50}"
+
+# Load configuration from YAML with fallback defaults
+DRY_RUN_MODE="${branch_cleanup_dry_run_mode:-false}"
+SAFETY_MODE="${branch_cleanup_safety_mode:-true}"  # Note: Not in config.yaml, using default
+BACKUP_BEFORE_DELETE="${branch_cleanup_backup_before_delete:-true}"
+MAX_BRANCHES_PER_RUN="${branch_cleanup_max_branches_per_run:-50}"
 
 # Enhanced dry-run and confirmation configuration
-INTERACTIVE_MODE="${INTERACTIVE_MODE:-true}"  # Enable interactive prompts
-CONFIRM_BEFORE_DELETE="${CONFIRM_BEFORE_DELETE:-true}"  # Confirm before each deletion
-SHOW_DRY_RUN_SUMMARY="${SHOW_DRY_RUN_SUMMARY:-true}"  # Show summary in dry-run mode
-BATCH_CONFIRMATION="${BATCH_CONFIRMATION:-false}"  # Confirm all operations at once
-CONFIRMATION_TIMEOUT="${CONFIRMATION_TIMEOUT:-60}"  # Timeout for confirmation prompts
+INTERACTIVE_MODE="${branch_cleanup_interactive_mode:-true}"
+CONFIRM_BEFORE_DELETE="${branch_cleanup_confirm_before_delete:-true}"
+SHOW_DRY_RUN_SUMMARY="${branch_cleanup_show_dry_run_summary:-true}"
+BATCH_CONFIRMATION="${branch_cleanup_batch_confirmation:-false}"
+CONFIRMATION_TIMEOUT="${branch_cleanup_confirmation_timeout:-60}"
+
+# Additional dry-run specific settings
+SHOW_BRANCH_DETAILS="${branch_cleanup_show_branch_details:-true}"
+SHOW_SAFETY_INFO="${branch_cleanup_show_safety_info:-true}"
+SHOW_SKIPPED_BRANCHES="${branch_cleanup_show_skipped_branches:-true}"
 
     # Initialize enhanced systems
     initialize_enhanced_cleanup_system() {
@@ -150,8 +349,8 @@ show_dry_run_analysis() {
     
     echo
     
-    # Show skipped branches
-    if [[ ${#branches_skipped[@]} -gt 0 ]]; then
+    # Show skipped branches if enabled
+    if [[ ${#branches_skipped[@]} -gt 0 && "$SHOW_SKIPPED_BRANCHES" == "true" ]]; then
         echo "${YELLOW}🛡️  Branches that would be SKIPPED:${NC}"
         echo
         for reason in "${branches_skipped[@]}"; do
@@ -160,14 +359,22 @@ show_dry_run_analysis() {
         echo
         echo "${YELLOW}Total branches skipped: ${#branches_skipped[@]}${NC}"
         echo
+    elif [[ ${#branches_skipped[@]} -gt 0 ]]; then
+        echo "${YELLOW}🛡️  ${#branches_skipped[@]} branches would be skipped${NC}"
+        echo
     fi
     
-    # Show safety information
-    echo "${BLUE}🔒 Safety Information:${NC}"
-    echo "  • Backup before delete: $BACKUP_BEFORE_DELETE"
-    echo "  • Safety mode: $SAFETY_MODE"
-    echo "  • Max branches per run: $MAX_BRANCHES_PER_RUN"
-    echo
+    # Show safety information if enabled
+    if [[ "$SHOW_SAFETY_INFO" == "true" ]]; then
+        echo "${BLUE}🔒 Safety Information:${NC}"
+        echo "  • Backup before delete: $BACKUP_BEFORE_DELETE"
+        echo "  • Safety mode: $SAFETY_MODE"
+        echo "  • Max branches per run: $MAX_BRANCHES_PER_RUN"
+        echo "  • Interactive mode: $INTERACTIVE_MODE"
+        echo "  • Confirm before delete: $CONFIRM_BEFORE_DELETE"
+        echo "  • Confirmation timeout: ${CONFIRMATION_TIMEOUT}s"
+        echo
+    fi
     
     if [[ "$SHOW_DRY_RUN_SUMMARY" == "true" ]]; then
         show_dry_run_summary "${branches_to_delete[@]}" "${branches_skipped[@]}"
@@ -184,42 +391,47 @@ show_branch_deletion_preview() {
     
     cd "$repo_dir" || return 1
     
-    # Get branch information
-    local last_commit
-    local commit_age
-    local is_merged_status
-    local has_untracked_status
-    
-    last_commit=$(git log -1 --format="%h | %an | %ad | %s" --date=short "$branch" 2>/dev/null || echo "Unable to retrieve")
-    
-    local commit_timestamp
-    if commit_timestamp=$(git log -1 --format=%ct "$branch" 2>/dev/null); then
-        commit_age=$((( $(date +%s) - commit_timestamp ) / 86400))
-        commit_age="${commit_age} days old"
-    else
-        commit_age="unknown age"
-    fi
-    
-    if git merge-base --is-ancestor "$branch" "main" 2>/dev/null || \
-       git merge-base --is-ancestor "$branch" "master" 2>/dev/null; then
-        is_merged_status="✅ Merged"
-    else
-        is_merged_status="⚠️  Unmerged"
-    fi
-    
-    if git diff --name-only "$branch" 2>/dev/null | grep -q .; then
-        has_untracked_status="⚠️  Has untracked changes"
-    else
-        has_untracked_status="✅ No untracked changes"
-    fi
-    
     printf "${RED}%2d. %s${NC}\n" "$display_num" "$branch"
-    echo "     Last commit: $last_commit"
-    echo "     Age: $commit_age"
-    echo "     Status: $is_merged_status | $has_untracked_status"
     
-    if [[ "$BACKUP_BEFORE_DELETE" == "true" ]]; then
-        echo "     📦 Backup: Would create patch backup before deletion"
+    if [[ "$SHOW_BRANCH_DETAILS" == "true" ]]; then
+        # Get branch information
+        local last_commit
+        local commit_age
+        local is_merged_status
+        local has_untracked_status
+        
+        last_commit=$(git log -1 --format="%h | %an | %ad | %s" --date=short "$branch" 2>/dev/null || echo "Unable to retrieve")
+        
+        local commit_timestamp
+        if commit_timestamp=$(git log -1 --format=%ct "$branch" 2>/dev/null); then
+            commit_age=$((( $(date +%s) - commit_timestamp ) / 86400))
+            commit_age="${commit_age} days old"
+        else
+            commit_age="unknown age"
+        fi
+        
+        if git merge-base --is-ancestor "$branch" "main" 2>/dev/null || \
+           git merge-base --is-ancestor "$branch" "master" 2>/dev/null; then
+            is_merged_status="✅ Merged"
+        else
+            is_merged_status="⚠️  Unmerged"
+        fi
+        
+        if git diff --name-only "$branch" 2>/dev/null | grep -q .; then
+            has_untracked_status="⚠️  Has untracked changes"
+        else
+            has_untracked_status="✅ No untracked changes"
+        fi
+        
+        echo "     Last commit: $last_commit"
+        echo "     Age: $commit_age"
+        echo "     Status: $is_merged_status | $has_untracked_status"
+        
+        if [[ "$BACKUP_BEFORE_DELETE" == "true" ]]; then
+            echo "     📦 Backup: Would create patch backup before deletion"
+        fi
+    else
+        echo "     (detailed information disabled - use --show-details to enable)"
     fi
     echo
 }
@@ -1138,6 +1350,8 @@ main_enhanced_cleanup() {
     log "INFO" "Dry run mode: $DRY_RUN_MODE"
     log "INFO" "Interactive mode: $INTERACTIVE_MODE"
     log "INFO" "Confirm before delete: $CONFIRM_BEFORE_DELETE"
+    log "INFO" "Max branches per run: $MAX_BRANCHES_PER_RUN"
+    log "INFO" "Backup before delete: $BACKUP_BEFORE_DELETE"
     
     # Initialize enhanced systems
     if ! initialize_enhanced_cleanup_system; then
@@ -1306,5 +1520,17 @@ EOF
 
 # Execute main function if script is run directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    # Parse command-line arguments first
+    parse_command_line_args "$@"
+    
+    # Validate configuration values
+    validate_configuration_values
+    
+    # Show configuration if in debug mode or dry-run
+    if [[ "$DRY_RUN_MODE" == "true" ]]; then
+        show_configuration
+    fi
+    
+    # Run main cleanup function
     main_enhanced_cleanup
 fi
