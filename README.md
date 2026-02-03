@@ -255,6 +255,42 @@ branch_protection:
     - "production"
 ```
 
+### Branch Cleanup Configuration
+
+Enhanced branch cleanup with comprehensive safety mechanisms:
+
+```yaml
+# Enhanced branch cleanup configuration
+branch_cleanup:
+  # Dry-run and interactive mode settings
+  dry_run_mode: false                  # Enable dry-run mode by default
+  interactive_mode: true               # Enable interactive prompts
+  confirm_before_delete: true          # Confirm before each branch deletion
+  show_dry_run_summary: true           # Show detailed summary in dry-run mode
+  batch_confirmation: false            # Confirm all operations at once vs individual
+  confirmation_timeout: 60            # Timeout for confirmation prompts (seconds)
+  
+  # Safety and operational settings
+  safety_mode: true                    # Enable all safety checks by default
+  backup_before_delete: true           # Create backup patches before deletion
+  max_branches_per_run: 50            # Maximum branches to delete in one run
+  
+  # Dry-run specific settings
+  show_branch_details: true            # Show detailed branch info in dry-run
+  show_safety_info: true               # Show safety configuration in dry-run
+  show_skipped_branches: true          # Show why branches are skipped in dry-run
+```
+
+**Key Safety Features:**
+- **Dry Run Mode**: Preview operations before executing changes
+- **Interactive Confirmation**: Confirm each deletion or use batch mode
+- **Backup Creation**: Automatic patch backups before deletion
+- **Safety Limits**: Maximum branches per run to prevent accidents
+- **Comprehensive Protection**: Multiple layers of branch safety checks
+- **Detailed Analysis**: Branch state analysis with conflict detection
+- **Configurable Timeouts**: Prevent hanging operations
+```
+
 ### Telegram Bot Configuration (P0 Critical)
 
 Real-time monitoring and alerting through Telegram:
@@ -376,7 +412,8 @@ echo "Configuration loaded successfully"
 ```bash
 # Branch management and protection
 ./scripts/branch_protection.sh    # Advanced branch safety rules
-./scripts/cleanup-branches.sh     # Clean up old branches
+./scripts/cleanup-branches.sh     # Clean up old branches (basic version)
+./scripts/cleanup-branches-enhanced.sh  # Enhanced branch cleanup with safety features
 ./scripts/cleanup-automation-engine.sh  # System cleanup operations
 
 # Monitoring and alerting
@@ -399,6 +436,85 @@ echo "Configuration loaded successfully"
    ```bash
    ./main.sh
    ```
+
+### Branch Cleanup Usage
+
+The enhanced branch cleanup script provides comprehensive safety features and flexible operation modes:
+
+#### Basic Usage
+
+```bash
+# Run with default configuration (interactive mode)
+./scripts/cleanup-branches-enhanced.sh
+
+# Dry run to see what would be deleted
+./scripts/cleanup-branches-enhanced.sh --dry-run
+
+# Run automatically without confirmations
+./scripts/cleanup-branches-enhanced.sh --no-confirmation
+```
+
+#### Advanced Options
+
+```bash
+# Interactive mode with detailed information
+./scripts/cleanup-branches-enhanced.sh --interactive --show-details
+
+# Limit number of branches deleted
+./scripts/cleanup-branches-enhanced.sh --max-branches 10
+
+# Batch confirmation vs individual confirmations
+./scripts/cleanup-branches-enhanced.sh --batch-confirmation
+
+# Skip backup creation (faster but less safe)
+./scripts/cleanup-branches-enhanced.sh --no-backup
+
+# Disable safety checks (DANGEROUS - use with caution)
+./scripts/cleanup-branches-enhanced.sh --no-safety
+```
+
+#### Command-Line Options
+
+| Option | Description |
+|--------|-------------|
+| `-h, --help` | Show help message and exit |
+| `-d, --dry-run` | Enable dry-run mode (simulation only) |
+| `-y, --no-confirmation` | Skip all confirmation prompts |
+| `-i, --interactive` | Enable interactive prompts for each operation |
+| `-b, --batch-confirmation` | Enable batch confirmation |
+| `-t, --timeout SECONDS` | Set confirmation prompt timeout |
+| `-m, --max-branches COUNT` | Maximum branches to delete in one run |
+| `--no-backup` | Disable creating backup patches |
+| `--no-safety` | Disable safety checks (dangerous) |
+| `--show-details` | Show detailed branch information |
+| `--hide-summary` | Hide detailed summary in dry-run mode |
+
+#### Safety Features
+
+- **Protected Branches**: Never deletes main, master, develop, staging, production
+- **Current Branch Protection**: Cannot delete the currently checked-out branch
+- **Backup Creation**: Automatic patch backups before deletion (configurable)
+- **Safety Limits**: Maximum branches per run prevents accidental mass deletion
+- **Multi-stage Verification**: Comprehensive safety checks before deletion
+- **Interactive Prompts**: Confirm each operation or use batch mode
+- **Dry Run Mode**: Preview exactly what would be deleted
+- **Timeout Protection**: Prevents hanging operations
+
+#### Integration with Main System
+
+The branch cleanup script integrates seamlessly with the Auto-slopp system:
+
+```yaml
+# Configuration in config.yaml
+branch_cleanup:
+  dry_run_mode: false      # Set to true for safety testing
+  interactive_mode: true    # Require human confirmation
+  safety_mode: true        # Enable all safety checks
+  backup_before_delete: true # Create automatic backups
+```
+
+The script automatically uses the system's logging, error handling, and configuration management facilities.
+```
 
 ## 📁 File Structure
 
@@ -423,7 +539,8 @@ Auto-slopp/
 │   ├── number_manager.sh             # Atomic number assignment and tracking
 │   ├── beads_updater.sh             # Cross-repository beads synchronization
 │   ├── branch_protection.sh         # Advanced branch safety rules
-│   ├── cleanup-branches.sh          # Clean up old branches
+│   ├── cleanup-branches.sh          # Clean up old branches (basic version)
+│   ├── cleanup-branches-enhanced.sh # Enhanced branch cleanup with safety features
 │   ├── cleanup-automation-engine.sh # System cleanup operations
 │   │
 │   ├── Monitoring & Discovery Scripts/
@@ -653,6 +770,35 @@ For each repository:
 ├── Monitor rate limiting status and queue size
 ├── Perform periodic health checks
 └── Generate security and delivery reports
+```
+
+#### cleanup-branches-enhanced.sh
+```bash
+# Enhanced branch cleanup initialization
+├── Parse command-line arguments and configuration
+├── Initialize branch protection system
+├── Load enhanced error handling and state management
+└── Validate configuration and perform health checks
+
+# Comprehensive branch analysis
+├── Collect local and remote branch information
+├── Analyze branch states and relationships
+├── Detect potential conflicts and safety issues
+├── Generate safety assessments and recommendations
+└── Create detailed analysis reports
+
+# Safe branch deletion operations
+├── Multi-stage safety verification
+├── Interactive confirmation prompts
+├── Backup creation before deletion
+├── Enhanced deletion with monitoring
+└── Performance tracking and error recovery
+
+# Dry-run and simulation capabilities
+├── Comprehensive dry-run analysis
+├── Detailed branch deletion previews
+├── Safety information display
+└── Batch and individual confirmation options
 ```
 
 ## 📝 Task File Format
@@ -1463,15 +1609,18 @@ grep -i "access_denied\|permission_denied" ~/git/Auto-logs/*.log
 - **Error Handling Utils**: Robust logging and error recovery
 - **File Numbering System**: Sequential task processing
 
-## 📚 Logging Documentation
+## 📚 Documentation
 
-For detailed logging information and guidance:
-
+### Logging Documentation
 - **[Logging Best Practices](docs/logging-best-practices.md)** - Comprehensive usage guidelines
 - **[Logging Troubleshooting](docs/logging-troubleshooting.md)** - Diagnostic steps and solutions
 - **[Logging Examples](docs/logging-examples.md)** - Practical implementation examples
 - **[Enhanced Logging Features](docs/enhanced_logging.md)** - Feature documentation
 - **[Logging System Documentation](LOGGING_SYSTEM_DOCUMENTATION.md)** - Technical architecture
+
+### Branch Management Documentation
+- **[Branch Cleanup Usage Guide](docs/branch-cleanup-usage-guide.md)** - Comprehensive branch cleanup documentation
+- **[Configuration Documentation](docs/CONFIGURATION.md)** - Complete configuration reference including branch cleanup settings
 
 ## 📞 Support
 

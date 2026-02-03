@@ -48,6 +48,23 @@ YAML configuration utilities that:
 |----------|-------------|---------|----------|
 | `TIMESTAMP_FORMAT` | Timestamp format for logs | readable-precise | No |
 | `TIMESTAMP_TIMEZONE` | Timezone for timestamps | local | No |
+
+### Branch Cleanup Configuration Variables
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `DRY_RUN_MODE` | Enable dry-run mode by default | false | No |
+| `INTERACTIVE_MODE` | Enable interactive prompts | true | No |
+| `CONFIRM_BEFORE_DELETE` | Confirm before each branch deletion | true | No |
+| `SHOW_DRY_RUN_SUMMARY` | Show detailed summary in dry-run mode | true | No |
+| `BATCH_CONFIRMATION` | Confirm all operations at once vs individual | false | No |
+| `CONFIRMATION_TIMEOUT` | Timeout for confirmation prompts (seconds) | 60 | No |
+| `SAFETY_MODE` | Enable all safety checks by default | true | No |
+| `BACKUP_BEFORE_DELETE` | Create backup patches before deletion | true | No |
+| `MAX_BRANCHES_PER_RUN` | Maximum branches to delete in one run | 50 | No |
+| `SHOW_BRANCH_DETAILS` | Show detailed branch info in dry-run | true | No |
+| `SHOW_SAFETY_INFO` | Show safety configuration in dry-run | true | No |
+| `SHOW_SKIPPED_BRANCHES` | Show why branches are skipped in dry-run | true | No |
 | `LOG_LEVEL` | Minimum log level to output | INFO | No |
 | `LOG_DIRECTORY` | Directory for log files | ~/git/Auto-logs | No |
 | `LOG_MAX_SIZE_MB` | Maximum log file size before rotation | 10 | No |
@@ -310,3 +327,174 @@ If upgrading from an old `config.sh` system:
    ```
 
 The new system provides better validation, path expansion, and error handling.
+
+## Branch Cleanup Configuration
+
+The enhanced branch cleanup script (`cleanup-branches-enhanced.sh`) provides comprehensive configuration options for safe and flexible branch management.
+
+### Configuration Section
+
+```yaml
+# Enhanced branch cleanup configuration
+branch_cleanup:
+  # Dry-run and interactive mode settings
+  dry_run_mode: false                  # Enable dry-run mode by default
+  interactive_mode: true               # Enable interactive prompts
+  confirm_before_delete: true          # Confirm before each branch deletion
+  show_dry_run_summary: true           # Show detailed summary in dry-run mode
+  batch_confirmation: false            # Confirm all operations at once vs individual
+  confirmation_timeout: 60            # Timeout for confirmation prompts (seconds)
+  
+  # Safety and operational settings
+  safety_mode: true                    # Enable all safety checks by default
+  backup_before_delete: true           # Create backup patches before deletion
+  max_branches_per_run: 50            # Maximum branches to delete in one run
+  
+  # Dry-run specific settings
+  show_branch_details: true            # Show detailed branch info in dry-run
+  show_safety_info: true               # Show safety configuration in dry-run
+  show_skipped_branches: true          # Show why branches are skipped in dry-run
+```
+
+### Configuration Options Explained
+
+#### Dry-run and Interactive Settings
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `dry_run_mode` | boolean | false | Run in simulation mode without making changes |
+| `interactive_mode` | boolean | true | Enable interactive prompts for user decisions |
+| `confirm_before_delete` | boolean | true | Require confirmation for each branch deletion |
+| `show_dry_run_summary` | boolean | true | Show detailed summary in dry-run mode |
+| `batch_confirmation` | boolean | false | Confirm all operations at once vs individual confirmations |
+| `confirmation_timeout` | integer | 60 | Timeout for confirmation prompts in seconds |
+
+#### Safety and Operational Settings
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `safety_mode` | boolean | true | Enable all safety checks by default |
+| `backup_before_delete` | boolean | true | Create backup patches before deletion |
+| `max_branches_per_run` | integer | 50 | Maximum branches to delete in one run |
+
+#### Dry-run Display Settings
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `show_branch_details` | boolean | true | Show detailed branch information in dry-run |
+| `show_safety_info` | boolean | true | Show safety configuration in dry-run |
+| `show_skipped_branches` | boolean | true | Show reasons for skipped branches in dry-run |
+
+### Configuration Examples
+
+#### Safe Production Setup
+
+```yaml
+branch_cleanup:
+  dry_run_mode: true                  # Always preview first
+  interactive_mode: true               # Require human oversight
+  confirm_before_delete: true          # Confirm each deletion
+  safety_mode: true                   # All safety checks enabled
+  backup_before_delete: true           # Create backups
+  max_branches_per_run: 10            # Conservative limit
+  confirmation_timeout: 120            # Longer timeout for careful review
+```
+
+#### Automated CI/CD Setup
+
+```yaml
+branch_cleanup:
+  dry_run_mode: false                 # Execute directly
+  interactive_mode: false              # No human interaction
+  confirm_before_delete: false         # Auto-confirm deletions
+  batch_confirmation: true            # Single confirmation for all
+  safety_mode: true                   # Keep safety checks
+  backup_before_delete: true           # Maintain backups
+  max_branches_per_run: 100           # Higher limit for automation
+  confirmation_timeout: 30            # Shorter timeout
+```
+
+#### Development/Testing Setup
+
+```yaml
+branch_cleanup:
+  dry_run_mode: true                  # Always simulate
+  interactive_mode: true               # Interactive learning
+  confirm_before_delete: true          # Educational confirmations
+  show_dry_run_summary: true          # Detailed feedback
+  show_branch_details: true            # Maximum information
+  show_safety_info: true              # Show safety workings
+  show_skipped_branches: true         # Explain skips
+  max_branches_per_run: 5             # Small test batches
+```
+
+### Safety Configuration Guidelines
+
+1. **Always enable `safety_mode`** in production environments
+2. **Use `dry_run_mode: true`** for initial testing and verification
+3. **Set appropriate `max_branches_per_run`** to prevent accidental mass deletions
+4. **Enable `backup_before_delete`** unless you have other backup strategies
+5. **Configure `confirmation_timeout`** based on your operational needs
+6. **Use `interactive_mode: true`** for manual operations
+7. **Set `batch_confirmation: true`** for trusted automated operations
+
+### Integration with Other Systems
+
+The branch cleanup configuration integrates with:
+
+- **Branch Protection System**: Uses `branch_protection` configuration for protected branches
+- **Logging System**: Logs operations according to `log_level` and `timestamp_format` settings
+- **Error Handling**: Uses system error handling and recovery mechanisms
+- **Backup System**: Integrates with system backup and archival settings
+
+### Environment Variable Overrides
+
+You can override configuration using environment variables:
+
+```bash
+# Temporary override for testing
+export branch_cleanup_dry_run_mode=true
+export branch_cleanup_interactive_mode=false
+export branch_cleanup_max_branches_per_run=5
+
+./scripts/cleanup-branches-enhanced.sh
+```
+
+### Command Line Priority
+
+Command line arguments take precedence over configuration file settings:
+
+```bash
+# This will run in dry-run mode even if config.yaml has dry_run_mode: false
+./scripts/cleanup-branches-enhanced.sh --dry-run --max-branches 10
+```
+
+### Troubleshooting Branch Cleanup Configuration
+
+1. **Configuration not loading**:
+   ```bash
+   # Check if branch_cleanup section exists
+   grep -A 20 "branch_cleanup:" config.yaml
+   
+   # Verify YAML syntax
+   python3 -c "import yaml; yaml.safe_load(open('config.yaml'))"
+   ```
+
+2. **Settings not taking effect**:
+   ```bash
+   # Check environment variables
+   env | grep branch_cleanup
+   
+   # Test configuration loading
+   source scripts/yaml_config.sh && load_config
+   echo "DRY_RUN_MODE: $DRY_RUN_MODE"
+   ```
+
+3. **Safety mode issues**:
+   ```bash
+   # Check safety configuration
+   ./scripts/cleanup-branches-enhanced.sh --help
+   
+   # Test with minimal safety
+   ./scripts/cleanup-branches-enhanced.sh --dry-run --no-safety
+   ```
