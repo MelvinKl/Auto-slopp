@@ -50,30 +50,30 @@ for repo_dir in "$MANAGED_REPO_PATH"/*; do
     log "DEBUG" "Found task directory: $task_dir"
     
     # Ensure files are numbered, then process in numerical order
-    # First, assign numbers to any unnumbered task files
+    # First, assign numbers to any unnumbered task files using number_manager
     unnumbered_files=($(find "$task_dir" -maxdepth 1 -type f -name "*.txt" ! -name "[0-9][0-9][0-9][0-9]-*" ! -name "*.used" | sort))
     if [ ${#unnumbered_files[@]} -gt 0 ]; then
-        # Find the next available number
-        max_num=0
-        numbered_files=($(find "$task_dir" -maxdepth 1 -type f -name "[0-9][0-9][0-9][0-9]-*.txt" ! -name "*.used" 2>/dev/null))
-        for num_file in "${numbered_files[@]}"; do
-            basename_num=$(basename "$num_file" | sed 's/^\([0-9][0-9][0-9][0-9]\)-.*/\1/')
-            if [[ "$basename_num" =~ ^[0-9][0-9][0-9][0-9]$ ]]; then
-                num_val=$((10#$basename_num))
-                if [ $num_val -gt $max_num ]; then
-                    max_num=$num_val
-                fi
+        # Initialize number manager if needed
+        if [ ! -f "${MANAGED_REPO_PATH:-.}/.number_state/state.json" ]; then
+            if ! "$SCRIPT_DIR/number_manager.sh" init "$repo_name" >/dev/null 2>&1; then
+                log "ERROR" "Failed to initialize number manager for repository: $repo_name"
+                continue
             fi
-        done
+        fi
         
-        # Assign numbers to unnumbered files
-        next_num=$((max_num + 1))
+        # Assign numbers to unnumbered files using number manager
         for unnumbered_file in "${unnumbered_files[@]}"; do
+            # Get next unique number from number manager
+            next_num=$("$SCRIPT_DIR/number_manager.sh" get "$repo_name" 2>/dev/null | tail -1)
+            if [ $? -ne 0 ] || [ -z "$next_num" ]; then
+                log "ERROR" "Failed to get next number from number manager for repository: $repo_name"
+                continue 2  # Skip to next repository
+            fi
+            
             filename=$(basename "$unnumbered_file" .txt)
             new_filename=$(printf "%04d-%s.txt" "$next_num" "$filename")
-            log "INFO" "Renaming $(basename "$unnumbered_file") to $new_filename"
+            log "INFO" "Renaming $(basename "$unnumbered_file") to $new_filename (using number manager)"
             mv "$unnumbered_file" "$task_dir/$new_filename"
-            next_num=$((next_num + 1))
         done
     fi
     
