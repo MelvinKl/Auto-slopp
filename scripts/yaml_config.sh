@@ -378,3 +378,6 @@ load_config() {
     export TELEGRAM_CONFIG_AUTO_RELOAD TELEGRAM_CONFIG_CONFIG_FILE_WATCH_INTERVAL_SECONDS
     export TELEGRAM_CONFIG_VALIDATION_STRICTNESS TELEGRAM_CONFIG_BACKUP_CONFIGURATION
 }
+
+# Export YAML functions for use by other modules
+export -f read_yaml_config read_yaml_nested_config read_yaml_array load_config

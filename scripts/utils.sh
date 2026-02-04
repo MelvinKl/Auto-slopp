@@ -20,10 +20,79 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Function to load Telegram configuration from YAML
+load_telegram_config() {
+    local config_file="${1:-config.yaml}"
+    
+    # Check if config file exists
+    if [[ ! -f "$config_file" ]]; then
+        log "DEBUG" "Telegram config file not found: $config_file"
+        return 1
+    fi
+    
+    # Load YAML config function if not already loaded
+    if ! declare -F yaml_get >/dev/null 2>&1; then
+        local yaml_config_script="$(dirname "${BASH_SOURCE[0]}")/yaml_config.sh"
+        if [[ -f "$yaml_config_script" ]]; then
+            source "$yaml_config_script"
+        else
+            log "WARNING" "yaml_config.sh not found - cannot load Telegram configuration"
+            return 1
+        fi
+    fi
+    
+    # Load Telegram configuration with defaults
+    export TELEGRAM_ENABLED=$(read_yaml_config "$config_file" "telegram.enabled" "false")
+    
+    if [[ "$TELEGRAM_ENABLED" == "true" ]]; then
+        # Load bot token from environment variable (as configured in YAML)
+        export TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
+        
+        # Load other configuration
+        export TELEGRAM_CHAT_ID=$(read_yaml_config "$config_file" "telegram.default_chat_id" "")
+        export TELEGRAM_API_TIMEOUT_SECONDS=$(read_yaml_config "$config_file" "telegram.api_timeout_seconds" "10")
+        export TELEGRAM_RATE_LIMITING_MESSAGES_PER_SECOND=$(read_yaml_config "$config_file" "telegram.rate_limiting.messages_per_second" "5")
+        export TELEGRAM_MAX_MESSAGE_LENGTH=$(read_yaml_config "$config_file" "telegram.formatting.max_message_length" "4000")
+        export TELEGRAM_FORMATTING_PARSE_MODE=$(read_yaml_config "$config_file" "telegram.formatting.parse_mode" "HTML")
+        export TELEGRAM_FORMATTING_INCLUDE_TIMESTAMP=$(read_yaml_config "$config_file" "telegram.formatting.include_timestamp" "true")
+        export TELEGRAM_FORMATTING_INCLUDE_LOG_LEVEL=$(read_yaml_config "$config_file" "telegram.formatting.include_log_level" "true")
+        export TELEGRAM_FORMATTING_INCLUDE_SCRIPT_NAME=$(read_yaml_config "$config_file" "telegram.formatting.include_script_name" "true")
+        export TELEGRAM_FORMATTING_USE_EMOJI_INDICATORS=$(read_yaml_config "$config_file" "telegram.formatting.use_emoji_indicators" "true")
+        
+        # Load filter configuration
+        export TELEGRAM_FILTERS_LOG_LEVELS=$(read_yaml_config "$config_file" "telegram.filters.log_levels" "ERROR,WARNING,SUCCESS")
+        export TELEGRAM_FILTERS_SCRIPTS=$(read_yaml_config "$config_file" "telegram.filters.scripts" "main.sh,updater.sh,implementer.sh,planner.sh")
+        
+        # Load retry configuration
+        export TELEGRAM_MAX_RETRIES=$(read_yaml_config "$config_file" "telegram.retry.max_attempts" "3")
+        export TELEGRAM_RETRY_BASE_DELAY=$(read_yaml_config "$config_file" "telegram.retry.base_delay" "1.0")
+        export TELEGRAM_RETRY_MAX_DELAY=$(read_yaml_config "$config_file" "telegram.retry.max_delay" "30.0")
+        export TELEGRAM_RETRY_JITTER=$(read_yaml_config "$config_file" "telegram.retry.jitter" "true")
+        
+        # Load security configuration
+        export TELEGRAM_VALIDATE_BOT_TOKEN=$(read_yaml_config "$config_file" "telegram.security.validate_bot_token" "true")
+        export TELEGRAM_HIDE_TOKENS_IN_LOGS=$(read_yaml_config "$config_file" "telegram.security.hide_tokens_in_logs" "true")
+        
+        # Load async configuration
+        export TELEGRAM_SEND_ASYNC=$(read_yaml_config "$config_file" "telegram.buffering.enabled" "true")
+        export TELEGRAM_SYNC_TIMEOUT_SECONDS=$(read_yaml_config "$config_file" "telegram.sync_timeout_seconds" "5")
+        
+        log "DEBUG" "Telegram configuration loaded from $config_file"
+        return 0
+    else
+        log "DEBUG" "Telegram logging is disabled in configuration"
+        return 0
+    fi
+}
+
 # Function to configure logging settings
 configure_logging() {
     local timestamp_format="${1:-default}"
     local timezone="${2:-local}"
+    local config_file="${3:-config.yaml}"
+    
+    # Load Telegram configuration first
+    load_telegram_config "$config_file"
     
     # Validate and set timestamp format
     if validate_timestamp_format "$timestamp_format"; then
@@ -49,9 +118,37 @@ configure_logging() {
         echo "WARNING: Timestamp generation failed, falling back to default format and local timezone" >&2
     fi
     
+    # Initialize Telegram integration if enabled
+    if [[ "${TELEGRAM_ENABLED:-false}" == "true" ]]; then
+        # Initialize buffering if configured
+        local buffering_enabled=$(read_yaml_config "$config_file" "telegram.buffering.enabled" "false")
+        set_telegram_buffering "$buffering_enabled"
+        
+        if [[ "$buffering_enabled" == "true" ]]; then
+            local max_messages=$(read_yaml_config "$config_file" "telegram.buffering.max_messages" "10")
+            local flush_interval=$(read_yaml_config "$config_file" "telegram.buffering.flush_interval_seconds" "30")
+            
+            export TELEGRAM_BUFFER_MAX_MESSAGES="$max_messages"
+            export TELEGRAM_BUFFER_FLUSH_INTERVAL_SECONDS="$flush_interval"
+            
+            log "DEBUG" "Telegram buffering initialized: max_messages=$max_messages, flush_interval=${flush_interval}s"
+        fi
+        
+        # Test Telegram connectivity if validation is enabled
+        if [[ "${TELEGRAM_VALIDATE_BOT_TOKEN:-true}" == "true" ]]; then
+            if declare -F validate_telegram_logging_config >/dev/null 2>&1; then
+                if validate_telegram_logging_config >/dev/null 2>&1; then
+                    log "DEBUG" "Telegram configuration validation passed"
+                else
+                    log "WARNING" "Telegram configuration validation failed - messages may not be sent"
+                fi
+            fi
+        fi
+    fi
+    
     # Log the configuration change if log function is available
     if declare -f log >/dev/null 2>&1; then
-        log "DEBUG" "Logging configured: format=$TIMESTAMP_FORMAT, timezone=$TIMESTAMP_TIMEZONE"
+        log "DEBUG" "Logging configured: format=$TIMESTAMP_FORMAT, timezone=$TIMESTAMP_TIMEZONE, telegram_enabled=${TELEGRAM_ENABLED:-false}"
         
         # Show example timestamp in debug mode
         if [[ "${DEBUG_MODE:-false}" == "true" ]]; then
@@ -423,7 +520,7 @@ log() {
         echo "$clean_log_entry" >> "$log_file"
     fi
     
-    # Send to Telegram if enabled and configured
+    # Send to Telegram if enabled and configured (enhanced integration)
     if [[ "${TELEGRAM_ENABLED:-false}" == "true" ]]; then
         # Load Telegram modules if not already loaded
         if ! declare -F send_log_to_telegram >/dev/null 2>&1; then
@@ -434,8 +531,61 @@ log() {
             fi
         fi
         
-        # Send log to Telegram asynchronously
+        # Send log to Telegram with enhanced error handling and buffering
         if declare -F send_log_to_telegram >/dev/null 2>&1; then
+            # Check if we should use buffering for this level
+            local use_buffer=false
+            if [[ "$TELEGRAM_BUFFER_ENABLED" == "true" ]]; then
+                # Use buffering for INFO, SUCCESS, DEBUG levels
+                # Send ERROR, WARNING, CRITICAL immediately (but still buffer for consistency)
+                case "$level" in
+                    "ERROR"|"WARNING"|"CRITICAL")
+                        # Force flush buffer for high-priority messages, then send immediately
+                        force_flush_telegram_buffer
+                        use_buffer=false
+                        ;;
+                    *)
+                        # Buffer lower priority messages
+                        use_buffer=true
+                        ;;
+                esac
+            fi
+            
+            if [[ "$use_buffer" == "true" ]]; then
+                # Add to buffer instead of sending immediately
+                if add_to_telegram_buffer "$level" "$message" "$script_name" "$timestamp"; then
+                    log "DEBUG" "Message added to Telegram buffer: $level from $script_name"
+                else
+                    # Fallback to direct sending if buffering fails
+                    send_log_to_telegram_direct "$level" "$message" "$script_name" &
+                fi
+            else
+                # Send immediately for high-priority messages or when buffering is disabled
+                send_log_to_telegram_direct "$level" "$message" "$script_name" &
+            fi
+        else
+            log "WARNING" "Telegram logger module not available - messages will not be sent to Telegram"
+        fi
+    fi
+}
+
+# Helper function to send log to Telegram directly (non-buffered)
+send_log_to_telegram_direct() {
+    local level="$1"
+    local message="$2"
+    local script_name="${3:-$SCRIPT_NAME}"
+    
+    # Use async sending to avoid blocking
+    if [[ "${TELEGRAM_SEND_ASYNC:-true}" == "true" ]]; then
+        send_log_to_telegram "$level" "$message" "$script_name" &
+    else
+        # Synchronous sending with timeout protection
+        local timeout="${TELEGRAM_SYNC_TIMEOUT_SECONDS:-5}"
+        if command -v timeout >/dev/null 2>&1; then
+            timeout "$timeout" send_log_to_telegram "$level" "$message" "$script_name" || {
+                log "WARNING" "Telegram logging timed out after ${timeout}s"
+            }
+        else
             send_log_to_telegram "$level" "$message" "$script_name" &
         fi
     fi
@@ -891,6 +1041,199 @@ EOF
     
     return $exit_code
 }
+
+# =============================================================================
+# TELEGRAM LOGGING BUFFERING SYSTEM
+# =============================================================================
+
+# Global variables for message buffering
+declare -g TELEGRAM_MESSAGE_BUFFER_FILE="/tmp/telegram_buffer_$$"
+declare -g TELEGRAM_BUFFER_ENABLED="${TELEGRAM_BUFFER_ENABLED:-false}"
+declare -g TELEGRAM_BUFFER_MAX_MESSAGES="${TELEGRAM_BUFFER_MAX_MESSAGES:-10}"
+declare -g TELEGRAM_BUFFER_FLUSH_INTERVAL_SECONDS="${TELEGRAM_BUFFER_FLUSH_INTERVAL_SECONDS:-30}"
+declare -g TELEGRAM_BUFFER_LAST_FLUSH_TIME=0
+declare -g TELEGRAM_BUFFER_MESSAGE_COUNT=0
+
+# Function to initialize message buffer
+init_telegram_buffer() {
+    if [[ "$TELEGRAM_BUFFER_ENABLED" == "true" ]]; then
+        # Create buffer file if it doesn't exist
+        if [[ ! -f "$TELEGRAM_MESSAGE_BUFFER_FILE" ]]; then
+            echo "[]" > "$TELEGRAM_MESSAGE_BUFFER_FILE"
+        fi
+        TELEGRAM_BUFFER_LAST_FLUSH_TIME=$(date +%s)
+        log "DEBUG" "Telegram message buffer initialized (max: $TELEGRAM_BUFFER_MAX_MESSAGES, interval: ${TELEGRAM_BUFFER_FLUSH_INTERVAL_SECONDS}s)"
+    fi
+}
+
+# Function to add message to buffer
+add_to_telegram_buffer() {
+    local level="$1"
+    local message="$2"
+    local script_name="${3:-unknown}"
+    local timestamp="${4:-$(generate_timestamp)}"
+    
+    if [[ "$TELEGRAM_BUFFER_ENABLED" != "true" ]]; then
+        return 1
+    fi
+    
+    # Ensure buffer exists
+    init_telegram_buffer
+    
+    # Create message entry
+    local message_entry="{
+        \"timestamp\": \"$timestamp\",
+        \"level\": \"$level\",
+        \"script_name\": \"$script_name\",
+        \"message\": \"$message\"
+    }"
+    
+    # Add to buffer using jq for proper JSON handling
+    if command -v jq >/dev/null 2>&1; then
+        jq --argjson entry "$message_entry" '. += [$entry]' "$TELEGRAM_MESSAGE_BUFFER_FILE" > "${TELEGRAM_MESSAGE_BUFFER_FILE}.tmp" && \
+            mv "${TELEGRAM_MESSAGE_BUFFER_FILE}.tmp" "$TELEGRAM_MESSAGE_BUFFER_FILE"
+    else
+        # Fallback: append to file (less reliable)
+        echo "$message_entry" >> "$TELEGRAM_MESSAGE_BUFFER_FILE.raw"
+    fi
+    
+    ((TELEGRAM_BUFFER_MESSAGE_COUNT++))
+    log "DEBUG" "Added message to Telegram buffer (count: $TELEGRAM_BUFFER_MESSAGE_COUNT)"
+    
+    # Check if buffer should be flushed
+    check_and_flush_telegram_buffer
+    
+    return 0
+}
+
+# Function to check if buffer should be flushed
+check_and_flush_telegram_buffer() {
+    local current_time=$(date +%s)
+    local time_since_flush=$((current_time - TELEGRAM_BUFFER_LAST_FLUSH_TIME))
+    
+    # Flush conditions:
+    # 1. Buffer is full (max messages reached)
+    # 2. Time interval has passed
+    # 3. High-priority message (ERROR/CRITICAL) triggers immediate flush
+    
+    if [[ $TELEGRAM_BUFFER_MESSAGE_COUNT -ge $TELEGRAM_BUFFER_MAX_MESSAGES ]] || \
+       [[ $time_since_flush -ge $TELEGRAM_BUFFER_FLUSH_INTERVAL_SECONDS ]]; then
+        flush_telegram_buffer
+        return 0
+    fi
+    
+    return 1
+}
+
+# Function to flush buffer to Telegram
+flush_telegram_buffer() {
+    if [[ "$TELEGRAM_BUFFER_ENABLED" != "true" ]]; then
+        return 1
+    fi
+    
+    if [[ $TELEGRAM_BUFFER_MESSAGE_COUNT -eq 0 ]]; then
+        log "DEBUG" "Telegram buffer is empty, nothing to flush"
+        return 0
+    fi
+    
+    log "DEBUG" "Flushing Telegram buffer ($TELEGRAM_BUFFER_MESSAGE_COUNT messages)"
+    
+    local messages_sent=0
+    local messages_failed=0
+    
+    # Read and send buffered messages
+    if command -v jq >/dev/null 2>&1 && [[ -f "$TELEGRAM_MESSAGE_BUFFER_FILE" ]]; then
+        # Process JSON buffer
+        while IFS= read -r message_entry; do
+            local level=$(echo "$message_entry" | jq -r '.level' 2>/dev/null || echo "INFO")
+            local message=$(echo "$message_entry" | jq -r '.message' 2>/dev/null || echo "")
+            local script_name=$(echo "$message_entry" | jq -r '.script_name' 2>/dev/null || echo "unknown")
+            
+            if [[ -n "$message" ]]; then
+                if send_log_to_telegram "$level" "$message" "$script_name" >/dev/null 2>&1; then
+                    ((messages_sent++))
+                else
+                    ((messages_failed++))
+                fi
+            fi
+        done < <(jq -r '.[] | @base64' "$TELEGRAM_MESSAGE_BUFFER_FILE" | while IFS= read -r line; do echo "$line" | base64 --decode; done)
+        
+        # Clear buffer
+        echo "[]" > "$TELEGRAM_MESSAGE_BUFFER_FILE"
+        
+    elif [[ -f "$TELEGRAM_MESSAGE_BUFFER_FILE.raw" ]]; then
+        # Process raw buffer fallback
+        while IFS= read -r message_entry; do
+            if [[ -n "$message_entry" ]]; then
+                # Simple parsing for raw entries
+                local level=$(echo "$message_entry" | grep -o '"level": "[^"]*"' | cut -d'"' -f4 || echo "INFO")
+                local message=$(echo "$message_entry" | grep -o '"message": "[^"]*"' | cut -d'"' -f4 || echo "")
+                local script_name=$(echo "$message_entry" | grep -o '"script_name": "[^"]*"' | cut -d'"' -f4 || echo "unknown")
+                
+                if [[ -n "$message" ]]; then
+                    if send_log_to_telegram "$level" "$message" "$script_name" >/dev/null 2>&1; then
+                        ((messages_sent++))
+                    else
+                        ((messages_failed++))
+                    fi
+                fi
+            fi
+        done < "$TELEGRAM_MESSAGE_BUFFER_FILE.raw"
+        
+        # Clear raw buffer
+        rm -f "$TELEGRAM_MESSAGE_BUFFER_FILE.raw"
+    fi
+    
+    # Reset buffer state
+    TELEGRAM_BUFFER_MESSAGE_COUNT=0
+    TELEGRAM_BUFFER_LAST_FLUSH_TIME=$(date +%s)
+    
+    log "INFO" "Telegram buffer flushed: $messages_sent sent, $messages_failed failed"
+    return 0
+}
+
+# Function to force immediate buffer flush (for high-priority messages)
+force_flush_telegram_buffer() {
+    if [[ "$TELEGRAM_BUFFER_ENABLED" == "true" ]] && [[ $TELEGRAM_BUFFER_MESSAGE_COUNT -gt 0 ]]; then
+        flush_telegram_buffer
+    fi
+}
+
+# Function to enable/disable buffering
+set_telegram_buffering() {
+    local enabled="$1"
+    
+    if [[ "$enabled" == "true" ]]; then
+        export TELEGRAM_BUFFER_ENABLED="true"
+        init_telegram_buffer
+        log "INFO" "Telegram message buffering enabled"
+    else
+        # Flush existing buffer before disabling
+        flush_telegram_buffer
+        export TELEGRAM_BUFFER_ENABLED="false"
+        log "INFO" "Telegram message buffering disabled"
+    fi
+}
+
+# Function to cleanup buffer on exit
+cleanup_telegram_buffer() {
+    if [[ "$TELEGRAM_BUFFER_ENABLED" == "true" ]]; then
+        log "DEBUG" "Cleaning up Telegram buffer on exit"
+        flush_telegram_buffer
+        
+        # Remove buffer files
+        [[ -f "$TELEGRAM_MESSAGE_BUFFER_FILE" ]] && rm -f "$TELEGRAM_MESSAGE_BUFFER_FILE"
+        [[ -f "$TELEGRAM_MESSAGE_BUFFER_FILE.raw" ]] && rm -f "$TELEGRAM_MESSAGE_BUFFER_FILE.raw"
+        [[ -f "${TELEGRAM_MESSAGE_BUFFER_FILE}.tmp" ]] && rm -f "${TELEGRAM_MESSAGE_BUFFER_FILE}.tmp"
+    fi
+}
+
+# Register cleanup for buffer
+trap cleanup_telegram_buffer EXIT
+
+# =============================================================================
+# MERGE FUNCTIONS
+# =============================================================================
 
 # Function to merge origin/main into current ai branch safely
 merge_origin_main_to_ai() {
@@ -1778,4 +2121,7 @@ export -f classify_merge_error log_merge_attempt log_merge_conflict_detection lo
 export -f rollback_merge_on_failure preserve_state_for_opencode retry_merge_after_opencode_resolution
 export -f validate_repository_state get_repository_health_status
 export -f has_open_bead_tasks get_open_bead_tasks_count log_task_availability_decision
+# Telegram integration functions
+export -f load_telegram_config send_log_to_telegram_direct
+export -f init_telegram_buffer add_to_telegram_buffer check_and_flush_telegram_buffer flush_telegram_buffer force_flush_telegram_buffer set_telegram_buffering cleanup_telegram_buffer
 export RED GREEN YELLOW BLUE NC DEBUG_MODE

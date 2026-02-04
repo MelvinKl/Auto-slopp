@@ -331,3 +331,10 @@ telegram:
     config_file_watch_interval_seconds: 30  # How often to check for config changes
     validation_strictness: "strict"     # Validation level: "strict", "warn", or "relaxed"
     backup_configuration: true          # Backup configuration changes
+  
+  # Message buffering configuration
+  buffering:
+    enabled: false                     # Enable message buffering for batch sending
+    max_messages: 10                  # Maximum messages to buffer before auto-flush
+    flush_interval_seconds: 30         # Time interval to force buffer flush
+    immediate_flush_levels: ["ERROR", "WARNING", "CRITICAL"]  # Levels that trigger immediate flush
