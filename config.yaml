@@ -272,9 +272,9 @@ branch_cleanup:
 
 # Telegram Bot logging configuration (P0 Critical)
 telegram:
-  enabled: false                        # Enable/disable Telegram logging globally
+  enabled: true                        # Enable/disable Telegram logging globally
   bot_token: "${TELEGRAM_BOT_TOKEN}"    # Environment variable for bot token (NEVER store in plain text)
-  default_chat_id: "@logs_channel"      # Default channel/chat for sending messages
+  default_chat_id: "7649674603"      # Default channel/chat for sending messages
   api_timeout_seconds: 10               # Timeout for Telegram API requests
   connection_retries: 3                 # Maximum retry attempts for failed connections
   

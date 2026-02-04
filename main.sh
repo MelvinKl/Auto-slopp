@@ -24,8 +24,11 @@ configure_logging "$TIMESTAMP_FORMAT" "$TIMESTAMP_TIMEZONE"
 # Log that the system is starting up
 log "INFO" "Starting Repository Automation System"
 
-while true; do
+ while true; do
     log "INFO" "=== Running automation cycle ==="
+    
+    # Reset SCRIPT_DIR to this script's directory (scripts may modify it)
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     
     # Discover all scripts in scripts directory
     SCRIPTS_DIR="$SCRIPT_DIR/scripts"
