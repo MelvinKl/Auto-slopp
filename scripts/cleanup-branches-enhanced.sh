@@ -617,7 +617,8 @@ should_proceed_with_cleanup() {
     echo "Safety mode: ${GREEN}$SAFETY_MODE${NC}"
     echo
     
-    return $(request_user_confirmation "Proceed with cleanup operation?")
+    request_user_confirmation "Proceed with cleanup operation?"
+    return $?
 }
 
 # =============================================================================
