@@ -1056,6 +1056,26 @@ secure_token_input() {
     local prompt="${1:-Enter Telegram bot token}"
     local confirm="${2:-true}"
     
+    # Check for environment variable first (non-interactive mode)
+    if [[ -n "$TELEGRAM_BOT_TOKEN" ]]; then
+        log "DEBUG" "Token loaded from TELEGRAM_BOT_TOKEN environment variable"
+        echo "$TELEGRAM_BOT_TOKEN"
+        return 0
+    fi
+    
+    # Check for token file (non-interactive mode)
+    local token_file="${TELEGRAM_TOKEN_FILE:-/etc/telegram/token}"
+    if [[ -f "$token_file" ]]; then
+        local token
+        token=$(cat "$token_file" 2>/dev/null)
+        if [[ -n "$token" ]]; then
+            log "DEBUG" "Token loaded from $token_file"
+            echo "$token"
+            return 0
+        fi
+    fi
+    
+    # Interactive mode - ask for user input
     echo "$prompt" >&2
     local token
     read -s token 2>/dev/null
