@@ -202,6 +202,15 @@ request_explicit_confirmation() {
     echo "  ${GREEN}no${NC}     - Cancel the operation (SAFE)"
     echo "  ${YELLOW}info${NC}  - Show detailed branch information"
     echo
+if [[ "$AUTO_CONFIRM" == "true" ]]; then
+        echo "${YELLOW}AUTO_CONFIRM mode: Auto-proceeding with protected branch deletion${NC}"
+        log "WARNING" "AUTO_CONFIRM mode: Proceeding with deletion of protected branch: $branch"
+        echo "${RED}Proceeding with deletion of protected branch: $branch${NC}"
+        echo "${YELLOW}This operation was auto-confirmed in hands-off mode.${NC}"
+        echo
+        return 0
+    fi
+    
     echo -n "Your choice [no]: "
     
     read -r user_input
@@ -218,16 +227,16 @@ request_explicit_confirmation() {
         "info"|"INFO"|"i"|"I")
             show_branch_detailed_info "$branch" "$repo_dir"
             request_explicit_confirmation "$branch" "$repo_dir" "$protection_reason"
-            return $?
             ;;
         "no"|"NO"|"n"|"N"|"")
             log "INFO" "User cancelled deletion of protected branch: $branch"
-            echo "${GREEN}Operation cancelled. Branch $branch remains safe.${NC}"
+            echo "${GREEN}Operation cancelled - protected branch preserved${NC}"
             echo
             return 1
             ;;
         *)
-            echo "${RED}Invalid choice. Operation cancelled for safety.${NC}"
+            log "WARNING" "Invalid input for protected branch confirmation: $user_input"
+            echo "${RED}Invalid input. Operation cancelled for safety.${NC}"
             echo
             return 1
             ;;

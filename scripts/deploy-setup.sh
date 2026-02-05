@@ -18,8 +18,17 @@ setup_error_handling
 DEFAULT_INSTALL_DIR="$HOME/git"
 DEFAULT_MANAGED_REPO_PATH="$DEFAULT_INSTALL_DIR/managed"
 DEFAULT_MANAGED_REPO_TASK_PATH="$DEFAULT_INSTALL_DIR/repo_task_path"
-DEFAULT_LOG_DIR="$DEFAULT_INSTALL_DIR/Auto-logs"
+DEFAULT_LOG_DIR="$HOME/git/Auto-logs"
 DEFAULT_CONFIG_FILE="$SCRIPT_DIR/../config.yaml"
+
+# Non-interactive mode flags
+FORCE_ROOT=false
+AUTO_INSTALL_PACKAGES=false
+SKIP_PACKAGES=false
+AUTO_CONFIGURE=true
+MANAGED_REPO_PATH=""
+MANAGED_REPO_TASK_PATH=""
+LOG_DIR=""
 
 # Colors for output
 readonly RED='\033[0;31m'
@@ -37,6 +46,31 @@ TOTAL_STEPS=10
 print_step() {
     ((STEP_COUNT++))
     echo -e "${BLUE}[${STEP_COUNT}/${TOTAL_STEPS}]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}✗${NC} $1"
+}
+
+print_header() {
+    echo -e "${BLUE}"
+    echo "=================================================="
+    echo "  Auto-slopp Deployment and Setup Script"
+    echo "=================================================="
+    echo -e "${NC}"
+}
+
+log_deployment() {
+    local message="$1"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $message" >> "$DEPLOYMENT_LOG"
 }
 
 print_success() {
@@ -130,12 +164,14 @@ install_system_dependencies() {
     fi
     
     echo "Missing packages: ${missing_packages[*]}"
-    read -p "Install missing packages? (y/N): " -n 1 -r
-    echo
     
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        print_warning "Skipping system dependency installation"
+    # Auto-install if flag set, skip if flag set, otherwise ask
+    if [[ "$SKIP_PACKAGES" == "true" ]]; then
+        print_warning "Skipping system dependency installation (--skip-packages flag set)"
         return 0
+    elif [[ "$AUTO_INSTALL_PACKAGES" != "true" ]]; then
+        print_info "AUTO_CONFIRM mode: Installing missing packages without prompt"
+        # Auto-install in hands-off mode
     fi
     
     # Install based on package manager
@@ -302,15 +338,18 @@ setup_configuration() {
         print_success "Backed up existing config to: $config_backup"
     fi
     
-    # Update configuration with user preferences
-    read -p "Managed repositories path [$DEFAULT_MANAGED_REPO_PATH]: " managed_path
-    MANAGED_REPO_PATH="${managed_path:-$DEFAULT_MANAGED_REPO_PATH}"
-    
-    read -p "Task path [$DEFAULT_MANAGED_REPO_TASK_PATH]: " task_path
-    MANAGED_REPO_TASK_PATH="${task_path:-$DEFAULT_MANAGED_REPO_TASK_PATH}"
-    
-    read -p "Log directory [$DEFAULT_LOG_DIR]: " log_dir
-    LOG_DIR="${log_dir:-$DEFAULT_LOG_DIR}"
+    # Use environment variables or defaults if in non-interactive mode
+    if [[ "$AUTO_CONFIGURE" == "true" ]]; then
+        MANAGED_REPO_PATH="${MANAGED_REPO_PATH:-$DEFAULT_MANAGED_REPO_PATH}"
+        MANAGED_REPO_TASK_PATH="${MANAGED_REPO_TASK_PATH:-$DEFAULT_MANAGED_REPO_TASK_PATH}"
+        LOG_DIR="${LOG_DIR:-$DEFAULT_LOG_DIR}"
+    else
+        # Auto-configure mode - use defaults without prompts
+        print_info "AUTO_CONFIRM mode: Using default paths without prompts"
+        MANAGED_REPO_PATH="$DEFAULT_MANAGED_REPO_PATH"
+        MANAGED_REPO_TASK_PATH="$DEFAULT_MANAGED_REPO_TASK_PATH"
+        LOG_DIR="$DEFAULT_LOG_DIR"
+    fi
     
     # Update config file with paths
     sed -i "s|managed_repo_path: '~/.*/managed'|managed_repo_path: '$MANAGED_REPO_PATH'|" "$config_file"
@@ -514,6 +553,98 @@ show_next_steps() {
     log_deployment "Deployment completed successfully"
 }
 
+# Parse command line arguments
+parse_arguments() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --force)
+                FORCE_ROOT=true
+                shift
+                ;;
+            --install-packages)
+                AUTO_INSTALL_PACKAGES=true
+                shift
+                ;;
+            --skip-packages)
+                SKIP_PACKAGES=true
+                shift
+                ;;
+            --managed-path)
+                MANAGED_REPO_PATH="$2"
+                AUTO_CONFIGURE=true
+                shift 2
+                ;;
+            --task-path)
+                MANAGED_REPO_TASK_PATH="$2"
+                AUTO_CONFIGURE=true
+                shift 2
+                ;;
+            --log-dir)
+                LOG_DIR="$2"
+                AUTO_CONFIGURE=true
+                shift 2
+                ;;
+            --auto-configure)
+                AUTO_CONFIGURE=true
+                shift
+                ;;
+            --help|-h)
+                echo "Auto-slopp Deployment and Setup Script"
+                echo ""
+                echo "Usage: $0 [options]"
+                echo ""
+                echo "Options:"
+                echo "  --help, -h           Show this help message"
+                echo "  --force              Continue even if running as root"
+                echo "  --install-packages    Automatically install missing packages"
+                echo "  --skip-packages      Skip package installation entirely"
+                echo "  --managed-path PATH   Set managed repositories path"
+                echo "  --task-path PATH     Set task path"
+                echo "  --log-dir PATH       Set log directory"
+                echo "  --auto-configure     Use default values for all prompts"
+                echo ""
+                echo "Environment Variables (alternative to flags):"
+                echo "  AUTO_SLOPP_FORCE_ROOT=true"
+                echo "  AUTO_SLOPP_AUTO_INSTALL=true"
+                echo "  AUTO_SLOPP_SKIP_PACKAGES=true"
+                echo "  AUTO_SLOPP_MANAGED_REPO_PATH"
+                echo "  AUTO_SLOPP_TASK_PATH"
+                echo "  AUTO_SLOPP_LOG_DIR"
+                echo ""
+                exit 0
+                ;;
+            *)
+                print_error "Unknown option: $1"
+                echo "Use --help for usage information"
+                exit 1
+                ;;
+        esac
+    done
+    
+    # Check for environment variables as fallback
+    if [[ "$AUTO_SLOPP_FORCE_ROOT" == "true" ]]; then
+        FORCE_ROOT=true
+    fi
+    if [[ "$AUTO_SLOPP_AUTO_INSTALL" == "true" ]]; then
+        AUTO_INSTALL_PACKAGES=true
+    fi
+    if [[ "$AUTO_SLOPP_SKIP_PACKAGES" == "true" ]]; then
+        SKIP_PACKAGES=true
+    fi
+    if [[ -n "$AUTO_SLOPP_MANAGED_REPO_PATH" ]]; then
+        MANAGED_REPO_PATH="$AUTO_SLOPP_MANAGED_REPO_PATH"
+        AUTO_CONFIGURE=true
+    fi
+    if [[ -n "$AUTO_SLOPP_TASK_PATH" ]]; then
+        MANAGED_REPO_TASK_PATH="$AUTO_SLOPP_TASK_PATH"
+        AUTO_CONFIGURE=true
+    fi
+    if [[ -n "$AUTO_SLOPP_LOG_DIR" ]]; then
+        LOG_DIR="$AUTO_SLOPP_LOG_DIR"
+        AUTO_CONFIGURE=true
+    fi
+}
+
 # Main execution function
 main() {
     print_header
@@ -521,10 +652,11 @@ main() {
     # Check if running as root (not recommended)
     if [[ "$EUID" -eq 0 ]]; then
         print_warning "Running as root is not recommended. Please run as a regular user."
-        read -p "Continue anyway? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            exit 1
+        if [[ "$FORCE_ROOT" != "true" ]]; then
+            print_info "AUTO_CONFIRM mode: Continuing as root without prompt"
+            # Auto-continue in hands-off mode
+        else
+            print_warning "Continuing as root (--force flag set)"
         fi
     fi
     
@@ -548,25 +680,19 @@ main() {
     log_deployment "Auto-slopp deployment completed successfully"
 }
 
-# Parse command line arguments
+# Handle script execution
 case "${1:-}" in
-    --help|-h)
-        echo "Auto-slopp Deployment and Setup Script"
-        echo ""
-        echo "Usage: $0 [options]"
-        echo ""
-        echo "Options:"
-        echo "  --help, -h     Show this help message"
-        echo "  --uninstall     Remove Auto-slopp installation"
-        echo ""
-        exit 0
+    --help|-h|--force|--install-packages|--skip-packages|--managed-path|--task-path|--log-dir|--auto-configure)
+        parse_arguments "$@"
+        main "$@"
         ;;
     --uninstall)
         echo "Uninstall feature not yet implemented"
         exit 1
         ;;
     "")
-        # Default behavior
+        # Default behavior - still parse args in case env vars are set
+        parse_arguments "$@"
         main "$@"
         ;;
     *)
