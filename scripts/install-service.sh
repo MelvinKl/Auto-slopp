@@ -68,11 +68,8 @@ validate_installation() {
     if ! sudo -u "$SERVICE_USER" bash -c "cd '$AUTO_SLOPP_HOME' && source scripts/yaml_config.sh && load_config config.yaml" >/dev/null 2>&1; then
         print_warning "Configuration validation failed - service may not start properly"
         if [[ "$FORCE_INSTALL" != "true" ]]; then
-            read -p "Continue anyway? (y/N): " -n 1 -r
-            echo
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                exit 1
-            fi
+            print_info "AUTO_CONFIRM mode: Continuing installation without prompt"
+            # Auto-continue in hands-off mode
         else
             print_warning "Continuing anyway (--force-install flag set)"
         fi

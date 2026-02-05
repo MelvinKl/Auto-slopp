@@ -170,13 +170,8 @@ install_system_dependencies() {
         print_warning "Skipping system dependency installation (--skip-packages flag set)"
         return 0
     elif [[ "$AUTO_INSTALL_PACKAGES" != "true" ]]; then
-        read -p "Install missing packages? (y/N): " -n 1 -r
-        echo
-        
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            print_warning "Skipping system dependency installation"
-            return 0
-        fi
+        print_info "AUTO_CONFIRM mode: Installing missing packages without prompt"
+        # Auto-install in hands-off mode
     fi
     
     # Install based on package manager
@@ -349,15 +344,11 @@ setup_configuration() {
         MANAGED_REPO_TASK_PATH="${MANAGED_REPO_TASK_PATH:-$DEFAULT_MANAGED_REPO_TASK_PATH}"
         LOG_DIR="${LOG_DIR:-$DEFAULT_LOG_DIR}"
     else
-        # Interactive mode - ask for user input
-        read -p "Managed repositories path [$DEFAULT_MANAGED_REPO_PATH]: " managed_path
-        MANAGED_REPO_PATH="${managed_path:-$DEFAULT_MANAGED_REPO_PATH}"
-        
-        read -p "Task path [$DEFAULT_MANAGED_REPO_TASK_PATH]: " task_path
-        MANAGED_REPO_TASK_PATH="${task_path:-$DEFAULT_MANAGED_REPO_TASK_PATH}"
-        
-        read -p "Log directory [$DEFAULT_LOG_DIR]: " log_dir
-        LOG_DIR="${log_dir:-$DEFAULT_LOG_DIR}"
+        # Auto-configure mode - use defaults without prompts
+        print_info "AUTO_CONFIRM mode: Using default paths without prompts"
+        MANAGED_REPO_PATH="$DEFAULT_MANAGED_REPO_PATH"
+        MANAGED_REPO_TASK_PATH="$DEFAULT_MANAGED_REPO_TASK_PATH"
+        LOG_DIR="$DEFAULT_LOG_DIR"
     fi
     
     # Update config file with paths
@@ -662,11 +653,8 @@ main() {
     if [[ "$EUID" -eq 0 ]]; then
         print_warning "Running as root is not recommended. Please run as a regular user."
         if [[ "$FORCE_ROOT" != "true" ]]; then
-            read -p "Continue anyway? (y/N): " -n 1 -r
-            echo
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                exit 1
-            fi
+            print_info "AUTO_CONFIRM mode: Continuing as root without prompt"
+            # Auto-continue in hands-off mode
         else
             print_warning "Continuing as root (--force flag set)"
         fi

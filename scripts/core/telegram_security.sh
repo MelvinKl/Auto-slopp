@@ -1100,13 +1100,17 @@ secure_token_input() {
     
     # Confirm token if requested
     if [[ "$confirm" == "true" ]]; then
-        echo "Confirm token (type 'yes' to proceed):" >&2
-        local confirmation
-        read confirmation 2>/dev/null
-        
-        if [[ "$confirmation" != "yes" ]]; then
-            log "INFO" "Token input cancelled by user"
-            return 1
+        if [[ "$AUTO_CONFIRM" != "true" ]]; then
+            echo "Confirm token (type 'yes' to proceed):" >&2
+            local confirmation
+            read confirmation 2>/dev/null
+            
+            if [[ "$confirmation" != "yes" ]]; then
+                log "INFO" "Token input cancelled by user"
+                return 1
+            fi
+        else
+            log "INFO" "AUTO_CONFIRM mode: Skipping token confirmation"
         fi
     fi
     

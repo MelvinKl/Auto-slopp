@@ -569,6 +569,7 @@ request_user_confirmation() {
     local default="${2:-no}"
     
     if [[ "$INTERACTIVE_MODE" != "true" ]]; then
+        echo "${YELLOW}AUTO_CONFIRM mode: Auto-confirming '$prompt'${NC}"
         return 0  # Auto-confirm in non-interactive mode
     fi
     
