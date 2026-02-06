@@ -8,9 +8,12 @@ Telegram integration, and console output with rich formatting.
 import logging
 import logging.handlers
 import sys
+
+import glob
+import shutil
 from pathlib import Path
-from datetime import datetime
-from typing import Optional, Dict, Any
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 
 from rich.console import Console
@@ -411,3 +414,334 @@ def log_success(message: str, script_name: Optional[str] = None):
 def log_debug(message: str, script_name: Optional[str] = None):
     """Log debug message."""
     log(LogLevel.DEBUG, message, script_name=script_name)
+
+
+class LogRotationManager:
+    """Manages log rotation and cleanup operations."""
+
+    def __init__(self, config=None):
+        self.config = config
+        if config is None:
+            try:
+                from ..config import get_config
+
+                self.config = get_config()
+            except ImportError:
+                # Use defaults if config not available
+                self.config = type(
+                    "Config",
+                    (),
+                    {
+                        "logging": type(
+                            "Logging",
+                            (),
+                            {
+                                "log_directory": "~/git/Auto-logs",
+                                "log_max_size_mb": 10,
+                                "log_max_files": 5,
+                                "log_retention_days": 30,
+                            },
+                        )()
+                    },
+                )()
+
+        self.logger = get_logger(f"{__name__}.rotation")
+        self.log_dir = Path(self.config.logging.log_directory).expanduser()
+
+    def setup_log_rotation(self, logger_name: str = "auto_slopp") -> logging.Handler:
+        """
+        Set up rotating file handler for logger.
+
+        Args:
+            logger_name: Name of the logger to set up
+
+        Returns:
+            Configured rotating file handler
+        """
+        # Ensure log directory exists
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create log file path
+        log_file = self.log_dir / f"{logger_name}.log"
+
+        # Set up rotating file handler
+        max_bytes = self.config.logging.log_max_size_mb * 1024 * 1024
+        backup_count = self.config.logging.log_max_files
+
+        handler = logging.handlers.RotatingFileHandler(
+            log_file, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
+        )
+
+        # Set formatter
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        handler.setFormatter(formatter)
+
+        self.logger.info(
+            f"Log rotation set up: {log_file} "
+            f"(max {max_bytes} bytes, {backup_count} backups)"
+        )
+        return handler
+
+    def rotate_logs(self, force: bool = False) -> Dict[str, Any]:
+        """
+        Perform log rotation for all log files.
+
+        Args:
+            force: Force rotation even if size threshold not met
+
+        Returns:
+            Dictionary with rotation results
+        """
+        results = {
+            "rotated": [],
+            "errors": [],
+            "total_size_before": 0,
+            "total_size_after": 0,
+        }
+
+        try:
+            # Ensure log directory exists
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+
+            # Find all log files
+            log_files = list(self.log_dir.glob("*.log*"))
+
+            for log_file in log_files:
+                try:
+                    # Check file size
+                    file_size = log_file.stat().st_size
+                    max_size = self.config.logging.log_max_size_mb * 1024 * 1024
+                    results["total_size_before"] += file_size
+
+                    if force or file_size > max_size:
+                        # Rotate the file
+                        self._rotate_single_file(log_file)
+                        results["rotated"].append(str(log_file))
+                        self.logger.info(f"Rotated log file: {log_file}")
+
+                except Exception as e:
+                    error_msg = f"Failed to rotate {log_file}: {e}"
+                    results["errors"].append(error_msg)
+                    self.logger.error(error_msg)
+
+            # Calculate new total size
+            for log_file in log_files:
+                if log_file.exists():
+                    results["total_size_after"] += log_file.stat().st_size
+
+            self.logger.info(
+                f"Log rotation completed: {len(results['rotated'])} files rotated, "
+                f"{len(results['errors'])} errors"
+            )
+
+        except Exception as e:
+            error_msg = f"Log rotation failed: {e}"
+            results["errors"].append(error_msg)
+            self.logger.error(error_msg)
+
+        return results
+
+    def _rotate_single_file(self, log_file: Path):
+        """Rotate a single log file."""
+        if not log_file.exists():
+            return
+
+        # Create backup name with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_name = f"{log_file.stem}_{timestamp}{log_file.suffix}"
+        backup_path = log_file.parent / backup_name
+
+        # Move current log to backup
+        shutil.move(str(log_file), str(backup_path))
+
+        # Create new empty log file
+        log_file.touch()
+
+    def cleanup_old_logs(self) -> Dict[str, Any]:
+        """
+        Clean up log files older than retention period.
+
+        Returns:
+            Dictionary with cleanup results
+        """
+        results = {"deleted": [], "errors": [], "space_freed": 0}
+
+        try:
+            # Calculate cutoff date
+            retention_days = self.config.logging.log_retention_days
+            cutoff_date = datetime.now() - timedelta(days=retention_days)
+
+            # Find all log files (including rotated ones)
+            log_pattern = str(self.log_dir / "*.log*")
+            log_files = glob.glob(log_pattern)
+
+            for log_file_path in log_files:
+                log_file = Path(log_file_path)
+                try:
+                    # Get file modification time
+                    mtime = datetime.fromtimestamp(log_file.stat().st_mtime)
+
+                    if mtime < cutoff_date:
+                        # Calculate space to be freed
+                        file_size = log_file.stat().st_size
+                        results["space_freed"] += file_size
+
+                        # Delete the file
+                        log_file.unlink()
+                        results["deleted"].append(str(log_file))
+                        self.logger.info(f"Deleted old log file: {log_file}")
+
+                except Exception as e:
+                    error_msg = f"Failed to delete {log_file}: {e}"
+                    results["errors"].append(error_msg)
+                    self.logger.error(error_msg)
+
+            self.logger.info(
+                f"Log cleanup completed: {len(results['deleted'])} files deleted, "
+                f"{results['space_freed']} bytes freed"
+            )
+
+        except Exception as e:
+            error_msg = f"Log cleanup failed: {e}"
+            results["errors"].append(error_msg)
+            self.logger.error(error_msg)
+
+        return results
+
+    def get_log_statistics(self) -> Dict[str, Any]:
+        """
+        Get statistics about log files.
+
+        Returns:
+            Dictionary with log statistics
+        """
+        stats = {
+            "total_files": 0,
+            "total_size": 0,
+            "oldest_file": None,
+            "newest_file": None,
+            "files_by_size": [],
+            "directory": str(self.log_dir),
+        }
+
+        try:
+            if not self.log_dir.exists():
+                return stats
+
+            # Find all log files
+            log_files = list(self.log_dir.glob("*.log*"))
+            stats["total_files"] = len(log_files)
+
+            if not log_files:
+                return stats
+
+            # Collect file information
+            file_info = []
+            oldest_time = None
+            newest_time = None
+
+            for log_file in log_files:
+                if log_file.exists():
+                    file_size = log_file.stat().st_size
+                    mtime = datetime.fromtimestamp(log_file.stat().st_mtime)
+
+                    stats["total_size"] += file_size
+                    file_info.append(
+                        {
+                            "file": str(log_file),
+                            "size": file_size,
+                            "modified": mtime.isoformat(),
+                        }
+                    )
+
+                    if oldest_time is None or mtime < oldest_time:
+                        oldest_time = mtime
+                        stats["oldest_file"] = str(log_file)
+
+                    if newest_time is None or mtime > newest_time:
+                        newest_time = mtime
+                        stats["newest_file"] = str(log_file)
+
+            # Sort files by size (largest first)
+            stats["files_by_size"] = sorted(
+                file_info, key=lambda x: x["size"], reverse=True
+            )
+
+        except Exception as e:
+            self.logger.error(f"Failed to get log statistics: {e}")
+            stats["error"] = str(e)
+
+        return stats
+
+    def monitor_log_sizes(self) -> List[Dict[str, Any]]:
+        """
+        Monitor log file sizes and return files needing attention.
+
+        Returns:
+            List of files that exceed size threshold
+        """
+        attention_needed = []
+        max_size = self.config.logging.log_max_size_mb * 1024 * 1024
+
+        try:
+            log_files = list(self.log_dir.glob("*.log"))
+
+            for log_file in log_files:
+                if log_file.exists():
+                    file_size = log_file.stat().st_size
+                    size_mb = file_size / (1024 * 1024)
+
+                    if file_size > max_size:
+                        attention_needed.append(
+                            {
+                                "file": str(log_file),
+                                "size_bytes": file_size,
+                                "size_mb": round(size_mb, 2),
+                                "threshold_mb": self.config.logging.log_max_size_mb,
+                                "percentage": round((file_size / max_size) * 100, 1),
+                            }
+                        )
+
+        except Exception as e:
+            self.logger.error(f"Failed to monitor log sizes: {e}")
+
+        return attention_needed
+
+
+# Global log rotation manager
+_rotation_manager: Optional[LogRotationManager] = None
+
+
+def get_log_rotation_manager(config=None) -> LogRotationManager:
+    """Get the global log rotation manager instance."""
+    global _rotation_manager
+    if _rotation_manager is None:
+        _rotation_manager = LogRotationManager(config)
+    return _rotation_manager
+
+
+def setup_log_rotation(logger_name: str = "auto_slopp", config=None) -> logging.Handler:
+    """Set up log rotation for a logger."""
+    manager = get_log_rotation_manager(config)
+    return manager.setup_log_rotation(logger_name)
+
+
+def rotate_logs(force: bool = False) -> Dict[str, Any]:
+    """Rotate all log files."""
+    manager = get_log_rotation_manager()
+    return manager.rotate_logs(force)
+
+
+def cleanup_old_logs() -> Dict[str, Any]:
+    """Clean up old log files."""
+    manager = get_log_rotation_manager()
+    return manager.cleanup_old_logs()
+
+
+def get_log_statistics() -> Dict[str, Any]:
+    """Get log file statistics."""
+    manager = get_log_rotation_manager()
+    return manager.get_log_statistics()
