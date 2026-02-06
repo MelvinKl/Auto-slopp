@@ -1,0 +1,97 @@
+auto_update_reboot:
+  change_detection_interval_minutes: 5
+  emergency_override: false
+  enabled: false
+  maintenance_mode: false
+  max_reboot_attempts_per_day: 3
+  reboot_cooldown_minutes: 60
+  reboot_delay_seconds: 30
+  safe_reboot:
+    business_hours_end: '17:00'
+    business_hours_start: 09:00
+    countdown_check_interval: 30
+    create_pre_reboot_backup: true
+    enhanced_state_logging: true
+    graceful_shutdown_enabled: true
+    graceful_shutdown_timeout: 30
+    maintenance_window_end: 04:00
+    maintenance_window_start: 02:00
+    max_degraded_critical_services: 2
+    max_disk_usage_percent: 85
+    max_failed_services: 5
+    max_memory_usage_percent: 85
+    max_system_load_multiplier: 2.0
+    monitor_during_countdown: true
+    stop_non_critical_services: true
+    sync_filesystems: true
+beads_updater:
+  backup_retention_days: 30
+  cleanup_temp_files: true
+  default_conflict_strategy: newest
+  default_max_retries: 3
+  default_sync_mode: auto
+  enable_detailed_reporting: true
+  lock_timeout_minutes: 30
+branch_protection:
+  enable_protection: true
+  protect_current_branch: true
+  protected_branches:
+  - main
+  - master
+  - develop
+  - staging
+  - production
+  protection_patterns:
+  - keep-*
+  - protected-*
+  - temp-*
+  - backup-*
+  require_confirmation: true
+  require_explicit_confirmation_for:
+  - main
+  - master
+  - develop
+  - staging
+  - production
+  show_warnings: true
+git:
+  network_timeout_seconds: 60
+  retry_attempts: 3
+  retry_delay_seconds: 5
+  timeout_seconds: 30
+logging:
+  log_directory: ~/git/Auto-logs
+  log_level: INFO
+  log_max_files: 5
+  log_max_size_mb: 10
+  log_retention_days: 30
+  timestamp_format: default
+  timestamp_timezone: local
+managed_repo_path: ~/git/managed
+managed_repo_task_path: ~/git/repo_task_path
+sleep_duration: 100
+telegram:
+  api_timeout_seconds: 10
+  bot_token: ''
+  connection_retries: 3
+  default_chat_id: '7649674603'
+  enabled: true
+  formatting:
+    include_log_level: true
+    include_script_name: true
+    include_timestamp: true
+    max_message_length: 4000
+    parse_mode: HTML
+    use_emoji_indicators: true
+  rate_limiting:
+    backoff_multiplier: 2.0
+    burst_size: 20
+    max_backoff_seconds: 30
+    messages_per_second: 5
+    rate_limit_window_seconds: 60
+  security:
+    audit_token_access: true
+    encrypt_config_storage: true
+    hide_tokens_in_logs: true
+    require_https: true
+    validate_bot_token: true
