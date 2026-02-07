@@ -104,7 +104,7 @@ class TelegramHandler(logging.Handler):
         """
         try:
             message = self.format(record)
-            
+
             # Escape HTML characters if using HTML parse mode
             if self.parse_mode == "HTML":
                 message = self._escape_html(message)
@@ -160,7 +160,7 @@ class TelegramHandler(logging.Handler):
 
     def close(self) -> None:
         """Close the HTTP client."""
-        if hasattr(self, 'client'):
+        if hasattr(self, "client"):
             try:
                 loop = asyncio.get_running_loop()
                 asyncio.create_task(self.client.aclose())
@@ -173,9 +173,7 @@ class TelegramHandler(logging.Handler):
 
 
 def setup_telegram_logging(
-    level: int = logging.INFO,
-    format_string: Optional[str] = None,
-    **handler_kwargs
+    level: int = logging.INFO, format_string: Optional[str] = None, **handler_kwargs
 ) -> Optional[logging.Handler]:
     """Set up Telegram logging handler.
 
@@ -202,18 +200,14 @@ def setup_telegram_logging(
         parse_mode=settings.telegram_parse_mode,
         disable_web_page_preview=settings.telegram_disable_web_page_preview,
         disable_notification=settings.telegram_disable_notification,
-        **handler_kwargs
+        **handler_kwargs,
     )
 
     handler.setLevel(level)
 
     if format_string is None:
-        format_string = (
-            "<b>{levelname}</b> ({name})\n"
-            "Message: {message}\n"
-            "Time: {asctime}"
-        )
-    
+        format_string = "<b>{levelname}</b> ({name})\n" "Message: {message}\n" "Time: {asctime}"
+
     formatter = logging.Formatter(format_string, style="{")
     handler.setFormatter(formatter)
 

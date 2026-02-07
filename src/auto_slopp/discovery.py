@@ -24,7 +24,7 @@ def discover_workers(search_path: Path) -> List[Type[Worker]]:
     """
     import sys
     import types
-    
+
     workers: List[Type[Worker]] = []
 
     if not search_path.exists() or not search_path.is_dir():
@@ -33,7 +33,7 @@ def discover_workers(search_path: Path) -> List[Type[Worker]]:
     # Add the search path to sys.path temporarily
     search_path_str = str(search_path.resolve())
     original_path = sys.path[:]
-    
+
     try:
         if search_path_str not in sys.path:
             sys.path.insert(0, search_path_str)
@@ -58,7 +58,7 @@ def discover_workers(search_path: Path) -> List[Type[Worker]]:
                         module_name = search_path.name
                     else:
                         module_name = str(relative_dir).replace("/", ".")
-                    
+
                     if module_name:
                         module = importlib.import_module(module_name)
                     else:
@@ -72,10 +72,12 @@ def discover_workers(search_path: Path) -> List[Type[Worker]]:
                 # Find all Worker subclasses in the module
                 for name, obj in inspect.getmembers(module, inspect.isclass):
                     module_check = module_path or ""
-                    if (issubclass(obj, Worker) and 
-                        obj is not Worker and 
-                        obj.__module__.endswith(module_check) and
-                        not inspect.isabstract(obj)):
+                    if (
+                        issubclass(obj, Worker)
+                        and obj is not Worker
+                        and obj.__module__.endswith(module_check)
+                        and not inspect.isabstract(obj)
+                    ):
                         workers.append(obj)
 
             except (ImportError, SyntaxError, AttributeError) as e:
@@ -106,7 +108,7 @@ def _file_to_module_path(file_path: Path, search_path: Path) -> Optional[str]:
 
         # Remove .py extension and convert to module path
         module_path = relative_path.with_suffix("").as_posix().replace("/", ".")
-        
+
         # Handle __init__.py files - they represent the package itself
         if module_path == "__init__":
             module_path = ""

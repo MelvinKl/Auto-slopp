@@ -84,15 +84,15 @@ from typing import Any
 
 class MyCustomWorker(Worker):
     """Custom worker for my specific automation task."""
-    
+
     def run(self, repo_path: Path, task_path: Path) -> Any:
         """
         Execute the worker's automation task.
-        
+
         Args:
             repo_path: Path to the repository directory
             task_path: Path to the task directory or file
-            
+
         Returns:
             Any result data from the worker execution
         """
@@ -103,7 +103,7 @@ class MyCustomWorker(Worker):
             "task": str(task_path),
             "processed_items": 42
         }
-        
+
         return result
 ```
 
@@ -117,11 +117,11 @@ from typing import Any, Dict
 
 class ConfigurableWorker(Worker):
     """Worker that accepts configuration during initialization."""
-    
+
     def __init__(self, max_items: int = 100, enable_logging: bool = True):
         """
         Initialize the configurable worker.
-        
+
         Args:
             max_items: Maximum number of items to process
             enable_logging: Whether to enable detailed logging
@@ -129,15 +129,15 @@ class ConfigurableWorker(Worker):
         self.max_items = max_items
         self.enable_logging = enable_logging
         self.logger = logging.getLogger("auto_slopp.workers.ConfigurableWorker")
-    
+
     def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
         """Process items with configurable limits."""
         if self.enable_logging:
             self.logger.info(f"Processing up to {self.max_items} items")
-        
+
         # Implementation logic here
         processed_items = min(42, self.max_items)  # Example processing
-        
+
         return {
             "worker_name": "ConfigurableWorker",
             "processed_items": processed_items,
@@ -199,16 +199,16 @@ heartbeat = HeartbeatWorker(message="Custom service is running")
 ```python
 class Worker(ABC):
     """Abstract base class for all worker implementations."""
-    
+
     @abstractmethod
     def run(self, repo_path: Path, task_path: Path) -> Any:
         """
         Execute the worker's automation task.
-        
+
         Args:
             repo_path: Path to the repository directory
             task_path: Path to the task directory or file
-            
+
         Returns:
             Any result data from the worker execution
         """
@@ -225,11 +225,11 @@ class Settings(BaseSettings):
     base_repo_path: Path = Field(default_factory=lambda: Path.cwd())
     base_task_path: Path = Field(default_factory=lambda: Path.cwd() / "tasks")
     worker_search_path: Path = Field(default_factory=lambda: Path(__file__).parent.parent)
-    
+
     # Execution
     executor_sleep_interval: float = Field(default=1.0)
     debug: bool = Field(default=False)
-    
+
     # Telegram integration
     telegram_enabled: bool = Field(default=False)
     telegram_bot_token: Optional[str] = Field(default=None)

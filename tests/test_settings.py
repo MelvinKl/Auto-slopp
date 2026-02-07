@@ -19,7 +19,7 @@ class TestSettings:
         # Arrange - Create settings instance without environment variables
         with patch.dict(os.environ, {}, clear=True):
             test_settings = Settings()
-            
+
         # Act & Assert - Check default values
         assert test_settings.base_repo_path == Path.cwd()
         assert test_settings.base_task_path == Path.cwd() / "tasks"
@@ -54,10 +54,10 @@ class TestSettings:
             "AUTO_SLOPP_TELEGRAM_DISABLE_WEB_PAGE_PREVIEW": "false",
             "AUTO_SLOPP_TELEGRAM_DISABLE_NOTIFICATION": "true",
         }
-        
+
         with patch.dict(os.environ, env_vars, clear=True):
             test_settings = Settings()
-            
+
         # Act & Assert - Check that environment variables are loaded
         assert test_settings.base_repo_path == Path("/custom/repo")
         assert test_settings.base_task_path == Path("/custom/tasks")
@@ -83,11 +83,11 @@ AUTO_SLOPP_TELEGRAM_BOT_TOKEN=env_file_token
 AUTO_SLOPP_TELEGRAM_CHAT_ID=env_file_chat
 AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=0.5
 """
-        
+
         with tempfile.TemporaryDirectory() as tmp_dir:
             env_file = Path(tmp_dir) / ".env"
             env_file.write_text(env_content)
-            
+
             # Change to temp directory and create settings
             original_cwd = Path.cwd()
             try:
@@ -96,7 +96,7 @@ AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=0.5
                     test_settings = Settings()
             finally:
                 os.chdir(original_cwd)
-            
+
             # Act & Assert - Check values from .env file
             assert test_settings.debug is True
             assert test_settings.telegram_enabled is True
@@ -111,10 +111,10 @@ AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=0.5
             "AUTO_SLOPP_BASE_REPO_PATH": "/test/repo",
             "AUTO_SLOPP_BASE_TASK_PATH": "/test/tasks",
         }
-        
+
         with patch.dict(os.environ, env_vars, clear=True):
             test_settings = Settings()
-            
+
         # Act & Assert - Check that paths are Path objects
         assert isinstance(test_settings.base_repo_path, Path)
         assert isinstance(test_settings.base_task_path, Path)
@@ -131,7 +131,7 @@ AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=0.5
             {"AUTO_SLOPP_TELEGRAM_RETRY_ATTEMPTS": "not_an_integer"},  # Should be int
             {"AUTO_SLOPP_TELEGRAM_RETRY_DELAY": "not_a_number"},  # Should be float
         ]
-        
+
         # Act & Assert - Each invalid case should raise ValidationError
         for env_vars in invalid_cases:
             with patch.dict(os.environ, env_vars, clear=True):
@@ -148,7 +148,7 @@ AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=0.5
             {"AUTO_SLOPP_TELEGRAM_RETRY_ATTEMPTS": "-1"},
             {"AUTO_SLOPP_TELEGRAM_RETRY_DELAY": "-0.5"},
         ]
-        
+
         # Act & Assert - These should be valid since no constraints are specified
         for env_vars in constraint_cases:
             with patch.dict(os.environ, env_vars, clear=True):
@@ -160,7 +160,7 @@ AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=0.5
         """Test that worker_search_path defaults to correct location."""
         with patch.dict(os.environ, {}, clear=True):
             test_settings = Settings()
-            
+
         # The settings file is in src/settings/main.py, so parent.parent is src/
         expected_path = Path(__file__).parent.parent / "src"
         assert test_settings.worker_search_path == expected_path
@@ -169,7 +169,7 @@ AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=0.5
         """Test that telegram_api_url contains token placeholder."""
         with patch.dict(os.environ, {}, clear=True):
             test_settings = Settings()
-            
+
         # Act & Assert - Check URL template
         assert "{token}" in test_settings.telegram_api_url
         assert test_settings.telegram_api_url.startswith("https://api.telegram.org/bot")
@@ -181,10 +181,10 @@ AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=0.5
             "AUTO_SLOPP_DEBUG": "true",
             "AUTO_SLOPP_TELEGRAM_ENABLED": "true",
         }
-        
+
         with patch.dict(os.environ, env_vars, clear=True):
             test_settings = Settings()
-            
+
         # Act & Assert - Check that specified values are overridden, others use defaults
         assert test_settings.debug is True  # Overridden
         assert test_settings.telegram_enabled is True  # Overridden
@@ -196,9 +196,10 @@ AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=0.5
         """Test that the global settings instance is available."""
         # Act & Assert - Check that global settings instance exists
         from settings.main import settings
+
         assert isinstance(settings, Settings)
-        assert hasattr(settings, 'base_repo_path')
-        assert hasattr(settings, 'telegram_enabled')
+        assert hasattr(settings, "base_repo_path")
+        assert hasattr(settings, "telegram_enabled")
 
     def test_env_prefix(self):
         """Test that environment variables use correct prefix."""
@@ -207,10 +208,10 @@ AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=0.5
             "AUTO_SLOPP_DEBUG": "true",
             "DEBUG": "false",  # Without prefix - should be ignored
         }
-        
+
         with patch.dict(os.environ, env_vars, clear=True):
             test_settings = Settings()
-            
+
         # Act & Assert - Only prefixed variable should be used
         assert test_settings.debug is True
 
@@ -220,10 +221,10 @@ AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=0.5
         env_vars = {
             "AUTO_SLOPP_TELEGRAM_ENABLED": "true",
         }
-        
+
         with patch.dict(os.environ, env_vars, clear=True):
             test_settings = Settings()
-            
+
         # Act & Assert - Optional fields should be None when not set
         assert test_settings.telegram_enabled is True
         assert test_settings.telegram_bot_token is None

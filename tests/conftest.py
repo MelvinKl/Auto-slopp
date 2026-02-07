@@ -10,7 +10,7 @@ import pytest
 @pytest.fixture
 def temp_dir():
     """Create a temporary directory for testing.
-    
+
     Returns:
         Path: Temporary directory path.
     """
@@ -21,59 +21,59 @@ def temp_dir():
 @pytest.fixture
 def temp_repo_dir(temp_dir):
     """Create a temporary repository directory with basic structure.
-    
+
     Args:
         temp_dir: Temporary directory fixture.
-        
+
     Returns:
         Path: Temporary repository directory path.
     """
     repo_dir = temp_dir / "test_repo"
     repo_dir.mkdir()
-    
+
     # Create some basic files
     (repo_dir / "README.md").write_text("# Test Repository")
     (repo_dir / "src").mkdir()
     (repo_dir / "src" / "main.py").write_text("print('Hello, World!')")
     (repo_dir / "tests").mkdir()
-    
+
     return repo_dir
 
 
 @pytest.fixture
 def temp_task_dir(temp_dir):
     """Create a temporary task directory with sample tasks.
-    
+
     Args:
         temp_dir: Temporary directory fixture.
-        
+
     Returns:
         Path: Temporary task directory path.
     """
     task_dir = temp_dir / "test_tasks"
     task_dir.mkdir()
-    
+
     # Create some sample task files
     (task_dir / "task1.json").write_text('{"name": "task1", "type": "test"}')
     (task_dir / "task2.txt").write_text("This is a text task file")
-    
+
     return task_dir
 
 
 @pytest.fixture
 def temp_workers_dir(temp_dir):
     """Create a temporary workers directory with sample worker files.
-    
+
     Args:
         temp_dir: Temporary directory fixture.
-        
+
     Returns:
         Path: Temporary workers directory path.
     """
     workers_dir = temp_dir / "workers"
     workers_dir.mkdir()
     (workers_dir / "__init__.py").write_text("")
-    
+
     # Create sample worker file
     worker_code = '''
 from pathlib import Path
@@ -81,19 +81,19 @@ from auto_slopp.worker import Worker
 
 class TestWorker(Worker):
     """Test worker for testing purposes."""
-    
+
     def run(self, repo_path: Path, task_path: Path) -> dict:
         return {"status": "completed", "repo": str(repo_path), "task": str(task_path)}
 '''
     (workers_dir / "test_worker.py").write_text(worker_code)
-    
+
     return workers_dir
 
 
 @pytest.fixture
 def mock_settings():
     """Create a mock settings object.
-    
+
     Returns:
         MagicMock: Mock settings object with default values.
     """
@@ -118,12 +118,12 @@ def mock_settings():
 @pytest.fixture
 def sample_log_record():
     """Create a sample log record for testing.
-    
+
     Returns:
         logging.LogRecord: Sample log record.
     """
     import logging
-    
+
     return logging.LogRecord(
         name="test_logger",
         level=logging.INFO,
@@ -131,5 +131,5 @@ def sample_log_record():
         lineno=42,
         msg="Test log message",
         args=(),
-        exc_info=None
+        exc_info=None,
     )
