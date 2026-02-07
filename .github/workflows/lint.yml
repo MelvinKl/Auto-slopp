@@ -19,7 +19,14 @@ jobs:
         python-version: "3.14"
 
     - name: Install dependencies
-      run: make dev-install
+      run: |
+        python --version
+        make --version || true
+        pip install --upgrade pip
+        pip install -e .[dev]
 
     - name: Run linting checks
-      run: make lint
+      run: |
+        echo "=== Checking tools ==="
+        which black isort flake8 || true
+        make lint
