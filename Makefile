@@ -32,7 +32,7 @@ lint:
 	@echo "Make: $$(make --version 2>/dev/null || echo 'make not found')"
 	@echo "Working directory: $$(pwd)"
 	@echo "Available tools:"
-	@which black isort flake8 || echo 'Some tools missing'"
+	@which black isort flake8 || echo "Some tools missing""
 	@echo "Running black..."
 	black --check --diff src/ tests/ || (echo "❌ Black formatting check failed" && exit 1)
 	@echo "✅ Black formatting check passed"
