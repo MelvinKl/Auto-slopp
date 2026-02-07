@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from auto_slopp.example_workers import (
+from auto_slopp.workers import (
     BeadsTaskWorker,
     DirectoryScanner,
     FileMonitor,

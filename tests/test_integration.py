@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from auto_slopp.example_workers import (
+from auto_slopp.workers import (
     BeadsTaskWorker,
     OpenAgentWorker,
     SimpleLogger,
@@ -124,7 +124,7 @@ class TestCIIntegration:
             (temp_repo_dir / f"source_{i}.py").write_text(f"# Source file {i}\nprint('Hello {i}')")
             (temp_repo_dir / f"data_{i}.json").write_text(f'{{"id": {i}, "data": "test"}}')
 
-        from auto_slopp.example_workers import DirectoryScanner, FileMonitor
+        from auto_slopp.workers import DirectoryScanner, FileMonitor
 
         # Test file monitoring with large dataset
         file_monitor = FileMonitor()
@@ -157,7 +157,7 @@ class TestCIIntegration:
     @pytest.mark.integration
     def test_resource_cleanup_after_failure(self, temp_repo_dir, temp_task_dir):
         """Test proper resource cleanup after worker failures."""
-        from auto_slopp.example_workers import TaskProcessor
+        from auto_slopp.workers import TaskProcessor
 
         # Create files that will cause processing issues
         (temp_task_dir / "huge_file.txt").write_text("x" * (20 * 1024 * 1024))  # 20MB
@@ -176,7 +176,7 @@ class TestCIIntegration:
     @pytest.mark.integration
     def test_ci_report_generation(self, temp_repo_dir, temp_task_dir):
         """Test generation of CI reports."""
-        from auto_slopp.example_workers import DirectoryScanner, FileMonitor
+        from auto_slopp.workers import DirectoryScanner, FileMonitor
 
         # Collect comprehensive repository data
         scanner = DirectoryScanner()

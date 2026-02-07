@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 import pytest
 
-from auto_slopp.example_workers import (
+from auto_slopp.workers import (
     BeadsTaskWorker,
     DirectoryScanner,
     FileMonitor,
