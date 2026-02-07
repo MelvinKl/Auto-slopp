@@ -13,6 +13,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
     - name: Set up Python 3.14
       uses: actions/setup-python@v5
       with:
@@ -22,8 +27,7 @@ jobs:
       run: |
         python --version
         make --version || true
-        pip install --upgrade pip
-        pip install -e .[dev]
+        make dev-install
 
     - name: Verify tools and run linting
       run: |
