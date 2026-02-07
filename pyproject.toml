@@ -1,0 +1,77 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "auto-slopp"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.14"
+dependencies = [
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "coverage>=7.3.0",
+    "flake8>=6.0.0",
+    "flake8-docstrings>=1.7.0",
+    "flake8-import-order>=0.18.2",
+    "flake8-bugbear>=23.7.10",
+    "black>=23.7.0",
+    "isort>=5.12.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/auto_slopp"]
+
+[project.scripts]
+auto-slopp = "auto_slopp.main:main"
+
+[tool.black]
+line-length = 120
+target-version = ['py314']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 120
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+
+[tool.flake8]
+max-line-length = 120
+max-complexity = 8
+extend-ignore = ["E203", "W503"]
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    ".venv",
+    ".eggs",
+    "*.egg-info",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".tox",
+]
+docstring-convention = "google"

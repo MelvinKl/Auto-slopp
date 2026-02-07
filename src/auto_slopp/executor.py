@@ -1,0 +1,120 @@
+"""Endless loop executor for running Worker instances."""
+
+import sys
+import time
+import traceback
+from pathlib import Path
+from typing import Any, Optional, Type
+
+from ..settings.main import settings
+from .discovery import discover_workers
+from .worker import Worker
+
+
+class Executor:
+    """Main executor that continuously runs discovered workers.
+
+    The executor runs in an endless loop, discovering workers,
+    instantiating them with the provided paths, and executing
+    their run methods while handling exceptions gracefully.
+    """
+
+    def __init__(self, search_path: Path, repo_path: Path, task_path: Path):
+        """Initialize the executor.
+
+        Args:
+            search_path: Path to search for worker implementations
+            repo_path: Path to the repository directory
+            task_path: Path to the task directory or file
+        """
+        self.search_path = search_path
+        self.repo_path = repo_path
+        self.task_path = task_path
+        self.running = False
+
+    def start(self) -> None:
+        """Start the endless execution loop."""
+        print("Starting Auto-slopp executor...")
+        self.running = True
+
+        try:
+            while self.running:
+                self._run_iteration()
+                time.sleep(settings.executor_sleep_interval)  # Prevent tight loop
+        except KeyboardInterrupt:
+            print("\\nReceived interrupt signal, shutting down...")
+        except Exception as e:
+            print(f"Fatal error in executor: {e}")
+            traceback.print_exc()
+        finally:
+            self.running = False
+            print("Executor stopped.")
+
+    def stop(self) -> None:
+        """Stop the execution loop."""
+        self.running = False
+
+    def _run_iteration(self) -> None:
+        """Run a single iteration of worker discovery and execution."""
+        try:
+            # Discover worker classes
+            workers = discover_workers(self.search_path)
+
+            if not workers:
+                print("No workers found in this iteration")
+                return
+
+            print(f"Found {len(workers)} workers: {[w.__name__ for w in workers]}")
+
+            # Execute each worker
+            for worker_class in workers:
+                self._execute_worker(worker_class)
+
+        except Exception as e:
+            print(f"Error in iteration: {e}")
+            traceback.print_exc()
+
+    def _execute_worker(self, worker_class: Type[Worker]) -> None:
+        """Execute a single worker instance.
+
+        Args:
+            worker_class: Worker class to instantiate and execute
+        """
+        try:
+            print(f"Executing worker: {worker_class.__name__}")
+
+            # Instantiate worker
+            worker = worker_class()
+
+            # Execute worker
+            start_time = time.time()
+            result = worker.run(self.repo_path, self.task_path)
+            execution_time = time.time() - start_time
+
+            print(f"Worker {worker_class.__name__} completed in {execution_time:.2f}s")
+            if result is not None:
+                print(f"Result: {result}")
+
+        except Exception as e:
+            print(f"Error executing worker {worker_class.__name__}: {e}")
+            traceback.print_exc()
+
+
+def run_executor(
+    search_path: Optional[Path] = None,
+    repo_path: Optional[Path] = None,
+    task_path: Optional[Path] = None,
+) -> None:
+    """Run the executor with the given parameters or settings defaults.
+
+    Args:
+        search_path: Path to search for worker implementations (optional)
+        repo_path: Path to the repository directory (optional)
+        task_path: Path to the task directory or file (optional)
+    """
+    executor = Executor(
+        search_path=search_path or settings.worker_search_path,
+        repo_path=repo_path or settings.base_repo_path,
+        task_path=task_path or settings.base_task_path,
+    )
+    executor.start()
