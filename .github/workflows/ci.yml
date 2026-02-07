@@ -40,6 +40,70 @@ jobs:
         name: codecov-umbrella
         fail_ci_if_error: false
 
+  security:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
+    - name: Install dependencies
+      run: uv pip install -e .[dev]
+
+    - name: Run safety check for security vulnerabilities
+      run: |
+        source .venv/bin/activate
+        safety check --json --output safety-report.json || true
+        safety check
+
+    - name: Run bandit security linter
+      run: |
+        source .venv/bin/activate
+        bandit -r src/ -f json -o bandit-report.json || true
+        bandit -r src/
+
+    - name: Upload security reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          safety-report.json
+          bandit-report.json
+
+  performance:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
+    - name: Create virtual environment
+      run: uv venv
+
+    - name: Install dependencies
+      run: uv pip install -e .[dev]
+
+    - name: Run performance tests
+      run: |
+        source .venv/bin/activate
+        pytest -m performance -v --tb=short --junitxml=performance-results.xml
+
+    - name: Upload performance results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-results
+        path: performance-results.xml
+
   lint:
     runs-on: ubuntu-latest
 
