@@ -48,6 +48,64 @@ auto-slopp
 
 Run with custom paths:
 ```bash
+auto-slopp --repo-path /path/to/repo --task-path /path/to/tasks --search-path /path/to/workers
+```
+
+### Development
+
+The project includes a comprehensive Makefile for streamlined development and testing:
+
+#### Installation and Setup
+```bash
+# Install dependencies
+make dev-install
+
+# Format code
+make format
+
+# Run all tests and checks
+make test
+
+# Run tests with coverage
+make coverage
+
+# Run security scans
+make security
+```
+
+#### Available Makefile Targets
+
+| Target | Description |
+|---------|-------------|
+| `make help` | Show all available targets |
+| `make install` | Install production dependencies |
+| `make dev-install` | Install development dependencies |
+| `make test` | Run all tests and linting checks |
+| `make test-unit` | Run unit tests only |
+| `make test-performance` | Run performance tests |
+| `make test-integration` | Run integration tests |
+| `make lint` | Run formatting and linting checks |
+| `make format` | Format code with black and isort |
+| `make security` | Run security vulnerability scans |
+| `make coverage` | Generate test coverage report |
+| `make clean` | Clean temporary files and caches |
+| `make ci` | Full CI simulation |
+
+#### CI/CD Integration
+
+The same `make test` command is used in GitHub Actions CI/CD pipelines, ensuring consistency between local development and CI environments. All pipeline steps use the Makefile as the single source of truth for build and test operations.
+
+#### Quality Checks
+
+The `make test` target includes comprehensive validation:
+
+1. **Code Formatting**: Black code formatting validation
+2. **Import Sorting**: isort import organization checks  
+3. **Linting**: flake8 code quality checks
+4. **Security**: Safety dependency scan + Bandit security linter
+5. **Testing**: Full pytest test suite execution
+
+All checks must pass for the command to succeed, ensuring code quality and reliability before deployment.
 auto-slopp --repo-path /path/to/repo --task-path /path/to/tasks
 ```
 
