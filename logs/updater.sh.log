@@ -1,4 +1,0 @@
-[INFO] 2026-01-30 10:44:22 updater.sh:   Updating branch: ai
-[ERROR] 2026-01-30 10:44:22 updater.sh: Git command failed with exit code 1: merge origin/main -m 'Merge main into ai (automated)'
-[ERROR] 2026-01-30 10:44:22 updater.sh:   Merge failed for ai
-[SUCCESS] 2026-01-30 10:44:22 updater.sh: updater.sh completed successfully
