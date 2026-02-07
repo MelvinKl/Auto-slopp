@@ -317,10 +317,10 @@ class TestBeadsTaskWorker:
     def test_check_beads_availability_success(self, mock_run):
         """Test successful beads availability check."""
         mock_run.return_value.returncode = 0
-        
+
         worker = BeadsTaskWorker()
         available = worker._check_beads_availability(Path("/tmp"))
-        
+
         assert available is True
         mock_run.assert_called_once()
 
@@ -328,10 +328,10 @@ class TestBeadsTaskWorker:
     def test_check_beads_availability_failure(self, mock_run):
         """Test failed beads availability check."""
         mock_run.return_value.returncode = 1
-        
+
         worker = BeadsTaskWorker()
         available = worker._check_beads_availability(Path("/tmp"))
-        
+
         assert available is False
 
     @patch("subprocess.run")
@@ -343,10 +343,10 @@ class TestBeadsTaskWorker:
         ]
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = json.dumps(mock_response)
-        
+
         worker = BeadsTaskWorker()
         tasks = worker._get_ready_tasks()
-        
+
         assert len(tasks) == 2
         assert tasks[0]["id"] == "task1"
         assert tasks[1]["id"] == "task2"
@@ -361,18 +361,18 @@ class TestBeadsTaskWorker:
         ]
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = json.dumps(mock_response)
-        
+
         # Test priority filter
         worker = BeadsTaskWorker(priority_filter=1)
         tasks = worker._get_ready_tasks()
-        
+
         assert len(tasks) == 1
         assert tasks[0]["id"] == "task2"
-        
+
         # Test include_in_progress filter
         worker = BeadsTaskWorker(include_in_progress=True)
         tasks = worker._get_ready_tasks()
-        
+
         assert len(tasks) == 3  # All tasks included
 
     @patch("subprocess.run")
@@ -380,10 +380,10 @@ class TestBeadsTaskWorker:
         """Test ready tasks retrieval when command fails."""
         mock_run.return_value.returncode = 1
         mock_run.return_value.stderr = "Error occurred"
-        
+
         worker = BeadsTaskWorker()
         tasks = worker._get_ready_tasks()
-        
+
         assert len(tasks) == 0
 
     @patch("subprocess.run")
@@ -395,10 +395,10 @@ class TestBeadsTaskWorker:
         ]
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = json.dumps(mock_response)
-        
+
         worker = BeadsTaskWorker()
         tasks = worker._get_open_tasks()
-        
+
         assert len(tasks) == 2
         assert tasks[0]["id"] == "open1"
 
@@ -413,10 +413,10 @@ class TestBeadsTaskWorker:
             {"id": "task1", "status": "open", "priority": 2, "issue_type": "task"},
             {"id": "task3", "status": "open", "priority": 1, "issue_type": "feature"},
         ]
-        
+
         worker = BeadsTaskWorker()
         analysis = worker._analyze_tasks(all_tasks, ready_tasks)
-        
+
         assert analysis["status_breakdown"]["open"] == 2
         assert analysis["status_breakdown"]["in_progress"] == 1
         assert analysis["priority_breakdown"][1] == 2  # Two priority 1 tasks
@@ -432,14 +432,14 @@ class TestBeadsTaskWorker:
         """Test running worker when beads is available."""
         # Mock beads availability check
         mock_run.return_value.returncode = 0
-        
+
         # Mock ready tasks response
         ready_tasks = [{"id": "task1", "title": "Test", "status": "open", "priority": 2}]
         mock_run.return_value.stdout = json.dumps(ready_tasks)
-        
+
         worker = BeadsTaskWorker()
         result = worker.run(Path("/tmp"), Path("dummy_task"))
-        
+
         assert result["worker_name"] == "BeadsTaskWorker"
         assert result["beads_available"] is True
         assert result["ready_tasks_count"] == 1
@@ -450,10 +450,10 @@ class TestBeadsTaskWorker:
         """Test running worker when beads is not available."""
         # Mock beads availability check failure
         mock_run.return_value.returncode = 1
-        
+
         worker = BeadsTaskWorker()
         result = worker.run(Path("/tmp"), Path("dummy_task"))
-        
+
         assert result["worker_name"] == "BeadsTaskWorker"
         assert "error" in result
         assert "not available" in result["error"]
@@ -475,12 +475,7 @@ class TestOpenAgentWorker:
         """Test initialization with custom parameters."""
         args = ["--help", "--verbose"]
         work_dir = Path("/custom/dir")
-        worker = OpenAgentWorker(
-            agent_args=args,
-            timeout=60,
-            capture_output=False,
-            working_dir=work_dir
-        )
+        worker = OpenAgentWorker(agent_args=args, timeout=60, capture_output=False, working_dir=work_dir)
         assert worker.agent_args == args
         assert worker.timeout == 60
         assert worker.capture_output is False
@@ -492,10 +487,10 @@ class TestOpenAgentWorker:
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = "OpenAgent output"
         mock_run.return_value.stderr = ""
-        
+
         worker = OpenAgentWorker(agent_args=["--version"])
         result = worker.run(Path("/tmp"), Path("dummy_task"))
-        
+
         assert result["worker_name"] == "OpenAgentWorker"
         assert result["success"] is True
         assert result["return_code"] == 0
@@ -509,13 +504,13 @@ class TestOpenAgentWorker:
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = "Success"
         mock_run.return_value.stderr = ""
-        
+
         task_path = Path("/tmp/task_file.txt")
         task_path.write_text("task content")  # Create the file
-        
+
         worker = OpenAgentWorker(agent_args=["--process"])
         result = worker.run(Path("/tmp"), task_path)
-        
+
         # Check that task path was added to command
         assert str(task_path) in result["command"]
         mock_run.assert_called_once()
@@ -528,10 +523,10 @@ class TestOpenAgentWorker:
         mock_run.return_value.returncode = 1
         mock_run.return_value.stdout = ""
         mock_run.return_value.stderr = "Error message"
-        
+
         worker = OpenAgentWorker()
         result = worker.run(Path("/tmp"), Path("dummy_task"))
-        
+
         assert result["success"] is False
         assert result["return_code"] == 1
         assert result["stderr"] == "Error message"
@@ -540,11 +535,12 @@ class TestOpenAgentWorker:
     def test_run_timeout(self, mock_run):
         """Test OpenAgent execution timeout."""
         import subprocess
+
         mock_run.side_effect = subprocess.TimeoutExpired("openagent", 300)
-        
+
         worker = OpenAgentWorker(timeout=300)
         result = worker.run(Path("/tmp"), Path("dummy_task"))
-        
+
         assert result["success"] is False
         assert result["timeout"] is True
         assert "timed out" in result["error"]
@@ -553,10 +549,10 @@ class TestOpenAgentWorker:
     def test_run_command_not_found(self, mock_run):
         """Test OpenAgent execution when command is not found."""
         mock_run.side_effect = FileNotFoundError()
-        
+
         worker = OpenAgentWorker()
         result = worker.run(Path("/tmp"), Path("dummy_task"))
-        
+
         assert result["success"] is False
         assert result["return_code"] == -1
         assert "not found" in result["error"]
@@ -567,11 +563,11 @@ class TestOpenAgentWorker:
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = "Success"
         mock_run.return_value.stderr = ""
-        
+
         custom_dir = Path("/custom/working/dir")
         worker = OpenAgentWorker(working_dir=custom_dir)
         result = worker.run(Path("/tmp"), Path("dummy_task"))
-        
+
         assert result["working_directory"] == str(custom_dir)
         mock_run.assert_called_once()
         # Verify the working directory was passed correctly
@@ -581,10 +577,10 @@ class TestOpenAgentWorker:
     def test_run_without_output_capture(self, mock_run):
         """Test OpenAgent execution without output capture."""
         mock_run.return_value.returncode = 0
-        
+
         worker = OpenAgentWorker(capture_output=False)
         result = worker.run(Path("/tmp"), Path("dummy_task"))
-        
+
         assert result["success"] is True
         assert "stdout" not in result
         assert "stderr" not in result
@@ -595,10 +591,10 @@ class TestOpenAgentWorker:
     def test_run_with_exception(self, mock_run):
         """Test OpenAgent execution with unexpected exception."""
         mock_run.side_effect = Exception("Unexpected error")
-        
+
         worker = OpenAgentWorker()
         result = worker.run(Path("/tmp"), Path("dummy_task"))
-        
+
         assert result["success"] is False
         assert result["return_code"] == -1
         assert "Unexpected error" in result["error"]

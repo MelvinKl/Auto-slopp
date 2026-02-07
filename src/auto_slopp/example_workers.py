@@ -301,10 +301,18 @@ class DirectoryScanner(Worker):
         self.logger.info(f"DirectoryScanner scanning repository: {repo_path}")
 
         if not repo_path.exists():
-            return {"worker_name": "DirectoryScanner", "error": "Repository path does not exist", "repo_path": str(repo_path)}
+            return {
+                "worker_name": "DirectoryScanner",
+                "error": "Repository path does not exist",
+                "repo_path": str(repo_path),
+            }
 
         if not repo_path.is_dir():
-            return {"worker_name": "DirectoryScanner", "error": "Repository path is not a directory", "repo_path": str(repo_path)}
+            return {
+                "worker_name": "DirectoryScanner",
+                "error": "Repository path is not a directory",
+                "repo_path": str(repo_path),
+            }
 
         # Perform directory scanning
         scan_results = self._scan_directory(repo_path)
@@ -320,10 +328,12 @@ class DirectoryScanner(Worker):
                 "include_hidden": self.include_hidden,
                 "max_depth": self.max_depth,
             },
-            **scan_results
+            **scan_results,
         }
 
-        self.logger.info(f"DirectoryScanner completed in {execution_time:.2f}s, found {result['total_directories']} directories and {result['total_files']} files")
+        self.logger.info(
+            f"DirectoryScanner completed in {execution_time:.2f}s, found {result['total_directories']} directories and {result['total_files']} files"
+        )
         return result
 
     def _scan_directory(self, root_path: Path) -> Dict[str, Any]:
@@ -470,7 +480,7 @@ class BeadsTaskWorker(Worker):
 
         # Get ready tasks
         ready_tasks = self._get_ready_tasks()
-        
+
         # Get all open tasks for analysis
         all_open_tasks = self._get_open_tasks()
 
@@ -491,7 +501,9 @@ class BeadsTaskWorker(Worker):
             "task_analysis": task_analysis,
         }
 
-        self.logger.info(f"BeadsTaskWorker found {len(ready_tasks)} ready tasks out of {len(all_open_tasks)} total open tasks")
+        self.logger.info(
+            f"BeadsTaskWorker found {len(ready_tasks)} ready tasks out of {len(all_open_tasks)} total open tasks"
+        )
         return result
 
     def _check_beads_availability(self, repo_path: Path) -> bool:
@@ -506,15 +518,10 @@ class BeadsTaskWorker(Worker):
         try:
             # Try to run a simple beads command to check availability
             import subprocess
-            result = subprocess.run(
-                ["bd", "--help"],
-                cwd=repo_path,
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
+
+            result = subprocess.run(["bd", "--help"], cwd=repo_path, capture_output=True, text=True, timeout=10)
             return result.returncode == 0
-        except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        except subprocess.TimeoutExpired, FileNotFoundError, Exception:
             return False
 
     def _get_ready_tasks(self) -> List[Dict[str, Any]]:
@@ -524,36 +531,31 @@ class BeadsTaskWorker(Worker):
             List of ready task dictionaries.
         """
         try:
-            result = subprocess.run(
-                ["bd", "ready", "--json"],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            
+            result = subprocess.run(["bd", "ready", "--json"], capture_output=True, text=True, timeout=30)
+
             if result.returncode == 0:
                 tasks = json.loads(result.stdout)
-                
+
                 # Apply filters
                 filtered_tasks = []
                 for task in tasks:
                     # Skip in-progress tasks if not included
                     if not self.include_in_progress and task.get("status") == "in_progress":
                         continue
-                    
+
                     # Apply priority filter
                     if self.priority_filter is not None:
                         task_priority = task.get("priority", 2)
                         if task_priority != self.priority_filter:
                             continue
-                    
+
                     filtered_tasks.append(task)
-                
+
                 return filtered_tasks
             else:
                 self.logger.error(f"bd ready command failed: {result.stderr}")
                 return []
-                
+
         except (subprocess.TimeoutExpired, json.JSONDecodeError, Exception) as e:
             self.logger.error(f"Error getting ready tasks: {str(e)}")
             return []
@@ -566,18 +568,15 @@ class BeadsTaskWorker(Worker):
         """
         try:
             result = subprocess.run(
-                ["bd", "list", "--status", "open", "--json"],
-                capture_output=True,
-                text=True,
-                timeout=30
+                ["bd", "list", "--status", "open", "--json"], capture_output=True, text=True, timeout=30
             )
-            
+
             if result.returncode == 0:
                 return json.loads(result.stdout)
             else:
                 self.logger.error(f"bd list command failed: {result.stderr}")
                 return []
-                
+
         except (subprocess.TimeoutExpired, json.JSONDecodeError, Exception) as e:
             self.logger.error(f"Error getting open tasks: {str(e)}")
             return []
@@ -596,27 +595,27 @@ class BeadsTaskWorker(Worker):
         status_counts = {}
         priority_counts = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
         type_counts = {}
-        
+
         for task in all_tasks:
             # Count by status
             status = task.get("status", "unknown")
             status_counts[status] = status_counts.get(status, 0) + 1
-            
+
             # Count by priority
             priority = task.get("priority", 2)
             if 0 <= priority <= 4:
                 priority_counts[priority] += 1
-            
+
             # Count by type
             task_type = task.get("issue_type", "unknown")
             type_counts[task_type] = type_counts.get(task_type, 0) + 1
-        
+
         # Calculate readiness percentage
         ready_percentage = (len(ready_tasks) / len(all_tasks) * 100) if all_tasks else 0
-        
+
         # Find high priority ready tasks
         high_priority_ready = [task for task in ready_tasks if task.get("priority", 2) <= 1]
-        
+
         return {
             "status_breakdown": status_counts,
             "priority_breakdown": priority_counts,
@@ -636,11 +635,13 @@ class OpenAgentWorker(Worker):
     captures output, and provides execution status and results.
     """
 
-    def __init__(self, 
-                 agent_args: Optional[List[str]] = None,
-                 timeout: int = 300,
-                 capture_output: bool = True,
-                 working_dir: Optional[Path] = None):
+    def __init__(
+        self,
+        agent_args: Optional[List[str]] = None,
+        timeout: int = 300,
+        capture_output: bool = True,
+        working_dir: Optional[Path] = None,
+    ):
         """Initialize the OpenAgent worker.
 
         Args:
@@ -671,10 +672,10 @@ class OpenAgentWorker(Worker):
 
         # Determine working directory
         work_dir = self.working_dir or repo_path
-        
+
         # Build command
         cmd = ["openagent"] + self.agent_args
-        
+
         # Add task path to arguments if provided
         if task_path and task_path.exists():
             cmd.extend([str(task_path)])
@@ -682,11 +683,7 @@ class OpenAgentWorker(Worker):
         try:
             # Execute the command
             result = subprocess.run(
-                cmd,
-                cwd=work_dir,
-                capture_output=self.capture_output,
-                text=True,
-                timeout=self.timeout
+                cmd, cwd=work_dir, capture_output=self.capture_output, text=True, timeout=self.timeout
             )
 
             execution_time = time.time() - start_time
@@ -707,12 +704,14 @@ class OpenAgentWorker(Worker):
 
             # Add output if captured
             if self.capture_output:
-                execution_result.update({
-                    "stdout": result.stdout,
-                    "stderr": result.stderr,
-                    "stdout_lines": result.stdout.splitlines() if result.stdout else [],
-                    "stderr_lines": result.stderr.splitlines() if result.stderr else [],
-                })
+                execution_result.update(
+                    {
+                        "stdout": result.stdout,
+                        "stderr": result.stderr,
+                        "stdout_lines": result.stdout.splitlines() if result.stdout else [],
+                        "stderr_lines": result.stderr.splitlines() if result.stderr else [],
+                    }
+                )
 
             self.logger.info(f"OpenAgentWorker completed in {execution_time:.2f}s with return code {result.returncode}")
             return execution_result
@@ -720,7 +719,7 @@ class OpenAgentWorker(Worker):
         except subprocess.TimeoutExpired:
             execution_time = time.time() - start_time
             self.logger.error(f"OpenAgentWorker timed out after {self.timeout}s")
-            
+
             return {
                 "worker_name": "OpenAgentWorker",
                 "execution_time": execution_time,
@@ -738,7 +737,7 @@ class OpenAgentWorker(Worker):
         except FileNotFoundError:
             execution_time = time.time() - start_time
             self.logger.error("OpenAgent command not found")
-            
+
             return {
                 "worker_name": "OpenAgentWorker",
                 "execution_time": execution_time,
@@ -756,7 +755,7 @@ class OpenAgentWorker(Worker):
         except Exception as e:
             execution_time = time.time() - start_time
             self.logger.error(f"OpenAgentWorker failed with error: {str(e)}")
-            
+
             return {
                 "worker_name": "OpenAgentWorker",
                 "execution_time": execution_time,

@@ -545,6 +545,7 @@ class TestTelegramPerformance:
                 await asyncio.gather(*tasks, return_exceptions=True)
 
             import time
+
             start_time = time.time()
             asyncio.run(send_concurrent())
             end_time = time.time()
@@ -569,7 +570,7 @@ class TestTelegramPerformance:
         ):
             handler = TelegramHandler()
             handler.setFormatter(logging.Formatter("%(message)s"))
-            
+
             # Create a large message (close to Telegram's 4096 character limit)
             large_message = "A" * 4000
 
@@ -601,12 +602,12 @@ class TestTelegramPerformance:
         mock_client_class.return_value = mock_client
         mock_response = AsyncMock()
         mock_response.raise_for_status = AsyncMock()
-        
+
         # Add a small delay to simulate network latency
         async def delayed_post(*args, **kwargs):
             await asyncio.sleep(0.1)  # 100ms delay
             return mock_response
-        
+
         mock_client.post.side_effect = delayed_post
 
         with patch.dict(
@@ -629,6 +630,7 @@ class TestTelegramPerformance:
 
             # Act - Measure sending time
             import time
+
             start_time = time.time()
             asyncio.run(handler._send_message_async(record))
             end_time = time.time()
@@ -671,7 +673,7 @@ class TestTelegramErrorScenarios:
             with patch("auto_slopp.telegram_handler.logging.getLogger") as mock_logger:
                 mock_error_logger = MagicMock()
                 mock_logger.return_value = mock_error_logger
-                
+
                 handler.emit(record)  # Should not raise exception
 
             # Assert - Should retry and log error but not raise exception
@@ -684,7 +686,7 @@ class TestTelegramErrorScenarios:
         # Arrange - Mock HTTP client with auth error
         mock_client = AsyncMock()
         mock_client_class.return_value = mock_client
-        
+
         auth_response = MagicMock()
         auth_response.status_code = 401
         auth_error = httpx.HTTPStatusError("Unauthorized", request=MagicMock(), response=auth_response)
@@ -712,7 +714,7 @@ class TestTelegramErrorScenarios:
             with patch("auto_slopp.telegram_handler.logging.getLogger") as mock_logger:
                 mock_error_logger = MagicMock()
                 mock_logger.return_value = mock_error_logger
-                
+
                 handler.emit(record)  # Should not raise exception
 
             # Assert - Should log error but not retry (auth errors are not retryable)
@@ -725,7 +727,7 @@ class TestTelegramErrorScenarios:
         # Arrange - Mock HTTP client with 404 error
         mock_client = AsyncMock()
         mock_client_class.return_value = mock_client
-        
+
         not_found_response = MagicMock()
         not_found_response.status_code = 404
         not_found_error = httpx.HTTPStatusError("Chat not found", request=MagicMock(), response=not_found_response)
@@ -753,7 +755,7 @@ class TestTelegramErrorScenarios:
             with patch("auto_slopp.telegram_handler.logging.getLogger") as mock_logger:
                 mock_error_logger = MagicMock()
                 mock_logger.return_value = mock_error_logger
-                
+
                 handler.emit(record)  # Should not raise exception
 
             # Assert - Should log error but not retry (404 errors are not retryable)
@@ -790,7 +792,7 @@ class TestTelegramErrorScenarios:
             with patch("auto_slopp.telegram_handler.logging.getLogger") as mock_logger:
                 mock_error_logger = MagicMock()
                 mock_logger.return_value = mock_error_logger
-                
+
                 handler.emit(record)  # Should not raise exception
 
             # Assert - Should retry connection errors
@@ -894,7 +896,7 @@ class TestTelegramConfigurationValidation:
         mock_client.post.return_value = mock_response
 
         parse_modes = ["HTML", "Markdown", None, ""]
-        
+
         for parse_mode in parse_modes:
             with patch.dict(
                 "auto_slopp.telegram_handler.settings.__dict__",
@@ -920,7 +922,7 @@ class TestTelegramConfigurationValidation:
                 # Assert - Check payload
                 call_args = mock_client.post.call_args
                 payload = call_args.kwargs["json"]
-                
+
                 if parse_mode:
                     assert payload.get("parse_mode") == parse_mode
                 else:
@@ -929,13 +931,13 @@ class TestTelegramConfigurationValidation:
     def test_setup_with_custom_format_string(self):
         """Test setup_telegram_logging with custom format string."""
         custom_format = "CUSTOM: {levelname} - {message} - {asctime}"
-        
+
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
             {"telegram_enabled": True, "telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
         ):
             handler = setup_telegram_logging(format_string=custom_format)
-            
+
             assert handler is not None
             assert isinstance(handler, TelegramHandler)
             formatter = handler.formatter
@@ -962,17 +964,27 @@ class TestTelegramConfigurationValidation:
 
             # Create log records at different levels
             warning_record = logging.LogRecord(
-                name="test_logger", level=logging.WARNING, pathname="", lineno=0,
-                msg="Warning message", args=(), exc_info=None,
+                name="test_logger",
+                level=logging.WARNING,
+                pathname="",
+                lineno=0,
+                msg="Warning message",
+                args=(),
+                exc_info=None,
             )
             error_record = logging.LogRecord(
-                name="test_logger", level=logging.ERROR, pathname="", lineno=0,
-                msg="Error message", args=(), exc_info=None,
+                name="test_logger",
+                level=logging.ERROR,
+                pathname="",
+                lineno=0,
+                msg="Error message",
+                args=(),
+                exc_info=None,
             )
 
             # Act - Send messages that should pass through
-            handler.emit(warning_record) # Should pass through
-            handler.emit(error_record)   # Should pass through
+            handler.emit(warning_record)  # Should pass through
+            handler.emit(error_record)  # Should pass through
 
             # Wait for async processing
             asyncio.run(asyncio.sleep(0.1))
@@ -1001,17 +1013,17 @@ class TestTelegramEndToEnd:
             # Act - Set up logger
             logger = logging.getLogger("test_e2e")
             logger.setLevel(logging.DEBUG)
-            
+
             telegram_handler = setup_telegram_logging(level=logging.INFO)
             assert telegram_handler is not None
             logger.addHandler(telegram_handler)
 
             # Send various types of log messages
             logger.debug("Debug message")  # Should be filtered
-            logger.info("Info message")   # Should be sent
+            logger.info("Info message")  # Should be sent
             logger.warning("Warning message")  # Should be sent
             logger.error("Error message")  # Should be sent
-            
+
             # Log with exception
             try:
                 raise ValueError("Test exception")
@@ -1027,7 +1039,7 @@ class TestTelegramEndToEnd:
             # Verify message content
             calls = mock_client.post.call_args_list
             messages = [call.kwargs["json"]["text"] for call in calls]
-            
+
             assert any("Info message" in msg for msg in messages)
             assert any("Warning message" in msg for msg in messages)
             assert any("Error message" in msg for msg in messages)
@@ -1094,20 +1106,20 @@ class TestTelegramEndToEnd:
         ):
             logger = logging.getLogger("test_dynamic")
             logger.setLevel(logging.INFO)
-            
+
             # Act - Add handler, log messages, remove handler, log more
             telegram_handler = setup_telegram_logging()
             assert telegram_handler is not None
             logger.addHandler(telegram_handler)
-            
+
             logger.info("Message with handler")
             asyncio.run(asyncio.sleep(0.1))
-            
+
             # Remove handler
             logger.removeHandler(telegram_handler)
             logger.info("Message without handler")
             asyncio.run(asyncio.sleep(0.1))
-            
+
             # Re-add handler
             logger.addHandler(telegram_handler)
             logger.info("Message with handler again")
@@ -1128,16 +1140,16 @@ class TestTelegramEndToEnd:
         mock_client_class.return_value = mock_client
         mock_response = AsyncMock()
         mock_response.raise_for_status = AsyncMock()
-        
+
         # Simulate: success, failure, success, failure, success
         error_response = MagicMock()
         error_response.status_code = 500
         http_error = httpx.HTTPStatusError("Server Error", request=MagicMock(), response=error_response)
-        
+
         mock_client.post.side_effect = [
             mock_response,  # Success
-            http_error,     # Failure (will retry)
-            http_error,     # Failure (final retry fails)
+            http_error,  # Failure (will retry)
+            http_error,  # Failure (final retry fails)
             mock_response,  # Success
             mock_response,  # Success
         ]
@@ -1151,15 +1163,16 @@ class TestTelegramEndToEnd:
 
             # Create log records
             records = [
-                logging.LogRecord(name="test", level=logging.INFO, pathname="", lineno=0,
-                                msg=f"Message {i}", args=(), exc_info=None)
+                logging.LogRecord(
+                    name="test", level=logging.INFO, pathname="", lineno=0, msg=f"Message {i}", args=(), exc_info=None
+                )
                 for i in range(5)
             ]
 
             with patch("auto_slopp.telegram_handler.logging.getLogger") as mock_logger:
                 mock_error_logger = MagicMock()
                 mock_logger.return_value = mock_error_logger
-                
+
                 # Act - Send all messages
                 for record in records:
                     handler.emit(record)
@@ -1206,6 +1219,7 @@ class TestTelegramEndToEnd:
             async def run_all_tasks():
                 tasks = [emit_from_task(i) for i in range(3)]
                 await asyncio.gather(*tasks)
+
             asyncio.run(run_all_tasks())
 
             # Assert - All messages should be sent
