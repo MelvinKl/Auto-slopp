@@ -10,6 +10,7 @@ A Python-based automation framework for task execution with pluggable worker sys
 - **Task Execution**: Automated discovery and execution of worker implementations
 - **Modern Python**: Built with Python 3.14+ using uv package manager
 - **Comprehensive Testing**: Full test suite with pytest and mocked dependencies
+- **Real-time Monitoring**: Telegram bot integration for instant error notifications and status updates
 
 ## Installation
 
@@ -69,6 +70,11 @@ AUTO_SLOPP_DEBUG=false
 AUTO_SLOPP_TELEGRAM_ENABLED=true
 AUTO_SLOPP_TELEGRAM_BOT_TOKEN=your_bot_token
 AUTO_SLOPP_TELEGRAM_CHAT_ID=your_chat_id
+
+# Advanced Telegram settings
+AUTO_SLOPP_TELEGRAM_TIMEOUT=60.0
+AUTO_SLOPP_TELEGRAM_RETRY_ATTEMPTS=5
+AUTO_SLOPP_TELEGRAM_PARSE_MODE=HTML
 ```
 
 ## Creating Worker Implementations
@@ -342,6 +348,55 @@ AUTO_SLOPP_TELEGRAM_RETRY_DELAY=2.0
 AUTO_SLOPP_TELEGRAM_PARSE_MODE=HTML
 ```
 
+## Telegram Logging
+
+For comprehensive Telegram logging setup and configuration, see the [Telegram Logging Guide](docs/telegram-logging.md).
+
+### Quick Setup
+
+1. **Create Telegram Bot**
+   ```bash
+   # Talk to @BotFather on Telegram
+   /newbot
+   # Follow prompts to get your bot token
+   ```
+
+2. **Get Chat ID**
+   ```bash
+   # Send a message to your bot, then visit:
+   https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates
+   # Look for "chat.id" in the response
+   ```
+
+3. **Configure Environment**
+   ```bash
+   AUTO_SLOPP_TELEGRAM_ENABLED=true
+   AUTO_SLOPP_TELEGRAM_BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+   AUTO_SLOPP_TELEGRAM_CHAT_ID=123456789
+   ```
+
+4. **Test Configuration**
+   ```bash
+   auto-slopp --debug
+   # Check for Telegram connection logs
+   ```
+
+### Features
+
+- **Real-time notifications** for errors and warnings
+- **Configurable log levels** and message formatting
+- **Retry logic** for network failures and rate limiting
+- **HTML/Markdown formatting** support
+- **Group and channel notifications** support
+- **Secure token management** through environment variables
+
+### Security
+
+- **Never share bot tokens** - treat them as passwords
+- **Use environment variables** for sensitive configuration
+- **Enable bot privacy settings** in BotFather
+- **Regular token rotation** recommended for production
+
 ## Troubleshooting
 
 ### Common Issues
@@ -357,9 +412,11 @@ AUTO_SLOPP_TELEGRAM_PARSE_MODE=HTML
 - Ensure boolean values use `true`/`false` (case-insensitive)
 
 **Telegram integration not working:**
+- 📖 **See complete guide:** [Telegram Logging Guide](docs/telegram-logging.md#troubleshooting)
 - Verify bot token and chat ID are correct
 - Check network connectivity to Telegram API
 - Enable debug mode to see API error details
+- Test with curl: `curl https://api.telegram.org/bot<YOUR_TOKEN>/getMe`
 
 **Path issues:**
 - Use absolute paths for reliable configuration
