@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from ...worker import Worker
+from ..worker import Worker
 
 
 class OpenAgentWorker(Worker):
