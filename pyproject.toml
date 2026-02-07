@@ -10,6 +10,7 @@ requires-python = ">=3.14"
 dependencies = [
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
+    "httpx>=0.25.0",
 ]
 
 [project.optional-dependencies]
@@ -75,3 +76,8 @@ exclude = [
     ".tox",
 ]
 docstring-convention = "google"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]

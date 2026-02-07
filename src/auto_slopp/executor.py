@@ -6,7 +6,7 @@ import traceback
 from pathlib import Path
 from typing import Any, Optional, Type
 
-from ..settings.main import settings
+from settings.main import settings
 from .discovery import discover_workers
 from .worker import Worker
 

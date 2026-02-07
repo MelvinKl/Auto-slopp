@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Optional
 
-from pydantic import Field, HttpUrl
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     telegram_chat_id: Optional[str] = Field(default=None, description="Telegram chat ID to send messages to")
 
-    telegram_api_url: HttpUrl = Field(
+    telegram_api_url: str = Field(
         default="https://api.telegram.org/bot{token}/sendMessage", description="Telegram API URL for sending messages"
     )
 
