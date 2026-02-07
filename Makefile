@@ -14,11 +14,11 @@ help:
 
 # Install dependencies
 install:
-	uv pip install -e .
+	uv sync
 
 # Install development dependencies
 dev-install:
-	uv pip install -e .[dev]
+	uv sync --extra dev
 
 # Main target: run all tests and linting checks
 test: lint security test-unit
