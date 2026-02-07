@@ -1,102 +1,104 @@
-# Makefile for Auto-slopp project
-
-.PHONY: test test-quick test-unit test-integration test-system test-performance test-security test-regression test-framework help clean install-deps validate
+.PHONY: help test lint format clean install dev-install coverage security
 
 # Default target
-all: help
-
-# Test targets with comprehensive coverage
-test: test-framework
-	@echo "Running comprehensive test suite..."
-	@./tests/test_suite_enhanced.sh
-
-test-quick: test-framework
-	@echo "Running quick test suite (critical tests only)..."
-	@./tests/test_suite_enhanced.sh --quick
-
-test-unit: test-framework
-	@echo "Running unit tests..."
-	@./tests/test_suite_enhanced.sh --category unit
-
-test-integration: test-framework
-	@echo "Running integration tests..."
-	@./tests/test_suite_enhanced.sh --category integration
-
-test-system: test-framework
-	@echo "Running system tests..."
-	@./tests/test_suite_enhanced.sh --category system
-
-test-performance: test-framework
-	@echo "Running performance tests..."
-	@./tests/test_suite_enhanced.sh --category performance
-
-test-security: test-framework
-	@echo "Running security tests..."
-	@./tests/test_suite_enhanced.sh --category security
-
-test-regression: test-framework
-	@echo "Running regression tests..."
-	@./tests/test_suite_enhanced.sh --category regression
-
-# Test framework validation
-test-framework:
-	@echo "Validating test framework..."
-	@./tests/test_framework.sh
-
-# Legacy test target (backwards compatibility)
-test-legacy:
-	@echo "Running legacy test suite..."
-	@./tests/test_suite.sh --no-make
-
-# Install test dependencies
-install-deps:
-	@echo "Installing test dependencies..."
-	@if command -v apt-get >/dev/null 2>&1; then \
-		sudo apt-get update && sudo apt-get install -y bc jq; \
-	elif command -v yum >/dev/null 2>&1; then \
-		sudo yum install -y bc jq; \
-	elif command -v brew >/dev/null 2>&1; then \
-		brew install bc jq; \
-	else \
-		echo "Please install bc and jq manually"; \
-		exit 1; \
-	fi
-
-# Validate project structure
-validate:
-	@echo "Validating project structure..."
-	@./tests/test_suite_enhanced.sh --quick --verbose
-
-# Help target
 help:
 	@echo "Available targets:"
-	@echo ""
-	@echo "Testing:"
-	@echo "  test               Run comprehensive test suite"
-	@echo "  test-quick         Run only critical tests"
-	@echo "  test-unit          Run unit tests only"
-	@echo "  test-integration   Run integration tests only"
-	@echo "  test-system        Run system tests only"
-	@echo "  test-performance   Run performance tests only"
-	@echo "  test-security      Run security tests only"
-	@echo "  test-regression    Run regression tests only"
-	@echo "  test-legacy        Run legacy test suite"
-	@echo "  test-framework     Validate test framework"
-	@echo ""
-	@echo "Development:"
-	@echo "  install-deps       Install test dependencies"
-	@echo "  validate          Quick project validation"
-	@echo "  clean              Clean temporary files"
-	@echo "  help               Show this help message"
-	@echo ""
-	@echo "Examples:"
-	@echo "  make test-quick              # Quick validation"
-	@echo "  make test-unit test-system   # Specific test categories"
-	@echo "  make validate                 # Fast project check"
+	@echo "  install      - Install dependencies using uv"
+	@echo "  dev-install  - Install development dependencies"
+	@echo "  test         - Run all tests and linting checks (main target)"
+	@echo "  lint         - Run linting checks only"
+	@echo "  format       - Format code with black and isort"
+	@echo "  coverage     - Run tests with coverage report"
+	@echo "  security     - Run security vulnerability scans"
+	@echo "  clean        - Clean up temporary files and caches"
 
-# Clean target
+# Install dependencies
+install:
+	uv sync
+
+# Install development dependencies
+dev-install:
+	uv sync --extra dev
+
+# Main target: run all tests and linting checks
+test: lint security test-unit
+	@echo "✅ All checks passed!"
+
+# Run linting checks (fails if any issue found)
+lint:
+	@echo "🔍 Running linting checks..."
+	@echo "Environment debug:"
+	@echo "Python: $$(uv run python --version)"
+	@echo "Make: $$(make --version 2>/dev/null || echo 'make not found')"
+	@echo "Working directory: $$(pwd)"
+	@echo "Available tools:"
+	@uv run which black isort flake8 || echo "Some tools missing"
+	@echo "Running black..."
+	uv run black --check --diff src/ tests/ || (echo "❌ Black formatting check failed" && exit 1)
+	@echo "✅ Black formatting check passed"
+	@echo "Running isort..."
+	uv run isort --check-only --diff src/ tests/ || (echo "❌ isort import sorting check failed" && exit 1)
+	@echo "✅ isort import sorting check passed"
+	@echo "Running flake8..."
+	uv run flake8 --max-line-length=120 --max-complexity=8 --extend-ignore=E203,W503,D104,F401,D401,I201,F841,F811,B014,C901,B007,E501,I100,D202 src/ tests/ || (echo "❌ flake8 linting failed" && exit 1)
+	@echo "✅ flake8 linting passed"
+
+# Format code
+format:
+	@echo "🎨 Formatting code..."
+	uv run black src/ tests/
+	uv run isort src/ tests/
+	@echo "✅ Code formatting completed"
+
+# Run unit tests
+test-unit:
+	@echo "🧪 Running unit tests..."
+	uv run python -m pytest tests/ -v --tb=short || (echo "❌ Tests failed" && exit 1)
+	@echo "✅ All tests passed"
+
+# Run tests with coverage
+coverage:
+	@echo "📊 Running tests with coverage..."
+	uv run python -m pytest tests/ --cov=src --cov-report=term-missing --cov-report=html || (echo "❌ Tests failed" && exit 1)
+	@echo "✅ Coverage report generated"
+	@echo "📁 HTML coverage report available at htmlcov/index.html"
+
+# Run security vulnerability scans
+security:
+	@echo "🔒 Running security scans..."
+	@echo "Running safety check..."
+	uv run safety check || (echo "❌ Safety security check failed" && exit 1)
+	@echo "✅ Safety security check passed"
+	@echo "Running bandit security linter..."
+	uv run bandit -r src/ --severity-level=medium || (echo "❌ Bandit security linter failed" && exit 1)
+	@echo "✅ Bandit security linter passed"
+
+# Run performance tests specifically
+test-performance:
+	@echo "⚡ Running performance tests..."
+	uv run python -m pytest -m performance -v --tb=short || (echo "❌ Performance tests failed" && exit 1)
+	@echo "✅ Performance tests passed"
+
+# Run integration tests specifically
+test-integration:
+	@echo "🔗 Running integration tests..."
+	uv run python -m pytest -m integration -v --tb=short || (echo "❌ Integration tests failed" && exit 1)
+	@echo "✅ Integration tests passed"
+
+# Run full CI simulation (everything CI runs)
+ci: lint security coverage test-performance test-integration
+	@echo "🚀 Full CI simulation completed successfully!"
+
+# Clean up temporary files and caches
 clean:
-	@echo "Cleaning temporary files..."
-	@find /tmp -name "auto-slopp-test-*" -type d -mtime +1 -exec rm -rf {} + 2>/dev/null || true
-	@rm -f test_*.log
-	@echo "✓ Clean completed"
+	@echo "🧹 Cleaning up..."
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	rm -rf .pytest_cache/ .coverage htmlcov/ .mypy_cache/ 2>/dev/null || true
+	rm -rf dist/ build/ 2>/dev/null || true
+	@echo "✅ Cleanup completed"
+
+# Quick development check (format + basic tests)
+dev-check: format test-unit
+	@echo "🚀 Development check completed!"
