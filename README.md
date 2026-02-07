@@ -348,6 +348,19 @@ AUTO_SLOPP_TELEGRAM_RETRY_DELAY=2.0
 AUTO_SLOPP_TELEGRAM_PARSE_MODE=HTML
 ```
 
+## Documentation
+
+For comprehensive documentation, see the [docs/](docs/) directory:
+
+### User Documentation
+- **[Telegram Logging Guide](docs/telegram-logging.md)** - Complete setup and configuration guide
+
+### Developer Documentation
+- **[API Reference](docs/api-reference.md)** - Complete API documentation
+- **[Development Guide](docs/development-guide.md)** - Development setup and workflow
+- **[Architecture Overview](docs/architecture.md)** - System architecture and design
+- **[Contributing Guide](docs/contributing.md)** - Contribution guidelines
+
 ## Telegram Logging
 
 For comprehensive Telegram logging setup and configuration, see the [Telegram Logging Guide](docs/telegram-logging.md).
