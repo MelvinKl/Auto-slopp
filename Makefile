@@ -70,13 +70,13 @@ security:
 # Run performance tests specifically
 test-performance:
 	@echo "⚡ Running performance tests..."
-	source .venv/bin/activate && python -m pytest -m performance -v --tb=short || (echo "❌ Performance tests failed" && exit 1)
+	. .venv/bin/activate && python -m pytest -m performance -v --tb=short || (echo "❌ Performance tests failed" && exit 1)
 	@echo "✅ Performance tests passed"
 
 # Run integration tests specifically
 test-integration:
 	@echo "🔗 Running integration tests..."
-	source .venv/bin/activate && python -m pytest -m integration -v --tb=short || (echo "❌ Integration tests failed" && exit 1)
+	. .venv/bin/activate && python -m pytest -m integration -v --tb=short || (echo "❌ Integration tests failed" && exit 1)
 	@echo "✅ Integration tests passed"
 
 # Run full CI simulation (everything CI runs)
