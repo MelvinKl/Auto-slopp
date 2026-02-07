@@ -28,26 +28,26 @@ test: lint security test-unit
 lint:
 	@echo "🔍 Running linting checks..."
 	@echo "Environment debug:"
-	@echo "Python: $$(python --version)"
+	@echo "Python: $$(. .venv/bin/activate && python --version)"
 	@echo "Make: $$(make --version 2>/dev/null || echo 'make not found')"
 	@echo "Working directory: $$(pwd)"
 	@echo "Available tools:"
-	@which black isort flake8 || echo "Some tools missing""
+	@. .venv/bin/activate && which black isort flake8 || echo "Some tools missing"
 	@echo "Running black..."
-	black --check --diff src/ tests/ || (echo "❌ Black formatting check failed" && exit 1)
+	. .venv/bin/activate && black --check --diff src/ tests/ || (echo "❌ Black formatting check failed" && exit 1)
 	@echo "✅ Black formatting check passed"
 	@echo "Running isort..."
-	isort --check-only --diff src/ tests/ || (echo "❌ isort import sorting check failed" && exit 1)
+	. .venv/bin/activate && isort --check-only --diff src/ tests/ || (echo "❌ isort import sorting check failed" && exit 1)
 	@echo "✅ isort import sorting check passed"
 	@echo "Running flake8..."
-	flake8 --max-line-length=120 --max-complexity=8 --extend-ignore=E203,W503,D104,F401,D401,I201,F841,F811,B014,C901,B007,E501,I100,D202 src/ tests/ || (echo "❌ flake8 linting failed" && exit 1)
+	. .venv/bin/activate && flake8 --max-line-length=120 --max-complexity=8 --extend-ignore=E203,W503,D104,F401,D401,I201,F841,F811,B014,C901,B007,E501,I100,D202 src/ tests/ || (echo "❌ flake8 linting failed" && exit 1)
 	@echo "✅ flake8 linting passed"
 
 # Format code
 format:
 	@echo "🎨 Formatting code..."
-	black src/ tests/
-	isort src/ tests/
+	. .venv/bin/activate && black src/ tests/
+	. .venv/bin/activate && isort src/ tests/
 	@echo "✅ Code formatting completed"
 
 # Run unit tests
