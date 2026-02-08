@@ -6,7 +6,9 @@ This package contains all worker implementations organized by functionality:
 
 # Import all workers to make them available for discovery
 from .openagent_worker import OpenAgentWorker
+from .renovate_test_worker import RenovateTestWorker
 
 __all__ = [
     "OpenAgentWorker",
+    "RenovateTestWorker",
 ]
