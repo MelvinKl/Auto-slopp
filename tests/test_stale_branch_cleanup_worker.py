@@ -1,22 +1,21 @@
 """Tests for StaleBranchCleanupWorker."""
 
+import os
 import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import Mock, call, patch
-import tempfile
-import os
+from unittest.mock import Mock, patch
 
-import pytest
-
-from auto_slopp.workers.stale_branch_cleanup_worker import StaleBranchCleanupWorker
+from auto_slopp.workers.stale_branch_cleanup_worker import (
+    StaleBranchCleanupWorker,
+)
 
 
 class TestStaleBranchCleanupWorker:
     """Test cases for StaleBranchCleanupWorker."""
 
     def test_worker_inherits_from_base_class(self):
-        """Test that StaleBranchCleanupWorker properly inherits from Worker base class."""
+        """Test that StaleBranchCleanupWorker properly inherits from Worker base."""
         worker = StaleBranchCleanupWorker()
         assert hasattr(worker, "run")
         assert callable(getattr(worker, "run"))
@@ -167,7 +166,9 @@ class TestStaleBranchCleanupWorker:
         os.chdir(temp_repo_dir)
         subprocess.run(["git", "init"], check=True, capture_output=True)
         subprocess.run(
-            ["git", "config", "user.name", "Test User"], check=True, capture_output=True
+            ["git", "config", "user.name", "Test User"],
+            check=True,
+            capture_output=True,
         )
         subprocess.run(
             ["git", "config", "user.email", "test@example.com"],
@@ -184,14 +185,28 @@ class TestStaleBranchCleanupWorker:
 
         # Create a feature branch with an old commit
         subprocess.run(
-            ["git", "checkout", "-b", "old-feature"], check=True, capture_output=True
+            ["git", "checkout", "-b", "old-feature"],
+            check=True,
+            capture_output=True,
         )
 
         # Use environment variable to override the date for testing
         old_date = "2024-01-01T10:00:00Z"
         subprocess.run(
-            ["git", "commit", "--allow-empty", "-m", "Old feature", "--date", old_date],
-            env=dict(os.environ, GIT_COMMITTER_DATE=old_date, GIT_AUTHOR_DATE=old_date),
+            [
+                "git",
+                "commit",
+                "--allow-empty",
+                "-m",
+                "Old feature",
+                "--date",
+                old_date,
+            ],
+            env=dict(
+                os.environ,
+                GIT_COMMITTER_DATE=old_date,
+                GIT_AUTHOR_DATE=old_date,
+            ),
             check=True,
             capture_output=True,
         )
