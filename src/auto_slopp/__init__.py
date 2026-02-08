@@ -11,8 +11,8 @@ from .workers import (
 
 __all__ = [
     "Worker",
-    "discover_workers", 
-    "Executor", 
+    "discover_workers",
+    "Executor",
     "run_executor",
     "OpenAgentWorker",
 ]
