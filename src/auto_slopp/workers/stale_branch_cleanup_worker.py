@@ -29,9 +29,7 @@ class StaleBranchCleanupWorker(Worker):
         """
         self.days_threshold = days_threshold
         self.dry_run = dry_run
-        self.logger = logging.getLogger(
-            "auto_slopp.workers.StaleBranchCleanupWorker"
-        )
+        self.logger = logging.getLogger("auto_slopp.workers.StaleBranchCleanupWorker")
 
     def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
         """Execute stale branch cleanup.
@@ -63,9 +61,7 @@ class StaleBranchCleanupWorker(Worker):
             remote_branches = self._get_remote_branches()
 
             # Find stale branches
-            stale_branches = self._identify_stale_branches(
-                local_branches, remote_branches
-            )
+            stale_branches = self._identify_stale_branches(local_branches, remote_branches)
 
             # Delete stale branches
             deleted_branches = []
@@ -88,9 +84,7 @@ class StaleBranchCleanupWorker(Worker):
             # Restore working directory
             os.chdir(original_cwd)
 
-            execution_time = (
-                datetime.now(timezone.utc) - start_time
-            ).total_seconds()
+            execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
 
             result = {
                 "worker_name": "StaleBranchCleanupWorker",
@@ -111,8 +105,7 @@ class StaleBranchCleanupWorker(Worker):
             }
 
             self.logger.info(
-                f"Completed stale branch cleanup: {len(deleted_branches)} "
-                f"deleted, {len(failed_deletions)} failed"
+                f"Completed stale branch cleanup: {len(deleted_branches)} " f"deleted, {len(failed_deletions)} failed"
             )
             return result
 
@@ -123,9 +116,7 @@ class StaleBranchCleanupWorker(Worker):
             except OSError:
                 pass
 
-            execution_time = (
-                datetime.now(timezone.utc) - start_time
-            ).total_seconds()
+            execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
             self.logger.error(f"Stale branch cleanup failed: {str(e)}")
 
             return {
@@ -155,8 +146,7 @@ class StaleBranchCleanupWorker(Worker):
                     "git",
                     "branch",
                     "-v",
-                    "--format=%(refname:short)%00%(committerdate:iso-strict)"
-                    "%00%(objectname)",
+                    "--format=%(refname:short)%00%(committerdate:iso-strict)" "%00%(objectname)",
                 ],
                 capture_output=True,
                 text=True,
@@ -168,9 +158,7 @@ class StaleBranchCleanupWorker(Worker):
                 if line.strip():
                     parts = line.split("\x00")
                     if len(parts) >= 3:
-                        name = (
-                            parts[0].strip("* ").strip()
-                        )  # Remove '* ' prefix for current branch
+                        name = parts[0].strip("* ").strip()  # Remove '* ' prefix for current branch
                         # Using iso-strict format from git, should be parseable
                         date_str = parts[1]
                         try:
@@ -178,9 +166,7 @@ class StaleBranchCleanupWorker(Worker):
                         except ValueError:
                             # Fallback to handling git's regular iso format
                             # Handle format like '2026-02-08 11:06:41 +0000'
-                            date_str = date_str.replace(" ", "T", 1).replace(
-                                " ", ""
-                            )
+                            date_str = date_str.replace(" ", "T", 1).replace(" ", "")
                             commit_date = datetime.fromisoformat(date_str)
                         commit_hash = parts[2]
 
@@ -191,10 +177,7 @@ class StaleBranchCleanupWorker(Worker):
                                     "name": name,
                                     "last_commit_date": commit_date,
                                     "last_commit_hash": commit_hash,
-                                    "days_old": (
-                                        datetime.now(timezone.utc)
-                                        - commit_date
-                                    ).days,
+                                    "days_old": (datetime.now(timezone.utc) - commit_date).days,
                                 }
                             )
 
@@ -245,24 +228,16 @@ class StaleBranchCleanupWorker(Worker):
             List of stale branch information.
         """
         stale_branches = []
-        cutoff_date = datetime.now(timezone.utc) - timedelta(
-            days=self.days_threshold
-        )
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=self.days_threshold)
 
         for branch in local_branches:
             branch_name = branch["name"]
 
             # Check if branch not on remote and is older than threshold
-            if (
-                branch_name not in remote_branches
-                and branch["last_commit_date"] < cutoff_date
-            ):
+            if branch_name not in remote_branches and branch["last_commit_date"] < cutoff_date:
                 stale_branches.append(branch)
 
-        self.logger.info(
-            f"Found {len(stale_branches)} stale branches out of "
-            f"{len(local_branches)} local branches"
-        )
+        self.logger.info(f"Found {len(stale_branches)} stale branches out of " f"{len(local_branches)} local branches")
         return stale_branches
 
     def _delete_branch(self, branch_name: str) -> bool:
@@ -290,9 +265,7 @@ class StaleBranchCleanupWorker(Worker):
             current_branch = result.stdout.strip()
 
             if branch_name == current_branch:
-                self.logger.warning(
-                    f"Cannot delete current branch '{branch_name}'"
-                )
+                self.logger.warning(f"Cannot delete current branch '{branch_name}'")
                 return False
 
             # Delete the branch

@@ -18,7 +18,7 @@ class TestStaleBranchCleanupWorker:
         """Test that StaleBranchCleanupWorker properly inherits from Worker base."""
         worker = StaleBranchCleanupWorker()
         assert hasattr(worker, "run")
-        assert callable(getattr(worker, "run"))
+        assert callable(worker.run)
 
     def test_worker_initialization_default_values(self):
         """Test worker initialization with default values."""
@@ -138,9 +138,7 @@ class TestStaleBranchCleanupWorker:
 
         with patch("subprocess.run") as mock_run:
             # Mock current branch as the one being deleted
-            mock_run.return_value = Mock(
-                stdout="feature-branch\n", stderr="", returncode=0
-            )
+            mock_run.return_value = Mock(stdout="feature-branch\n", stderr="", returncode=0)
 
             result = worker._delete_branch("feature-branch")
             assert result is False
@@ -152,9 +150,7 @@ class TestStaleBranchCleanupWorker:
         with patch("subprocess.run") as mock_run:
             mock_run.side_effect = [
                 Mock(stdout="main\n", stderr="", returncode=0),  # current branch
-                subprocess.CalledProcessError(
-                    1, "git", "branch not found"
-                ),  # deletion failure
+                subprocess.CalledProcessError(1, "git", "branch not found"),  # deletion failure
             ]
 
             result = worker._delete_branch("non-existent-branch")
@@ -222,9 +218,7 @@ class TestStaleBranchCleanupWorker:
         assert result["success"] is True
         assert result["dry_run"] is True
         assert result["total_local_branches"] >= 1  # Should find our test branch
-        assert (
-            result["branches_deleted"] >= 1
-        )  # In dry run, branches_deleted means "would be deleted"
+        assert result["branches_deleted"] >= 1  # In dry run, branches_deleted means "would be deleted"
 
     def test_worker_result_structure_consistency(self, temp_repo_dir, temp_task_dir):
         """Test that worker result structure is consistent and complete."""
