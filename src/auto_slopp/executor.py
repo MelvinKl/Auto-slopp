@@ -6,10 +6,9 @@ import traceback
 from pathlib import Path
 from typing import Any, Optional, Type
 
+from auto_slopp.discovery import discover_workers
+from auto_slopp.worker import Worker
 from settings.main import settings
-
-from .discovery import discover_workers
-from .worker import Worker
 
 
 class Executor:

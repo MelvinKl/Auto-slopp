@@ -2,6 +2,17 @@
 
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
 
+## Code Standards
+
+**CRITICAL:** NEVER use relative imports in Python code. Always use absolute imports starting from the package root (`auto_slopp`). 
+
+**Examples:**
+- ✅ `from auto_slopp.worker import Worker`
+- ❌ `from .worker import Worker`
+- ❌ `from ..worker import Worker`
+
+This ensures consistent import behavior, better readability, and follows security best practices.
+
 ## Quick Reference
 
 ```bash

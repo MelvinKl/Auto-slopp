@@ -5,9 +5,9 @@ This package contains all worker implementations organized by functionality:
 """
 
 # Import all workers to make them available for discovery
-from .openagent_worker import OpenAgentWorker
-from .renovate_test_worker import RenovateTestWorker
-from .stale_branch_cleanup_worker import StaleBranchCleanupWorker
+from auto_slopp.workers.openagent_worker import OpenAgentWorker
+from auto_slopp.workers.renovate_test_worker import RenovateTestWorker
+from auto_slopp.workers.stale_branch_cleanup_worker import StaleBranchCleanupWorker
 
 __all__ = [
     "OpenAgentWorker",

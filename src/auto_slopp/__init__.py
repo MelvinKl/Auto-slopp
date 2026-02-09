@@ -2,10 +2,10 @@
 
 __version__ = "0.1.0"
 
-from .discovery import discover_workers
-from .executor import Executor, run_executor
-from .worker import Worker
-from .workers import (
+from auto_slopp.discovery import discover_workers
+from auto_slopp.executor import Executor, run_executor
+from auto_slopp.worker import Worker
+from auto_slopp.workers import (
     OpenAgentWorker,
 )
 

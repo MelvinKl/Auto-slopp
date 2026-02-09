@@ -5,10 +5,9 @@ import logging
 import sys
 from pathlib import Path
 
+from auto_slopp.executor import run_executor
+from auto_slopp.telegram_handler import setup_telegram_logging
 from settings.main import settings
-
-from .executor import run_executor
-from .telegram_handler import setup_telegram_logging
 
 
 def setup_logging() -> None:
@@ -51,11 +50,15 @@ Examples:
     )
 
     parser.add_argument(
-        "--repo-path", type=Path, help="Path to the repository directory (overrides AUTO_SLOPP_BASE_REPO_PATH)"
+        "--repo-path",
+        type=Path,
+        help="Path to the repository directory (overrides AUTO_SLOPP_BASE_REPO_PATH)",
     )
 
     parser.add_argument(
-        "--task-path", type=Path, help="Path to the task directory or file (overrides AUTO_SLOPP_BASE_TASK_PATH)"
+        "--task-path",
+        type=Path,
+        help="Path to the task directory or file (overrides AUTO_SLOPP_BASE_TASK_PATH)",
     )
 
     parser.add_argument(
@@ -65,7 +68,9 @@ Examples:
     )
 
     parser.add_argument(
-        "--debug", action="store_true", help="Enable debug mode with verbose logging (overrides AUTO_SLOPP_DEBUG)"
+        "--debug",
+        action="store_true",
+        help="Enable debug mode with verbose logging (overrides AUTO_SLOPP_DEBUG)",
     )
 
     parser.add_argument("--version", action="version", version="Auto-slopp 0.1.0")

@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
-from ..worker import Worker
+from auto_slopp.worker import Worker
 
 
 class StaleBranchCleanupWorker(Worker):

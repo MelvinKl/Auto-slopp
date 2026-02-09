@@ -5,7 +5,7 @@ import inspect
 from pathlib import Path
 from typing import List, Optional, Type, TypeVar
 
-from .worker import Worker
+from auto_slopp.worker import Worker
 
 T = TypeVar("T", bound=Worker)
 

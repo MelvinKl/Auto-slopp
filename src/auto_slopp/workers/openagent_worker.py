@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from ..worker import Worker
+from auto_slopp.worker import Worker
 
 
 class OpenAgentWorker(Worker):
@@ -69,7 +69,11 @@ class OpenAgentWorker(Worker):
         try:
             # Execute the command
             result = subprocess.run(
-                cmd, cwd=work_dir, capture_output=self.capture_output, text=True, timeout=self.timeout
+                cmd,
+                cwd=work_dir,
+                capture_output=self.capture_output,
+                text=True,
+                timeout=self.timeout,
             )
 
             execution_time = time.time() - start_time

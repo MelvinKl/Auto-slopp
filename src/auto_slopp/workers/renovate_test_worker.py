@@ -9,8 +9,8 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
-from ..worker import Worker
-from .openagent_worker import OpenAgentWorker
+from auto_slopp.worker import Worker
+from auto_slopp.workers.openagent_worker import OpenAgentWorker
 
 
 class RenovateTestWorker(Worker):
