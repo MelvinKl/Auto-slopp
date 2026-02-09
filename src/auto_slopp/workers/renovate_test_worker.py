@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
+from auto_slopp.utils.repository_utils import discover_repositories, validate_repository
 from auto_slopp.worker import Worker
 from auto_slopp.workers.openagent_worker import OpenAgentWorker
 
@@ -28,6 +29,7 @@ class RenovateTestWorker(Worker):
             agent_args=["fix", "the", "tests", "and", "push", "the", "changes"],
             timeout=timeout,
             capture_output=True,
+            process_all_repos=False,
         )
 
     def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
@@ -52,6 +54,9 @@ class RenovateTestWorker(Worker):
                 "repositories_fixed": 0,
             }
 
+        # Discover and validate repositories
+        repositories = discover_repositories(repo_path, validate=True)
+
         results = {
             "worker_name": "RenovateTestWorker",
             "success": True,
@@ -59,17 +64,28 @@ class RenovateTestWorker(Worker):
             "repositories_tested": 0,
             "repositories_fixed": 0,
             "repositories_with_errors": 0,
+            "repositories_invalid": 0,
             "repository_results": [],
             "errors": [],
         }
 
-        # Process all subdirectories in repo_path
-        for repo_dir in repo_path.iterdir():
-            if not repo_dir.is_dir():
-                continue
+        # Process only valid git repositories
+        for repo_info in repositories:
+            repo_dir = Path(repo_info["path"])
 
-            self.logger.info(f"Processing repository: {repo_dir.name}")
+            self.logger.info(f"Processing repository: {repo_info['name']}")
             results["repositories_processed"] += 1
+
+            if not repo_info.get("valid", False):
+                self.logger.warning(
+                    f"Skipping invalid repository: {repo_info['name']} - {repo_info.get('errors', ['Unknown error'])}"
+                )
+                results["repositories_invalid"] += 1
+                results["repositories_with_errors"] += 1
+                results["errors"].append(
+                    f"{repo_info['name']}: Invalid repository - {repo_info.get('errors', ['Unknown error'])}"
+                )
+                continue
 
             repo_result = self._process_repository(repo_dir)
             results["repository_results"].append(repo_result)
@@ -80,7 +96,9 @@ class RenovateTestWorker(Worker):
                     results["repositories_fixed"] += 1
             else:
                 results["repositories_with_errors"] += 1
-                results["errors"].append(f"{repo_dir.name}: {repo_result.get('error', 'Unknown error')}")
+                results["errors"].append(
+                    f"{repo_dir.name}: {repo_result.get('error', 'Unknown error')}"
+                )
 
         # Determine overall success
         if results["repositories_with_errors"] > 0:
@@ -88,6 +106,8 @@ class RenovateTestWorker(Worker):
 
         self.logger.info(
             f"RenovateTestWorker completed. Processed: {results['repositories_processed']}, "
+            f"Valid: {results['repositories_processed'] - results['repositories_invalid']}, "
+            f"Invalid: {results['repositories_invalid']}, "
             f"Tested: {results['repositories_tested']}, Fixed: {results['repositories_fixed']}, "
             f"Errors: {results['repositories_with_errors']}"
         )
@@ -144,17 +164,25 @@ class RenovateTestWorker(Worker):
 
                 # If tests failed, use OpenAgent to fix them
                 if not test_result["success"]:
-                    self.logger.info(f"Tests failed for {branch} in {repo_dir.name}, using OpenAgent to fix")
+                    self.logger.info(
+                        f"Tests failed for {branch} in {repo_dir.name}, using OpenAgent to fix"
+                    )
                     fix_result = self._fix_tests_with_openagent(repo_dir)
                     if fix_result["success"]:
                         result["tests_fixed"] = True
                         # Re-run tests to verify fix
                         verify_result = self._run_tests(repo_dir)
-                        result["test_results"][-1]["fix_success"] = verify_result["success"]
-                        result["test_results"][-1]["fix_output"] = verify_result.get("output", "")
+                        result["test_results"][-1]["fix_success"] = verify_result[
+                            "success"
+                        ]
+                        result["test_results"][-1]["fix_output"] = verify_result.get(
+                            "output", ""
+                        )
                     else:
                         result["test_results"][-1]["fix_success"] = False
-                        result["test_results"][-1]["fix_error"] = fix_result.get("error", "Unknown fix error")
+                        result["test_results"][-1]["fix_error"] = fix_result.get(
+                            "error", "Unknown fix error"
+                        )
                 else:
                     result["test_results"][-1]["fix_success"] = True  # No fix needed
 
@@ -185,7 +213,9 @@ class RenovateTestWorker(Worker):
             )
 
             if result.returncode != 0:
-                self.logger.error(f"Failed to list branches in {repo_dir.name}: {result.stderr}")
+                self.logger.error(
+                    f"Failed to list branches in {repo_dir.name}: {result.stderr}"
+                )
                 return []
 
             branches = []
@@ -236,7 +266,9 @@ class RenovateTestWorker(Worker):
             )
 
             if result.returncode != 0:
-                self.logger.error(f"Failed to checkout {branch} in {repo_dir.name}: {result.stderr}")
+                self.logger.error(
+                    f"Failed to checkout {branch} in {repo_dir.name}: {result.stderr}"
+                )
                 return False
 
             # Pull latest changes for the branch
@@ -255,7 +287,9 @@ class RenovateTestWorker(Worker):
             self.logger.error(f"Timeout checking out {branch} in {repo_dir.name}")
             return False
         except Exception as e:
-            self.logger.error(f"Error checking out {branch} in {repo_dir.name}: {str(e)}")
+            self.logger.error(
+                f"Error checking out {branch} in {repo_dir.name}: {str(e)}"
+            )
             return False
 
     def _run_tests(self, repo_dir: Path) -> Dict[str, Any]:
