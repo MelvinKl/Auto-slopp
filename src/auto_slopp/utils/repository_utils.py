@@ -131,9 +131,7 @@ def validate_repository(repo_dir: Path) -> Dict[str, any]:
     return result
 
 
-def discover_repositories(
-    repo_path: Path, validate: bool = True
-) -> List[Dict[str, any]]:
+def discover_repositories(repo_path: Path, validate: bool = True) -> List[Dict[str, any]]:
     """Discover all git repositories in the given path.
 
     Args:
@@ -214,9 +212,7 @@ def get_repository_status(repo_dir: Path) -> Dict[str, any]:
 
         status = {
             "valid": True,
-            "current_branch": branch_result.stdout.strip()
-            if branch_result.returncode == 0
-            else None,
+            "current_branch": branch_result.stdout.strip() if branch_result.returncode == 0 else None,
             "is_clean": len(status_result.stdout.strip()) == 0,
             "changed_files": [],
             "ahead": 0,

@@ -78,9 +78,7 @@ class OpenAgentWorker(Worker):
         else:
             return self._run_on_single_repository(repo_path, task_path, start_time)
 
-    def _run_on_all_repositories(
-        self, repo_path: Path, task_path: Path, start_time: float
-    ) -> Dict[str, Any]:
+    def _run_on_all_repositories(self, repo_path: Path, task_path: Path, start_time: float) -> Dict[str, Any]:
         """Run OpenAgent on all repositories in repo_path.
 
         Args:
@@ -129,9 +127,7 @@ class OpenAgentWorker(Worker):
 
         return results
 
-    def _run_on_single_repository(
-        self, repo_path: Path, task_path: Path, start_time: float
-    ) -> Dict[str, Any]:
+    def _run_on_single_repository(self, repo_path: Path, task_path: Path, start_time: float) -> Dict[str, Any]:
         """Run OpenAgent on a single repository (repo_path is the repository).
 
         Args:
@@ -196,18 +192,12 @@ class OpenAgentWorker(Worker):
                     {
                         "stdout": result.stdout,
                         "stderr": result.stderr,
-                        "stdout_lines": result.stdout.splitlines()
-                        if result.stdout
-                        else [],
-                        "stderr_lines": result.stderr.splitlines()
-                        if result.stderr
-                        else [],
+                        "stdout_lines": result.stdout.splitlines() if result.stdout else [],
+                        "stderr_lines": result.stderr.splitlines() if result.stderr else [],
                     }
                 )
 
-            self.logger.info(
-                f"OpenAgentWorker completed in {execution_time:.2f}s with return code {result.returncode}"
-            )
+            self.logger.info(f"OpenAgentWorker completed in {execution_time:.2f}s with return code {result.returncode}")
             return execution_result
 
         except subprocess.TimeoutExpired:
