@@ -1,12 +1,14 @@
-"""OpenAgent execution worker for running OpenAgent with specific arguments.
+"""OpenAgent execution base class for running OpenAgent with specific arguments.
 
-This worker executes OpenAgent commands with configurable arguments,
-captures output, and provides execution status and results.
+This abstract base class provides the foundation for executing OpenAgent commands
+with configurable arguments, capturing output, and providing execution status
+and results. It should be inherited by concrete worker implementations.
 """
 
 import logging
 import subprocess
 import time
+from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -14,7 +16,7 @@ from typing import Any, Dict, List, Optional
 from auto_slopp.worker import Worker
 
 
-class OpenAgentWorker(Worker):
+class OpenAgentWorker(Worker, ABC):
     """OpenAgent execution worker for running OpenAgent with specific arguments.
 
     This worker executes OpenAgent commands with configurable arguments,
@@ -43,7 +45,19 @@ class OpenAgentWorker(Worker):
         self.capture_output = capture_output
         self.working_dir = working_dir
         self.process_all_repos = process_all_repos
-        self.logger = logging.getLogger("auto_slopp.workers.OpenAgentWorker")
+        self.logger = logging.getLogger("auto_slopp.base.OpenAgentWorker")
+
+    @abstractmethod
+    def get_agent_instructions(self) -> str:
+        """Get the specific instructions for this OpenAgent worker.
+
+        This method must be implemented by concrete subclasses to provide
+        the specific instructions or context for the OpenAgent execution.
+
+        Returns:
+            String containing the specific instructions for this worker.
+        """
+        pass
 
     def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
         """Execute OpenAgent with the configured arguments.

@@ -11,7 +11,7 @@ from typing import Any, Dict, List
 
 from auto_slopp.utils.repository_utils import discover_repositories, validate_repository
 from auto_slopp.worker import Worker
-from auto_slopp.workers.openagent_worker import OpenAgentWorker
+from auto_slopp.workers.test_fix_worker import TestFixWorker
 
 
 class RenovateTestWorker(Worker):
@@ -25,12 +25,7 @@ class RenovateTestWorker(Worker):
         """
         self.timeout = timeout
         self.logger = logging.getLogger("auto_slopp.workers.RenovateTestWorker")
-        self.openagent_worker = OpenAgentWorker(
-            agent_args=["fix", "the", "tests", "and", "push", "the", "changes"],
-            timeout=timeout,
-            capture_output=True,
-            process_all_repos=False,
-        )
+        self.openagent_worker = TestFixWorker(timeout=timeout)
 
     def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
         """Execute renovate branch testing workflow.

@@ -6,7 +6,9 @@ from auto_slopp.discovery import discover_workers
 from auto_slopp.executor import Executor, run_executor
 from auto_slopp.worker import Worker
 from auto_slopp.workers import (
-    OpenAgentWorker,
+    RenovateTestWorker,
+    StaleBranchCleanupWorker,
+    TestFixWorker,
 )
 
 __all__ = [
@@ -14,5 +16,7 @@ __all__ = [
     "discover_workers",
     "Executor",
     "run_executor",
-    "OpenAgentWorker",
+    "RenovateTestWorker",
+    "StaleBranchCleanupWorker",
+    "TestFixWorker",
 ]
