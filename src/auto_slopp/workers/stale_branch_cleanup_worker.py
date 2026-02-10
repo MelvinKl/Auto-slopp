@@ -7,9 +7,14 @@ and deletes them if their last commit is older than 5 days.
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from auto_slopp.utils.branch_analysis import analyze_repository_branches
+from auto_slopp.utils.git_operations import (
+    delete_branch,
+    get_local_branches,
+    get_remote_branches,
+)
 from auto_slopp.utils.repository_utils import discover_repositories
 from auto_slopp.worker import Worker
 
@@ -183,6 +188,56 @@ class StaleBranchCleanupWorker(Worker):
         else:
             results["repositories_with_errors"] += 1
             results["success"] = False
+
+    def _get_local_branches(self) -> List[Dict[str, Any]]:
+        """Get local branches for testing purposes.
+
+        Returns:
+            List of local branch information.
+        """
+        return get_local_branches(Path.cwd())
+
+    def _get_remote_branches(self) -> Set[str]:
+        """Get remote branches for testing purposes.
+
+        Returns:
+            Set of remote branch names.
+        """
+        return get_remote_branches(Path.cwd())
+
+    def _identify_stale_branches(
+        self, local_branches: List[Dict[str, Any]], remote_branches: Set[str]
+    ) -> List[Dict[str, Any]]:
+        """Identify stale branches for testing purposes.
+
+        Args:
+            local_branches: List of local branch information
+            remote_branches: Set of remote branch names
+
+        Returns:
+            List of stale branch information.
+        """
+        from auto_slopp.utils.branch_analysis import identify_stale_branches
+
+        return identify_stale_branches(local_branches, remote_branches, self.days_threshold)
+
+    def _delete_branch(self, branch_name: str) -> bool:
+        """Delete a branch for testing purposes.
+
+        Args:
+            branch_name: Name of branch to delete
+
+        Returns:
+            True if deletion succeeded, False otherwise.
+        """
+        if self.dry_run:
+            return True
+
+        try:
+            delete_branch(Path.cwd(), branch_name)
+            return True
+        except Exception:
+            return False
 
     def _log_completion_summary(self, results: Dict[str, Any]) -> None:
         """Log completion summary.
