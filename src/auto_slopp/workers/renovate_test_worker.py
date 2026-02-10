@@ -326,9 +326,9 @@ class RenovateTestWorker(Worker):
             task_path = repo_dir / "fix_tests.task"
 
             # Run OpenCode to fix tests with specific arguments
-            agent_args = ["fix", "the", "tests", "and", "push", "the", "changes"]
+            agent_args = ["'make test'", "is", "failing","fix","it","and", "push", "the", "changes"]
             result = subprocess.run(
-                ["opencode"] + ["--agent", "openagent"] + agent_args,
+                ["opencode"] + ["--agent", "openagent", "run"] + agent_args,
                 cwd=repo_dir,
                 capture_output=True,
                 text=True,
