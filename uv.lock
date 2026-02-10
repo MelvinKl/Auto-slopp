@@ -52,6 +52,7 @@ dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "python-dotenv" },
 ]
 
 [package.optional-dependencies]
@@ -90,6 +91,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "safety", marker = "extra == 'dev'", specifier = ">=2.3.0" },
 ]
 provides-extras = ["dev"]

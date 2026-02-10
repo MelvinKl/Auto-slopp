@@ -306,63 +306,47 @@ class RenovateTestWorker(Worker):
                 "error": f"Error running tests: {str(e)}",
             }
 
+    def _fix_tests_with_openagent(self, repo_dir: Path) -> Dict[str, Any]:
+        """Use OpenAgent to fix failing tests.
 
-def _fix_tests_with_openagent(self, repo_dir: Path) -> Dict[str, Any]:
-    """Use OpenAgent to fix failing tests.
+        Args:
+            repo_dir: Path to the repository directory
 
-    Args:
-        repo_dir: Path to the repository directory
+        Returns:
+            Dictionary containing OpenAgent execution results
+        """
+        try:
+            # Create a dummy task path for OpenAgent
+            task_path = repo_dir / "fix_tests.task"
 
-    Returns:
-        Dictionary containing OpenAgent execution results
-    """
-    try:
-        # Create a dummy task path for OpenAgent
-        task_path = repo_dir / "fix_tests.task"
+            # Run OpenAgent to fix tests with specific arguments
+            agent_args = ["fix", "the", "tests", "and", "push", "the", "changes"]
+            result = subprocess.run(
+                ["openagent"] + agent_args,
+                cwd=repo_dir,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
+            )
 
-        # Run OpenAgent to fix tests with specific arguments
-        agent_args = ["fix", "the", "tests", "and", "push", "the", "changes"]
-        result = subprocess.run(
-            ["openagent"] + agent_args,
-            cwd=repo_dir,
-            capture_output=True,
-            text=True,
-            timeout=self.timeout,
-        )
+            return {
+                "success": result.returncode == 0,
+                "output": result.stdout,
+                "error": result.stderr if result.returncode != 0 else None,
+                "return_code": result.returncode,
+            }
 
-        return {
-            "success": result.returncode == 0,
-            "output": result.stdout,
-            "error": result.stderr if result.returncode != 0 else None,
-            "return_code": result.returncode,
-        }
-
-    except subprocess.TimeoutExpired:
-        return {
-            "success": False,
-            "output": "",
-            "error": f"OpenAgent timed out after {self.timeout} seconds",
-            "return_code": -1,
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "output": "",
-            "error": f"Error running OpenAgent: {str(e)}",
-            "return_code": -1,
-        }
-
-    except subprocess.TimeoutExpired:
-        return {
-            "success": False,
-            "output": "",
-            "error": f"OpenAgent timed out after {self.timeout} seconds",
-            "return_code": -1,
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "output": "",
-            "error": f"Error running OpenAgent: {str(e)}",
-            "return_code": -1,
-        }
+        except subprocess.TimeoutExpired:
+            return {
+                "success": False,
+                "output": "",
+                "error": f"OpenAgent timed out after {self.timeout} seconds",
+                "return_code": -1,
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "output": "",
+                "error": f"Error running OpenAgent: {str(e)}",
+                "return_code": -1,
+            }
