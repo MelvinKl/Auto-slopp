@@ -170,7 +170,7 @@ class OpenCodeWorker(Worker, ABC):
         working_dir = self.working_dir or work_dir
 
         # Build command - use opencode with openagent agent
-        cmd = ["opencode"] + ["--agent", "openagent"] + self.agent_args
+        cmd = ["opencode"] + ["--agent", "openagent"] + self.agent_args + ["run"]
 
         # Add task path to arguments if provided
         if task_path and task_path.exists():
