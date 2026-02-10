@@ -32,7 +32,7 @@ class TaskProcessorWorker(OpenCodeWorker):
         self,
         task_repo_path: Path,
         counter_start: int = 1,
-        timeout: int = 600,
+        timeout: int = 7200,
         agent_args: Optional[List[str]] = None,
         dry_run: bool = False,
     ):
