@@ -8,7 +8,6 @@ from auto_slopp.worker import Worker
 from auto_slopp.workers import (
     RenovateTestWorker,
     StaleBranchCleanupWorker,
-    TestFixWorker,
 )
 
 __all__ = [

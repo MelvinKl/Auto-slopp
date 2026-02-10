@@ -11,28 +11,26 @@ from typing import Any, Dict, List
 
 from auto_slopp.utils.repository_utils import discover_repositories, validate_repository
 from auto_slopp.worker import Worker
-from auto_slopp.workers.test_fix_worker import TestFixWorker
 
 
 class RenovateTestWorker(Worker):
     """Worker for testing renovate branches and fixing failures with OpenAgent."""
 
     def __init__(self, timeout: int = 600):
-        """Initialize the RenovateTestWorker.
+        """Initialize RenovateTestWorker.
 
         Args:
             timeout: Timeout for test execution and OpenAgent fixes in seconds
         """
         self.timeout = timeout
         self.logger = logging.getLogger("auto_slopp.workers.RenovateTestWorker")
-        self.openagent_worker = TestFixWorker(timeout=timeout)
 
     def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
         """Execute renovate branch testing workflow.
 
         Args:
-            repo_path: Path to the repository directory containing subdirectories
-            task_path: Path to the task directory or file (not used in this worker)
+            repo_path: Path to repository directory containing subdirectories
+            task_path: Path to task directory or file (not used in this worker)
 
         Returns:
             Dictionary containing execution results and summary.
@@ -308,32 +306,63 @@ class RenovateTestWorker(Worker):
                 "error": f"Error running tests: {str(e)}",
             }
 
-    def _fix_tests_with_openagent(self, repo_dir: Path) -> Dict[str, Any]:
-        """Use OpenAgent to fix failing tests.
 
-        Args:
-            repo_dir: Path to the repository directory
+def _fix_tests_with_openagent(self, repo_dir: Path) -> Dict[str, Any]:
+    """Use OpenAgent to fix failing tests.
 
-        Returns:
-            Dictionary containing OpenAgent execution results
-        """
-        try:
-            # Create a dummy task path for OpenAgent
-            task_path = repo_dir / "fix_tests.task"
+    Args:
+        repo_dir: Path to the repository directory
 
-            # Run OpenAgent to fix tests
-            result = self.openagent_worker.run(repo_dir, task_path)
+    Returns:
+        Dictionary containing OpenAgent execution results
+    """
+    try:
+        # Create a dummy task path for OpenAgent
+        task_path = repo_dir / "fix_tests.task"
 
-            return {
-                "success": result.get("success", False),
-                "output": result.get("stdout", ""),
-                "error": result.get("stderr") or result.get("error"),
-                "return_code": result.get("return_code", -1),
-            }
+        # Run OpenAgent to fix tests with specific arguments
+        agent_args = ["fix", "the", "tests", "and", "push", "the", "changes"]
+        result = subprocess.run(
+            ["openagent"] + agent_args,
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=self.timeout,
+        )
 
-        except Exception as e:
-            return {
-                "success": False,
-                "output": "",
-                "error": f"Error running OpenAgent: {str(e)}",
-            }
+        return {
+            "success": result.returncode == 0,
+            "output": result.stdout,
+            "error": result.stderr if result.returncode != 0 else None,
+            "return_code": result.returncode,
+        }
+
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "output": "",
+            "error": f"OpenAgent timed out after {self.timeout} seconds",
+            "return_code": -1,
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "output": "",
+            "error": f"Error running OpenAgent: {str(e)}",
+            "return_code": -1,
+        }
+
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "output": "",
+            "error": f"OpenAgent timed out after {self.timeout} seconds",
+            "return_code": -1,
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "output": "",
+            "error": f"Error running OpenAgent: {str(e)}",
+            "return_code": -1,
+        }
