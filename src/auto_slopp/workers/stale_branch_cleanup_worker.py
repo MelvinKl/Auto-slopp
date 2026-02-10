@@ -236,29 +236,23 @@ class StaleBranchCleanupWorker(Worker):
             local_branches, remote_branches, self.days_threshold
         )
 
-def _delete_branch(self, branch_name: str) -> bool:
+    def _delete_branch(self, branch_name: str) -> bool:
         """Delete a branch for testing purposes.
-        
+
         Args:
             branch_name: Name of branch to delete
-            
+
         Returns:
             True if deletion succeeded, False otherwise.
         """
         if self.dry_run:
             return True
-        
-        # Use a temporary directory for testing
-        import tempfile
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_repo_path = Path(temp_dir)
-            
-            # Mock scenario where it's not current branch
-            try:
-                delete_branch(temp_repo_path, branch_name)
-                return True
-            except Exception:
-                return False
+
+        try:
+            delete_branch(Path.cwd(), branch_name)
+            return True
+        except Exception:
+            return False
 
     def _log_completion_summary(self, results: Dict[str, Any]) -> None:
         """Log completion summary.
