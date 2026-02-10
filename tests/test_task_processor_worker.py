@@ -2,8 +2,9 @@
 
 import tempfile
 from pathlib import Path
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from auto_slopp.workers.task_processor_worker import TaskProcessorWorker
 

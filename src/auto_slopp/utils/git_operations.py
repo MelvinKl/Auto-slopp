@@ -38,7 +38,7 @@ def get_local_branches(repo_dir: Path) -> List[Dict[str, Any]]:
                 "git",
                 "branch",
                 "-v",
-                "--format=%(refname:short)%00%(committerdate:iso-strict)%00%(objectname)",
+                "--format=%(refname:short)%00%(authordate:iso-strict)%00%(objectname)",
             ],
             cwd=repo_dir,
             capture_output=True,

@@ -11,9 +11,9 @@ from typing import Any, Dict, List, Optional, Set
 
 from auto_slopp.utils.branch_analysis import analyze_repository_branches
 from auto_slopp.utils.git_operations import (
+    delete_branch,
     get_local_branches,
     get_remote_branches,
-    delete_branch,
 )
 from auto_slopp.utils.repository_utils import discover_repositories
 from auto_slopp.worker import Worker
@@ -68,16 +68,12 @@ class StaleBranchCleanupWorker(Worker):
             self._update_results_statistics(results, repo_result)
 
         # Finalize results
-        results["execution_time"] = (
-            datetime.now(timezone.utc) - start_time
-        ).total_seconds()
+        results["execution_time"] = (datetime.now(timezone.utc) - start_time).total_seconds()
         self._log_completion_summary(results)
 
         return results
 
-    def _validate_input_path(
-        self, repo_path: Path, task_path: Path, start_time: datetime
-    ) -> Optional[Dict[str, Any]]:
+    def _validate_input_path(self, repo_path: Path, task_path: Path, start_time: datetime) -> Optional[Dict[str, Any]]:
         """Validate the input repository path.
 
         Args:
@@ -91,9 +87,7 @@ class StaleBranchCleanupWorker(Worker):
         if not repo_path.exists():
             return {
                 "worker_name": "StaleBranchCleanupWorker",
-                "execution_time": (
-                    datetime.now(timezone.utc) - start_time
-                ).total_seconds(),
+                "execution_time": (datetime.now(timezone.utc) - start_time).total_seconds(),
                 "timestamp": start_time.isoformat(),
                 "repo_path": str(repo_path),
                 "task_path": str(task_path),
@@ -109,9 +103,7 @@ class StaleBranchCleanupWorker(Worker):
             }
         return None
 
-    def _create_results_dict(
-        self, start_time: datetime, repo_path: Path, task_path: Path
-    ) -> Dict[str, Any]:
+    def _create_results_dict(self, start_time: datetime, repo_path: Path, task_path: Path) -> Dict[str, Any]:
         """Create the initial results dictionary.
 
         Args:
@@ -154,15 +146,12 @@ class StaleBranchCleanupWorker(Worker):
         # Handle invalid repositories
         if not repo_info.get("valid", False):
             self.logger.warning(
-                f"Skipping invalid repository: {repo_info['name']} - "
-                f"{repo_info.get('errors', ['Unknown error'])}"
+                f"Skipping invalid repository: {repo_info['name']} - " f"{repo_info.get('errors', ['Unknown error'])}"
             )
             return self._create_invalid_repo_result(repo_info)
 
         # Analyze and cleanup branches using utility function
-        return analyze_repository_branches(
-            repo_dir=repo_dir, days_threshold=self.days_threshold, dry_run=self.dry_run
-        )
+        return analyze_repository_branches(repo_dir=repo_dir, days_threshold=self.days_threshold, dry_run=self.dry_run)
 
     def _create_invalid_repo_result(self, repo_info: Dict[str, Any]) -> Dict[str, Any]:
         """Create result for an invalid repository.
@@ -184,9 +173,7 @@ class StaleBranchCleanupWorker(Worker):
             "error": "; ".join(repo_info.get("errors", ["Repository is invalid"])),
         }
 
-    def _update_results_statistics(
-        self, results: Dict[str, Any], repo_result: Dict[str, Any]
-    ) -> None:
+    def _update_results_statistics(self, results: Dict[str, Any], repo_result: Dict[str, Any]) -> None:
         """Update results statistics with repository processing result.
 
         Args:
@@ -232,9 +219,7 @@ class StaleBranchCleanupWorker(Worker):
         """
         from auto_slopp.utils.branch_analysis import identify_stale_branches
 
-        return identify_stale_branches(
-            local_branches, remote_branches, self.days_threshold
-        )
+        return identify_stale_branches(local_branches, remote_branches, self.days_threshold)
 
     def _delete_branch(self, branch_name: str) -> bool:
         """Delete a branch for testing purposes.
