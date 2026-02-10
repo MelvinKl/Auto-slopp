@@ -26,7 +26,7 @@ class OpenCodeWorker(Worker, ABC):
     def __init__(
         self,
         agent_args: Optional[List[str]] = None,
-        timeout: int = 300,
+        timeout: int = 7200,
         capture_output: bool = True,
         working_dir: Optional[Path] = None,
         process_all_repos: bool = False,
