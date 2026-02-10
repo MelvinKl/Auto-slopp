@@ -78,14 +78,16 @@ def execute_openagent_with_instructions(
         Dictionary containing OpenAgent execution results
     """
     try:
-        logger.info(f"Executing OpenAgent with instructions length: {len(instructions)}")
+        logger.info(
+            f"Executing OpenAgent with instructions length: {len(instructions)}"
+        )
 
         # Create a temporary instruction file
         instruction_file = write_temp_instruction_file(work_dir, instructions)
 
         try:
             # Build OpenAgent command
-            cmd = ["openagent"] + agent_args
+            cmd = ["opencode"] + ["--agent", "openagent"] + agent_args
             cmd.append(str(instruction_file))
 
             # Execute OpenAgent
@@ -97,7 +99,9 @@ def execute_openagent_with_instructions(
                 timeout=timeout,
             )
 
-            logger.info(f"OpenAgent execution completed with return code: {result.returncode}")
+            logger.info(
+                f"OpenAgent execution completed with return code: {result.returncode}"
+            )
 
             return {
                 "success": result.returncode == 0,
@@ -162,17 +166,24 @@ def process_text_file(
 
         result["instructions"] = instructions
         logger.info(f"Loaded instructions from {text_file.name}")
-
+        instructions = f"Create a new branch that starts with ai/ with base origin/main and implement the following:\n{instructions}\nKeep your implementation simple. Only implement what is required. Ensure that 'make test' runs successful. Check if you need to update the README.md. Push your changes and create a pull request on github."
         # Execute OpenAgent with the instructions
         if not dry_run:
-            openagent_result = execute_openagent_with_instructions(instructions, task_repo_dir, agent_args, timeout)
+            openagent_result = execute_openagent_with_instructions(
+                instructions, task_repo_dir, agent_args, timeout
+            )
             result["openagent_executed"] = openagent_result["success"]
 
             if not openagent_result["success"]:
-                result["error"] = f"OpenAgent execution failed: " f"{openagent_result.get('error', 'Unknown error')}"
+                result["error"] = (
+                    f"OpenCode execution failed: "
+                    f"{openagent_result.get('error', 'Unknown error')}"
+                )
                 return result
         else:
-            logger.info(f"DRY RUN: Would execute OpenAgent with instructions from {text_file.name}")
+            logger.info(
+                f"DRY RUN: Would execute OpenAgent with instructions from {text_file.name}"
+            )
             result["openagent_executed"] = True
 
         # Rename the file with counter and .used suffix
@@ -248,7 +259,9 @@ def process_repository(
 
         # Process each text file
         for text_file in text_files:
-            file_result = process_text_file(text_file, task_repo_dir, dry_run, agent_args, timeout, counter_start)
+            file_result = process_text_file(
+                text_file, task_repo_dir, dry_run, agent_args, timeout, counter_start
+            )
             result["processed_files"].append(file_result)
 
             if file_result["success"]:
@@ -260,7 +273,9 @@ def process_repository(
                 if file_result.get("git_operations", False):
                     result["git_operations"] += 1
             else:
-                result["errors"].append(file_result.get("error", "Unknown processing error"))
+                result["errors"].append(
+                    file_result.get("error", "Unknown processing error")
+                )
 
         result["success"] = len(result["errors"]) == 0
 

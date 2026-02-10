@@ -1,10 +1,10 @@
-"""Task processing worker for handling text file instructions with OpenAgent.
+"""Task processing worker for handling text file instructions with OpenCode.
 
 This worker processes repositories by:
 1. Mapping repositories from repo_path to task_repo_path
 2. Creating directories if they don't exist
 3. Finding and processing .txt files with instructions
-4. Using OpenAgent to execute the instructions
+4. Using OpenCode to execute the instructions
 5. Renaming processed files with 4-digit counters and .used suffix
 6. Committing and pushing changes to task_repo_path
 """
@@ -14,25 +14,25 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from auto_slopp.base.openagent_worker import OpenAgentWorker
+from auto_slopp.base.opencode_worker import OpenCodeWorker
 from auto_slopp.utils.file_operations import ensure_directory_exists
 from auto_slopp.utils.repository_utils import discover_repositories
 from auto_slopp.utils.task_processing import process_repository
 
 
-class TaskProcessorWorker(OpenAgentWorker):
-    """Worker for processing text file instructions with OpenAgent.
+class TaskProcessorWorker(OpenCodeWorker):
+    """Worker for processing text file instructions with OpenCode.
 
     This worker maps repositories from repo_path to task_repo_path,
     processes .txt instruction files, and manages the complete workflow
-    including file renaming, git operations, and OpenAgent execution.
+    including file renaming, git operations, and OpenCode execution.
     """
 
     def __init__(
         self,
         task_repo_path: Path,
         counter_start: int = 1,
-        timeout: int = 600,
+        timeout: int = 7200,
         agent_args: Optional[List[str]] = None,
         dry_run: bool = False,
     ):
@@ -41,9 +41,9 @@ class TaskProcessorWorker(OpenAgentWorker):
         Args:
             task_repo_path: Path to the task repository directory
             counter_start: Starting number for 4-digit file counter
-            timeout: Timeout for OpenAgent execution in seconds
-            agent_args: Additional arguments to pass to OpenAgent
-            dry_run: If True, skip actual OpenAgent execution and git operations
+            timeout: Timeout for OpenCode execution in seconds
+            agent_args: Additional arguments to pass to OpenCode
+            dry_run: If True, skip actual OpenCode execution and git operations
         """
         super().__init__(agent_args=agent_args, timeout=timeout, process_all_repos=True)
         self.task_repo_path = task_repo_path
@@ -53,12 +53,14 @@ class TaskProcessorWorker(OpenAgentWorker):
 
         # Ensure task_repo_path exists
         if not ensure_directory_exists(self.task_repo_path):
-            raise RuntimeError(f"Failed to create task repository path: {self.task_repo_path}")
+            raise RuntimeError(
+                f"Failed to create task repository path: {self.task_repo_path}"
+            )
 
     def get_agent_instructions(self) -> str:
-        """Get instructions for OpenAgent execution.
+        """Get instructions for OpenCode execution.
 
-        This method is called by the parent OpenAgentWorker class.
+        This method is called by the parent OpenCodeWorker class.
         For TaskProcessorWorker, instructions are dynamically loaded
         from text files in each repository.
 
@@ -103,7 +105,9 @@ class TaskProcessorWorker(OpenAgentWorker):
 
         return results
 
-    def _validate_paths(self, repo_path: Path, task_path: Path, start_time: float) -> Optional[Dict[str, Any]]:
+    def _validate_paths(
+        self, repo_path: Path, task_path: Path, start_time: float
+    ) -> Optional[Dict[str, Any]]:
         """Validate input paths and return error result if invalid.
 
         Args:
@@ -132,7 +136,9 @@ class TaskProcessorWorker(OpenAgentWorker):
 
         return None
 
-    def _create_results_dict(self, start_time: float, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def _create_results_dict(
+        self, start_time: float, repo_path: Path, task_path: Path
+    ) -> Dict[str, Any]:
         """Create the initial results dictionary.
 
         Args:
@@ -176,7 +182,8 @@ class TaskProcessorWorker(OpenAgentWorker):
 
         if not repo_info.get("valid", False):
             self.logger.warning(
-                f"Skipping invalid repository: {repo_info['name']} - " f"{repo_info.get('errors', ['Unknown error'])}"
+                f"Skipping invalid repository: {repo_info['name']} - "
+                f"{repo_info.get('errors', ['Unknown error'])}"
             )
             return self._create_invalid_repo_result(repo_info)
 
@@ -212,7 +219,9 @@ class TaskProcessorWorker(OpenAgentWorker):
             "errors": repo_info.get("errors", ["Repository is invalid"]),
         }
 
-    def _update_results_statistics(self, results: Dict[str, Any], repo_result: Dict[str, Any]) -> None:
+    def _update_results_statistics(
+        self, results: Dict[str, Any], repo_result: Dict[str, Any]
+    ) -> None:
         """Update results statistics with repository processing result.
 
         Args:
@@ -222,8 +231,12 @@ class TaskProcessorWorker(OpenAgentWorker):
         results["repositories_processed"] += 1
 
         if repo_result["success"]:
-            results["text_files_processed"] += repo_result.get("text_files_processed", 0)
-            results["openagent_executions"] += repo_result.get("openagent_executions", 0)
+            results["text_files_processed"] += repo_result.get(
+                "text_files_processed", 0
+            )
+            results["openagent_executions"] += repo_result.get(
+                "openagent_executions", 0
+            )
             results["files_renamed"] += repo_result.get("files_renamed", 0)
             results["git_operations"] += repo_result.get("git_operations", 0)
         else:
@@ -240,7 +253,7 @@ class TaskProcessorWorker(OpenAgentWorker):
             f"TaskProcessorWorker completed. Processed: "
             f"{results['repositories_processed']}, "
             f"Text files: {results['text_files_processed']}, "
-            f"OpenAgent executions: {results['openagent_executions']}, "
+            f"OpenCode executions: {results['openagent_executions']}, "
             f"Files renamed: {results['files_renamed']}, "
             f"Git operations: {results['git_operations']}, "
             f"Errors: {results['repositories_with_errors']}"
