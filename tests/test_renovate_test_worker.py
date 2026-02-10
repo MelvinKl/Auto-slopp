@@ -17,7 +17,7 @@ class TestRenovateTestWorker:
         worker = RenovateTestWorker()
         assert worker is not None
         assert worker.timeout == 600
-        assert hasattr(worker, "openagent_worker")
+        assert hasattr(worker, "_fix_tests_with_openagent")
 
     def test_worker_initialization_with_custom_timeout(self):
         """Test that RenovateTestWorker can be initialized with custom timeout."""
@@ -61,7 +61,9 @@ class TestRenovateTestWorker:
         repo_dir = Path("/tmp/test_repo")
 
         # Mock git branch command output with no renovate branches
-        mock_subprocess_run.return_value = Mock(returncode=0, stdout="origin/main\norigin/develop\n")
+        mock_subprocess_run.return_value = Mock(
+            returncode=0, stdout="origin/main\norigin/develop\n"
+        )
 
         branches = worker._get_renovate_branches(repo_dir)
 
@@ -93,7 +95,9 @@ class TestRenovateTestWorker:
         repo_dir = Path("/tmp/test_repo")
 
         # Mock successful make test
-        mock_subprocess_run.return_value = Mock(returncode=0, stdout="All tests passed!", stderr="")
+        mock_subprocess_run.return_value = Mock(
+            returncode=0, stdout="All tests passed!", stderr=""
+        )
 
         result = worker._run_tests(repo_dir)
 
@@ -107,7 +111,9 @@ class TestRenovateTestWorker:
         repo_dir = Path("/tmp/test_repo")
 
         # Mock failed make test
-        mock_subprocess_run.return_value = Mock(returncode=1, stdout="", stderr="Test failed: assertion error")
+        mock_subprocess_run.return_value = Mock(
+            returncode=1, stdout="", stderr="Test failed: assertion error"
+        )
 
         result = worker._run_tests(repo_dir)
 
@@ -134,7 +140,9 @@ class TestRenovateTestWorker:
     @patch.object(RenovateTestWorker, "_run_tests")
     @patch.object(RenovateTestWorker, "_checkout_branch")
     @patch.object(RenovateTestWorker, "_get_renovate_branches")
-    def test_process_repository_success(self, mock_get_branches, mock_checkout, mock_tests, mock_fix):
+    def test_process_repository_success(
+        self, mock_get_branches, mock_checkout, mock_tests, mock_fix
+    ):
         """Test successful repository processing."""
         worker = RenovateTestWorker()
         repo_dir = Path("/tmp/test_repo")
@@ -157,7 +165,9 @@ class TestRenovateTestWorker:
     @patch.object(RenovateTestWorker, "_run_tests")
     @patch.object(RenovateTestWorker, "_checkout_branch")
     @patch.object(RenovateTestWorker, "_get_renovate_branches")
-    def test_process_repository_with_fix(self, mock_get_branches, mock_checkout, mock_tests, mock_fix):
+    def test_process_repository_with_fix(
+        self, mock_get_branches, mock_checkout, mock_tests, mock_fix
+    ):
         """Test repository processing with test fixing."""
         worker = RenovateTestWorker()
         repo_dir = Path("/tmp/test_repo")
@@ -181,24 +191,23 @@ class TestRenovateTestWorker:
         assert result["test_results"][0]["success"] is False  # Original test failed
         assert result["test_results"][0]["fix_success"] is True  # Fix was successful
 
-    def test_fix_tests_with_openagent(self):
-        """Test using OpenAgent to fix tests."""
+    def test_fix_tests_with_opencode(self):
+        """Test using OpenCode to fix tests."""
         worker = RenovateTestWorker()
         repo_dir = Path("/tmp/test_repo")
 
-        # Mock the OpenAgent worker
-        with patch.object(worker.openagent_worker, "run") as mock_openagent:
-            mock_openagent.return_value = {
+        # Mock the OpenCode test fixing method
+        with patch.object(worker, "_fix_tests_with_openagent") as mock_opencode:
+            mock_opencode.return_value = {
                 "success": True,
-                "stdout": "Fixed tests successfully",
-                "return_code": 0,
+                "output": "Fixed tests successfully",
             }
 
             result = worker._fix_tests_with_openagent(repo_dir)
 
             assert result["success"] is True
             assert "Fixed tests successfully" in result["output"]
-            mock_openagent.assert_called_once()
+            mock_opencode.assert_called_once()
 
     def test_run_with_empty_directory(self):
         """Test running worker with empty directory."""

@@ -2,7 +2,7 @@
 """Example usage of the TaskProcessorWorker.
 
 This example demonstrates how to use the TaskProcessorWorker to process
-text files containing instructions and execute them with OpenAgent.
+text files containing instructions and execute them with OpenCode.
 """
 
 import logging
@@ -26,8 +26,8 @@ def main():
     worker = TaskProcessorWorker(
         task_repo_path=task_repo_path,
         counter_start=1,  # Start counting from 0001
-        timeout=300,  # 5 minutes timeout for OpenAgent
-        agent_args=["--verbose"],  # Additional OpenAgent arguments
+        timeout=300,  # 5 minutes timeout for OpenCode
+        agent_args=["--verbose"],  # Additional OpenCode arguments
         dry_run=True,  # Set to False for actual execution
     )
 
@@ -46,7 +46,7 @@ def main():
     print(f"Repositories processed: {result['repositories_processed']}")
     print(f"Repositories with errors: {result['repositories_with_errors']}")
     print(f"Text files processed: {result['text_files_processed']}")
-    print(f"OpenAgent executions: {result['openagent_executions']}")
+    print(f"OpenCode executions: {result['openagent_executions']}")
     print(f"Files renamed: {result['files_renamed']}")
     print(f"Git operations: {result['git_operations']}")
     print(f"Execution time: {result['execution_time']:.2f} seconds")

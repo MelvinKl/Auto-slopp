@@ -89,7 +89,9 @@ class RenovateTestWorker(Worker):
                     results["repositories_fixed"] += 1
             else:
                 results["repositories_with_errors"] += 1
-                results["errors"].append(f"{repo_dir.name}: {repo_result.get('error', 'Unknown error')}")
+                results["errors"].append(
+                    f"{repo_dir.name}: {repo_result.get('error', 'Unknown error')}"
+                )
 
         # Determine overall success
         if results["repositories_with_errors"] > 0:
@@ -155,17 +157,25 @@ class RenovateTestWorker(Worker):
 
                 # If tests failed, use OpenAgent to fix them
                 if not test_result["success"]:
-                    self.logger.info(f"Tests failed for {branch} in {repo_dir.name}, using OpenAgent to fix")
+                    self.logger.info(
+                        f"Tests failed for {branch} in {repo_dir.name}, using OpenAgent to fix"
+                    )
                     fix_result = self._fix_tests_with_openagent(repo_dir)
                     if fix_result["success"]:
                         result["tests_fixed"] = True
                         # Re-run tests to verify fix
                         verify_result = self._run_tests(repo_dir)
-                        result["test_results"][-1]["fix_success"] = verify_result["success"]
-                        result["test_results"][-1]["fix_output"] = verify_result.get("output", "")
+                        result["test_results"][-1]["fix_success"] = verify_result[
+                            "success"
+                        ]
+                        result["test_results"][-1]["fix_output"] = verify_result.get(
+                            "output", ""
+                        )
                     else:
                         result["test_results"][-1]["fix_success"] = False
-                        result["test_results"][-1]["fix_error"] = fix_result.get("error", "Unknown fix error")
+                        result["test_results"][-1]["fix_error"] = fix_result.get(
+                            "error", "Unknown fix error"
+                        )
                 else:
                     result["test_results"][-1]["fix_success"] = True  # No fix needed
 
@@ -196,7 +206,9 @@ class RenovateTestWorker(Worker):
             )
 
             if result.returncode != 0:
-                self.logger.error(f"Failed to list branches in {repo_dir.name}: {result.stderr}")
+                self.logger.error(
+                    f"Failed to list branches in {repo_dir.name}: {result.stderr}"
+                )
                 return []
 
             branches = []
@@ -247,7 +259,9 @@ class RenovateTestWorker(Worker):
             )
 
             if result.returncode != 0:
-                self.logger.error(f"Failed to checkout {branch} in {repo_dir.name}: {result.stderr}")
+                self.logger.error(
+                    f"Failed to checkout {branch} in {repo_dir.name}: {result.stderr}"
+                )
                 return False
 
             # Pull latest changes for the branch
@@ -266,7 +280,9 @@ class RenovateTestWorker(Worker):
             self.logger.error(f"Timeout checking out {branch} in {repo_dir.name}")
             return False
         except Exception as e:
-            self.logger.error(f"Error checking out {branch} in {repo_dir.name}: {str(e)}")
+            self.logger.error(
+                f"Error checking out {branch} in {repo_dir.name}: {str(e)}"
+            )
             return False
 
     def _run_tests(self, repo_dir: Path) -> Dict[str, Any]:
@@ -307,22 +323,22 @@ class RenovateTestWorker(Worker):
             }
 
     def _fix_tests_with_openagent(self, repo_dir: Path) -> Dict[str, Any]:
-        """Use OpenAgent to fix failing tests.
+        """Use OpenCode to fix failing tests.
 
         Args:
             repo_dir: Path to the repository directory
 
         Returns:
-            Dictionary containing OpenAgent execution results
+            Dictionary containing OpenCode execution results
         """
         try:
             # Create a dummy task path for OpenAgent
             task_path = repo_dir / "fix_tests.task"
 
-            # Run OpenAgent to fix tests with specific arguments
+            # Run OpenCode to fix tests with specific arguments
             agent_args = ["fix", "the", "tests", "and", "push", "the", "changes"]
             result = subprocess.run(
-                ["openagent"] + agent_args,
+                ["opencode"] + ["--agent", "openagent"] + agent_args,
                 cwd=repo_dir,
                 capture_output=True,
                 text=True,

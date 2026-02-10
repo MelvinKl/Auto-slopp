@@ -87,7 +87,9 @@ class TestTaskProcessorWorker:
         test_repo.mkdir()
         # Initialize as git repository to be considered valid
         (test_repo / ".git").mkdir()
-        (test_repo / ".git" / "config").write_text("[core]\n\trepositoryformatversion = 0\n")
+        (test_repo / ".git" / "config").write_text(
+            "[core]\n\trepositoryformatversion = 0\n"
+        )
 
         text_file = test_repo / "instructions.txt"
         text_file.write_text("Test instruction content")
@@ -122,7 +124,9 @@ class TestTaskProcessorWorker:
         test_repo.mkdir()
         # Initialize as git repository to be considered valid
         (test_repo / ".git").mkdir()
-        (test_repo / ".git" / "config").write_text("[core]\n\trepositoryformatversion = 0\n")
+        (test_repo / ".git" / "config").write_text(
+            "[core]\n\trepositoryformatversion = 0\n"
+        )
 
         # Create empty text file
         text_file = test_repo / "empty.txt"
@@ -178,7 +182,7 @@ class TestTaskProcessorWorker:
         assert result["git_operations"] is True  # dry run
 
     def test_process_text_file_openagent_failure(self):
-        """Test text file processing when OpenAgent fails."""
+        """Test text file processing when OpenCode fails."""
         # Create worker without dry run to mock actual failure
         worker = TaskProcessorWorker(
             task_repo_path=self.task_repo_path,
@@ -194,14 +198,16 @@ class TestTaskProcessorWorker:
         text_file = test_repo / "instructions.txt"
         text_file.write_text("Test instruction content")
 
-        # Mock OpenAgent execution to fail
-        with patch.object(worker, "_execute_openagent_with_instructions") as mock_execute:
-            mock_execute.return_value = {"success": False, "error": "OpenAgent failed"}
+        # Mock OpenCode execution to fail
+        with patch.object(
+            worker, "_execute_openagent_with_instructions"
+        ) as mock_execute:
+            mock_execute.return_value = {"success": False, "error": "OpenCode failed"}
 
             result = worker._process_text_file(text_file, task_repo_dir)
 
             assert result["success"] is False
-            assert "OpenAgent failed" in result["error"]
+            assert "OpenCode failed" in result["error"]
             assert result["openagent_executed"] is False
 
     def test_rename_processed_file(self):
@@ -281,7 +287,9 @@ class TestTaskProcessorWorker:
 
             assert result is True
             # Should not call commit command
-            commit_calls = [call for call in mock_run.call_args_list if "commit" in str(call)]
+            commit_calls = [
+                call for call in mock_run.call_args_list if "commit" in str(call)
+            ]
             assert len(commit_calls) == 0
 
     def test_commit_and_push_changes_git_failure(self):
@@ -314,7 +322,9 @@ class TestTaskProcessorWorker:
             repo.mkdir()
             # Initialize as git repository
             (repo / ".git").mkdir()
-            (repo / ".git" / "config").write_text("[core]\n\trepositoryformatversion = 0\n")
+            (repo / ".git" / "config").write_text(
+                "[core]\n\trepositoryformatversion = 0\n"
+            )
 
         # Add text files to some repos
         (repo1 / "instructions1.txt").write_text("Instruction 1")
@@ -332,7 +342,9 @@ class TestTaskProcessorWorker:
     def test_create_error_result(self):
         """Test error result creation."""
         start_time = 1.0
-        result = self.worker._create_error_result(start_time, self.repo_path, self.temp_dir / "task", "Test error")
+        result = self.worker._create_error_result(
+            start_time, self.repo_path, self.temp_dir / "task", "Test error"
+        )
 
         assert result["success"] is False
         assert result["error"] == "Test error"
