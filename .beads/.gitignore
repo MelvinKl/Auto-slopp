@@ -1,3 +1,4 @@
+export-state
 # SQLite databases
 *.db
 *.db?*
