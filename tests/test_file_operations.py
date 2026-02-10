@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Tests for file operations functions related to task processing."""
 
-import pytest
-from pathlib import Path
 import tempfile
+from pathlib import Path
+
+import pytest
 
 from auto_slopp.utils.file_operations import (
-    rename_processed_file,
-    get_next_counter,
     create_file_counter_name,
+    get_next_counter,
+    rename_processed_file,
 )
 
 
