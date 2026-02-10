@@ -6,7 +6,7 @@ and ensuring they are proper git repositories.
 
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 def is_git_repository(repo_dir: Path) -> bool:
@@ -25,7 +25,7 @@ def is_git_repository(repo_dir: Path) -> bool:
         return False
 
 
-def validate_repository(repo_dir: Path) -> Dict[str, any]:
+def validate_repository(repo_dir: Path) -> Dict[str, Any]:
     """Validate a repository directory and return status information.
 
     Args:
@@ -131,7 +131,7 @@ def validate_repository(repo_dir: Path) -> Dict[str, any]:
     return result
 
 
-def discover_repositories(repo_path: Path, validate: bool = True) -> List[Dict[str, any]]:
+def discover_repositories(repo_path: Path, validate: bool = True) -> List[Dict[str, Any]]:
     """Discover all git repositories in the given path.
 
     Args:
@@ -167,7 +167,7 @@ def discover_repositories(repo_path: Path, validate: bool = True) -> List[Dict[s
     return repositories
 
 
-def get_repository_status(repo_dir: Path) -> Dict[str, any]:
+def get_repository_status(repo_dir: Path) -> Dict[str, Any]:
     """Get the git status of a repository.
 
     Args:
