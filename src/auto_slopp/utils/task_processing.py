@@ -85,7 +85,7 @@ def execute_openagent_with_instructions(
 
         try:
             # Build OpenAgent command
-            cmd = ["opencode"] + ["--agent", "openagent"] + agent_args
+            cmd = ["opencode"] + ["--agent", "openagent"] + agent_args + ["run"]
             cmd.append(str(instruction_file))
 
             # Execute OpenAgent
