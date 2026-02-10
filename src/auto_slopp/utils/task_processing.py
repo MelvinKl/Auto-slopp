@@ -166,7 +166,7 @@ def process_text_file(
 
         result["instructions"] = instructions
         logger.info(f"Loaded instructions from {text_file.name}")
-
+        instructions = f"Create a new branch that starts with ai/ with base origin/main and implement the following:\n{instructions}\nKeep your implementation simple. Only implement what is required. Ensure that 'make test' runs successful. Check if you need to update the README.md. Push your changes and create a pull request on github."
         # Execute OpenAgent with the instructions
         if not dry_run:
             openagent_result = execute_openagent_with_instructions(
