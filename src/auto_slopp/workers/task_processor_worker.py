@@ -53,9 +53,7 @@ class TaskProcessorWorker(OpenCodeWorker):
 
         # Ensure task_repo_path exists
         if not ensure_directory_exists(self.task_repo_path):
-            raise RuntimeError(
-                f"Failed to create task repository path: {self.task_repo_path}"
-            )
+            raise RuntimeError(f"Failed to create task repository path: {self.task_repo_path}")
 
     def get_agent_instructions(self) -> str:
         """Get instructions for OpenCode execution.
@@ -105,9 +103,7 @@ class TaskProcessorWorker(OpenCodeWorker):
 
         return results
 
-    def _validate_paths(
-        self, repo_path: Path, task_path: Path, start_time: float
-    ) -> Optional[Dict[str, Any]]:
+    def _validate_paths(self, repo_path: Path, task_path: Path, start_time: float) -> Optional[Dict[str, Any]]:
         """Validate input paths and return error result if invalid.
 
         Args:
@@ -136,9 +132,7 @@ class TaskProcessorWorker(OpenCodeWorker):
 
         return None
 
-    def _create_results_dict(
-        self, start_time: float, repo_path: Path, task_path: Path
-    ) -> Dict[str, Any]:
+    def _create_results_dict(self, start_time: float, repo_path: Path, task_path: Path) -> Dict[str, Any]:
         """Create the initial results dictionary.
 
         Args:
@@ -182,8 +176,7 @@ class TaskProcessorWorker(OpenCodeWorker):
 
         if not repo_info.get("valid", False):
             self.logger.warning(
-                f"Skipping invalid repository: {repo_info['name']} - "
-                f"{repo_info.get('errors', ['Unknown error'])}"
+                f"Skipping invalid repository: {repo_info['name']} - " f"{repo_info.get('errors', ['Unknown error'])}"
             )
             return self._create_invalid_repo_result(repo_info)
 
@@ -219,9 +212,7 @@ class TaskProcessorWorker(OpenCodeWorker):
             "errors": repo_info.get("errors", ["Repository is invalid"]),
         }
 
-    def _update_results_statistics(
-        self, results: Dict[str, Any], repo_result: Dict[str, Any]
-    ) -> None:
+    def _update_results_statistics(self, results: Dict[str, Any], repo_result: Dict[str, Any]) -> None:
         """Update results statistics with repository processing result.
 
         Args:
@@ -231,12 +222,8 @@ class TaskProcessorWorker(OpenCodeWorker):
         results["repositories_processed"] += 1
 
         if repo_result["success"]:
-            results["text_files_processed"] += repo_result.get(
-                "text_files_processed", 0
-            )
-            results["openagent_executions"] += repo_result.get(
-                "openagent_executions", 0
-            )
+            results["text_files_processed"] += repo_result.get("text_files_processed", 0)
+            results["openagent_executions"] += repo_result.get("openagent_executions", 0)
             results["files_renamed"] += repo_result.get("files_renamed", 0)
             results["git_operations"] += repo_result.get("git_operations", 0)
         else:

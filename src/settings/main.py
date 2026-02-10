@@ -30,7 +30,23 @@ class Settings(BaseSettings):
         description="Path to search for worker implementations",
     )
 
-    @field_validator("base_repo_path", "base_task_path", "worker_search_path", mode="before")
+    task_repo_path: Path = Field(
+        default_factory=lambda: Path.cwd() / "tasks",
+        description="Path to the task repository directory",
+    )
+
+    worker_search_path: Path = Field(
+        default_factory=lambda: Path(__file__).parent.parent,
+        description="Path to search for worker implementations",
+    )
+
+    @field_validator(
+        "base_repo_path",
+        "base_task_path",
+        "task_repo_path",
+        "worker_search_path",
+        mode="before",
+    )
     @classmethod
     def expand_user_paths(cls, v):
         """Expand user (~) paths in path fields."""
@@ -39,26 +55,6 @@ class Settings(BaseSettings):
         elif isinstance(v, Path):
             return v.expanduser()
         return v
-
-    base_task_path: Path = Field(
-        default_factory=lambda: Path.cwd() / "tasks",
-        description="Base path to the task directory",
-    )
-
-    worker_search_path: Path = Field(
-        default_factory=lambda: Path(__file__).parent.parent,
-        description="Path to search for worker implementations",
-    )
-
-    base_task_path: Path = Field(
-        default_factory=lambda: Path.cwd() / "tasks",
-        description="Base path to the task directory",
-    )
-
-    worker_search_path: Path = Field(
-        default_factory=lambda: Path(__file__).parent.parent,
-        description="Path to search for worker implementations",
-    )
 
     executor_sleep_interval: float = Field(
         default=1.0, description="Sleep interval between executor iterations in seconds"

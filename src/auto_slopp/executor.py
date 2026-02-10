@@ -74,6 +74,24 @@ class Executor:
             print(f"Error in iteration: {e}")
             traceback.print_exc()
 
+    def _instantiate_worker(self, worker_class: Type[Worker]) -> Worker:
+        """Instantiate a worker with appropriate arguments.
+
+        Args:
+            worker_class: Worker class to instantiate
+
+        Returns:
+            Instantiated worker instance
+        """
+        # Special handling for TaskProcessorWorker which requires task_repo_path
+        if worker_class.__name__ == "TaskProcessorWorker":
+            from settings.main import settings
+
+            return worker_class(task_repo_path=settings.task_repo_path)
+
+        # Default instantiation for simple workers
+        return worker_class()
+
     def _execute_worker(self, worker_class: Type[Worker]) -> None:
         """Execute a single worker instance.
 
@@ -83,8 +101,8 @@ class Executor:
         try:
             print(f"Executing worker: {worker_class.__name__}")
 
-            # Instantiate worker
-            worker = worker_class()
+            # Instantiate worker with appropriate arguments
+            worker = self._instantiate_worker(worker_class)
 
             # Execute worker
             start_time = time.time()
