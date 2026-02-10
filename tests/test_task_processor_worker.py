@@ -216,7 +216,7 @@ class TestTaskProcessorWorker:
 
         assert renamed_file is not None
         assert renamed_file.name.startswith("0001_")
-        assert renamed_file.name.endswith(".used.txt")
+        assert renamed_file.name.endswith(".used")
         assert "original" in renamed_file.name
         assert not original_file.exists()
         assert renamed_file.exists()
@@ -232,8 +232,8 @@ class TestTaskProcessorWorker:
         test_repo.mkdir()
 
         # Create existing used files
-        (test_repo / "0001_file1.used.txt").write_text("Content 1")
-        (test_repo / "0003_file2.used.txt").write_text("Content 2")
+        (test_repo / "0001_file1.used").write_text("Content 1")
+        (test_repo / "0003_file2.used").write_text("Content 2")
 
         counter = self.worker._get_next_counter(test_repo)
         assert counter == 4  # Should be max existing + 1

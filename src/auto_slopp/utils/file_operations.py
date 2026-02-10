@@ -71,11 +71,11 @@ def get_next_counter(directory: Path, counter_start: int = 1) -> int:
     """
     try:
         # Find all files with counter prefix pattern
-        counter_pattern = re.compile(r"^(\d{4})_.*\.used\.txt$")
+        counter_pattern = re.compile(r"^(\d{4})_.*\.used$")
         existing_counters = []
 
         for file_path in directory.iterdir():
-            if file_path.is_file() and file_path.suffix == ".txt":
+            if file_path.is_file():
                 match = counter_pattern.match(file_path.name)
                 if match:
                     existing_counters.append(int(match.group(1)))
@@ -106,8 +106,8 @@ def rename_processed_file(original_file: Path, counter_start: int = 1) -> Option
         counter = get_next_counter(original_file.parent, counter_start)
         counter_str = f"{counter:04d}"
 
-        # Create new filename: counter_original_name.used.txt
-        new_name = f"{counter_str}_{original_file.stem}.used{original_file.suffix}"
+        # Create new filename: counter_original_name.used
+        new_name = f"{counter_str}_{original_file.stem}.used"
         new_path = original_file.parent / new_name
 
         # Rename the file
@@ -180,4 +180,4 @@ def create_file_counter_name(original_file: Path, counter: int) -> str:
         New filename with counter and .used suffix.
     """
     counter_str = f"{counter:04d}"
-    return f"{counter_str}_{original_file.stem}.used{original_file.suffix}"
+    return f"{counter_str}_{original_file.stem}.used"
