@@ -154,16 +154,13 @@ def process_text_file(
 
         # Commit and push changes in task_repo_path
         if not dry_run:
-            commit_success, push_success = commit_and_push_changes(
-                task_repo_dir, f"Process instructions from {text_file.name}"
-            )
-            result["git_operations"] = commit_success
+            # TODO: commit the changes without pushing
 
             if not commit_success:
-                result["error"] = "Git commit/push operations failed"
+                result["error"] = "Git commit operations failed"
                 return result
         else:
-            logger.info(f"DRY RUN: Would commit and push changes for {text_file.name}")
+            logger.info(f"DRY RUN: Would commit changes for {text_file.name}")
             result["git_operations"] = True
 
         result["success"] = True
@@ -207,7 +204,7 @@ def process_repository(
             return result
 
         logger.info(f"Ensured task directory exists: {task_repo_dir}")
-
+        # TODO: tell opencode with working dir task_repo_dir to pull from the git repo
         # Find .txt files in the repository
         text_files = find_text_files(repo_dir)
 
@@ -233,7 +230,7 @@ def process_repository(
                 result["errors"].append(file_result.get("error", "Unknown processing error"))
 
         result["success"] = len(result["errors"]) == 0
-
+        # TODO: tell opencode with working dir task_repo_dir to push the changes
     except Exception as e:
         logger.error(f"Error processing repository {repo_dir.name}: {str(e)}")
         result["errors"].append(str(e))
