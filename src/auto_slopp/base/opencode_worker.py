@@ -6,13 +6,13 @@ and results. It should be inherited by concrete worker implementations.
 """
 
 import logging
-import subprocess
 import time
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from auto_slopp.utils.opencode import run_opencode
 from auto_slopp.worker import Worker
 
 
@@ -113,100 +113,24 @@ class OpenCodeWorker(Worker, ABC):
         Returns:
             Dictionary containing execution results.
         """
-        start_time = time.time()
-
         # Determine working directory
         working_dir = self.working_dir or work_dir
 
-        # Build command - use opencode with openagent agent
-        cmd = ["opencode"] + ["--agent", "openagent"] + self.agent_args + ["run"]
-
-        # Add task path to arguments if provided
+        # Prepare additional instructions from task path if provided
+        additional_instructions = None
         if task_path and task_path.exists():
-            cmd.extend([str(task_path)])
+            additional_instructions = str(task_path)
 
-        try:
-            # Execute the command
-            result = subprocess.run(
-                cmd,
-                cwd=working_dir,
-                capture_output=self.capture_output,
-                text=True,
-                timeout=self.timeout,
-            )
+        # Use the centralized opencode utility
+        result = run_opencode(
+            additional_instructions=additional_instructions,
+            working_directory=working_dir,
+            timeout=self.timeout,
+            agent_args=self.agent_args,
+            capture_output=self.capture_output,
+        )
 
-            execution_time = time.time() - start_time
+        # Add worker name to result for consistency
+        result["worker_name"] = "OpenCodeWorker"
 
-            # Prepare result
-            execution_result = {
-                "worker_name": "OpenCodeWorker",
-                "execution_time": execution_time,
-                "timestamp": datetime.now().isoformat(),
-                "working_directory": str(working_dir),
-                "command": " ".join(cmd),
-                "return_code": result.returncode,
-                "success": result.returncode == 0,
-                "timeout": False,
-            }
-
-            # Add output if captured
-            if self.capture_output:
-                execution_result.update(
-                    {
-                        "stdout": result.stdout,
-                        "stderr": result.stderr,
-                        "stdout_lines": result.stdout.splitlines() if result.stdout else [],
-                        "stderr_lines": result.stderr.splitlines() if result.stderr else [],
-                    }
-                )
-
-            self.logger.info(f"OpenCodeWorker completed in {execution_time:.2f}s with return code {result.returncode}")
-            return execution_result
-
-        except subprocess.TimeoutExpired:
-            execution_time = time.time() - start_time
-            self.logger.error(f"OpenCodeWorker timed out after {self.timeout}s")
-
-            return {
-                "worker_name": "OpenCodeWorker",
-                "execution_time": execution_time,
-                "timestamp": datetime.now().isoformat(),
-                "working_directory": str(working_dir),
-                "command": " ".join(cmd),
-                "return_code": -1,
-                "success": False,
-                "timeout": True,
-                "error": f"Command timed out after {self.timeout} seconds",
-            }
-
-        except FileNotFoundError:
-            execution_time = time.time() - start_time
-            self.logger.error("OpenCode command not found")
-
-            return {
-                "worker_name": "OpenCodeWorker",
-                "execution_time": execution_time,
-                "timestamp": datetime.now().isoformat(),
-                "working_directory": str(working_dir),
-                "command": " ".join(cmd),
-                "return_code": -1,
-                "success": False,
-                "timeout": False,
-                "error": "OpenCode command not found - is it installed and in PATH?",
-            }
-
-        except Exception as e:
-            execution_time = time.time() - start_time
-            self.logger.error(f"OpenCodeWorker failed with error: {str(e)}")
-
-            return {
-                "worker_name": "OpenCodeWorker",
-                "execution_time": execution_time,
-                "timestamp": datetime.now().isoformat(),
-                "working_directory": str(working_dir),
-                "command": " ".join(cmd),
-                "return_code": -1,
-                "success": False,
-                "timeout": False,
-                "error": f"Unexpected error: {str(e)}",
-            }
+        return result
