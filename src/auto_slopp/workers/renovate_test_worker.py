@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
+from auto_slopp.utils.git_operations import checkout_branch_resilient
 from auto_slopp.utils.opencode import run_opencode
 from auto_slopp.utils.repository_utils import discover_repositories, validate_repository
 from auto_slopp.worker import Worker
@@ -216,7 +217,7 @@ class RenovateTestWorker(Worker):
             return []
 
     def _checkout_branch(self, repo_dir: Path, branch: str) -> bool:
-        """Checkout a specific branch in the repository.
+        """Checkout a specific branch in the repository with enhanced resilience.
 
         Args:
             repo_dir: Path to the repository directory
@@ -225,47 +226,15 @@ class RenovateTestWorker(Worker):
         Returns:
             True if checkout successful, False otherwise
         """
-        try:
-            # Fetch latest changes
-            subprocess.run(
-                ["git", "fetch", "origin"],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
+        # Use the resilient checkout function from git_operations
+        success = checkout_branch_resilient(repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60)
 
-            # Checkout the branch
-            result = subprocess.run(
-                ["git", "checkout", branch],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-
-            if result.returncode != 0:
-                self.logger.error(f"Failed to checkout {branch} in {repo_dir.name}: {result.stderr}")
-                return False
-
-            # Pull latest changes for the branch
-            subprocess.run(
-                ["git", "pull", "origin", branch],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-
+        if success:
             self.logger.info(f"Successfully checked out {branch} in {repo_dir.name}")
-            return True
+        else:
+            self.logger.error(f"Failed to checkout {branch} in {repo_dir.name}")
 
-        except subprocess.TimeoutExpired:
-            self.logger.error(f"Timeout checking out {branch} in {repo_dir.name}")
-            return False
-        except Exception as e:
-            self.logger.error(f"Error checking out {branch} in {repo_dir.name}: {str(e)}")
-            return False
+        return success
 
     def _run_tests(self, repo_dir: Path) -> Dict[str, Any]:
         """Run make test in the repository.

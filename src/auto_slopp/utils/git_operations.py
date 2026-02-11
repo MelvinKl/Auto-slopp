@@ -204,6 +204,129 @@ def has_changes(repo_dir: Path) -> bool:
         raise GitOperationError(f"Failed to check git status: {e}")
 
 
+def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = True, timeout: int = 60) -> bool:
+    """Checkout a git branch with enhanced resilience.
+
+    If checkout fails, performs a git reset --hard and retries.
+
+    Args:
+        repo_dir: Path to the git repository
+        branch: Branch name to checkout
+        fetch_first: Whether to fetch from remote before checkout
+        timeout: Timeout for individual git commands in seconds
+
+    Returns:
+        True if checkout successful, False otherwise
+    """
+    try:
+        logger.info(f"Checking out branch '{branch}' in {repo_dir.name}")
+
+        # Fetch latest changes if requested
+        if fetch_first:
+            logger.debug(f"Fetching latest changes for {repo_dir.name}")
+            fetch_result = subprocess.run(
+                ["git", "fetch", "origin"],
+                cwd=repo_dir,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            if fetch_result.returncode != 0:
+                logger.warning(f"Fetch failed for {repo_dir.name}: {fetch_result.stderr}")
+                # Continue with checkout even if fetch fails
+
+        # First attempt to checkout
+        checkout_result = subprocess.run(
+            ["git", "checkout", branch],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+
+        if checkout_result.returncode == 0:
+            logger.info(f"Successfully checked out '{branch}' in {repo_dir.name}")
+
+            # Pull latest changes for the branch
+            pull_result = subprocess.run(
+                ["git", "pull", "origin", branch],
+                cwd=repo_dir,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            if pull_result.returncode != 0:
+                logger.warning(f"Pull failed for branch '{branch}' in {repo_dir.name}: {pull_result.stderr}")
+                # Don't fail the checkout if pull fails
+
+            return True
+
+        # If first checkout attempt failed, try reset and retry
+        logger.warning(f"Initial checkout failed for '{branch}' in {repo_dir.name}: {checkout_result.stderr}")
+        logger.info(f"Attempting git reset --hard and retry for '{branch}' in {repo_dir.name}")
+
+        # Reset to clean state
+        reset_result = subprocess.run(
+            ["git", "reset", "--hard"],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        if reset_result.returncode != 0:
+            logger.error(f"Git reset --hard failed in {repo_dir.name}: {reset_result.stderr}")
+            return False
+
+        # Clean untracked files
+        clean_result = subprocess.run(
+            ["git", "clean", "-fd"],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        if clean_result.returncode != 0:
+            logger.warning(f"Git clean failed in {repo_dir.name}: {clean_result.stderr}")
+            # Continue despite clean failure
+
+        # Second attempt to checkout after reset
+        retry_checkout_result = subprocess.run(
+            ["git", "checkout", branch],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+
+        if retry_checkout_result.returncode == 0:
+            logger.info(f"Successfully checked out '{branch}' in {repo_dir.name} after reset")
+
+            # Pull latest changes for the branch
+            pull_result = subprocess.run(
+                ["git", "pull", "origin", branch],
+                cwd=repo_dir,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            if pull_result.returncode != 0:
+                logger.warning(f"Pull failed for branch '{branch}' in {repo_dir.name}: {pull_result.stderr}")
+
+            return True
+        else:
+            logger.error(
+                f"Failed to checkout '{branch}' in {repo_dir.name} even after reset: {retry_checkout_result.stderr}"
+            )
+            return False
+
+    except subprocess.TimeoutExpired:
+        logger.error(f"Timeout checking out '{branch}' in {repo_dir.name}")
+        return False
+    except Exception as e:
+        logger.error(f"Error checking out '{branch}' in {repo_dir.name}: {str(e)}")
+        return False
+
+
 def commit_and_push_changes(
     repo_dir: Path, commit_message: str, push_if_remote: bool = True
 ) -> Tuple[bool, Optional[bool]]:
