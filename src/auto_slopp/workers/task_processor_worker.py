@@ -172,11 +172,27 @@ class TaskProcessorWorker(OpenCodeWorker):
         # Use the provided task_path as the task repository directory
         if not task_path.exists():
             task_path.mkdir()
-            # TODO: create file in task_path_dir so it is recognized by git and commit it.        
+            # Create a .gitkeep file so the directory is recognized by git
+            gitkeep_file = task_path / ".gitkeep"
+            gitkeep_file.write_text("# Directory created by TaskProcessorWorker\n")
+
+            # Initialize git repository and commit the .gitkeep file
+            from auto_slopp.utils.git_operations import commit_and_push_changes
+
+            commit_success, _ = commit_and_push_changes(
+                task_path,
+                f"Initialize directory for {repo_dir.name}",
+                push_if_remote=False,
+            )
+
+            if commit_success:
+                self.logger.info(f"Successfully initialized task directory: {task_path.name}")
+            else:
+                self.logger.warning(f"Failed to initialize git in task directory: {task_path.name}")
 
         return process_repository(
             repo_dir=repo_dir,
-            task_repo_dir=task_repo_dir,
+            task_repo_dir=task_path,
             dry_run=self.dry_run,
             agent_args=self.agent_args,
             timeout=self.timeout,
