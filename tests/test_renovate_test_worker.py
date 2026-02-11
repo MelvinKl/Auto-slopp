@@ -67,24 +67,20 @@ class TestRenovateTestWorker:
 
         assert len(branches) == 0
 
-    @patch("auto_slopp.workers.renovate_test_worker.subprocess.run")
-    def test_checkout_branch_success(self, mock_subprocess_run):
-        """Test successful branch checkout."""
+    @patch("auto_slopp.workers.renovate_test_worker.checkout_branch_resilient")
+    def test_checkout_branch_success(self, mock_checkout_resilient):
+        """Test successful branch checkout using resilient checkout."""
         worker = RenovateTestWorker()
         repo_dir = Path("/tmp/test_repo")
         branch = "renovate/test-1"
 
-        # Mock successful git commands
-        mock_subprocess_run.side_effect = [
-            Mock(returncode=0),  # git fetch
-            Mock(returncode=0),  # git checkout
-            Mock(returncode=0),  # git pull
-        ]
+        # Mock successful resilient checkout
+        mock_checkout_resilient.return_value = True
 
         result = worker._checkout_branch(repo_dir, branch)
 
         assert result is True
-        assert mock_subprocess_run.call_count == 3
+        mock_checkout_resilient.assert_called_once_with(repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60)
 
     @patch("auto_slopp.workers.renovate_test_worker.subprocess.run")
     def test_run_tests_success(self, mock_subprocess_run):
