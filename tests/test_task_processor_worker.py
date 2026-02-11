@@ -66,11 +66,11 @@ class TestTaskProcessorWorkerSimple:
                 dry_run=True,
             )
 
-            # Run worker (should succeed even with no repos)
+            # Run worker (should succeed even with no text files)
             result = worker.run(repo_path, task_repo_path)
 
             assert result["success"] is True
-            assert result["repositories_processed"] == 0
+            assert result["repositories_processed"] == 1  # Always 1 in new architecture
             assert result["repositories_with_errors"] == 0
             assert result["execution_time"] >= 0
             assert "worker_name" in result

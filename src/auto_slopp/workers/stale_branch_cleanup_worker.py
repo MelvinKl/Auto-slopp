@@ -38,17 +38,17 @@ class StaleBranchCleanupWorker(Worker):
         self.logger = logging.getLogger("auto_slopp.workers.StaleBranchCleanupWorker")
 
     def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
-        """Execute stale branch cleanup.
+        """Execute stale branch cleanup for a single repository.
 
         Args:
-            repo_path: Path to the directory containing repository subdirectories
+            repo_path: Path to a single repository directory
             task_path: Path to the task directory or file (unused in worker)
 
         Returns:
             Dictionary containing cleanup results and statistics.
         """
         start_time = datetime.now(timezone.utc)
-        self.logger.info(f"Starting stale branch cleanup in {repo_path}")
+        self.logger.info(f"Starting stale branch cleanup for {repo_path}")
 
         # Validate input path
         validation_result = self._validate_input_path(repo_path, task_path, start_time)
@@ -58,14 +58,10 @@ class StaleBranchCleanupWorker(Worker):
         # Initialize results
         results = self._create_results_dict(start_time, repo_path, task_path)
 
-        # Discover and validate repositories
-        repositories = discover_repositories(repo_path, validate=True)
-
-        # Process each repository
-        for repo_info in repositories:
-            repo_result = self._process_repository(repo_info)
-            results["repository_results"].append(repo_result)
-            self._update_results_statistics(results, repo_result)
+        # Process the single repository
+        repo_result = self._process_single_repository(repo_path)
+        results["repository_results"].append(repo_result)
+        self._update_results_statistics(results, repo_result)
 
         # Finalize results
         results["execution_time"] = (datetime.now(timezone.utc) - start_time).total_seconds()
@@ -130,6 +126,34 @@ class StaleBranchCleanupWorker(Worker):
             "success": True,
         }
 
+    def _process_single_repository(self, repo_dir: Path) -> Dict[str, Any]:
+        """Process a single repository directory for stale branch cleanup.
+
+        Args:
+            repo_dir: Path to the repository directory
+
+        Returns:
+            Dictionary containing processing results for this repository.
+        """
+        self.logger.info(f"Processing repository: {repo_dir.name}")
+
+        # Validate the repository
+        from auto_slopp.utils.repository_utils import validate_repository
+
+        repo_info = validate_repository(repo_dir)
+
+        # Handle invalid repositories
+        if not repo_info.get("valid", False):
+            self.logger.warning(
+                f"Repository is invalid: {repo_dir.name} - " f"{repo_info.get('errors', ['Unknown error'])}"
+            )
+            return self._create_invalid_repo_result_from_path(
+                repo_dir, repo_info.get("errors", ["Repository is invalid"])
+            )
+
+        # Analyze and cleanup branches using utility function
+        return analyze_repository_branches(repo_dir=repo_dir, days_threshold=self.days_threshold, dry_run=self.dry_run)
+
     def _process_repository(self, repo_info: Dict[str, Any]) -> Dict[str, Any]:
         """Process a single repository directory for stale branch cleanup.
 
@@ -152,6 +176,27 @@ class StaleBranchCleanupWorker(Worker):
 
         # Analyze and cleanup branches using utility function
         return analyze_repository_branches(repo_dir=repo_dir, days_threshold=self.days_threshold, dry_run=self.dry_run)
+
+    def _create_invalid_repo_result_from_path(self, repo_dir: Path, errors: List[str]) -> Dict[str, Any]:
+        """Create result for an invalid repository from path.
+
+        Args:
+            repo_dir: Path to the repository directory
+            errors: List of error messages
+
+        Returns:
+            Error result for invalid repository
+        """
+        return {
+            "repository": repo_dir.name,
+            "path": str(repo_dir),
+            "success": False,
+            "branches_deleted": 0,
+            "branches_failed_to_delete": 0,
+            "deleted_branches": [],
+            "failed_deletions": [],
+            "error": "; ".join(errors),
+        }
 
     def _create_invalid_repo_result(self, repo_info: Dict[str, Any]) -> Dict[str, Any]:
         """Create result for an invalid repository.

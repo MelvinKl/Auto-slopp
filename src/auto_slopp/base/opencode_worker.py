@@ -87,59 +87,8 @@ class OpenCodeWorker(Worker, ABC):
                 "repository_results": [],
             }
 
-        if self.process_all_repos:
-            return self._run_on_all_repositories(repo_path, task_path, start_time)
-        else:
-            return self._run_on_single_repository(repo_path, task_path, start_time)
-
-    def _run_on_all_repositories(self, repo_path: Path, task_path: Path, start_time: float) -> Dict[str, Any]:
-        """Run OpenCode on all repositories in repo_path.
-
-        Args:
-            repo_path: Path to the directory containing repository subdirectories
-            task_path: Path to the task directory or file
-            start_time: Start time for execution tracking
-
-        Returns:
-            Dictionary containing execution results for all repositories.
-        """
-        results = {
-            "worker_name": "OpenCodeWorker",
-            "execution_time": 0,
-            "timestamp": datetime.now().isoformat(),
-            "repo_path": str(repo_path),
-            "task_path": str(task_path),
-            "process_all_repos": True,
-            "repositories_processed": 0,
-            "repositories_with_errors": 0,
-            "repository_results": [],
-            "success": True,
-        }
-
-        # Process all subdirectories in repo_path
-        for repo_dir in repo_path.iterdir():
-            if not repo_dir.is_dir():
-                continue
-
-            self.logger.info(f"Processing repository: {repo_dir.name}")
-            results["repositories_processed"] += 1
-
-            repo_result = self._execute_opencode(repo_dir, task_path)
-            results["repository_results"].append(repo_result)
-
-            if not repo_result["success"]:
-                results["repositories_with_errors"] += 1
-                results["success"] = False
-
-        # Update final execution time
-        results["execution_time"] = time.time() - start_time
-
-        self.logger.info(
-            f"OpenCodeWorker completed. Processed: {results['repositories_processed']}, "
-            f"Errors: {results['repositories_with_errors']}"
-        )
-
-        return results
+        # Always run on single repository now - orchestrator handles iteration
+        return self._run_on_single_repository(repo_path, task_path, start_time)
 
     def _run_on_single_repository(self, repo_path: Path, task_path: Path, start_time: float) -> Dict[str, Any]:
         """Run OpenCode on a single repository (repo_path is the repository).
