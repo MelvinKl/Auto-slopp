@@ -5,18 +5,16 @@ the task processing workflow.
 """
 
 import logging
-import subprocess
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from auto_slopp.utils.file_operations import (
-    cleanup_temp_file,
     find_text_files,
     read_file_content,
     rename_processed_file,
-    write_temp_instruction_file,
 )
 from auto_slopp.utils.git_operations import commit_and_push_changes
+from auto_slopp.utils.opencode import run_opencode
 
 logger = logging.getLogger(__name__)
 
@@ -77,54 +75,26 @@ def execute_openagent_with_instructions(
     Returns:
         Dictionary containing OpenAgent execution results
     """
-    try:
-        logger.info(f"Executing OpenAgent with instructions length: {len(instructions)}")
+    logger.info(f"Executing OpenAgent with instructions length: {len(instructions)}")
 
-        # Create a temporary instruction file
-        instruction_file = write_temp_instruction_file(work_dir, instructions)
+    # Use the centralized opencode utility
+    result = run_opencode(
+        additional_instructions=instructions,
+        working_directory=work_dir,
+        timeout=timeout,
+        agent_args=agent_args,
+        capture_output=True,
+    )
 
-        try:
-            # Build OpenAgent command
-            cmd = ["opencode"] + ["--agent", "openagent"] + agent_args + ["run"]
-            cmd.append(str(instruction_file))
+    # Log execution result
+    if result["success"]:
+        logger.info(f"OpenAgent execution completed successfully with return code: {result['return_code']}")
+    else:
+        logger.error(f"OpenAgent execution failed with return code: {result['return_code']}")
+        if result.get("error"):
+            logger.error(f"Error: {result['error']}")
 
-            # Execute OpenAgent
-            result = subprocess.run(
-                cmd,
-                cwd=work_dir,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-
-            logger.info(f"OpenAgent execution completed with return code: {result.returncode}")
-
-            return {
-                "success": result.returncode == 0,
-                "return_code": result.returncode,
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-                "timeout": False,
-            }
-
-        finally:
-            # Clean up instruction file
-            cleanup_temp_file(instruction_file)
-
-    except subprocess.TimeoutExpired:
-        logger.error(f"OpenAgent execution timed out after {timeout} seconds")
-        return {
-            "success": False,
-            "timeout": True,
-            "error": f"OpenAgent execution timed out after {timeout} seconds",
-        }
-
-    except Exception as e:
-        logger.error(f"Error executing OpenAgent: {str(e)}")
-        return {
-            "success": False,
-            "error": f"Error executing OpenAgent: {str(e)}",
-        }
+    return result
 
 
 def process_text_file(

@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
+from auto_slopp.utils.opencode import run_opencode
 from auto_slopp.utils.repository_utils import discover_repositories, validate_repository
 from auto_slopp.worker import Worker
 
@@ -312,48 +313,22 @@ class RenovateTestWorker(Worker):
         Returns:
             Dictionary containing OpenCode execution results
         """
-        try:
-            # Create a dummy task path for OpenAgent
-            task_path = repo_dir / "fix_tests.task"
+        # Create instructions for fixing failing tests
+        additional_instructions = "'make test' is failing fix it and push the changes"
 
-            # Run OpenCode to fix tests with specific arguments
-            agent_args = [
-                "'make test'",
-                "is",
-                "failing",
-                "fix",
-                "it",
-                "and",
-                "push",
-                "the",
-                "changes",
-            ]
-            result = subprocess.run(
-                ["opencode"] + ["--agent", "openagent", "run"] + agent_args,
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
-            )
+        # Use the centralized opencode utility
+        result = run_opencode(
+            additional_instructions=additional_instructions,
+            working_directory=repo_dir,
+            timeout=self.timeout,
+            agent_args=[],
+            capture_output=True,
+        )
 
-            return {
-                "success": result.returncode == 0,
-                "output": result.stdout,
-                "error": result.stderr if result.returncode != 0 else None,
-                "return_code": result.returncode,
-            }
-
-        except subprocess.TimeoutExpired:
-            return {
-                "success": False,
-                "output": "",
-                "error": f"OpenAgent timed out after {self.timeout} seconds",
-                "return_code": -1,
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "output": "",
-                "error": f"Error running OpenAgent: {str(e)}",
-                "return_code": -1,
-            }
+        # Return in the expected format for consistency
+        return {
+            "success": result["success"],
+            "output": result.get("stdout", ""),
+            "error": result.get("error") if not result["success"] else None,
+            "return_code": result["return_code"],
+        }
