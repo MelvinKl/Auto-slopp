@@ -26,16 +26,16 @@ class RenovateTestWorker(Worker):
         self.logger = logging.getLogger("auto_slopp.workers.RenovateTestWorker")
 
     def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
-        """Execute renovate branch testing workflow.
+        """Execute renovate branch testing workflow for a single repository.
 
         Args:
-            repo_path: Path to repository directory containing subdirectories
+            repo_path: Path to a single repository directory
             task_path: Path to task directory or file (not used in this worker)
 
         Returns:
             Dictionary containing execution results and summary.
         """
-        self.logger.info(f"RenovateTestWorker starting in {repo_path}")
+        self.logger.info(f"RenovateTestWorker starting for {repo_path}")
 
         if not repo_path.exists():
             return {
@@ -47,13 +47,13 @@ class RenovateTestWorker(Worker):
                 "repositories_fixed": 0,
             }
 
-        # Discover and validate repositories
-        repositories = discover_repositories(repo_path, validate=True)
+        # Validate this single repository
+        repo_info = validate_repository(repo_path)
 
         results = {
             "worker_name": "RenovateTestWorker",
             "success": True,
-            "repositories_processed": 0,
+            "repositories_processed": 1,
             "repositories_tested": 0,
             "repositories_fixed": 0,
             "repositories_with_errors": 0,
@@ -62,47 +62,38 @@ class RenovateTestWorker(Worker):
             "errors": [],
         }
 
-        # Process only valid git repositories
-        for repo_info in repositories:
-            repo_dir = Path(repo_info["path"])
+        self.logger.info(f"Processing repository: {repo_path.name}")
 
-            self.logger.info(f"Processing repository: {repo_info['name']}")
-            results["repositories_processed"] += 1
-
-            if not repo_info.get("valid", False):
-                self.logger.warning(
-                    f"Skipping invalid repository: {repo_info['name']} - {repo_info.get('errors', ['Unknown error'])}"
-                )
-                results["repositories_invalid"] += 1
-                results["repositories_with_errors"] += 1
-                results["errors"].append(
-                    f"{repo_info['name']}: Invalid repository - {repo_info.get('errors', ['Unknown error'])}"
-                )
-                continue
-
-            repo_result = self._process_repository(repo_dir)
+        if not repo_info.get("valid", False):
+            self.logger.warning(
+                f"Repository is invalid: {repo_path.name} - {repo_info.get('errors', ['Unknown error'])}"
+            )
+            results["repositories_invalid"] = 1
+            results["repositories_with_errors"] = 1
+            results["errors"].append(
+                f"{repo_path.name}: Invalid repository - {repo_info.get('errors', ['Unknown error'])}"
+            )
+            results["success"] = False
+        else:
+            # Process the valid repository
+            repo_result = self._process_repository(repo_path)
             results["repository_results"].append(repo_result)
 
             if repo_result["success"]:
-                results["repositories_tested"] += 1
+                results["repositories_tested"] = 1
                 if repo_result["tests_fixed"]:
-                    results["repositories_fixed"] += 1
+                    results["repositories_fixed"] = 1
                 # Only count as error if there's an actual error message
                 if repo_result.get("error"):
-                    results["repositories_with_errors"] += 1
-                    results["errors"].append(f"{repo_dir.name}: {repo_result.get('error', 'Unknown error')}")
+                    results["repositories_with_errors"] = 1
+                    results["errors"].append(f"{repo_path.name}: {repo_result.get('error', 'Unknown error')}")
             else:
-                results["repositories_with_errors"] += 1
-                results["errors"].append(f"{repo_dir.name}: {repo_result.get('error', 'Unknown error')}")
-
-        # Determine overall success
-        if results["repositories_with_errors"] > 0:
-            results["success"] = False
+                results["repositories_with_errors"] = 1
+                results["errors"].append(f"{repo_path.name}: {repo_result.get('error', 'Unknown error')}")
+                results["success"] = False
 
         self.logger.info(
-            f"RenovateTestWorker completed. Processed: {results['repositories_processed']}, "
-            f"Valid: {results['repositories_processed'] - results['repositories_invalid']}, "
-            f"Invalid: {results['repositories_invalid']}, "
+            f"RenovateTestWorker completed for {repo_path.name}. "
             f"Tested: {results['repositories_tested']}, Fixed: {results['repositories_fixed']}, "
             f"Errors: {results['repositories_with_errors']}"
         )
@@ -326,7 +317,17 @@ class RenovateTestWorker(Worker):
             task_path = repo_dir / "fix_tests.task"
 
             # Run OpenCode to fix tests with specific arguments
-            agent_args = ["'make test'", "is", "failing","fix","it","and", "push", "the", "changes"]
+            agent_args = [
+                "'make test'",
+                "is",
+                "failing",
+                "fix",
+                "it",
+                "and",
+                "push",
+                "the",
+                "changes",
+            ]
             result = subprocess.run(
                 ["opencode"] + ["--agent", "openagent", "run"] + agent_args,
                 cwd=repo_dir,

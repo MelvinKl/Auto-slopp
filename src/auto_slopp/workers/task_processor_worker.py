@@ -45,7 +45,7 @@ class TaskProcessorWorker(OpenCodeWorker):
             agent_args: Additional arguments to pass to OpenCode
             dry_run: If True, skip actual OpenCode execution and git operations
         """
-        super().__init__(agent_args=agent_args, timeout=timeout, process_all_repos=True)
+        super().__init__(agent_args=agent_args, timeout=timeout, process_all_repos=False)
         self.task_repo_path = task_repo_path
         self.counter_start = counter_start
         self.dry_run = dry_run
@@ -68,11 +68,11 @@ class TaskProcessorWorker(OpenCodeWorker):
         return ""
 
     def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
-        """Execute the task processing workflow.
+        """Execute the task processing workflow for a single repository.
 
         Args:
-            repo_path: Path to the directory containing repository subdirectories
-            task_path: Path to the task directory or file (unused in this worker)
+            repo_path: Path to a single repository subdirectory
+            task_path: Path to the corresponding task subdirectory
 
         Returns:
             Dictionary containing execution results and statistics
@@ -85,17 +85,13 @@ class TaskProcessorWorker(OpenCodeWorker):
         if validation_result:
             return validation_result
 
-        # Initialize results
+        # Initialize results for single repository
         results = self._create_results_dict(start_time, repo_path, task_path)
 
-        # Discover repositories in repo_path
-        repositories = discover_repositories(repo_path, validate=True)
-
-        # Process each repository
-        for repo_info in repositories:
-            repo_result = self._process_single_repository(repo_info)
-            results["repository_results"].append(repo_result)
-            self._update_results_statistics(results, repo_result)
+        # Process the single repository
+        repo_result = self._process_single_repository(repo_path, task_path)
+        results["repository_results"].append(repo_result)
+        self._update_results_statistics(results, repo_result)
 
         # Finalize results
         results["execution_time"] = self._get_elapsed_time(start_time)
@@ -161,27 +157,21 @@ class TaskProcessorWorker(OpenCodeWorker):
             "success": True,
         }
 
-    def _process_single_repository(self, repo_info: Dict[str, Any]) -> Dict[str, Any]:
-        """Process a single repository from repo info.
+    def _process_single_repository(self, repo_dir: Path, task_path: Path) -> Dict[str, Any]:
+        """Process a single repository.
 
         Args:
-            repo_info: Repository information from discover_repositories
+            repo_dir: Path to the repository directory
+            task_path: Path to the corresponding task directory
 
         Returns:
             Processing result for this repository
         """
-        repo_dir = Path(repo_info["path"])
+        self.logger.info(f"Processing repository: {repo_dir.name}")
 
-        self.logger.info(f"Processing repository: {repo_info['name']}")
+        # Use the provided task_path as the task repository directory
+        task_repo_dir = task_path if task_path else self.task_repo_path / repo_dir.name
 
-        if not repo_info.get("valid", False):
-            self.logger.warning(
-                f"Skipping invalid repository: {repo_info['name']} - " f"{repo_info.get('errors', ['Unknown error'])}"
-            )
-            return self._create_invalid_repo_result(repo_info)
-
-        # Process the repository using the utility function
-        task_repo_dir = self.task_repo_path / repo_dir.name
         return process_repository(
             repo_dir=repo_dir,
             task_repo_dir=task_repo_dir,
@@ -190,27 +180,6 @@ class TaskProcessorWorker(OpenCodeWorker):
             timeout=self.timeout,
             counter_start=self.counter_start,
         )
-
-    def _create_invalid_repo_result(self, repo_info: Dict[str, Any]) -> Dict[str, Any]:
-        """Create result for an invalid repository.
-
-        Args:
-            repo_info: Repository information
-
-        Returns:
-            Error result for invalid repository
-        """
-        return {
-            "repository": repo_info["name"],
-            "path": repo_info["path"],
-            "success": False,
-            "text_files_processed": 0,
-            "openagent_executions": 0,
-            "files_renamed": 0,
-            "git_operations": 0,
-            "processed_files": [],
-            "errors": repo_info.get("errors", ["Repository is invalid"]),
-        }
 
     def _update_results_statistics(self, results: Dict[str, Any], repo_result: Dict[str, Any]) -> None:
         """Update results statistics with repository processing result.

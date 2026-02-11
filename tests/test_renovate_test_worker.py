@@ -210,7 +210,8 @@ class TestRenovateTestWorker:
             result = worker.run(empty_dir, task_path)
 
             assert result["worker_name"] == "RenovateTestWorker"
-            assert result["success"] is True  # No errors, just no repos processed
-            assert result["repositories_processed"] == 0
+            assert result["success"] is False  # Invalid repository (no .git)
+            assert result["repositories_processed"] == 1  # Always 1 in new architecture
             assert result["repositories_tested"] == 0
             assert result["repositories_fixed"] == 0
+            assert result["repositories_with_errors"] == 1

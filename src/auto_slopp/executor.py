@@ -101,21 +101,95 @@ class Executor:
         try:
             print(f"Executing worker: {worker_class.__name__}")
 
-            # Instantiate worker with appropriate arguments
-            worker = self._instantiate_worker(worker_class)
-
-            # Execute worker
-            start_time = time.time()
-            result = worker.run(self.repo_path, self.task_path)
-            execution_time = time.time() - start_time
-
-            print(f"Worker {worker_class.__name__} completed in {execution_time:.2f}s")
-            if result is not None:
-                print(f"Result: {result}")
+            # Check if this worker needs directory iteration (orchestrator-level)
+            if self._worker_needs_directory_iteration(worker_class):
+                self._execute_worker_with_directories(worker_class)
+            else:
+                self._execute_worker_single(worker_class)
 
         except Exception as e:
             print(f"Error executing worker {worker_class.__name__}: {e}")
             traceback.print_exc()
+
+    def _worker_needs_directory_iteration(self, worker_class: Type[Worker]) -> bool:
+        """Check if worker needs directory iteration at orchestrator level.
+
+        Args:
+            worker_class: Worker class to check
+
+        Returns:
+            True if worker should be executed for each subdirectory
+        """
+        # Workers that currently handle their own directory iteration
+        # should be handled by the orchestrator instead
+        workers_requiring_iteration = {
+            "TaskProcessorWorker",
+            "RenovateTestWorker",
+            "StaleBranchCleanupWorker",
+        }
+
+        return worker_class.__name__ in workers_requiring_iteration
+
+    def _execute_worker_with_directories(self, worker_class: Type[Worker]) -> None:
+        """Execute worker for each subdirectory in repo_path.
+
+        Args:
+            worker_class: Worker class to instantiate and execute
+        """
+        if not self.repo_path.exists():
+            print(f"Repository path does not exist: {self.repo_path}")
+            return
+
+        # Get all subdirectories in repo_path
+        subdirectories = [d for d in self.repo_path.iterdir() if d.is_dir()]
+
+        if not subdirectories:
+            print(f"No subdirectories found in {self.repo_path}")
+            return
+
+        print(f"Found {len(subdirectories)} subdirectories to process")
+
+        # Execute worker for each subdirectory
+        for subdirectory in subdirectories:
+            try:
+                print(f"Processing subdirectory: {subdirectory.name}")
+
+                # Instantiate worker
+                worker = self._instantiate_worker(worker_class)
+
+                # Map repo_task_path to corresponding subdirectory
+                repo_task_path = self.task_path / subdirectory.name if self.task_path else None
+
+                # Execute worker on single subdirectory
+                start_time = time.time()
+                result = worker.run(subdirectory, repo_task_path)
+                execution_time = time.time() - start_time
+
+                print(f"Worker {worker_class.__name__} on {subdirectory.name} completed in {execution_time:.2f}s")
+                if result is not None:
+                    print(f"Result: {result}")
+
+            except Exception as e:
+                print(f"Error executing worker {worker_class.__name__} on {subdirectory.name}: {e}")
+                traceback.print_exc()
+
+    def _execute_worker_single(self, worker_class: Type[Worker]) -> None:
+        """Execute worker once on entire repo_path (for workers that don't need iteration).
+
+        Args:
+            worker_class: Worker class to instantiate and execute
+        """
+        # Instantiate worker with appropriate arguments
+        worker = self._instantiate_worker(worker_class)
+
+        # Execute worker
+        start_time = time.time()
+        result = worker.run(self.repo_path, self.task_path)
+        execution_time = time.time() - start_time
+
+        print(f"Worker {worker_class.__name__} completed in {execution_time:.2f}s")
+        if result is not None:
+            print(f"Result: {result}")
 
 
 def run_executor(

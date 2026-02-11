@@ -222,14 +222,9 @@ class TestStaleBranchCleanupWorker:
         )
         subprocess.run(["git", "checkout", "main"], check=True, capture_output=True)
 
-        # Test with a worker - now it expects a directory containing repositories
-        # So we need to put our test repo in a parent directory
-        parent_dir = temp_repo_dir.parent
-        test_repo_dir = parent_dir / "test_repo"
-        temp_repo_dir.rename(test_repo_dir)
-
+        # Test with a worker - now it processes a single repository directly
         worker = StaleBranchCleanupWorker(days_threshold=5, dry_run=True)
-        result = worker.run(parent_dir, temp_task_dir)
+        result = worker.run(temp_repo_dir, temp_task_dir)
 
         # Should find old branch as stale (since it's not on remote)
         assert result["success"] is True
@@ -237,9 +232,6 @@ class TestStaleBranchCleanupWorker:
         assert result["repositories_processed"] == 1
         assert result["repositories_with_errors"] == 0
         assert result["total_branches_deleted"] >= 1  # In dry run, branches_deleted means "would be deleted"
-
-        # Clean up
-        test_repo_dir.rename(temp_repo_dir)
 
     def test_no_stale_branches_scenario(self):
         """Test scenario where no branches are stale."""
