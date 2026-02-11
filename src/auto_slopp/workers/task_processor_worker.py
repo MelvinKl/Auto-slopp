@@ -170,7 +170,9 @@ class TaskProcessorWorker(OpenCodeWorker):
         self.logger.info(f"Processing repository: {repo_dir.name}")
 
         # Use the provided task_path as the task repository directory
-        task_repo_dir = task_path if task_path else self.task_repo_path / repo_dir.name
+        if not task_path.exists():
+            task_path.mkdir()
+            # TODO: create file in task_path_dir so it is recognized by git and commit it.        
 
         return process_repository(
             repo_dir=repo_dir,
