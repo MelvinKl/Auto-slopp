@@ -5,6 +5,7 @@ A Python-based automation framework for task execution with pluggable worker sys
 ## Features
 
 - **Pluggable Worker System**: Abstract base class for creating custom automation workers
+- **HTTP Requests**: Simple HTTP client utility and worker for making web API calls
 - **Configuration Management**: Pydantic-based settings with environment variable support
 - **Flexible Logging**: Built-in logging with optional Telegram integration for remote notifications
 - **Task Execution**: Automated discovery and execution of worker implementations
@@ -249,11 +250,31 @@ processor = TaskProcessor(max_file_size=5*1024*1024)  # 5MB
 ### HeartbeatWorker
 Demonstrates periodic execution with status messages.
 ```python
-from auto_slopp.example_workers import HeartbeatWorker
+from auto_slopp.workers import HeartbeatWorker
 
 # Custom heartbeat message
 heartbeat = HeartbeatWorker(message="Custom service is running")
 # Returns: timestamp, message, path information
+```
+
+### HttpRequestsWorker
+Makes HTTP requests to external APIs and web services.
+```python
+from auto_slopp.workers import HttpRequestsWorker
+
+# Simple GET request
+worker = HttpRequestsWorker(url="https://api.example.com/data")
+result = worker.run(repo_path, task_path)
+# Returns: status_code, content, headers, success flag
+
+# POST request with JSON data
+worker = HttpRequestsWorker(
+    method="POST",
+    url="https://api.example.com/endpoint",
+    json_data={"key": "value"},
+    headers={"Authorization": "Bearer token"}
+)
+result = worker.run(repo_path, task_path)
 ```
 
 ## API Reference
