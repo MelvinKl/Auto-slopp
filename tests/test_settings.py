@@ -64,6 +64,9 @@ class TestSettings:
         env_vars = {
             "AUTO_SLOPP_DEBUG": "true",
             "AUTO_SLOPP_TELEGRAM_ENABLED": "true",
+            "AUTO_SLOPP_BASE_REPO_PATH": "/test/repo",
+            "AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL": "45.0",
+            "AUTO_SLOPP_TELEGRAM_BOT_TOKEN": "test_token_123",
         }
 
         # Test with clean environment (no .env loading)
@@ -74,9 +77,9 @@ class TestSettings:
         # Act & Assert - Check that specified values are overridden, others use defaults
         assert test_settings.debug is True  # Overridden
         assert test_settings.telegram_enabled is True  # Overridden
-        assert test_settings.base_repo_path == Path("/root/git/managed")  # From .env in current setup
-        assert test_settings.executor_sleep_interval == 30.0  # From .env (this is the actual behavior)
-        assert test_settings.telegram_bot_token is not None  # From .env (this is the actual behavior)
+        assert test_settings.base_repo_path == Path("/test/repo")  # From env var
+        assert test_settings.executor_sleep_interval == 45.0  # From env var
+        assert test_settings.telegram_bot_token == "test_token_123"  # From env var
 
     def test_optional_telegram_fields(self):
         """Test optional telegram fields when telegram is enabled."""
