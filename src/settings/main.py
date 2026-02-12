@@ -2,11 +2,36 @@
 
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
+import yaml
 from dotenv import load_dotenv
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
+
+
+def load_yaml_config(config_path: Path) -> Dict[str, Any]:
+    """Load configuration from a YAML file.
+
+    Args:
+        config_path: Path to the YAML configuration file.
+
+    Returns:
+        Dictionary containing the configuration values.
+    """
+    if not config_path.exists():
+        return {}
+
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    if config is None:
+        return {}
+
+    if not isinstance(config, dict):
+        return {}
+
+    return config
 
 
 class Settings(BaseSettings):
@@ -35,16 +60,12 @@ class Settings(BaseSettings):
         description="Path to the task repository directory",
     )
 
-    worker_search_path: Path = Field(
-        default_factory=lambda: Path(__file__).parent.parent,
-        description="Path to search for worker implementations",
-    )
-
     @field_validator(
         "base_repo_path",
         "base_task_path",
         "task_repo_path",
         "worker_search_path",
+        "yaml_config_path",
         mode="before",
     )
     @classmethod
@@ -92,6 +113,28 @@ class Settings(BaseSettings):
     telegram_disable_notification: bool = Field(
         default=False, description="Disable notification sound for Telegram messages"
     )
+
+    yaml_config_path: Optional[Path] = Field(default=None, description="Path to YAML configuration file")
+
+    def __init__(self, **data):
+        """Initialize settings with optional YAML config file support.
+
+        Args:
+            **data: Configuration key-value pairs.
+        """
+        yaml_config = {}
+        yaml_path = data.get("yaml_config_path")
+
+        if yaml_path:
+            yaml_path = Path(yaml_path) if isinstance(yaml_path, str) else yaml_path
+            if yaml_path and yaml_path.exists():
+                yaml_config = load_yaml_config(yaml_path)
+
+        for key, value in yaml_config.items():
+            if key not in data:
+                data[key] = value
+
+        super().__init__(**data)
 
     model_config = {
         "env_prefix": "AUTO_SLOPP_",

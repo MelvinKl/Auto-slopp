@@ -53,6 +53,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
+    { name = "pyyaml" },
 ]
 
 [package.optional-dependencies]
@@ -92,9 +93,10 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "safety", marker = "extra == 'dev'", specifier = ">=2.3.0" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["dev", "virtualenv"]
 
 [package.metadata.requires-dev]
 dev = [

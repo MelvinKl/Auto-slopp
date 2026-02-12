@@ -135,6 +135,41 @@ AUTO_SLOPP_TELEGRAM_RETRY_ATTEMPTS=5
 AUTO_SLOPP_TELEGRAM_PARSE_MODE=HTML
 ```
 
+### YAML Configuration
+
+Alternatively, you can use a YAML configuration file. Create a `config.yaml` file in the project root:
+
+```yaml
+# Basic configuration
+base_repo_path: /path/to/your/repo
+base_task_path: /path/to/your/tasks
+debug: false
+
+# Telegram logging (optional)
+telegram_enabled: true
+telegram_bot_token: your_bot_token
+telegram_chat_id: your_chat_id
+
+# Advanced Telegram settings
+telegram_timeout: 60.0
+telegram_retry_attempts: 5
+telegram_parse_mode: HTML
+```
+
+To use the YAML configuration file, set the `AUTO_SLOPP_YAML_CONFIG_PATH` environment variable:
+
+```bash
+export AUTO_SLOPP_YAML_CONFIG_PATH=/path/to/your/config.yaml
+```
+
+Or pass it directly when creating Settings:
+
+```python
+from settings.main import Settings
+
+settings = Settings(yaml_config_path="/path/to/config.yaml")
+```
+
 ## Creating Worker Implementations
 
 ### Basic Worker

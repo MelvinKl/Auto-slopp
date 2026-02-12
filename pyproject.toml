@@ -12,6 +12,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "httpx>=0.25.0",
     "python-dotenv>=1.0.0",
+    "pyyaml>=6.0.0",
 ]
 
 [project.optional-dependencies]
@@ -28,12 +29,34 @@ dev = [
     "safety>=2.3.0",
     "bandit>=1.7.0",
 ]
+virtualenv = []
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/auto_slopp"]
+[project.entry-points."virtualenv.activate"]
+bash = "virtualenv.activation.bash:BashActivator"
+batch = "virtualenv.activation.batch:BatchActivator"
+cshell = "virtualenv.activation.cshell:CShellActivator"
+fish = "virtualenv.activation.fish:FishActivator"
+nushell = "virtualenv.activation.nushell:NushellActivator"
+powershell = "virtualenv.activation.powershell:PowerShellActivator"
+python = "virtualenv.activation.python:PythonActivator"
 
-[project.scripts]
-auto-slopp = "auto_slopp.main:main"
+[project.entry-points."virtualenv.create"]
+cpython3-mac-brew = "virtualenv.create.via_global_ref.builtin.cpython.mac_os:CPython3macOsBrew"
+cpython3-mac-framework = "virtualenv.create.via_global_ref.builtin.cpython.mac_os:CPython3macOsFramework"
+cpython3-posix = "virtualenv.create.via_global_ref.builtin.cpython.cpython3:CPython3Posix"
+cpython3-win = "virtualenv.create.via_global_ref.builtin.cpython.cpython3:CPython3Windows"
+graalpy-posix = "virtualenv.create.via_global_ref.builtin.graalpy:GraalPyPosix"
+graalpy-win = "virtualenv.create.via_global_ref.builtin.graalpy:GraalPyWindows"
+pypy3-posix = "virtualenv.create.via_global_ref.builtin.pypy.pypy3:PyPy3Posix"
+pypy3-win = "virtualenv.create.via_global_ref.builtin.pypy.pypy3:Pypy3Windows"
+venv = "virtualenv.create.via_global_ref.venv:Venv"
+
+[project.entry-points."virtualenv.discovery"]
+builtin = "virtualenv.discovery.builtin:Builtin"
+
+[project.entry-points."virtualenv.seed"]
+app-data = "virtualenv.seed.embed.via_app_data.via_app_data:FromAppData"
+pip = "virtualenv.seed.embed.pip_invoke:PipInvoke"
 
 [tool.black]
 line-length = 120
