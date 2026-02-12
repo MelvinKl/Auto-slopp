@@ -24,9 +24,7 @@ class ExamplePlugin:
         before_context=None,
     ):
         """Called after worker execution."""
-        print(
-            f"Example plugin: {worker_class.__name__} completed in {execution_time:.2f}s"
-        )
+        print(f"Example plugin: {worker_class.__name__} completed in {execution_time:.2f}s")
         if before_context and "plugin_data" in before_context:
             print(f"Example plugin: Found context: {before_context['plugin_data']}")
 
@@ -43,9 +41,7 @@ class ExamplePlugin:
         """Filter workers - remove any worker with 'Test' in the name for demo."""
         filtered = [w for w in workers if "Test" not in w.__name__]
         if len(filtered) != len(workers):
-            print(
-                f"Example plugin: Filtered out {len(workers) - len(filtered)} test workers"
-            )
+            print(f"Example plugin: Filtered out {len(workers) - len(filtered)} test workers")
         return filtered
 
     @hookimpl

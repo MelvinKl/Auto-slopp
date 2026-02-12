@@ -70,9 +70,7 @@ class PluginManager:
                 try:
                     # Convert file path to module path
                     relative_path = py_file.relative_to(search_path)
-                    module_path = (
-                        relative_path.with_suffix("").as_posix().replace("/", ".")
-                    )
+                    module_path = relative_path.with_suffix("").as_posix().replace("/", ".")
 
                     # Import the module
                     spec = importlib.util.spec_from_file_location(module_path, py_file)
@@ -82,8 +80,7 @@ class PluginManager:
 
                         # Register plugin if it has pluggy hook implementations
                         if hasattr(module, "__plugin__") or any(
-                            hasattr(getattr(module, attr, None), "auto_slopp_")
-                            for attr in dir(module)
+                            hasattr(getattr(module, attr, None), "auto_slopp_") for attr in dir(module)
                         ):
                             self.pm.register(module, module_path)
 
