@@ -4,6 +4,7 @@ A Python-based automation framework for task execution with pluggable worker sys
 
 ## Features
 
+- **Pluggy Plugin System**: Advanced plugin architecture using pluggy for extensible worker management and lifecycle hooks
 - **Pluggable Worker System**: Abstract base class for creating custom automation workers
 - **Configuration Management**: Pydantic-based settings with environment variable support
 - **Flexible Logging**: Built-in logging with optional Telegram integration for remote notifications
@@ -255,6 +256,61 @@ from auto_slopp.example_workers import HeartbeatWorker
 heartbeat = HeartbeatWorker(message="Custom service is running")
 # Returns: timestamp, message, path information
 ```
+
+## Plugin System
+
+Auto-slopp now includes a powerful plugin system built on pluggy, allowing extensive customization and extension of worker behavior.
+
+### Creating Plugins
+
+Plugins can implement various hooks to control worker lifecycle, execution, and configuration:
+
+```python
+from auto_slopp.hooks import hookimpl
+
+class MyPlugin:
+    @hookimpl
+    def auto_slopp_worker_before_execution(self, worker_class, repo_path, task_path):
+        """Called before worker execution."""
+        print(f"About to execute {worker_class.__name__}")
+        return {"timestamp": time.time()}
+
+    @hookimpl
+    def auto_slopp_worker_after_execution(self, worker_class, repo_path, task_path, result, execution_time, before_context=None):
+        """Called after worker execution."""
+        print(f"{worker_class.__name__} completed in {execution_time:.2f}s")
+
+    @hookimpl
+    def auto_slopp_filter_workers(self, workers):
+        """Filter workers before execution."""
+        return [w for w in workers if not w.__name__.startswith("Test")]
+
+    @hookimpl
+    def auto_slopp_modify_worker_kwargs(self, worker_class, kwargs):
+        """Modify worker instantiation arguments."""
+        kwargs["plugin_added"] = True
+        return kwargs
+
+# Mark module as plugin
+__plugin__ = True
+```
+
+### Available Hooks
+
+- **`auto_slopp_register_workers`**: Register worker classes with the system
+- **`auto_slopp_worker_before_execution`**: Called before each worker executes
+- **`auto_slopp_worker_after_execution`**: Called after each worker completes
+- **`auto_slopp_worker_execution_failed`**: Called when worker execution fails
+- **`auto_slopp_modify_worker_kwargs`**: Modify worker instantiation parameters
+- **`auto_slopp_filter_workers`**: Filter the list of workers to execute
+- **`auto_slopp_should_execute_worker`**: Control whether a worker should execute
+
+### Plugin Discovery
+
+Plugins are automatically discovered from:
+1. Worker search path (configured via settings)
+2. Python modules with `__plugin__ = True`
+3. Modules containing hook implementations
 
 ## API Reference
 
