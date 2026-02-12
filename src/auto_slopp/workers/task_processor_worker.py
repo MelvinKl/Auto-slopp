@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from auto_slopp.base.opencode_worker import OpenCodeWorker
 from auto_slopp.utils.file_operations import ensure_directory_exists
+from auto_slopp.utils.git_operations import checkout_branch_resilient
 from auto_slopp.utils.repository_utils import discover_repositories
 from auto_slopp.utils.task_processing import process_repository
 
@@ -189,6 +190,23 @@ class TaskProcessorWorker(OpenCodeWorker):
                 self.logger.info(f"Successfully initialized task directory: {task_path.name}")
             else:
                 self.logger.warning(f"Failed to initialize git in task directory: {task_path.name}")
+
+        # Pull latest changes from task repository before processing
+        if not self.dry_run:
+            self.logger.info(f"Pulling latest changes from task repository: {task_path.name}")
+            pull_success = checkout_branch_resilient(
+                repo_dir=task_path,
+                branch="main",
+                fetch_first=True,
+                timeout=60,
+            )
+
+            if pull_success:
+                self.logger.info(f"Successfully pulled latest changes from task repository: {task_path.name}")
+            else:
+                self.logger.warning(f"Failed to pull latest changes from task repository: {task_path.name}")
+        else:
+            self.logger.info(f"DRY RUN: Would pull latest changes from task repository: {task_path.name}")
 
         return process_repository(
             repo_dir=repo_dir,

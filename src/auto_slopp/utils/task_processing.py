@@ -139,7 +139,7 @@ def process_text_file(
             result["openagent_executed"] = openagent_result["success"]
 
             if not openagent_result["success"]:
-                result["error"] = f"OpenCode execution failed: " f"{openagent_result.get('error', 'Unknown error')}"
+                result["error"] = f"OpenCode execution failed: {openagent_result.get('error', 'Unknown error')}"
                 return result
         else:
             logger.info(f"DRY RUN: Would execute OpenAgent with instructions from {text_file.name}")
@@ -218,20 +218,8 @@ def process_repository(
             result["success"] = True
             return result
 
-        # Pull latest changes from the git repo only if we have files to process
-        if not dry_run:
-            pull_result = run_opencode(
-                additional_instructions="git pull origin main",
-                working_directory=task_repo_dir,
-                timeout=60,
-                capture_output=True,
-            )
-            if pull_result["success"]:
-                logger.info(f"Successfully pulled latest changes in {task_repo_dir.name}")
-            else:
-                logger.warning(
-                    f"Failed to pull changes in {task_repo_dir.name}: {pull_result.get('error', 'Unknown error')}"
-                )
+        # Note: Git pull is now handled in TaskProcessorWorker before calling process_repository
+        # This ensures we pull latest changes from task repository before processing
 
         # Process each text file
         for text_file in text_files:
