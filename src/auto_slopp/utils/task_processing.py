@@ -210,7 +210,15 @@ def process_repository(
 
         logger.info(f"Ensured task directory exists: {task_repo_dir}")
 
-        # Pull latest changes from the git repo
+        # Find .txt files in the task repository (not the original repo)
+        text_files = find_text_files(task_repo_dir)
+
+        if not text_files:
+            logger.info(f"No .txt files found in {task_repo_dir.name} (task repository)")
+            result["success"] = True
+            return result
+
+        # Pull latest changes from the git repo only if we have files to process
         if not dry_run:
             pull_result = run_opencode(
                 additional_instructions="git pull origin main",
@@ -224,14 +232,6 @@ def process_repository(
                 logger.warning(
                     f"Failed to pull changes in {task_repo_dir.name}: {pull_result.get('error', 'Unknown error')}"
                 )
-
-        # Find .txt files in the repository
-        text_files = find_text_files(repo_dir)
-
-        if not text_files:
-            logger.info(f"No .txt files found in {repo_dir.name}")
-            result["success"] = True
-            return result
 
         # Process each text file
         for text_file in text_files:
