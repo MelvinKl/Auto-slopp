@@ -246,6 +246,19 @@ processor = TaskProcessor(max_file_size=5*1024*1024)  # 5MB
 # Returns: processed files, content previews, metadata
 ```
 
+### H11Worker
+Makes HTTP GET requests using the h11 library for HTTP/1.1 protocol handling.
+```python
+from auto_slopp.workers.h11_worker import H11Worker
+
+# Configure timeout
+http_worker = H11Worker(timeout=30)
+
+# Usage with task file containing URLs:
+# Each line in the file should contain a URL to request
+# Returns: HTTP responses with status codes, headers, and body content
+```
+
 ### HeartbeatWorker
 Demonstrates periodic execution with status messages.
 ```python
