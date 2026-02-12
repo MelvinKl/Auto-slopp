@@ -116,6 +116,57 @@ def get_remote_branches(repo_dir: Path) -> set:
         raise GitOperationError(f"Failed to get remote branches: {e}")
 
 
+def identify_branches_behind_remote(repo_dir: Path) -> List[Dict[str, Any]]:
+    """Identify local branches that are behind their remote tracking branches.
+
+    Args:
+        repo_dir: Path to the git repository
+
+    Returns:
+        List of dictionaries containing branch information for branches behind remote.
+
+    Raises:
+        GitOperationError: If git command fails
+    """
+    try:
+        result = subprocess.run(
+            ["git", "status", "-sb", "--format=%(refname:short)%00%(upstream:short)"],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        behind_branches = []
+        for line in result.stdout.strip().split("\n"):
+            if not line.strip():
+                continue
+
+            parts = line.split("\x00")
+            if len(parts) >= 2:
+                local_branch = parts[0].strip()
+                upstream = parts[1].strip() if len(parts) > 1 else ""
+
+                if not upstream:
+                    continue
+
+                if "[behind" in line:
+                    behind_branches.append(
+                        {
+                            "name": local_branch,
+                            "upstream": upstream,
+                            "status": "behind",
+                        }
+                    )
+
+        logger.info(f"Found {len(behind_branches)} branches behind remote")
+        return behind_branches
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to identify branches behind remote in {repo_dir}: {e}")
+        raise GitOperationError(f"Failed to identify branches behind remote: {e}")
+
+
 def get_current_branch(repo_dir: Path) -> str:
     """Get the name of the current branch.
 

@@ -30,10 +30,13 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/auto_slopp"]
+packages = ["src/auto_slopp", "src/identify", "src/pre_commit"]
 
 [project.scripts]
 auto-slopp = "auto_slopp.main:main"
+identify-cli = "identify.cli:main"
+pre-commit-check = "pre_commit:main"
+pre-commit = "pre_commit.main:main"
 
 [tool.black]
 line-length = 120

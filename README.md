@@ -317,6 +317,12 @@ Options:
   --help               Show help message
 ```
 
+### Additional CLI Tools
+
+```bash
+identify-cli
+```
+
 ## Development
 
 ### Running Tests
@@ -526,7 +532,7 @@ This provides:
 
 ## License
 
-[License information to be added]
+This project is licensed under multiple licenses. See the [LICENSE](LICENSE) file for full details.
 
 ## Version History
 
