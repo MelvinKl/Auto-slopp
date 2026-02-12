@@ -34,6 +34,7 @@ packages = ["src/auto_slopp"]
 
 [project.scripts]
 auto-slopp = "auto_slopp.main:main"
+dotenv = "dotenv.__main__:cli"
 
 [tool.black]
 line-length = 120
