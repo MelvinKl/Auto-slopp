@@ -378,8 +378,9 @@ Options:
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all tests (both commands work)
 pytest
+py.test
 
 # Run with coverage
 pytest --cov=src --cov-report=html
