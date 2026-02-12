@@ -113,4 +113,5 @@ filterwarnings = [
 dev = [
     "pytest>=9.0.2",
     "pre-commit>=3.6.0",
+    "pytest-cov>=7.0.0",
 ]

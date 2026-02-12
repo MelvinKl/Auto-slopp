@@ -74,6 +74,7 @@ dev = [
 dev = [
     { name = "pre-commit" },
     { name = "pytest" },
+    { name = "pytest-cov" },
 ]
 
 [package.metadata]
@@ -100,6 +101,7 @@ provides-extras = ["dev"]
 dev = [
     { name = "pre-commit", specifier = ">=3.6.0" },
     { name = "pytest", specifier = ">=9.0.2" },
+    { name = "pytest-cov", specifier = ">=7.0.0" },
 ]
 
 [[package]]

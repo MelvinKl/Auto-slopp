@@ -59,9 +59,12 @@ test-unit:
 # Run tests with coverage
 coverage:
 	@echo "📊 Running tests with coverage..."
-	uv run python -m pytest tests/ --cov=src --cov-report=term-missing --cov-report=html || (echo "❌ Tests failed" && exit 1)
+	uv run python -m coverage run --source=src -m pytest tests/ || (echo "❌ Tests failed" && exit 1)
+	@echo "📈 Generating coverage report..."
+	uv run python -m coverage report --show-missing --omit="*/tests/*,*/test_*" || echo "⚠️ Coverage report has warnings, continuing..."
+	uv run python -m coverage html --omit="*/tests/*,*/test_*" || echo "⚠️ HTML report failed, but coverage was collected"
 	@echo "✅ Coverage report generated"
-	@echo "📁 HTML coverage report available at htmlcov/index.html"
+	@if [ -f "htmlcov/index.html" ]; then echo "📁 HTML coverage report available at htmlcov/index.html"; else echo "⚠️ HTML report not available"; fi
 
 # Run security vulnerability scans
 security:
