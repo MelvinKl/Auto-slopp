@@ -215,12 +215,12 @@ Auto-slopp automatically discovers worker implementations in the configured sear
 
 ## Example Workers
 
-The project includes several example workers:
+The project includes several workers:
 
 ### SimpleLogger
 Logs basic information about repository and task paths.
 ```python
-from auto_slopp.example_workers import SimpleLogger
+from auto_slopp.workers import SimpleLogger
 
 # Usage is automatic through discovery
 # Result includes: path info, existence checks, file counts
@@ -229,7 +229,7 @@ from auto_slopp.example_workers import SimpleLogger
 ### FileMonitor
 Scans repository for files matching specific patterns.
 ```python
-from auto_slopp.example_workers import FileMonitor
+from auto_slopp.workers import FileMonitor
 
 # Configure with custom patterns
 monitor = FileMonitor(file_patterns=["*.py", "*.md", "*.json"])
@@ -239,7 +239,7 @@ monitor = FileMonitor(file_patterns=["*.py", "*.md", "*.json"])
 ### TaskProcessor
 Processes task files with size limits and content analysis.
 ```python
-from auto_slopp.example_workers import TaskProcessor
+from auto_slopp.workers import TaskProcessor
 
 # Configure maximum file size
 processor = TaskProcessor(max_file_size=5*1024*1024)  # 5MB
@@ -249,11 +249,24 @@ processor = TaskProcessor(max_file_size=5*1024*1024)  # 5MB
 ### HeartbeatWorker
 Demonstrates periodic execution with status messages.
 ```python
-from auto_slopp.example_workers import HeartbeatWorker
+from auto_slopp.workers import HeartbeatWorker
 
 # Custom heartbeat message
 heartbeat = HeartbeatWorker(message="Custom service is running")
 # Returns: timestamp, message, path information
+```
+
+### NodeenvWorker
+Creates isolated Node.js virtual environments similar to Python's virtualenv.
+```python
+from auto_slopp.workers import NodeenvWorker
+
+# Create environment with latest LTS Node.js
+nodeenv = NodeenvWorker()
+# Returns: environment info, node/npm versions, activation scripts
+
+# Create environment with specific Node.js version
+nodeenv = NodeenvWorker(node_version="18.17.0", env_name="my-node-env")
 ```
 
 ## API Reference
