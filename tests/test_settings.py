@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from settings.main import Settings, settings
+from auto_slopp.settings.main import Settings, settings
 
 
 class TestSettings:
@@ -74,9 +74,9 @@ class TestSettings:
         # Act & Assert - Check that specified values are overridden, others use defaults
         assert test_settings.debug is True  # Overridden
         assert test_settings.telegram_enabled is True  # Overridden
-        assert test_settings.base_repo_path == Path("/root/git/managed")  # From .env in current setup
-        assert test_settings.executor_sleep_interval == 30.0  # From .env (this is the actual behavior)
-        assert test_settings.telegram_bot_token is not None  # From .env (this is the actual behavior)
+        assert test_settings.base_repo_path == Path.cwd()  # Default when no .env loaded
+        assert test_settings.executor_sleep_interval == 1.0  # Default value
+        assert test_settings.telegram_bot_token is None  # Default when no .env loaded
 
     def test_optional_telegram_fields(self):
         """Test optional telegram fields when telegram is enabled."""
@@ -126,7 +126,7 @@ class TestSettings:
     def test_global_settings_instance(self):
         """Test that global settings instance is available."""
         # Act & Assert - Check that global settings instance exists
-        from settings.main import settings
+        from auto_slopp.settings.main import settings
 
         assert isinstance(settings, Settings)
         assert hasattr(settings, "base_repo_path")

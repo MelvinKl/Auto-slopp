@@ -6,8 +6,8 @@ import sys
 from pathlib import Path
 
 from auto_slopp.executor import run_executor
+from auto_slopp.settings.main import settings
 from auto_slopp.telegram_handler import setup_telegram_logging
-from settings.main import settings
 
 
 def setup_logging() -> None:

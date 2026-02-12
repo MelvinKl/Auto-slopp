@@ -7,7 +7,7 @@ from typing import Optional
 
 import httpx
 
-from settings.main import settings
+from auto_slopp.settings.main import settings
 
 
 class TelegramHandler(logging.Handler):
@@ -206,7 +206,7 @@ def setup_telegram_logging(
     handler.setLevel(level)
 
     if format_string is None:
-        format_string = "<b>{levelname}</b> ({name})\n" "Message: {message}\n" "Time: {asctime}"
+        format_string = "<b>{levelname}</b> ({name})\nMessage: {message}\nTime: {asctime}"
 
     formatter = logging.Formatter(format_string, style="{")
     handler.setFormatter(formatter)

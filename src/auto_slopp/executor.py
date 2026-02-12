@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any, Optional, Type
 
 from auto_slopp.discovery import discover_workers
+from auto_slopp.settings.main import settings
 from auto_slopp.worker import Worker
-from settings.main import settings
 
 
 class Executor:
@@ -85,8 +85,6 @@ class Executor:
         """
         # Special handling for TaskProcessorWorker which requires task_repo_path
         if worker_class.__name__ == "TaskProcessorWorker":
-            from settings.main import settings
-
             return worker_class(task_repo_path=settings.task_repo_path)
 
         # Default instantiation for simple workers
