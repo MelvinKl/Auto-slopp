@@ -51,6 +51,19 @@ Run with custom paths:
 auto-slopp --repo-path /path/to/repo --task-path /path/to/tasks --search-path /path/to/workers
 ```
 
+### Console Scripts
+
+The package provides several console scripts for coverage analysis:
+
+```bash
+# Main coverage command
+coverage --help
+
+# Legacy coverage commands (deprecated)
+coverage3 --help
+coverage_3_14 --help
+```
+
 ### Development
 
 The project includes a comprehensive Makefile for streamlined development and testing:
