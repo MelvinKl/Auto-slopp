@@ -51,6 +51,25 @@ Run with custom paths:
 auto-slopp --repo-path /path/to/repo --task-path /path/to/tasks --search-path /path/to/workers
 ```
 
+### Available Console Scripts
+
+The project includes several console scripts:
+
+**auto-slopp**: Main automation framework
+```bash
+auto-slopp --help
+```
+
+**markdown-it**: Markdown to HTML converter
+```bash
+# Convert markdown file to HTML
+markdown-it README.md
+
+# Interactive mode
+markdown-it
+# Type markdown and press Ctrl-D to convert
+```
+
 ### Development
 
 The project includes a comprehensive Makefile for streamlined development and testing:
