@@ -92,6 +92,40 @@ def discover_workers(search_path: Path) -> List[Type[Worker]]:
     return workers
 
 
+def discover_workers_stevedore() -> List[Type[Worker]]:
+    """Discover workers using stevedore plugin system.
+
+    Uses stevedore to load workers registered via entry points
+    under the 'auto_slopp.workers' namespace.
+
+    Returns:
+        List of Worker subclass types discovered via stevedore
+    """
+    from stevedore import ExtensionManager
+
+    workers: List[Type[Worker]] = []
+
+    try:
+        manager = ExtensionManager(
+            namespace="auto_slopp.workers",
+            invoke_on_load=False,
+        )
+
+        for ext in manager.extensions:
+            try:
+                worker_class = ext.plugin
+                if issubclass(worker_class, Worker) and not inspect.isabstract(worker_class):
+                    workers.append(worker_class)
+            except Exception as e:
+                print(f"Warning: Could not load worker {ext.name}: {e}")
+                continue
+
+    except Exception as e:
+        print(f"Warning: Stevedore discovery failed: {e}")
+
+    return workers
+
+
 def _file_to_module_path(file_path: Path, search_path: Path) -> Optional[str]:
     """Convert a file path to a Python module path.
 

@@ -12,6 +12,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "httpx>=0.25.0",
     "python-dotenv>=1.0.0",
+    "stevedore>=5.0.0",
 ]
 
 [project.optional-dependencies]
@@ -34,6 +35,11 @@ packages = ["src/auto_slopp"]
 
 [project.scripts]
 auto-slopp = "auto_slopp.main:main"
+
+[project.entry-points."auto_slopp.workers"]
+task_processor = "auto_slopp.workers.task_processor_worker:TaskProcessorWorker"
+renovate_test = "auto_slopp.workers.renovate_test_worker:RenovateTestWorker"
+stale_branch_cleanup = "auto_slopp.workers.stale_branch_cleanup_worker:StaleBranchCleanupWorker"
 
 [tool.black]
 line-length = 120

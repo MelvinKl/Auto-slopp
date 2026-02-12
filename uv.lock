@@ -53,6 +53,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
+    { name = "stevedore" },
 ]
 
 [package.optional-dependencies]
@@ -93,6 +94,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "safety", marker = "extra == 'dev'", specifier = ">=2.3.0" },
+    { name = "stevedore", specifier = ">=5.0.0" },
 ]
 provides-extras = ["dev"]
 

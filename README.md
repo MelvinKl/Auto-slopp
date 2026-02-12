@@ -213,6 +213,8 @@ class ConfigurableWorker(Worker):
 
 Auto-slopp automatically discovers worker implementations in the configured search path. Simply place your worker files in a directory that's included in `AUTO_SLOPP_WORKER_SEARCH_PATH` or the default search directory.
 
+Workers can also be discovered via the stevedore plugin system using entry points defined under the `auto_slopp.workers` namespace. This allows for dynamic loading of worker plugins without direct imports.
+
 ## Example Workers
 
 The project includes several example workers:
