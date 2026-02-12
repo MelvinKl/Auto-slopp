@@ -42,6 +42,9 @@ lint:
 	@echo "Running flake8..."
 	uv run flake8 --max-line-length=120 --max-complexity=8 --extend-ignore=E203,W503,D104,F401,D401,I201,F841,F811,B014,C901,B007,E501,I100,D202 src/ tests/ || (echo "❌ flake8 linting failed" && exit 1)
 	@echo "✅ flake8 linting passed"
+	@echo "Running pycodestyle..."
+	uv run pycodestyle --max-line-length=120 --ignore=E203,W503,E501 src/ tests/ || (echo "❌ pycodestyle check failed" && exit 1)
+	@echo "✅ pycodestyle check passed"
 
 # Format code
 format:
