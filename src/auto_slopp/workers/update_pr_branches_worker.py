@@ -20,6 +20,11 @@ class UpdatePRBranchesWorker(Worker):
     def __init__(self):
         """Initialize UpdatePRBranchesWorker."""
         self.logger = logging.getLogger("auto_slopp.workers.UpdatePRBranchesWorker")
+        # TODO: git operations belong into the git_operations file NOT into this file. If you add them here they arent't reusable. Also: There is error handling available in the git_operations.
+        # TODO: create a new file for github_oiperations and move ALL operations for github there. Not only from this file, from all files.
+        TODO: git operations belong into the git_operations file NOT into this file. If you add them here they arent't reusable. Also: There is error handling available in the git_operations.
+        TODO: create a new file for github_oiperations and move ALL operations for github there. Not only from this file, from all files.
+        raise YourPRIsStupidError()
 
     def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
         """Execute PR branch update workflow for a single repository.
