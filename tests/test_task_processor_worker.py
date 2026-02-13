@@ -2,7 +2,7 @@
 
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -88,9 +88,7 @@ class TestTaskProcessorWorkerSimple:
             task_repo_path.mkdir()
 
             # Mock checkout_branch_resilient to verify it's called with main branch
-            with patch(
-                "auto_slopp.workers.task_processor_worker.checkout_branch_resilient"
-            ) as mock_checkout:
+            with patch("auto_slopp.workers.task_processor_worker.checkout_branch_resilient") as mock_checkout:
                 mock_checkout.return_value = True
 
                 # Initialize worker
@@ -101,9 +99,7 @@ class TestTaskProcessorWorkerSimple:
                 )
 
                 # Also mock process_repository to avoid actual processing
-                with patch(
-                    "auto_slopp.workers.task_processor_worker.process_repository"
-                ) as mock_process:
+                with patch("auto_slopp.workers.task_processor_worker.process_repository") as mock_process:
                     mock_process.return_value = {
                         "success": True,
                         "text_files_processed": 0,

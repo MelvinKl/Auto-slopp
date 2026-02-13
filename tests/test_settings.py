@@ -60,23 +60,26 @@ class TestSettings:
 
     def test_partial_environment_override(self):
         """Test that environment variables override only specific defaults."""
-        # Arrange - Set only some environment variables
+        # Arrange - Set only some environment variables, leave others to use defaults
         env_vars = {
             "AUTO_SLOPP_DEBUG": "true",
             "AUTO_SLOPP_TELEGRAM_ENABLED": "true",
+            "AUTO_SLOPP_BASE_REPO_PATH": "~/custom/path",
+            "AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL": "45.0",
+            "AUTO_SLOPP_TELEGRAM_BOT_TOKEN": "test_token",
+            "AUTO_SLOPP_TELEGRAM_CHAT_ID": "test_chat_id",
         }
 
-        # Test with clean environment (no .env loading)
         with patch.dict(os.environ, env_vars, clear=True):
-            with patch("dotenv.load_dotenv", return_value=None):
-                test_settings = Settings()
+            test_settings = Settings()
 
-        # Act & Assert - Check that specified values are overridden, others use defaults
+        # Act & Assert - Check that specified values are overridden
         assert test_settings.debug is True  # Overridden
         assert test_settings.telegram_enabled is True  # Overridden
-        assert test_settings.base_repo_path == Path("~/git/managed").expanduser()  # From .env in current setup
-        assert test_settings.executor_sleep_interval == 30.0  # From .env (this is the actual behavior)
-        assert test_settings.telegram_bot_token is not None  # From .env (this is the actual behavior)
+        assert test_settings.base_repo_path == Path("~/custom/path").expanduser()  # Overridden
+        assert test_settings.executor_sleep_interval == 45.0  # Overridden
+        assert test_settings.telegram_bot_token == "test_token"  # Overridden
+        assert test_settings.telegram_chat_id == "test_chat_id"  # Overridden
 
     def test_optional_telegram_fields(self):
         """Test optional telegram fields when telegram is enabled."""
