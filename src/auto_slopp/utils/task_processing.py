@@ -101,20 +101,14 @@ def process_text_file(
         instructions = f"Create a new branch that starts with ai/ from base origin/main and implement the following:\n{instructions}\nKeep your implementation simple. Only implement what is required. Ensure that 'make test' runs successful. Only push if ALL tests are successful. Check if you need to update the README.md. Push your changes and create a pull request on github."
         # Execute OpenAgent with the instructions
         if not dry_run:
-            openagent_result = execute_openagent_with_instructions(
-                instructions, repo_dir, agent_args, timeout
-            )
+            openagent_result = execute_openagent_with_instructions(instructions, repo_dir, agent_args, timeout)
             result["openagent_executed"] = openagent_result["success"]
 
             if not openagent_result["success"]:
-                result["error"] = (
-                    f"OpenCode execution failed: {openagent_result.get('error', 'Unknown error')}"
-                )
+                result["error"] = f"OpenCode execution failed: {openagent_result.get('error', 'Unknown error')}"
                 return result
         else:
-            logger.info(
-                f"DRY RUN: Would execute OpenAgent with instructions from {text_file.name}"
-            )
+            logger.info(f"DRY RUN: Would execute OpenAgent with instructions from {text_file.name}")
             result["openagent_executed"] = True
 
         # Rename the file with counter and .used suffix
@@ -186,9 +180,7 @@ def process_repository(
         text_files = find_text_files(task_repo_dir)
 
         if not text_files:
-            logger.info(
-                f"No .txt files found in {task_repo_dir.name} (task repository)"
-            )
+            logger.info(f"No .txt files found in {task_repo_dir.name} (task repository)")
             result["success"] = True
             return result
 
@@ -217,9 +209,7 @@ def process_repository(
                 if file_result.get("git_operations", False):
                     result["git_operations"] += 1
             else:
-                result["errors"].append(
-                    file_result.get("error", "Unknown processing error")
-                )
+                result["errors"].append(file_result.get("error", "Unknown processing error"))
 
         result["success"] = len(result["errors"]) == 0
 
