@@ -5,11 +5,13 @@ This package contains all worker implementations organized by functionality:
 """
 
 # Import all workers to make them available for discovery
+from auto_slopp.workers.pr_test_worker import PRTestWorker
 from auto_slopp.workers.pr_worker import PRWorker
 from auto_slopp.workers.stale_branch_cleanup_worker import StaleBranchCleanupWorker
 from auto_slopp.workers.task_processor_worker import TaskProcessorWorker
 
 __all__ = [
+    "PRTestWorker",
     "PRWorker",
     "StaleBranchCleanupWorker",
     "TaskProcessorWorker",
