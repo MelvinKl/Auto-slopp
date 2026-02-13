@@ -154,22 +154,8 @@ class UpdatePRBranchesWorker(Worker):
     def _push_branch(self, repo_dir: Path, branch: str) -> bool:
         """Push the updated branch to remote."""
         try:
-            self.logger.info(f"Pushing branch {branch} to remote")
-
-            result = subprocess.run(
-                ["git", "push", "origin", branch, "--force"],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-
-            if result.returncode != 0:
-                self.logger.error(f"Failed to push branch {branch}: {result.stderr}")
-                return False
-
-            self.logger.info(f"Successfully pushed branch {branch}")
-            return True
+            raise NotImplementedError()
+            # TODO: use git_operations
 
         except subprocess.TimeoutExpired:
             self.logger.error(f"Timeout pushing branch {branch}")
