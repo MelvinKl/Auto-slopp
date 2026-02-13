@@ -35,11 +35,6 @@ class Settings(BaseSettings):
         description="Path to the task repository directory",
     )
 
-    worker_search_path: Path = Field(
-        default_factory=lambda: Path(__file__).parent.parent,
-        description="Path to search for worker implementations",
-    )
-
     @field_validator(
         "base_repo_path",
         "base_task_path",
