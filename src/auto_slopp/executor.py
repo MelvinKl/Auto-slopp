@@ -6,8 +6,11 @@ import traceback
 from pathlib import Path
 from typing import Any, Optional, Type
 
-from auto_slopp.discovery import discover_workers
-from auto_slopp.utils.git_operations import pull_from_remote, push_to_remote
+from auto_slopp.utils.git_operations import (
+    commit_all_change,
+    pull_from_remote,
+    push_to_remote,
+)
 from auto_slopp.worker import Worker
 from settings.main import settings
 
@@ -89,6 +92,14 @@ class Executor:
             if not (task_repo_path / ".git").exists():
                 print(f"Task repo path is not a git repository: {task_repo_path}")
                 return
+
+            commit_success, commit_msg = commit_all_changes(
+                task_repo_path, "Auto-slopp: auto-commit changes"
+            )
+            if commit_success:
+                print(f"Committed changes in task_repo: {commit_msg}")
+            else:
+                print(f"No changes or commit failed in task_repo: {commit_msg}")
 
             pull_success, pull_msg = pull_from_remote(task_repo_path, "origin", "main")
             if pull_success:
@@ -190,19 +201,25 @@ class Executor:
                 worker = self._instantiate_worker(worker_class)
 
                 # Map repo_task_path to corresponding subdirectory
-                repo_task_path = self.task_path / subdirectory.name if self.task_path else None
+                repo_task_path = (
+                    self.task_path / subdirectory.name if self.task_path else None
+                )
 
                 # Execute worker on single subdirectory
                 start_time = time.time()
                 result = worker.run(subdirectory, repo_task_path)
                 execution_time = time.time() - start_time
 
-                print(f"Worker {worker_class.__name__} on {subdirectory.name} completed in {execution_time:.2f}s")
+                print(
+                    f"Worker {worker_class.__name__} on {subdirectory.name} completed in {execution_time:.2f}s"
+                )
                 if result is not None:
                     print(f"Result: {result}")
 
             except Exception as e:
-                print(f"Error executing worker {worker_class.__name__} on {subdirectory.name}: {e}")
+                print(
+                    f"Error executing worker {worker_class.__name__} on {subdirectory.name}: {e}"
+                )
                 traceback.print_exc()
 
     def _execute_worker_single(self, worker_class: Type[Worker]) -> None:
