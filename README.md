@@ -526,7 +526,7 @@ This provides:
 
 ## License
 
-[License information to be added]
+This project includes Python software licensing information. See the [LICENSE](LICENSE) file for details.
 
 ## Version History
 
