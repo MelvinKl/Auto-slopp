@@ -256,6 +256,22 @@ heartbeat = HeartbeatWorker(message="Custom service is running")
 # Returns: timestamp, message, path information
 ```
 
+### PreCommitWorker
+Runs pre-commit hooks on repositories for automated code quality checks.
+```python
+from auto_slopp.workers.pre_commit_worker import PreCommitWorker
+
+# Run on all files
+worker = PreCommitWorker(all_files=True)
+
+# Run specific hooks
+worker = PreCommitWorker(hook_ids=["trailing-whitespace", "black", "isort"])
+
+# Run on specific files
+worker = PreCommitWorker(files=["src/main.py", "tests/test.py"])
+# Returns: success status, return code, stdout, stderr
+```
+
 ## API Reference
 
 ### Worker Base Class
