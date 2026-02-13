@@ -66,17 +66,16 @@ class TestSettings:
             "AUTO_SLOPP_TELEGRAM_ENABLED": "true",
         }
 
-        # Test with clean environment (no .env loading)
-        with patch.dict(os.environ, env_vars, clear=True):
-            with patch("dotenv.load_dotenv", return_value=None):
-                test_settings = Settings()
+        # Test with environment variables - .env is already loaded at module import
+        with patch.dict(os.environ, env_vars):
+            test_settings = Settings()
 
-        # Act & Assert - Check that specified values are overridden, others use defaults
+        # Act & Assert - Check that specified values are overridden, others use defaults from .env
         assert test_settings.debug is True  # Overridden
         assert test_settings.telegram_enabled is True  # Overridden
-        assert test_settings.base_repo_path == Path.cwd()  # Default value when no .env loaded
-        assert test_settings.executor_sleep_interval == 1.0  # Default value when no .env loaded
-        assert test_settings.telegram_bot_token is None  # Default value when no .env loaded
+        assert test_settings.base_repo_path == Path("/root/git/managed")  # From .env
+        assert test_settings.executor_sleep_interval == 30.0  # From .env
+        assert test_settings.telegram_bot_token == "8257503031:AAEBznkdzNkyA9zN7D-zPniLMmd0mmvRiQA"  # From .env
 
     def test_optional_telegram_fields(self):
         """Test optional telegram fields when telegram is enabled."""
