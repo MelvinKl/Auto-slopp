@@ -12,6 +12,7 @@ from typing import Any, Dict, List
 from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     merge_main_into_branch,
+    push_branch,
 )
 from auto_slopp.utils.repository_utils import validate_repository
 from auto_slopp.worker import Worker
@@ -23,6 +24,9 @@ class UpdatePRBranchesWorker(Worker):
     def __init__(self):
         """Initialize UpdatePRBranchesWorker."""
         self.logger = logging.getLogger("auto_slopp.workers.UpdatePRBranchesWorker")
+        # TODO: git operations belong into the git_operations file NOT into this file. If you add them here they aren't't reusable. Also: There is error handling available in the git_operations.
+        # TODO: create a new file for github_operations and move ALL operations for github there. Not only from this file, from all files.
+        pass
 
     def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
         """Execute PR branch update workflow for a single repository.
@@ -154,8 +158,16 @@ class UpdatePRBranchesWorker(Worker):
     def _push_branch(self, repo_dir: Path, branch: str) -> bool:
         """Push the updated branch to remote."""
         try:
-            raise NotImplementedError()
-            # TODO: use git_operations
+            self.logger.info(f"Pushing branch {branch} to remote")
+
+            success = push_branch(repo_dir=repo_dir, branch=branch, force=True)
+
+            if not success:
+                self.logger.error(f"Failed to push branch {branch}")
+                return False
+
+            self.logger.info(f"Successfully pushed branch {branch}")
+            return True
 
         except subprocess.TimeoutExpired:
             self.logger.error(f"Timeout pushing branch {branch}")
