@@ -2,7 +2,7 @@
 
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -75,3 +75,47 @@ class TestTaskProcessorWorkerSimple:
             assert result["execution_time"] >= 0
             assert "worker_name" in result
             assert result["worker_name"] == "TaskProcessorWorker"
+
+    def test_task_repo_always_uses_main_branch(self):
+        """Test that task_processor_worker always uses main branch for task_repo."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create paths
+            repo_path = Path(temp_dir) / "repos"
+            task_repo_path = Path(temp_dir) / "tasks"
+
+            # Create directories
+            repo_path.mkdir()
+            task_repo_path.mkdir()
+
+            # Mock checkout_branch_resilient to verify it's called with main branch
+            with patch(
+                "auto_slopp.workers.task_processor_worker.checkout_branch_resilient"
+            ) as mock_checkout:
+                mock_checkout.return_value = True
+
+                # Initialize worker
+                worker = TaskProcessorWorker(
+                    task_repo_path=task_repo_path,
+                    counter_start=1,
+                    dry_run=False,  # Must be False to trigger branch checkout
+                )
+
+                # Also mock process_repository to avoid actual processing
+                with patch(
+                    "auto_slopp.workers.task_processor_worker.process_repository"
+                ) as mock_process:
+                    mock_process.return_value = {
+                        "success": True,
+                        "text_files_processed": 0,
+                    }
+
+                    # Run worker
+                    result = worker.run(repo_path, task_repo_path)
+
+                    # Verify checkout_branch_resilient was called with main branch for task_path
+                    mock_checkout.assert_called()
+                    call_args = mock_checkout.call_args
+                    assert call_args.kwargs["repo_dir"] == task_repo_path
+                    assert call_args.kwargs["branch"] == "main"
+
+                    assert result["success"] is True
