@@ -49,6 +49,7 @@ name = "auto-slopp"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "certifi" },
     { name = "httpx" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -80,6 +81,7 @@ dev = [
 requires-dist = [
     { name = "bandit", marker = "extra == 'dev'", specifier = ">=1.7.0" },
     { name = "black", marker = "extra == 'dev'", specifier = ">=23.7.0" },
+    { name = "certifi", specifier = ">=2023.0.0" },
     { name = "coverage", marker = "extra == 'dev'", specifier = ">=7.3.0" },
     { name = "flake8", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "flake8-bugbear", marker = "extra == 'dev'", specifier = ">=23.7.10" },
