@@ -12,6 +12,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "httpx>=0.25.0",
     "python-dotenv>=1.0.0",
+    "pytest>=7.4.0",
 ]
 
 [project.optional-dependencies]
@@ -34,6 +35,8 @@ packages = ["src/auto_slopp"]
 
 [project.scripts]
 auto-slopp = "auto_slopp.main:main"
+"py.test" = "pytest:console_main"
+pytest = "pytest:console_main"
 
 [tool.black]
 line-length = 120
