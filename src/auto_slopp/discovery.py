@@ -30,13 +30,37 @@ def discover_workers(search_path: Path) -> List[Type[Worker]]:
     if not search_path.exists() or not search_path.is_dir():
         return workers
 
-    # Add the search path to sys.path temporarily
+    # Strategy: Add both the search_path AND the auto_slopp package root to sys.path
+    # This allows imports like 'from auto_slopp.worker import Worker' to work
+    # regardless of whether search_path is the workers dir or a custom directory
+
+    # Find potential auto_slopp package root by walking up from search_path
+    # We look for directories that have 'auto_slopp' as a parent
     search_path_str = str(search_path.resolve())
     original_path = sys.path[:]
 
+    # Collect all paths to add
+    paths_to_add = [search_path_str]
+
+    # Try to find and add the auto_slopp package root
+    # Check parent directories for 'auto_slopp' folder
+    current = search_path.parent
+    for _ in range(5):  # Look up to 5 levels
+        if current.name == "auto_slopp":
+            # Found auto_slopp, add its parent (src) to enable 'auto_slopp.xxx' imports
+            package_root = str(current.parent.resolve())
+            if package_root not in paths_to_add:
+                paths_to_add.insert(0, package_root)
+            break
+        if current == current.parent:
+            break
+        current = current.parent
+
     try:
-        if search_path_str not in sys.path:
-            sys.path.insert(0, search_path_str)
+        # Add all paths to sys.path (at the beginning, priority over installed packages)
+        for p in paths_to_add:
+            if p not in sys.path:
+                sys.path.insert(0, p)
 
         # Find all Python files in the search path
         for py_file in search_path.rglob("*.py"):
@@ -49,25 +73,19 @@ def discover_workers(search_path: Path) -> List[Type[Worker]]:
                 if not module_path and py_file.name != "__init__.py":
                     continue
 
-                # Import the module (special handling for __init__.py)
+                # Skip __init__.py at the root of search_path - it's handled differently
+                # and trying to import it as a standalone module often fails
                 if py_file.name == "__init__.py":
-                    # For __init__.py files, import the parent package
                     relative_dir = py_file.parent.relative_to(search_path)
                     if relative_dir == Path("."):
-                        # __init__.py in the root of search_path - use directory name as module
-                        module_name = search_path.name
-                    else:
-                        module_name = str(relative_dir).replace("/", ".")
+                        # This is __init__.py at the root of search_path - skip it
+                        # The individual worker files will be discovered directly
+                        continue
+                    # For nested __init__.py, handle as regular module below
 
-                    if module_name:
-                        module = importlib.import_module(module_name)
-                    else:
-                        # Skip if we can't determine a module name
-                        continue
-                else:
-                    if module_path is None:
-                        continue
-                    module = importlib.import_module(module_path)
+                if module_path is None:
+                    continue
+                module = importlib.import_module(module_path)
 
                 # Find all Worker subclasses in the module
                 for name, obj in inspect.getmembers(module, inspect.isclass):
