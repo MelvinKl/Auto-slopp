@@ -46,6 +46,11 @@ Run Auto-slopp with default settings:
 auto-slopp
 ```
 
+Run pre-commit hook:
+```bash
+pre-commit
+```
+
 Run with custom paths:
 ```bash
 auto-slopp --repo-path /path/to/repo --task-path /path/to/tasks --search-path /path/to/workers
