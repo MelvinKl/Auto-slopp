@@ -101,7 +101,7 @@ class Settings(BaseSettings):
 
 
 # Load .env file automatically before creating settings instance
-load_dotenv()
+load_dotenv(override=True)
 
 # Global settings instance
 settings = Settings()

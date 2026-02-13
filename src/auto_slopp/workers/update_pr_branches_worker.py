@@ -12,6 +12,7 @@ from typing import Any, Dict, List
 from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     merge_main_into_branch,
+    push_branch,
 )
 from auto_slopp.utils.repository_utils import validate_repository
 from auto_slopp.worker import Worker
@@ -62,9 +63,7 @@ class UpdatePRBranchesWorker(Worker):
                 f"Repository is invalid: {repo_path.name} - {repo_info.get('errors', ['Unknown error'])}"
             )
             results["success"] = False
-            results["error"] = (
-                f"Invalid repository: {repo_info.get('errors', ['Unknown error'])}"
-            )
+            results["error"] = f"Invalid repository: {repo_info.get('errors', ['Unknown error'])}"
             return results
 
         pr_branches = self._get_open_pr_branches(repo_path)
@@ -119,9 +118,7 @@ class UpdatePRBranchesWorker(Worker):
             )
 
             if result.returncode != 0:
-                self.logger.error(
-                    f"Failed to list PRs in {repo_dir.name}: {result.stderr}"
-                )
+                self.logger.error(f"Failed to list PRs in {repo_dir.name}: {result.stderr}")
                 return []
 
             prs = json.loads(result.stdout)
@@ -136,9 +133,7 @@ class UpdatePRBranchesWorker(Worker):
 
     def _checkout_branch(self, repo_dir: Path, branch: str) -> bool:
         """Checkout a specific branch in the repository."""
-        success = checkout_branch_resilient(
-            repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60
-        )
+        success = checkout_branch_resilient(repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60)
 
         if success:
             self.logger.info(f"Successfully checked out {branch} in {repo_dir.name}")
@@ -163,8 +158,16 @@ class UpdatePRBranchesWorker(Worker):
     def _push_branch(self, repo_dir: Path, branch: str) -> bool:
         """Push the updated branch to remote."""
         try:
-            raise NotImplementedError()
-            # TODO: use git_operations
+            self.logger.info(f"Pushing branch {branch} to remote")
+
+            success = push_branch(repo_dir=repo_dir, branch=branch, force=True)
+
+            if not success:
+                self.logger.error(f"Failed to push branch {branch}")
+                return False
+
+            self.logger.info(f"Successfully pushed branch {branch}")
+            return True
 
         except subprocess.TimeoutExpired:
             self.logger.error(f"Timeout pushing branch {branch}")
