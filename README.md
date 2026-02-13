@@ -256,6 +256,16 @@ heartbeat = HeartbeatWorker(message="Custom service is running")
 # Returns: timestamp, message, path information
 ```
 
+### AutoCommandWorker
+Automatically runs specified shell commands on repositories.
+```python
+from auto_slopp.workers.auto_command_worker import AutoCommandWorker
+
+# Configure with custom command
+worker = AutoCommandWorker(command="make test", timeout=300)
+# Returns: command output, return code, execution status
+```
+
 ## API Reference
 
 ### Worker Base Class
