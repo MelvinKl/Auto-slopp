@@ -84,7 +84,7 @@ def run_opencode(
     working_dir = working_directory or Path.cwd()
 
     logger.info(
-        f"Executing OpenCode with instructions: {additional_instructions[:100] if additional_instructions else 'None'}..."
+        f"Executing OpenCode with instructions: {additional_instructions if additional_instructions else 'None'}..."
     )
     logger.info(f"Working directory: {working_dir}")
     logger.info(f"Timeout: {timeout}s")
