@@ -256,6 +256,19 @@ heartbeat = HeartbeatWorker(message="Custom service is running")
 # Returns: timestamp, message, path information
 ```
 
+### NodeenvWorker
+Creates isolated Node.js virtual environments similar to Python's virtualenv.
+```python
+from auto_slopp.workers import NodeenvWorker
+
+# Create environment with latest LTS Node.js
+nodeenv = NodeenvWorker()
+# Returns: environment info, node/npm versions, activation scripts
+
+# Create environment with specific Node.js version
+nodeenv = NodeenvWorker(node_version="18.17.0", env_name="my-node-env")
+```
+
 ## API Reference
 
 ### Worker Base Class
