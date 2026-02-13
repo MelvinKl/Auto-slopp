@@ -12,6 +12,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "httpx>=0.25.0",
     "python-dotenv>=1.0.0",
+    "identify>=2.6.0",
 ]
 
 [project.optional-dependencies]
@@ -34,6 +35,10 @@ packages = ["src/auto_slopp"]
 
 [project.scripts]
 auto-slopp = "auto_slopp.main:main"
+
+[console_scripts]
+identify = "identify.__main__:cli"
+identify-cli = "identify.cli:main"
 
 [tool.black]
 line-length = 120
