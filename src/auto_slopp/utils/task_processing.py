@@ -120,18 +120,22 @@ def process_text_file(
 
         # Commit and push changes in task_repo_path
         if not dry_run:
-            # Commit the changes without pushing
-            commit_success, _ = commit_and_push_changes(
+            # Commit the changes and push to remote
+            commit_success, push_success = commit_and_push_changes(
                 task_repo_dir,
                 f"Process instruction file: {text_file.name}",
-                push_if_remote=False,
+                push_if_remote=True,
             )
 
             if not commit_success:
                 result["error"] = "Git commit operations failed"
                 return result
+
+            if push_success is False:
+                result["error"] = "Git push operations failed"
+                return result
         else:
-            logger.info(f"DRY RUN: Would commit changes for {text_file.name}")
+            logger.info(f"DRY RUN: Would commit and push changes for {text_file.name}")
             result["git_operations"] = True
 
         result["success"] = True
