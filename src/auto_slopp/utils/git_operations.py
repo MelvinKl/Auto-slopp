@@ -22,6 +22,47 @@ class GitOperationError(Exception):
     pass
 
 
+def _run_git_command(
+    repo_dir: Path,
+    *args: str,
+    check: bool = True,
+    timeout: int = 60,
+    capture_output: bool = True,
+) -> subprocess.CompletedProcess:
+    """Run a git command in the specified repository.
+
+    Args:
+        repo_dir: Path to the git repository
+        *args: Git command arguments
+        check: Whether to raise exception on non-zero return code
+        timeout: Timeout for the command in seconds
+        capture_output: Whether to capture output
+
+    Returns:
+        CompletedProcess instance
+
+    Raises:
+        GitOperationError: If git command fails and check is True
+    """
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=repo_dir,
+            capture_output=capture_output,
+            text=capture_output,
+            check=check,
+            timeout=timeout,
+        )
+        return result
+    except subprocess.CalledProcessError as e:
+        error_output = (e.stderr.strip() or e.stdout.strip()) if e.stderr or e.stdout else str(e)
+        logger.error(f"Git command 'git {' '.join(args)}' failed in {repo_dir}: {error_output}")
+        raise GitOperationError(f"Git command failed: {error_output}")
+    except subprocess.TimeoutExpired as e:
+        logger.error(f"Git command 'git {' '.join(args)}' timed out in {repo_dir}")
+        raise GitOperationError(f"Git command timed out: {e}")
+
+
 def _handle_git_operation_failure(
     operation: str,
     repo_dir: Path,
