@@ -106,8 +106,6 @@ The `make test` target includes comprehensive validation:
 5. **Testing**: Full pytest test suite execution
 
 All checks must pass for the command to succeed, ensuring code quality and reliability before deployment.
-auto-slopp --repo-path /path/to/repo --task-path /path/to/tasks
-```
 
 Enable debug mode:
 ```bash
