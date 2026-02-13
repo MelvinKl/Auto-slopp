@@ -440,6 +440,30 @@ def merge_main_into_branch(
         return False, error_msg
 
 
+def is_git_repo(directory: Path) -> bool:
+    """Check if a directory is inside a git repository.
+
+    Uses git rev-parse to detect if the directory is inside a git repo,
+    which works even when the directory is a subdirectory of the repo.
+
+    Args:
+        directory: Path to check
+
+    Returns:
+        True if the directory is inside a git repository, False otherwise.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=directory,
+            capture_output=True,
+            text=True,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
 def commit_and_push_changes(
     repo_dir: Path, commit_message: str, push_if_remote: bool = True
 ) -> Tuple[bool, Optional[bool]]:
@@ -463,7 +487,7 @@ def commit_and_push_changes(
     try:
         os.chdir(repo_dir)
 
-        if not (repo_dir / ".git").exists():
+        if not is_git_repo(repo_dir):
             logger.info(f"Initializing git repository in {repo_dir}")
             _run_git_command(repo_dir, "init")
 
