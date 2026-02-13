@@ -256,6 +256,16 @@ heartbeat = HeartbeatWorker(message="Custom service is running")
 # Returns: timestamp, message, path information
 ```
 
+### Apipkg
+Scans repository for Python packages and collects API-related information.
+```python
+from auto_slopp.example_workers import Apipkg
+
+# Configure whether to include hidden files
+worker = Apipkg(include_hidden=False)
+# Returns: package count, list of packages with module counts
+```
+
 ## API Reference
 
 ### Worker Base Class
