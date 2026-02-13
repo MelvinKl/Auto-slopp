@@ -256,6 +256,21 @@ heartbeat = HeartbeatWorker(message="Custom service is running")
 # Returns: timestamp, message, path information
 ```
 
+### BackportWorker
+Cherry-picks commits from a source branch to target release branches for backporting.
+```python
+from auto_slopp.workers import BackportWorker
+
+# Configure backport worker
+worker = BackportWorker(
+    source_branch="main",
+    target_branches=["release-1.0", "release-2.0"],
+    commits=["abc123", "def456"],  # Optional: specific commits to backport
+    dry_run=True  # Preview without making changes
+)
+# Returns: backported commits, failed commits, statistics
+```
+
 ## API Reference
 
 ### Worker Base Class
