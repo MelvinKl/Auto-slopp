@@ -61,9 +61,7 @@ class TestRenovateTestWorker:
         repo_dir = Path("/tmp/test_repo")
 
         # Mock git branch command output with no renovate branches
-        mock_subprocess_run.return_value = Mock(
-            returncode=0, stdout="origin/main\norigin/develop\n"
-        )
+        mock_subprocess_run.return_value = Mock(returncode=0, stdout="origin/main\norigin/develop\n")
 
         branches = worker._get_renovate_branches(repo_dir)
 
@@ -82,9 +80,7 @@ class TestRenovateTestWorker:
         result = worker._checkout_branch(repo_dir, branch)
 
         assert result is True
-        mock_checkout_resilient.assert_called_once_with(
-            repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60
-        )
+        mock_checkout_resilient.assert_called_once_with(repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60)
 
     @patch("auto_slopp.workers.renovate_test_worker.subprocess.run")
     def test_run_tests_success(self, mock_subprocess_run):
@@ -93,9 +89,7 @@ class TestRenovateTestWorker:
         repo_dir = Path("/tmp/test_repo")
 
         # Mock successful make test
-        mock_subprocess_run.return_value = Mock(
-            returncode=0, stdout="All tests passed!", stderr=""
-        )
+        mock_subprocess_run.return_value = Mock(returncode=0, stdout="All tests passed!", stderr="")
 
         result = worker._run_tests(repo_dir)
 
@@ -109,9 +103,7 @@ class TestRenovateTestWorker:
         repo_dir = Path("/tmp/test_repo")
 
         # Mock failed make test
-        mock_subprocess_run.return_value = Mock(
-            returncode=1, stdout="", stderr="Test failed: assertion error"
-        )
+        mock_subprocess_run.return_value = Mock(returncode=1, stdout="", stderr="Test failed: assertion error")
 
         result = worker._run_tests(repo_dir)
 
@@ -139,9 +131,7 @@ class TestRenovateTestWorker:
     @patch.object(RenovateTestWorker, "_merge_main")
     @patch.object(RenovateTestWorker, "_checkout_branch")
     @patch.object(RenovateTestWorker, "_get_renovate_branches")
-    def test_process_repository_success(
-        self, mock_get_branches, mock_checkout, mock_merge, mock_tests, mock_fix
-    ):
+    def test_process_repository_success(self, mock_get_branches, mock_checkout, mock_merge, mock_tests, mock_fix):
         """Test successful repository processing."""
         worker = RenovateTestWorker()
         repo_dir = Path("/tmp/test_repo")
@@ -166,9 +156,7 @@ class TestRenovateTestWorker:
     @patch.object(RenovateTestWorker, "_merge_main")
     @patch.object(RenovateTestWorker, "_checkout_branch")
     @patch.object(RenovateTestWorker, "_get_renovate_branches")
-    def test_process_repository_with_fix(
-        self, mock_get_branches, mock_checkout, mock_merge, mock_tests, mock_fix
-    ):
+    def test_process_repository_with_fix(self, mock_get_branches, mock_checkout, mock_merge, mock_tests, mock_fix):
         """Test repository processing with test fixing."""
         worker = RenovateTestWorker()
         repo_dir = Path("/tmp/test_repo")
