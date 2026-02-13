@@ -410,6 +410,133 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
         return False
 
 
+def push_branch(repo_dir: Path, branch: str, force: bool = True, timeout: int = 60) -> bool:
+    """Push a branch to the remote repository.
+
+    Args:
+        repo_dir: Path to the git repository
+        branch: Branch name to push
+        force: Whether to force push
+        timeout: Timeout for git command in seconds
+
+    Returns:
+        True if push successful, False otherwise.
+
+    Raises:
+        GitOperationError: If git command fails
+    """
+    try:
+        cmd = ["git", "push", "origin", branch]
+        if force:
+            cmd.append("--force")
+
+        result = subprocess.run(
+            cmd,
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+
+        if result.returncode != 0:
+            # Check both stdout and stderr for error messages
+            push_error = result.stderr.strip() or result.stdout.strip()
+            error_msg = f"Failed to push branch '{branch}': {push_error}"
+            logger.error(f"Failed to push branch '{branch}' in {repo_dir.name}: {push_error}")
+            _handle_git_operation_failure("push_branch", repo_dir, error_msg)
+            return False
+
+        logger.info(f"Successfully pushed branch '{branch}' to origin")
+        return True
+
+    except subprocess.TimeoutExpired:
+        error_msg = f"Timeout pushing branch '{branch}'"
+        logger.error(f"Timeout pushing branch '{branch}' in {repo_dir.name}")
+        _handle_git_operation_failure("push_branch", repo_dir, error_msg)
+        return False
+    except subprocess.CalledProcessError as e:
+        # Check both stdout and stderr for error messages
+        error_output = (e.stderr.strip() or e.stdout.strip()) if e.stderr or e.stdout else str(e)
+        error_msg = f"Failed to push branch '{branch}': {error_output}"
+        logger.error(f"Failed to push branch '{branch}' in {repo_dir.name}: {error_output}")
+        _handle_git_operation_failure("push_branch", repo_dir, error_msg)
+        return False
+
+
+def merge_main_into_branch(
+    repo_dir: Path, branch: str, remote_name: str = "origin", timeout: int = 60
+) -> Tuple[bool, str]:
+    """Merge origin/main into the current branch.
+
+    Args:
+        repo_dir: Path to the git repository
+        branch: Branch name to merge into
+        remote_name: Name of the remote (default: origin)
+        timeout: Timeout for git commands in seconds
+
+    Returns:
+        Tuple of (success, message). If success is False, message contains error details.
+
+    Raises:
+        GitOperationError: If git operations fail
+    """
+    try:
+        # Fetch the main branch from remote
+        fetch_result = subprocess.run(
+            ["git", "fetch", remote_name, "main:main"],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        if fetch_result.returncode != 0:
+            fetch_error = fetch_result.stderr.strip() or fetch_result.stdout.strip()
+            error_msg = f"Failed to fetch main: {fetch_error}"
+            logger.error(f"Failed to fetch main in {repo_dir.name}: {fetch_error}")
+            _handle_git_operation_failure("merge_main_into_branch", repo_dir, error_msg)
+            return False, fetch_error
+
+        # Merge origin/main into current branch
+        merge_result = subprocess.run(
+            ["git", "merge", f"{remote_name}/main", "--no-edit"],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        if merge_result.returncode != 0:
+            merge_error = merge_result.stderr.strip() or merge_result.stdout.strip()
+            logger.warning(f"Merge had conflicts or failed: {merge_error}")
+
+            # Abort the merge
+            abort_result = subprocess.run(
+                ["git", "merge", "--abort"],
+                cwd=repo_dir,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            if abort_result.returncode != 0:
+                abort_error = abort_result.stderr.strip() or abort_result.stdout.strip()
+                logger.error(f"Failed to abort merge: {abort_error}")
+
+            return False, merge_error
+
+        logger.info(f"Successfully merged {remote_name}/main into branch '{branch}'")
+        return True, "Merge successful"
+
+    except subprocess.TimeoutExpired:
+        error_msg = f"Timeout during merge operation for branch '{branch}'"
+        logger.error(f"Timeout merging main into branch '{branch}' in {repo_dir.name}")
+        _handle_git_operation_failure("merge_main_into_branch", repo_dir, error_msg)
+        return False, error_msg
+    except Exception as e:
+        error_msg = f"Error merging main into branch '{branch}': {str(e)}"
+        logger.error(f"Error merging main into branch '{branch}' in {repo_dir.name}: {str(e)}")
+        _handle_git_operation_failure("merge_main_into_branch", repo_dir, error_msg)
+        return False, error_msg
+
+
 def commit_and_push_changes(
     repo_dir: Path, commit_message: str, push_if_remote: bool = True
 ) -> Tuple[bool, Optional[bool]]:

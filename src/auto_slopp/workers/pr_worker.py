@@ -9,7 +9,11 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
-from auto_slopp.utils.git_operations import checkout_branch_resilient
+from auto_slopp.utils.git_operations import (
+    checkout_branch_resilient,
+    merge_main_into_branch,
+    push_branch,
+)
 from auto_slopp.utils.opencode import run_opencode
 from auto_slopp.utils.repository_utils import discover_repositories, validate_repository
 from auto_slopp.worker import Worker
@@ -242,54 +246,16 @@ class PRWorker(Worker):
         Returns:
             True if update successful, False otherwise
         """
-        try:
-            self.logger.info(f"Updating branch {branch} with latest main")
+        self.logger.info(f"Updating branch {branch} with latest main")
 
-            fetch_result = subprocess.run(
-                ["git", "fetch", "origin", "main:main"],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-            if fetch_result.returncode != 0:
-                # Check both stdout and stderr for error messages
-                fetch_error = fetch_result.stderr.strip() or fetch_result.stdout.strip()
-                self.logger.error(f"Failed to fetch main: {fetch_error}")
-                return False
+        success, message = merge_main_into_branch(repo_dir=repo_dir, branch=branch)
 
-            merge_result = subprocess.run(
-                ["git", "merge", "origin/main", "--no-edit"],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-            if merge_result.returncode != 0:
-                # Check both stdout and stderr for error messages
-                merge_error = merge_result.stderr.strip() or merge_result.stdout.strip()
-                self.logger.warning(f"Merge had conflicts or failed: {merge_error}")
-                resolve_result = subprocess.run(
-                    ["git", "merge", "--abort"],
-                    cwd=repo_dir,
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                )
-                if resolve_result.returncode != 0:
-                    resolve_error = resolve_result.stderr.strip() or resolve_result.stdout.strip()
-                    self.logger.error(f"Failed to abort merge: {resolve_error}")
-                return False
-
-            self.logger.info(f"Successfully merged origin/main into {branch}")
-            return True
-
-        except subprocess.TimeoutExpired:
-            self.logger.error(f"Timeout updating branch {branch}")
+        if not success:
+            self.logger.error(f"Failed to update branch {branch} with main: {message}")
             return False
-        except Exception as e:
-            self.logger.error(f"Error updating branch {branch}: {str(e)}")
-            return False
+
+        self.logger.info(f"Successfully merged origin/main into {branch}")
+        return True
 
     def _push_branch(self, repo_dir: Path, branch: str) -> bool:
         """Push the updated branch to remote.
@@ -301,32 +267,16 @@ class PRWorker(Worker):
         Returns:
             True if push successful, False otherwise
         """
-        try:
-            self.logger.info(f"Pushing branch {branch} to remote")
+        self.logger.info(f"Pushing branch {branch} to remote")
 
-            result = subprocess.run(
-                ["git", "push", "origin", branch, "--force"],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
+        success = push_branch(repo_dir=repo_dir, branch=branch, force=True)
 
-            if result.returncode != 0:
-                # Check both stdout and stderr for error messages
-                push_error = result.stderr.strip() or result.stdout.strip()
-                self.logger.error(f"Failed to push branch {branch}: {push_error}")
-                return False
-
-            self.logger.info(f"Successfully pushed branch {branch}")
-            return True
-
-        except subprocess.TimeoutExpired:
-            self.logger.error(f"Timeout pushing branch {branch}")
+        if not success:
+            self.logger.error(f"Failed to push branch {branch}")
             return False
-        except Exception as e:
-            self.logger.error(f"Error pushing branch {branch}: {str(e)}")
-            return False
+
+        self.logger.info(f"Successfully pushed branch {branch}")
+        return True
 
     def _run_tests(self, repo_dir: Path) -> Dict[str, Any]:
         """Run make test in the repository.
