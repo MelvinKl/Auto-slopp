@@ -35,6 +35,9 @@ packages = ["src/auto_slopp"]
 [project.scripts]
 auto-slopp = "auto_slopp.main:main"
 
+[console_scripts]
+dotenv = "dotenv.__main__:cli"
+
 [tool.black]
 line-length = 120
 target-version = ['py314']
