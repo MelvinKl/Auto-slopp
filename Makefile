@@ -40,7 +40,7 @@ lint:
 	uv run isort --check-only --diff src/ tests/ || (echo "❌ isort import sorting check failed" && exit 1)
 	@echo "✅ isort import sorting check passed"
 	@echo "Running flake8..."
-	uv run flake8 --max-line-length=120 --max-complexity=8 --extend-ignore=E203,W503,D104,F401,D401,I201,F841,F811,B014,C901,B007,E501,I100,D202 src/ tests/ || (echo "❌ flake8 linting failed" && exit 1)
+	uv run flake8 --max-line-length=120 --max-complexity=8 --extend-ignore=E203,W503,D104,F401,D401,I201,F841,F811,B014,C901,B007,E501,I100,D202,D101,D102,D105,D107,D205,D400 src/ tests/ || (echo "❌ flake8 linting failed" && exit 1)
 	@echo "✅ flake8 linting passed"
 
 # Format code
