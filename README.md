@@ -256,6 +256,16 @@ heartbeat = HeartbeatWorker(message="Custom service is running")
 # Returns: timestamp, message, path information
 ```
 
+### HTTP11Worker
+HTTP/1.1 server worker using the h11 library.
+```python
+from auto_slopp.workers import HTTP11Worker
+
+# Configure with custom host and port
+server = HTTP11Worker(host="127.0.0.1", port=8080)
+# Returns: server status, host, port, protocol info
+```
+
 ## API Reference
 
 ### Worker Base Class
