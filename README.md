@@ -6,6 +6,7 @@ A Python-based automation framework for task execution with pluggable worker sys
 
 - **Pluggable Worker System**: Abstract base class for creating custom automation workers
 - **Configuration Management**: Pydantic-based settings with environment variable support
+- **YAML Support**: PyYAML utilities for configuration and data serialization
 - **Flexible Logging**: Built-in logging with optional Telegram integration for remote notifications
 - **Task Execution**: Automated discovery and execution of worker implementations
 - **Modern Python**: Built with Python 3.14+ using uv package manager
