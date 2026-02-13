@@ -114,6 +114,39 @@ Enable debug mode:
 auto-slopp --debug
 ```
 
+### Directory Structure
+
+Auto-slopp operates with a specific directory structure:
+
+```
+AUTO_SLOPP_BASE_REPO_PATH/          # Directory containing git repositories
+├── repository_a/                    # Each subdirectory is a git repository
+├── repository_b/
+└── repository_c/
+
+AUTO_SLOPP_BASE_TASK_PATH/         # Git repository with task subdirectories
+├── repository_a/                   # Tasks for repository_a
+├── repository_b/                   # Tasks for repository_b
+└── repository_c/                   # Tasks for repository_c
+```
+
+- **`AUTO_SLOPP_BASE_REPO_PATH`** (or `--repo-path`): Directory containing multiple git repositories. Auto-slopp iterates over each subdirectory and processes it as a separate repository.
+
+- **`AUTO_SLOPP_BASE_TASK_PATH`** (or `--task-path`): A git repository where each subdirectory corresponds to a repository in `AUTO_SLOPP_BASE_REPO_PATH`. For example, if you have `repository_a` in your repo path, Auto-slopp will look for its tasks in `<task_path>/repository_a`.
+
+**Example:**
+```bash
+# Your managed repositories (each is a git repo)
+AUTO_SLOPP_BASE_REPO_PATH=/root/git/managed
+# /root/git/managed/warhammer_battle_calculator
+# /root/git/managed/Auto-slopp
+
+# Tasks for each repository (subdirectories match repo names)
+AUTO_SLOPP_BASE_TASK_PATH=/root/git/repo_task_path
+# /root/git/repo_task_path/warhammer_battle_calculator
+# /root/git/repo_task_path/Auto-slopp
+```
+
 ### Configuration
 
 Create a `.env` file in the project root:
