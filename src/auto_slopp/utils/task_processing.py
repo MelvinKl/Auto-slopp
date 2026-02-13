@@ -98,7 +98,7 @@ def process_text_file(
 
         result["instructions"] = instructions
         logger.info(f"Loaded instructions from {text_file.name}")
-        instructions = f"Create a new branch that starts with ai/ from base origin/main and implement the following:\n{instructions}\nKeep your implementation simple. Only implement what is required. Ensure that 'make test' runs successful. Only push if ALL tests are successful. Check if you need to update the README.md. Push your changes and create a pull request on github."
+        instructions = f"Create a new branch that starts with ai/ from base origin/main and implement the following:\n{instructions}\nKeep your implementation simple. Only implement what is required. Check if there are components you can reuse. Ensure that 'make test' runs successful. Only push if ALL tests are successful. Check if you need to update the README.md. Push your changes and create a pull request on github."
         # Execute OpenAgent with the instructions
         if not dry_run:
             openagent_result = execute_openagent_with_instructions(instructions, repo_dir, agent_args, timeout)
@@ -120,18 +120,22 @@ def process_text_file(
 
         # Commit and push changes in task_repo_path
         if not dry_run:
-            # Commit the changes without pushing
-            commit_success, _ = commit_and_push_changes(
+            # Commit the changes and push to remote
+            commit_success, push_success = commit_and_push_changes(
                 task_repo_dir,
                 f"Process instruction file: {text_file.name}",
-                push_if_remote=False,
+                push_if_remote=True,
             )
 
             if not commit_success:
                 result["error"] = "Git commit operations failed"
                 return result
+
+            if push_success is False:
+                result["error"] = "Git push operations failed"
+                return result
         else:
-            logger.info(f"DRY RUN: Would commit changes for {text_file.name}")
+            logger.info(f"DRY RUN: Would commit and push changes for {text_file.name}")
             result["git_operations"] = True
 
         result["success"] = True
@@ -187,8 +191,9 @@ def process_repository(
         # Note: Git pull is now handled in TaskProcessorWorker before calling process_repository
         # This ensures we pull latest changes from task repository before processing
 
-        # Process each text file
-        for text_file in text_files:
+        # Only process ONE file per repository per iteration to ensure fair share
+        if text_files:
+            text_file = text_files[0]  # Process oldest file first
             file_result = process_text_file(
                 text_file,
                 task_repo_dir,
