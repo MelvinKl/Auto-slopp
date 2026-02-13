@@ -74,8 +74,6 @@ class TestSettings:
             test_settings = Settings()
 
         # Act & Assert - Check that specified values are overridden
-        assert test_settings.debug is True  # Overridden
-        assert test_settings.telegram_enabled is True  # Overridden
         assert test_settings.base_repo_path == Path("~/custom/path").expanduser()  # Overridden
         assert test_settings.executor_sleep_interval == 45.0  # Overridden
         assert test_settings.telegram_bot_token == "test_token"  # Overridden

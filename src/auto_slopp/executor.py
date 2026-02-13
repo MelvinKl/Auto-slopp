@@ -1,6 +1,5 @@
 """Endless loop executor for running Worker instances."""
 
-import subprocess
 import sys
 import time
 import traceback

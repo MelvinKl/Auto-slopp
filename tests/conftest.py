@@ -1,10 +1,18 @@
 """Pytest configuration and shared fixtures."""
 
+import os
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+
+
+def pytest_configure(config):
+    """Clear AUTO_SLOPP_ environment variables before tests run to allow .env file to be used."""
+    for k in list(os.environ.keys()):
+        if k.startswith("AUTO_SLOPP_"):
+            del os.environ[k]
 
 
 @pytest.fixture

@@ -4,9 +4,17 @@ This module provides utility functions for validating repository directories
 and ensuring they are proper git repositories.
 """
 
-import subprocess
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
+
+from auto_slopp.utils.git_operations import (
+    get_ahead_behind,
+    get_current_branch,
+    get_default_branch,
+    get_remotes,
+    has_changes,
+    is_bare_repository,
+)
 
 
 def is_git_repository(repo_dir: Path) -> bool:
@@ -68,68 +76,15 @@ def validate_repository(repo_dir: Path) -> Dict[str, Any]:
     result["is_git_repo"] = True
 
     try:
-        # Check if it's a bare repository
-        result_bare = subprocess.run(
-            ["git", "rev-parse", "--is-bare-repository"],
-            cwd=repo_dir,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        result["is_bare"] = result_bare.stdout.strip() == "true"
+        result["is_bare"] = is_bare_repository(repo_dir)
 
-        # Get remotes
-        remote_result = subprocess.run(
-            ["git", "remote", "-v"],
-            cwd=repo_dir,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
+        result["remotes"] = get_remotes(repo_dir)
+        result["has_remotes"] = len(result["remotes"]) > 0
 
-        if remote_result.returncode == 0:
-            remotes = []
-            for line in remote_result.stdout.strip().split("\n"):
-                if line.strip():
-                    parts = line.split("\t")
-                    if len(parts) >= 2:
-                        remote_name = parts[0]
-                        remote_url = parts[1].split(" ")[0]
-                        remotes.append({"name": remote_name, "url": remote_url})
+        result["default_branch"] = get_default_branch(repo_dir)
 
-            result["remotes"] = remotes
-            result["has_remotes"] = len(remotes) > 0
-
-        # Get default branch
-        default_branch_result = subprocess.run(
-            ["git", "config", "--get", "init.defaultBranch"],
-            cwd=repo_dir,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-
-        if default_branch_result.returncode == 0:
-            result["default_branch"] = default_branch_result.stdout.strip()
-        else:
-            # Fallback to common branch names
-            for branch in ["main", "master", "develop"]:
-                branch_result = subprocess.run(
-                    ["git", "rev-parse", "--verify", branch],
-                    cwd=repo_dir,
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                )
-                if branch_result.returncode == 0:
-                    result["default_branch"] = branch
-                    break
-
-        # Mark as valid if no errors and it's a git repo
         result["valid"] = len(result["errors"]) == 0 and result["is_git_repo"]
 
-    except subprocess.TimeoutExpired:
-        result["errors"].append("Git command timed out")
     except Exception as e:
         result["errors"].append(f"Error validating repository: {str(e)}")
 
@@ -188,71 +143,21 @@ def get_repository_status(repo_dir: Path) -> Dict[str, Any]:
         }
 
     try:
-        # Get current branch
-        branch_result = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=repo_dir,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-
-        # Get status
-        status_result = subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=repo_dir,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-
-        # Get ahead/behind info
-        sync_result = subprocess.run(
-            ["git", "rev-list", "--count", "--left-right", "HEAD...@{u}"],
-            cwd=repo_dir,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
+        current_branch = get_current_branch(repo_dir)
+        status_output = has_changes(repo_dir)
+        behind, ahead = get_ahead_behind(repo_dir)
 
         status = {
             "valid": True,
-            "current_branch": branch_result.stdout.strip() if branch_result.returncode == 0 else None,
-            "is_clean": len(status_result.stdout.strip()) == 0,
+            "current_branch": current_branch,
+            "is_clean": not status_output,
             "changed_files": [],
-            "ahead": 0,
-            "behind": 0,
+            "ahead": ahead,
+            "behind": behind,
         }
-
-        # Parse changed files
-        if status_result.returncode == 0:
-            for line in status_result.stdout.strip().split("\n"):
-                if line.strip():
-                    status_code = line[:2]
-                    file_path = line[3:]
-                    status["changed_files"].append(
-                        {
-                            "file": file_path,
-                            "status": status_code,
-                            "staged": status_code[0] != " " and status_code[0] != "?",
-                            "modified": status_code[1] != " ",
-                        }
-                    )
-
-        # Parse ahead/behind
-        if sync_result.returncode == 0:
-            counts = sync_result.stdout.strip().split("\t")
-            if len(counts) == 2:
-                status["behind"] = int(counts[0])
-                status["ahead"] = int(counts[1])
 
         return status
 
-    except subprocess.TimeoutExpired:
-        return {
-            "valid": False,
-            "error": "Git command timed out",
-        }
     except Exception as e:
         return {
             "valid": False,

@@ -147,10 +147,6 @@ class UpdatePRBranchesWorker(Worker):
 
             self.logger.info(f"Successfully pushed branch {branch}")
             return True
-
-        except subprocess.TimeoutExpired:
-            self.logger.error(f"Timeout pushing branch {branch}")
-            return False
         except Exception as e:
             self.logger.error(f"Error pushing branch {branch}: {str(e)}")
             return False

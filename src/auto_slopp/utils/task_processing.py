@@ -67,7 +67,7 @@ def process_text_file(
     repo_dir: Path,
     dry_run: bool = False,
     agent_args: Optional[list] = None,
-    timeout: int = 600,
+    timeout: int = 7200,
     counter_start: int = 1,
 ) -> Dict[str, Any]:
     """Process a single text file with instructions.
@@ -152,7 +152,7 @@ def process_repository(
     task_repo_dir: Path,
     dry_run: bool = False,
     agent_args: Optional[list] = None,
-    timeout: int = 600,
+    timeout: int = 7200,
     counter_start: int = 1,
 ) -> Dict[str, Any]:
     """Process a single repository directory.

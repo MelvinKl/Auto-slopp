@@ -440,6 +440,159 @@ def merge_main_into_branch(
         return False, error_msg
 
 
+def is_bare_repository(repo_dir: Path) -> bool:
+    """Check if a repository is a bare repository.
+
+    Args:
+        repo_dir: Path to the git repository
+
+    Returns:
+        True if the repository is bare, False otherwise.
+    """
+    result = _run_git_command(repo_dir, "rev-parse", "--is-bare-repository", check=False)
+    return result.stdout.strip() == "true"
+
+
+def get_remotes(repo_dir: Path) -> List[Dict[str, str]]:
+    """Get all remotes with their URLs.
+
+    Args:
+        repo_dir: Path to the git repository
+
+    Returns:
+        List of dictionaries containing remote name and URL.
+    """
+    result = _run_git_command(repo_dir, "remote", "-v", check=False)
+
+    if result.returncode != 0:
+        return []
+
+    remotes = []
+    for line in result.stdout.strip().split("\n"):
+        if line.strip():
+            parts = line.split("\t")
+            if len(parts) >= 2:
+                remote_name = parts[0]
+                url_part = parts[1].split(" ")[0]
+                remotes.append({"name": remote_name, "url": url_part})
+
+    return remotes
+
+
+def get_default_branch(repo_dir: Path) -> Optional[str]:
+    """Get the default branch of the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+
+    Returns:
+        Name of the default branch, or None if not found.
+    """
+    result = _run_git_command(repo_dir, "config", "--get", "init.defaultBranch", check=False)
+
+    if result.returncode == 0:
+        return result.stdout.strip()
+
+    for branch in ["main", "master", "develop"]:
+        branch_result = _run_git_command(repo_dir, "rev-parse", "--verify", branch, check=False)
+        if branch_result.returncode == 0:
+            return branch
+
+    return None
+
+
+def branch_exists(repo_dir: Path, branch: str) -> bool:
+    """Check if a branch exists in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+        branch: Branch name to check
+
+    Returns:
+        True if the branch exists, False otherwise.
+    """
+    result = _run_git_command(repo_dir, "rev-parse", "--verify", branch, check=False)
+    return result.returncode == 0
+
+
+def get_ahead_behind(repo_dir: Path, remote: str = "origin", branch: Optional[str] = None) -> Tuple[int, int]:
+    """Get ahead/behind count between local and remote branch.
+
+    Args:
+        repo_dir: Path to the git repository
+        remote: Remote name (default: origin)
+        branch: Branch name (default: current branch)
+
+    Returns:
+        Tuple of (behind, ahead) counts.
+    """
+    if branch is None:
+        branch = get_current_branch(repo_dir)
+
+    try:
+        result = _run_git_command(
+            repo_dir,
+            "rev-list",
+            "--count",
+            "--left-right",
+            f"HEAD...{remote}/{branch}",
+            check=False,
+        )
+
+        if result.returncode == 0:
+            counts = result.stdout.strip().split("\t")
+            if len(counts) == 2:
+                return int(counts[0]), int(counts[1])
+
+    except Exception:
+        pass
+
+    return 0, 0
+
+
+def pull_from_remote(repo_dir: Path, remote: str = "origin", branch: str = "main") -> Tuple[bool, str]:
+    """Pull changes from a remote branch.
+
+    Args:
+        repo_dir: Path to the git repository
+        remote: Remote name (default: origin)
+        branch: Branch name (default: main)
+
+    Returns:
+        Tuple of (success, message).
+    """
+    result = _run_git_command(repo_dir, "pull", remote, branch, check=False)
+
+    if result.returncode == 0:
+        return True, "Pull successful"
+
+    error_msg = result.stderr.strip() or result.stdout.strip()
+    return False, error_msg
+
+
+def push_to_remote(repo_dir: Path, remote: str = "origin", branch: Optional[str] = None) -> Tuple[bool, str]:
+    """Push changes to a remote branch.
+
+    Args:
+        repo_dir: Path to the git repository
+        remote: Remote name (default: origin)
+        branch: Branch name (default: current branch)
+
+    Returns:
+        Tuple of (success, message).
+    """
+    if branch is None:
+        branch = get_current_branch(repo_dir)
+
+    result = _run_git_command(repo_dir, "push", remote, branch, check=False)
+
+    if result.returncode == 0:
+        return True, "Push successful"
+
+    error_msg = result.stderr.strip() or result.stdout.strip()
+    return False, error_msg
+
+
 def is_git_repo(directory: Path) -> bool:
     """Check if a directory is inside a git repository.
 
