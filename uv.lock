@@ -59,6 +59,7 @@ dependencies = [
 dev = [
     { name = "bandit" },
     { name = "black" },
+    { name = "cfgv" },
     { name = "coverage" },
     { name = "flake8" },
     { name = "flake8-bugbear" },
@@ -80,6 +81,7 @@ dev = [
 requires-dist = [
     { name = "bandit", marker = "extra == 'dev'", specifier = ">=1.7.0" },
     { name = "black", marker = "extra == 'dev'", specifier = ">=23.7.0" },
+    { name = "cfgv", marker = "extra == 'dev'", specifier = ">=3.3.0" },
     { name = "coverage", marker = "extra == 'dev'", specifier = ">=7.3.0" },
     { name = "flake8", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "flake8-bugbear", marker = "extra == 'dev'", specifier = ">=23.7.10" },
