@@ -8,6 +8,11 @@ from pathlib import Path
 from typing import Any, Optional, Type
 
 from auto_slopp.discovery import discover_workers
+from auto_slopp.utils.git_operations import (
+    commit_all_changes,
+    pull_from_remote,
+    push_to_remote,
+)
 from auto_slopp.worker import Worker
 from settings.main import settings
 
@@ -90,29 +95,23 @@ class Executor:
                 print(f"Task repo path is not a git repository: {task_repo_path}")
                 return
 
-            # Pull from origin/main
-            pull_result = subprocess.run(
-                ["git", "pull", "origin", "main"],
-                cwd=task_repo_path,
-                capture_output=True,
-                text=True,
-            )
-            if pull_result.returncode == 0:
+            commit_success, commit_msg = commit_all_changes(task_repo_path, "Auto-slopp: auto-commit changes")
+            if commit_success:
+                print(f"Committed changes in task_repo: {commit_msg}")
+            else:
+                print(f"No changes or commit failed in task_repo: {commit_msg}")
+
+            pull_success, pull_msg = pull_from_remote(task_repo_path, "origin", "main")
+            if pull_success:
                 print("Pulled latest changes from origin/main in task_repo")
             else:
-                print(f"Failed to pull from origin/main in task_repo: {pull_result.stderr}")
+                print(f"Failed to pull from origin/main in task_repo: {pull_msg}")
 
-            # Push to origin/main
-            push_result = subprocess.run(
-                ["git", "push", "origin", "main"],
-                cwd=task_repo_path,
-                capture_output=True,
-                text=True,
-            )
-            if push_result.returncode == 0:
+            push_success, push_msg = push_to_remote(task_repo_path, "origin", "main")
+            if push_success:
                 print("Pushed changes to origin/main in task_repo")
             else:
-                print(f"Failed to push to origin/main in task_repo: {push_result.stderr}")
+                print(f"Failed to push to origin/main in task_repo: {push_msg}")
 
         except Exception as e:
             print(f"Error updating task_repo: {e}")
