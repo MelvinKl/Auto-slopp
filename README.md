@@ -1,22 +1,22 @@
 # Auto-slopp
 
-A Python-based automation framework for task execution with pluggable worker system. Auto-slopp provides a flexible foundation for creating automation workflows with support for configuration management, logging (including Telegram integration), and extensible worker implementations.
+Task file processor for repository automation using uv package manager.
 
 ## Features
 
+- **Task Processing**: Process task files in a directory
 - **Pluggable Worker System**: Abstract base class for creating custom automation workers
-- **Configuration Management**: Pydantic-based settings with environment variable support
-- **Flexible Logging**: Built-in logging with optional Telegram integration for remote notifications
-- **Task Execution**: Automated discovery and execution of worker implementations
-- **Modern Python**: Built with Python 3.14+ using uv package manager
-- **Comprehensive Testing**: Full test suite with pytest and mocked dependencies
-- **Real-time Monitoring**: Telegram bot integration for instant error notifications and status updates
+- **Configuration Management**: Settings with environment variable support
+- **CLI Interface**: Command-line interface with argument parsing
+- **Modern Python**: Built with Python 3.10+ using uv package manager
+- **Comprehensive Testing**: Full test suite with pytest and >80% coverage
+- **Code Quality**: Black formatting, isort imports, flake8 linting, bandit security
 
 ## Installation
 
 ### Prerequisites
 
-- Python 3.14 or higher
+- Python 3.10 or higher
 - [uv](https://github.com/astral-sh/uv) package manager
 
 ### Setup

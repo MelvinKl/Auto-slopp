@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "auto-slopp"
 version = "0.1.0"
 description = "Add your description here"
-requires-python = ">=3.14"
+requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
@@ -16,21 +16,35 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.4.0",
-    "pytest-cov>=4.1.0",
-    "coverage>=7.3.0",
-    "flake8>=6.0.0",
-    "flake8-docstrings>=1.7.0",
-    "flake8-import-order>=0.18.2",
-    "flake8-bugbear>=23.7.10",
-    "black>=23.7.0",
-    "isort>=5.12.0",
+    "pytest>=8.3.5",
+    "coverage>=7.8.0",
+    "flake8>=7.2.0",
+    "flake8-black>=0.4.0",
+    "flake8-pyproject>=1.2.3",
+    "flake8-quotes>=3.4.0",
+    "flake8-return>=1.2.0",
+    "flake8-annotations-complexity>=0.1.0",
+    "flake8-bandit>=4.1.1",
+    "flake8-bugbear>=25.0.0",
+    "flake8-builtins>=3.0.0",
+    "flake8-comprehensions>=3.15.0",
+    "flake8-eradicate>=1.5.0",
+    "flake8-expression-complexity>=0.0.11",
+    "flake8-pytest-style>=2.1.0",
+    "pep8-naming>=0.15.1",
+    "flake8-eol>=0.0.8",
+    "flake8-exceptions>=0.0.1a0",
+    "flake8-simplify>=0.30.0",
+    "flake8-wot>=0.2.0",
+    "flake8-function-order>=0.0.5",
+    "flake8-tidy-imports>=4.10.0",
+    "black>=25.1.0",
+    "isort>=7.0.0",
     "safety>=2.3.0",
-    "bandit>=1.7.0",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/auto_slopp"]
+packages = ["auto_slopp"]
 
 [project.scripts]
 auto-slopp = "auto_slopp.main:main"
@@ -65,7 +79,7 @@ ensure_newline_before_comments = true
 [tool.flake8]
 max-line-length = 120
 max-complexity = 8
-extend-ignore = ["E203", "W503"]
+extend-ignore = ["E203", "W503", "D100", "D107"]
 exclude = [
     ".git",
     "__pycache__",

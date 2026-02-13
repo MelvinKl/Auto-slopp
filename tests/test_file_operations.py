@@ -1,96 +1,104 @@
-#!/usr/bin/env python3
-"""Tests for file operations functions related to task processing."""
+"""Tests for file_operations module."""
 
-import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from auto_slopp.utils.file_operations import (
-    create_file_counter_name,
-    get_next_counter,
-    rename_processed_file,
+    copy_file,
+    delete_file,
+    ensure_directory,
+    move_file,
 )
 
 
-class TestFileOperations:
-    """Test file operations for task processing."""
+class TestCopyFile:
+    """Test cases for copy_file function."""
 
-    def test_rename_processed_file(self):
-        """Test file renaming with .used suffix."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            test_path = Path(temp_dir)
-            original_file = test_path / "original.txt"
-            original_file.write_text("Content")
+    def test_copies_file(self, tmp_path):
+        """Test that file is copied."""
+        src = tmp_path / "source.txt"
+        src.write_text("content")
+        dst = tmp_path / "dest.txt"
 
-            renamed_file = rename_processed_file(original_file)
+        result = copy_file(src, dst)
 
-            assert renamed_file is not None
-            assert renamed_file.name.startswith("0001_")
-            assert renamed_file.name.endswith(".used")
-            assert "original" in renamed_file.name
-            assert not original_file.exists()
-            assert renamed_file.exists()
+        assert result is True
+        assert dst.exists()
+        assert dst.read_text() == "content"
 
-    def test_get_next_counter_no_existing_files(self):
-        """Test counter generation when no existing files."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            test_path = Path(temp_dir)
-            counter = get_next_counter(test_path)
-            assert counter == 1
+    def test_returns_false_on_error(self, tmp_path):
+        """Test that error returns False."""
+        src = tmp_path / "nonexistent.txt"
+        dst = tmp_path / "dest.txt"
 
-    def test_get_next_counter_with_existing_files(self):
-        """Test counter generation with existing .used files."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            test_path = Path(temp_dir)
+        result = copy_file(src, dst)
 
-            # Create existing used files
-            (test_path / "0001_file1.used").write_text("Content 1")
-            (test_path / "0003_file2.used").write_text("Content 2")
+        assert result is False
 
-            counter = get_next_counter(test_path)
-            assert counter == 4  # Should be max existing + 1
 
-    def test_create_file_counter_name(self):
-        """Test file counter name generation."""
-        test_cases = [
-            (Path("test.txt"), 1, "0001_test.used"),
-            (Path("README.md"), 2, "0002_README.used"),
-            (Path("script.py"), 3, "0003_script.used"),
-        ]
+class TestMoveFile:
+    """Test cases for move_file function."""
 
-        for file_path, counter, expected in test_cases:
-            result = create_file_counter_name(file_path, counter)
-            assert result == expected
-            assert result.endswith(".used")
+    def test_moves_file(self, tmp_path):
+        """Test that file is moved."""
+        src = tmp_path / "source.txt"
+        src.write_text("content")
+        dst = tmp_path / "dest.txt"
 
-    def test_get_next_counter_ignores_non_used_files(self):
-        """Test that counter generation ignores non-.used files."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            test_path = Path(temp_dir)
+        result = move_file(src, dst)
 
-            # Create various files that should be ignored
-            (test_path / "0001_file1.txt").write_text("Content 1")
-            (test_path / "0003_file2.md").write_text("Content 2")
-            (test_path / "other_file.used").write_text("Content 3")  # No counter
+        assert result is True
+        assert not src.exists()
+        assert dst.exists()
 
-            counter = get_next_counter(test_path)
-            assert counter == 1  # Should ignore non-pattern files
+    def test_returns_false_on_error(self, tmp_path):
+        """Test that error returns False."""
+        src = tmp_path / "nonexistent.txt"
+        dst = tmp_path / "dest.txt"
 
-    def test_rename_processed_file_sequence(self):
-        """Test sequential file renaming with correct counters."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            test_path = Path(temp_dir)
+        result = move_file(src, dst)
 
-            # Create and rename first file
-            file1 = test_path / "first.txt"
-            file1.write_text("Content 1")
-            renamed1 = rename_processed_file(file1)
+        assert result is False
 
-            # Create and rename second file
-            file2 = test_path / "second.txt"
-            file2.write_text("Content 2")
-            renamed2 = rename_processed_file(file2)
 
-            assert renamed1.name == "0001_first.used"
-            assert renamed2.name == "0002_second.used"
+class TestDeleteFile:
+    """Test cases for delete_file function."""
+
+    def test_deletes_file(self, tmp_path):
+        """Test that file is deleted."""
+        file_path = tmp_path / "test.txt"
+        file_path.write_text("content")
+
+        result = delete_file(file_path)
+
+        assert result is True
+        assert not file_path.exists()
+
+    def test_returns_false_on_error(self, tmp_path):
+        """Test that error returns False."""
+        file_path = tmp_path / "nonexistent.txt"
+
+        result = delete_file(file_path)
+
+        assert result is False
+
+
+class TestEnsureDirectory:
+    """Test cases for ensure_directory function."""
+
+    def test_creates_directory(self, tmp_path):
+        """Test that directory is created."""
+        dir_path = tmp_path / "new" / "dir"
+
+        result = ensure_directory(dir_path)
+
+        assert result is True
+        assert dir_path.exists()
+
+    def test_returns_true_for_existing_directory(self, tmp_path):
+        """Test that existing directory returns True."""
+        result = ensure_directory(tmp_path)
+
+        assert result is True

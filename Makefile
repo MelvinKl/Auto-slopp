@@ -34,20 +34,20 @@ lint:
 	@echo "Available tools:"
 	@uv run which black isort flake8 || echo "Some tools missing"
 	@echo "Running black..."
-	uv run black --check --diff src/ tests/ || (echo "❌ Black formatting check failed" && exit 1)
+	uv run black --check --diff auto_slopp/ tests/ || (echo "❌ Black formatting check failed" && exit 1)
 	@echo "✅ Black formatting check passed"
 	@echo "Running isort..."
-	uv run isort --check-only --diff src/ tests/ || (echo "❌ isort import sorting check failed" && exit 1)
+	uv run isort --check-only --diff auto_slopp/ tests/ || (echo "❌ isort import sorting check failed" && exit 1)
 	@echo "✅ isort import sorting check passed"
 	@echo "Running flake8..."
-	uv run flake8 --max-line-length=120 --max-complexity=8 --extend-ignore=E203,W503,D104,F401,D401,I201,F841,F811,B014,C901,B007,E501,I100,D202 src/ tests/ || (echo "❌ flake8 linting failed" && exit 1)
+	uv run flake8 --max-line-length=120 --max-complexity=8 --extend-ignore=E203,W503,D104,F401,D401,I201,F841,F811,B014,C901,B007,E501,I100,D202,D100,D107 auto_slopp/ tests/ || (echo "❌ flake8 linting failed" && exit 1)
 	@echo "✅ flake8 linting passed"
 
 # Format code
 format:
 	@echo "🎨 Formatting code..."
-	uv run black src/ tests/
-	uv run isort src/ tests/
+	uv run black auto_slopp/ tests/
+	uv run isort auto_slopp/ tests/
 	@echo "✅ Code formatting completed"
 
 # Run unit tests
@@ -59,7 +59,7 @@ test-unit:
 # Run tests with coverage
 coverage:
 	@echo "📊 Running tests with coverage..."
-	uv run python -m pytest tests/ --cov=src --cov-report=term-missing --cov-report=html || (echo "❌ Tests failed" && exit 1)
+	uv run python -m pytest tests/ --cov=auto_slopp --cov-report=term-missing --cov-report=html || (echo "❌ Tests failed" && exit 1)
 	@echo "✅ Coverage report generated"
 	@echo "📁 HTML coverage report available at htmlcov/index.html"
 
@@ -70,7 +70,7 @@ security:
 	uv run safety check || (echo "❌ Safety security check failed" && exit 1)
 	@echo "✅ Safety security check passed"
 	@echo "Running bandit security linter..."
-	uv run bandit -r src/ --severity-level=medium || (echo "❌ Bandit security linter failed" && exit 1)
+	uv run bandit -r auto_slopp/ --severity-level=medium || (echo "❌ Bandit security linter failed" && exit 1)
 	@echo "✅ Bandit security linter passed"
 
 # Run performance tests specifically

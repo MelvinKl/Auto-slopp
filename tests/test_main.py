@@ -1,231 +1,91 @@
 """Tests for main application functionality."""
 
-import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from auto_slopp.main import parse_arguments, setup_logging
+from auto_slopp.main import find_task_files, mark_task_used, process_task_file, run
 
 
-class TestMainApplication:
-    """Test cases for main application functionality."""
+class TestFindTaskFiles:
+    """Tests for find_task_files function."""
 
-    def test_parse_arguments_defaults(self):
-        """Test argument parsing with default values."""
-        with patch.object(sys, "argv", ["auto-slopp"]):
-            args = parse_arguments()
+    def test_returns_empty_list_for_nonexistent_directory(self, tmp_path):
+        """Test that nonexistent directory returns empty list."""
+        result = find_task_files(tmp_path / "nonexistent")
+        assert result == []
 
-            assert args.repo_path is None
-            assert args.task_path is None
-            assert args.search_path is None
-            assert args.debug is False
+    def test_finds_txt_files(self, tmp_path):
+        """Test that .txt files are found."""
+        (tmp_path / "task1.txt").write_text("task 1")
+        (tmp_path / "task2.txt").write_text("task 2")
+        (tmp_path / "readme.md").write_text("readme")
 
-    def test_parse_arguments_with_paths(self):
-        """Test argument parsing with provided paths."""
-        with patch.object(
-            sys,
-            "argv",
-            ["auto-slopp", "--repo-path", "/test/repo", "--task-path", "/test/tasks", "--search-path", "/test/workers"],
-        ):
-            args = parse_arguments()
+        result = find_task_files(tmp_path)
 
-            assert str(args.repo_path) == "/test/repo"
-            assert str(args.task_path) == "/test/tasks"
-            assert str(args.search_path) == "/test/workers"
-            assert args.debug is False
+        assert len(result) == 2
+        assert all(f.suffix == ".txt" for f in result)
 
-    def test_parse_arguments_with_debug(self):
-        """Test argument parsing with debug flag."""
-        with patch.object(sys, "argv", ["auto-slopp", "--debug"]):
-            args = parse_arguments()
+    def test_returns_sorted_files(self, tmp_path):
+        """Test that files are returned sorted."""
+        (tmp_path / "z_task.txt").write_text("z")
+        (tmp_path / "a_task.txt").write_text("a")
 
-            assert args.debug is True
+        result = find_task_files(tmp_path)
 
-    def test_parse_arguments_with_all_options(self):
-        """Test argument parsing with all options."""
-        with patch.object(
-            sys,
-            "argv",
-            [
-                "auto-slopp",
-                "--repo-path",
-                "/my/repo",
-                "--task-path",
-                "/my/tasks",
-                "--search-path",
-                "/my/workers",
-                "--debug",
-            ],
-        ):
-            args = parse_arguments()
+        assert result[0].name == "a_task.txt"
+        assert result[1].name == "z_task.txt"
 
-            assert str(args.repo_path) == "/my/repo"
-            assert str(args.task_path) == "/my/tasks"
-            assert str(args.search_path) == "/my/workers"
-            assert args.debug is True
 
-    def test_setup_logging_debug_mode(self, mock_settings):
-        """Test logging setup in debug mode."""
-        mock_settings.debug = True
+class TestProcessTaskFile:
+    """Tests for process_task_file function."""
 
-        # Reset logging configuration
-        import logging
+    def test_returns_true_for_valid_file(self, tmp_path):
+        """Test that valid file returns True."""
+        file_path = tmp_path / "task.txt"
+        file_path.write_text("task content")
 
-        logging.root.handlers.clear()
+        result = process_task_file(file_path)
 
-        with patch("auto_slopp.main.settings", mock_settings):
-            with patch("auto_slopp.main.setup_telegram_logging") as mock_telegram:
-                mock_telegram.return_value = None
+        assert result is True
 
-                setup_logging()
+    def test_returns_false_for_empty_file(self, tmp_path):
+        """Test that empty file returns False."""
+        file_path = tmp_path / "empty.txt"
+        file_path.write_text("")
 
-                # Check that handlers were added and root level is set
-                assert len(logging.root.handlers) == 1
-                assert isinstance(logging.root.handlers[0], logging.StreamHandler)
-                # In debug mode, the root logger should be set to DEBUG
-                assert logging.root.level == logging.DEBUG
+        result = process_task_file(file_path)
 
-    def test_setup_logging_production_mode(self, mock_settings):
-        """Test logging setup in production mode."""
-        mock_settings.debug = False
+        assert result is False
 
-        # Reset logging configuration
-        import logging
+    def test_returns_false_for_nonexistent_file(self, tmp_path):
+        """Test that nonexistent file returns False."""
+        result = process_task_file(tmp_path / "nonexistent.txt")
+        assert result is False
 
-        logging.root.handlers.clear()
 
-        with patch("auto_slopp.main.settings", mock_settings):
-            with patch("auto_slopp.main.setup_telegram_logging") as mock_telegram:
-                mock_telegram.return_value = None
+class TestMarkTaskUsed:
+    """Tests for mark_task_used function."""
 
-                setup_logging()
+    def test_renames_file_to_used(self, tmp_path):
+        """Test that file is renamed to .txt.used."""
+        file_path = tmp_path / "task.txt"
+        file_path.write_text("content")
 
-                # Check that handlers were added and root level is set
-                assert len(logging.root.handlers) == 1
-                assert isinstance(logging.root.handlers[0], logging.StreamHandler)
-                # In production mode, the root logger should be set to INFO
-                assert logging.root.level == logging.INFO
+        mark_task_used(file_path)
 
-    def test_setup_logging_with_telegram_enabled(self, mock_settings):
-        """Test logging setup with Telegram integration enabled."""
-        mock_settings.debug = False
-        mock_settings.telegram_enabled = True
+        assert file_path.with_suffix(".txt.used").exists()
+        assert not file_path.exists()
 
-        mock_handler = MagicMock()
 
-        with patch("auto_slopp.main.settings", mock_settings):
-            with patch("auto_slopp.main.setup_telegram_logging") as mock_telegram:
-                mock_telegram.return_value = mock_handler
+class TestRun:
+    """Tests for run function."""
 
-                with patch("auto_slopp.main.logging.getLogger") as mock_get_logger:
-                    mock_logger = MagicMock()
-                    mock_get_logger.return_value = mock_logger
+    def test_run_processes_task_files(self, tmp_path):
+        """Test that run processes task files."""
+        (tmp_path / "task1.txt").write_text("task 1")
+        (tmp_path / "task2.txt").write_text("task 2")
 
-                    setup_logging()
+        count = run(tmp_path)
 
-                    # Check that Telegram handler was added
-                    mock_telegram.assert_called_once_with(level=20)  # INFO level
-                    mock_logger.addHandler.assert_called_once_with(mock_handler)
-
-    def test_setup_logging_httpx_logging_configured(self, mock_settings):
-        """Test that httpx logging is configured to be less noisy."""
-        mock_settings.debug = False
-
-        with patch("auto_slopp.main.settings", mock_settings):
-            with patch("auto_slopp.main.setup_telegram_logging") as mock_telegram:
-                mock_telegram.return_value = None
-
-                with patch("auto_slopp.main.logging.getLogger") as mock_get_logger:
-                    mock_httpx_logger = MagicMock()
-                    mock_get_logger.return_value = mock_httpx_logger
-
-                    setup_logging()
-
-                    # Check that httpx logger level was set
-                    mock_httpx_logger.setLevel.assert_called_with(30)  # WARNING level
-
-    @patch("auto_slopp.main.run_executor")
-    def test_main_function_with_keyboard_interrupt(self, mock_run_executor, mock_settings):
-        """Test main function handles KeyboardInterrupt gracefully."""
-        mock_run_executor.side_effect = KeyboardInterrupt()
-
-        with patch("auto_slopp.main.settings", mock_settings):
-            with patch("auto_slopp.main.parse_arguments") as mock_parse:
-                mock_args = MagicMock()
-                mock_args.repo_path = None
-                mock_args.task_path = None
-                mock_args.search_path = None
-                mock_args.debug = False
-                mock_parse.return_value = mock_args
-
-                with patch("auto_slopp.main.setup_logging"):
-                    with patch("auto_slopp.main.sys.exit") as mock_exit:
-
-                        from auto_slopp.main import main
-
-                        main()
-
-                        mock_exit.assert_called_once_with(0)
-
-    @patch("auto_slopp.main.run_executor")
-    def test_main_function_with_exception(self, mock_run_executor, mock_settings):
-        """Test main function handles exceptions gracefully."""
-        mock_run_executor.side_effect = Exception("Test error")
-
-        with patch("auto_slopp.main.settings", mock_settings):
-            with patch("auto_slopp.main.parse_arguments") as mock_parse:
-                mock_args = MagicMock()
-                mock_args.repo_path = None
-                mock_args.task_path = None
-                mock_args.search_path = None
-                mock_args.debug = False
-                mock_parse.return_value = mock_args
-
-                with patch("auto_slopp.main.setup_logging"):
-                    with patch("auto_slopp.main.sys.exit") as mock_exit:
-
-                        from auto_slopp.main import main
-
-                        main()
-
-                        mock_exit.assert_called_once_with(1)
-
-    @patch("auto_slopp.main.run_executor")
-    def test_main_function_successful_execution(self, mock_run_executor, mock_settings):
-        """Test main function executes successfully."""
-        mock_settings.base_repo_path = Path("/default/repo")
-        mock_settings.base_task_path = Path("/default/tasks")
-        mock_settings.worker_search_path = Path("/default/workers")
-        mock_settings.debug = False
-        mock_settings.telegram_enabled = False
-
-        with patch("auto_slopp.main.settings", mock_settings):
-            with patch("auto_slopp.main.parse_arguments") as mock_parse:
-                mock_args = MagicMock()
-                mock_args.repo_path = Path("/custom/repo")
-                mock_args.task_path = Path("/custom/tasks")
-                mock_args.search_path = Path("/custom/workers")
-                mock_args.debug = True
-                mock_parse.return_value = mock_args
-
-                with patch("auto_slopp.main.setup_logging"):
-                    with patch("auto_slopp.main.sys.exit") as mock_exit:
-
-                        from auto_slopp.main import main
-
-                        # This should run without calling sys.exit
-                        mock_run_executor.assert_not_called()
-
-                        # Execute main but mock the infinite loop
-                        with patch("auto_slopp.main.run_executor") as mock_executor:
-                            mock_executor.side_effect = KeyboardInterrupt()  # Stop the loop
-                            main()
-
-                            # Check that run_executor was called with correct arguments
-                            mock_executor.assert_called_once_with(
-                                search_path=Path("/custom/workers"),
-                                repo_path=Path("/custom/repo"),
-                                task_path=Path("/custom/tasks"),
-                            )
+        assert count == 2
