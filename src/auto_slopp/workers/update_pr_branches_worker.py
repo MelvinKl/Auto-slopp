@@ -9,7 +9,10 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
-from auto_slopp.utils.git_operations import checkout_branch_resilient
+from auto_slopp.utils.git_operations import (
+    checkout_branch_resilient,
+    merge_main_into_branch,
+)
 from auto_slopp.utils.repository_utils import validate_repository
 from auto_slopp.worker import Worker
 
@@ -20,7 +23,7 @@ class UpdatePRBranchesWorker(Worker):
     def __init__(self):
         """Initialize UpdatePRBranchesWorker."""
         self.logger = logging.getLogger("auto_slopp.workers.UpdatePRBranchesWorker")
-        # TODO: git operations belong into the git_operations file NOT into this file. If you add them here they arent't reusable. Also: There is error handling available in the git_operations.
+        # TODO: git operations belong into the git_operations file NOT into this file. If you add them here they aren't't reusable. Also: There is error handling available in the git_operations.
         # TODO: create a new file for github_operations and move ALL operations for github there. Not only from this file, from all files.
         pass
 
@@ -59,7 +62,9 @@ class UpdatePRBranchesWorker(Worker):
                 f"Repository is invalid: {repo_path.name} - {repo_info.get('errors', ['Unknown error'])}"
             )
             results["success"] = False
-            results["error"] = f"Invalid repository: {repo_info.get('errors', ['Unknown error'])}"
+            results["error"] = (
+                f"Invalid repository: {repo_info.get('errors', ['Unknown error'])}"
+            )
             return results
 
         pr_branches = self._get_open_pr_branches(repo_path)
@@ -114,7 +119,9 @@ class UpdatePRBranchesWorker(Worker):
             )
 
             if result.returncode != 0:
-                self.logger.error(f"Failed to list PRs in {repo_dir.name}: {result.stderr}")
+                self.logger.error(
+                    f"Failed to list PRs in {repo_dir.name}: {result.stderr}"
+                )
                 return []
 
             prs = json.loads(result.stdout)
@@ -129,7 +136,9 @@ class UpdatePRBranchesWorker(Worker):
 
     def _checkout_branch(self, repo_dir: Path, branch: str) -> bool:
         """Checkout a specific branch in the repository."""
-        success = checkout_branch_resilient(repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60)
+        success = checkout_branch_resilient(
+            repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60
+        )
 
         if success:
             self.logger.info(f"Successfully checked out {branch} in {repo_dir.name}")
@@ -140,34 +149,22 @@ class UpdatePRBranchesWorker(Worker):
 
     def _merge_main(self, repo_dir: Path) -> bool:
         """Merge origin/main into the current branch."""
-        try:
-            self.logger.info(f"Merging origin/main into current branch in {repo_dir.name}")
+        self.logger.info(f"Merging origin/main into current branch in {repo_dir.name}")
 
-            # TODO: use git_operations
-            raise NotImplementedError()
-            self.logger.info("Successfully merged origin/main into current branch")
-            return True
+        success, message = merge_main_into_branch(repo_dir=repo_dir, branch="current")
 
-        except subprocess.TimeoutExpired:
-            self.logger.error("Timeout merging main")
+        if not success:
+            self.logger.warning(f"Merge failed: {message}")
             return False
-        except Exception as e:
-            self.logger.error(f"Error merging main: {str(e)}")
-            return False
+
+        self.logger.info("Successfully merged origin/main into current branch")
+        return True
 
     def _push_branch(self, repo_dir: Path, branch: str) -> bool:
         """Push the updated branch to remote."""
         try:
-            self.logger.info(f"Pushing branch {branch} to remote")
-
-            # TODO: use git_operations
             raise NotImplementedError()
-            if result.returncode != 0:
-                self.logger.error(f"Failed to push branch {branch}: {result.stderr}")
-                return False
-
-            self.logger.info(f"Successfully pushed branch {branch}")
-            return True
+            # TODO: use git_operations
 
         except subprocess.TimeoutExpired:
             self.logger.error(f"Timeout pushing branch {branch}")

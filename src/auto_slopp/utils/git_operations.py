@@ -415,6 +415,14 @@ def merge_main_into_branch(
             merge_error = merge_result.stderr.strip() or merge_result.stdout.strip()
             logger.warning(f"Merge had conflicts or failed: {merge_error}")
 
+            if "CONFLICT" in merge_error:
+                logger.info("Merge conflict detected, calling OpenCode to resolve")
+                _handle_git_operation_failure("merge_main_into_branch", repo_dir, merge_error)
+                return (
+                    False,
+                    f"Merge conflict detected and OpenCode attempted resolution: {merge_error}",
+                )
+
             abort_result = _run_git_command(repo_dir, "merge", "--abort", check=False, timeout=timeout)
             if abort_result.returncode != 0:
                 abort_error = abort_result.stderr.strip() or abort_result.stdout.strip()
@@ -430,6 +438,30 @@ def merge_main_into_branch(
         logger.error(f"Error merging main into branch '{branch}' in {repo_dir.name}: {str(e)}")
         _handle_git_operation_failure("merge_main_into_branch", repo_dir, error_msg)
         return False, error_msg
+
+
+def is_git_repo(directory: Path) -> bool:
+    """Check if a directory is inside a git repository.
+
+    Uses git rev-parse to detect if the directory is inside a git repo,
+    which works even when the directory is a subdirectory of the repo.
+
+    Args:
+        directory: Path to check
+
+    Returns:
+        True if the directory is inside a git repository, False otherwise.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=directory,
+            capture_output=True,
+            text=True,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
 
 
 def commit_and_push_changes(
@@ -455,7 +487,7 @@ def commit_and_push_changes(
     try:
         os.chdir(repo_dir)
 
-        if not (repo_dir / ".git").exists():
+        if not is_git_repo(repo_dir):
             logger.info(f"Initializing git repository in {repo_dir}")
             _run_git_command(repo_dir, "init")
 
