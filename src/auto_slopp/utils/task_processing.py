@@ -191,8 +191,9 @@ def process_repository(
         # Note: Git pull is now handled in TaskProcessorWorker before calling process_repository
         # This ensures we pull latest changes from task repository before processing
 
-        # Process each text file
-        for text_file in text_files:
+        # Only process ONE file per repository per iteration to ensure fair share
+        if text_files:
+            text_file = text_files[0]  # Process oldest file first
             file_result = process_text_file(
                 text_file,
                 task_repo_dir,
