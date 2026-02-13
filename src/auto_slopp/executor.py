@@ -1,10 +1,11 @@
 """Endless loop executor for running Worker instances."""
 
-import sys
 import time
 import traceback
 from pathlib import Path
 from typing import Any, Optional, Type
+
+from pluggy import PluginManager
 
 from auto_slopp.discovery import discover_workers
 from auto_slopp.worker import Worker
@@ -31,6 +32,7 @@ class Executor:
         self.repo_path = repo_path
         self.task_path = task_path
         self.running = False
+        self.plugin_manager = PluginManager("workers")
 
     def start(self) -> None:
         """Start the endless execution loop."""
@@ -42,7 +44,7 @@ class Executor:
                 self._run_iteration()
                 time.sleep(settings.executor_sleep_interval)  # Prevent tight loop
         except KeyboardInterrupt:
-            print("\\nReceived interrupt signal, shutting down...")
+            print("\nReceived interrupt signal, shutting down...")
         except Exception as e:
             print(f"Fatal error in executor: {e}")
             traceback.print_exc()
@@ -63,6 +65,9 @@ class Executor:
             if not workers:
                 print("No workers found in this iteration")
                 return
+
+            for worker_class in workers:
+                self.plugin_manager.register(worker_class())
 
             print(f"Found {len(workers)} workers: {[w.__name__ for w in workers]}")
 

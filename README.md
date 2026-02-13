@@ -4,7 +4,7 @@ A Python-based automation framework for task execution with pluggable worker sys
 
 ## Features
 
-- **Pluggable Worker System**: Abstract base class for creating custom automation workers
+- **Pluggable Worker System**: Abstract base class for creating custom automation workers using the pluggy library
 - **Configuration Management**: Pydantic-based settings with environment variable support
 - **Flexible Logging**: Built-in logging with optional Telegram integration for remote notifications
 - **Task Execution**: Automated discovery and execution of worker implementations
