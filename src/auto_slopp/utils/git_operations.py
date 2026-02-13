@@ -267,6 +267,29 @@ def has_changes(repo_dir: Path) -> bool:
         raise GitOperationError(error_msg)
 
 
+def has_remote(repo_dir: Path, remote_name: str = "origin") -> bool:
+    """Check if a remote exists in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+        remote_name: Name of the remote to check (default: "origin")
+
+    Returns:
+        True if the remote exists, False otherwise.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", remote_name],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return bool(result.stdout.strip())
+    except subprocess.CalledProcessError:
+        return False
+
+
 def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = True, timeout: int = 60) -> bool:
     """Checkout a git branch with enhanced resilience.
 
@@ -285,7 +308,7 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
         logger.info(f"Checking out branch '{branch}' in {repo_dir.name}")
 
         # Fetch latest changes if requested
-        if fetch_first:
+        if fetch_first and has_remote(repo_dir, "origin"):
             logger.debug(f"Fetching latest changes for {repo_dir.name}")
             fetch_result = subprocess.run(
                 ["git", "fetch", "origin"],
@@ -312,19 +335,20 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
         if checkout_result.returncode == 0:
             logger.info(f"Successfully checked out '{branch}' in {repo_dir.name}")
 
-            # Pull latest changes for the branch
-            pull_result = subprocess.run(
-                ["git", "pull", "--rebase=false", "origin", branch],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-            if pull_result.returncode != 0:
-                # Check both stdout and stderr for error messages
-                pull_error = pull_result.stderr.strip() or pull_result.stdout.strip()
-                logger.warning(f"Pull failed for branch '{branch}' in {repo_dir.name}: {pull_error}")
-                # Don't fail the checkout if pull fails
+            # Pull latest changes for the branch only if remote exists
+            if has_remote(repo_dir, "origin"):
+                pull_result = subprocess.run(
+                    ["git", "pull", "--rebase=false", "origin", branch],
+                    cwd=repo_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                )
+                if pull_result.returncode != 0:
+                    # Check both stdout and stderr for error messages
+                    pull_error = pull_result.stderr.strip() or pull_result.stdout.strip()
+                    logger.warning(f"Pull failed for branch '{branch}' in {repo_dir.name}: {pull_error}")
+                    # Don't fail the checkout if pull fails
 
             return True
 
@@ -376,18 +400,19 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
         if retry_checkout_result.returncode == 0:
             logger.info(f"Successfully checked out '{branch}' in {repo_dir.name} after reset")
 
-            # Pull latest changes for the branch
-            pull_result = subprocess.run(
-                ["git", "pull", "--rebase=false", "origin", branch],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-            if pull_result.returncode != 0:
-                # Check both stdout and stderr for error messages
-                pull_error = pull_result.stderr.strip() or pull_result.stdout.strip()
-                logger.warning(f"Pull failed for branch '{branch}' in {repo_dir.name}: {pull_error}")
+            # Pull latest changes for the branch only if remote exists
+            if has_remote(repo_dir, "origin"):
+                pull_result = subprocess.run(
+                    ["git", "pull", "--rebase=false", "origin", branch],
+                    cwd=repo_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                )
+                if pull_result.returncode != 0:
+                    # Check both stdout and stderr for error messages
+                    pull_error = pull_result.stderr.strip() or pull_result.stdout.strip()
+                    logger.warning(f"Pull failed for branch '{branch}' in {repo_dir.name}: {pull_error}")
 
             return True
         else:
@@ -425,6 +450,10 @@ def push_branch(repo_dir: Path, branch: str, force: bool = True, timeout: int = 
     Raises:
         GitOperationError: If git command fails
     """
+    if not has_remote(repo_dir, "origin"):
+        logger.warning(f"No remote 'origin' found in {repo_dir.name}, cannot push branch '{branch}'")
+        return False
+
     try:
         cmd = ["git", "push", "origin", branch]
         if force:
@@ -480,6 +509,11 @@ def merge_main_into_branch(
     Raises:
         GitOperationError: If git operations fail
     """
+    if not has_remote(repo_dir, remote_name):
+        error_msg = f"No remote '{remote_name}' found in {repo_dir.name}"
+        logger.warning(error_msg)
+        return False, error_msg
+
     try:
         # Fetch the main branch from remote
         fetch_result = subprocess.run(
