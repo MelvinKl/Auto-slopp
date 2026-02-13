@@ -143,35 +143,8 @@ class UpdatePRBranchesWorker(Worker):
         try:
             self.logger.info(f"Merging origin/main into current branch in {repo_dir.name}")
 
-            fetch_result = subprocess.run(
-                ["git", "fetch", "origin", "main:main"],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-            if fetch_result.returncode != 0:
-                self.logger.error(f"Failed to fetch main: {fetch_result.stderr}")
-                return False
-
-            merge_result = subprocess.run(
-                ["git", "merge", "origin/main", "--no-edit"],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-            if merge_result.returncode != 0:
-                self.logger.warning(f"Merge had conflicts or failed: {merge_result.stderr}")
-                subprocess.run(
-                    ["git", "merge", "--abort"],
-                    cwd=repo_dir,
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                )
-                return False
-
+            # TODO: use git_operations
+            raise NotImplementedError()
             self.logger.info("Successfully merged origin/main into current branch")
             return True
 
@@ -187,14 +160,8 @@ class UpdatePRBranchesWorker(Worker):
         try:
             self.logger.info(f"Pushing branch {branch} to remote")
 
-            result = subprocess.run(
-                ["git", "push", "origin", branch, "--force"],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-
+            # TODO: use git_operations
+            raise NotImplementedError()
             if result.returncode != 0:
                 self.logger.error(f"Failed to push branch {branch}: {result.stderr}")
                 return False
