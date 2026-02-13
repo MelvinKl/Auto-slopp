@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from auto_slopp.utils.opencode import run_opencode
+
 logger = logging.getLogger(__name__)
 
 
@@ -18,6 +20,47 @@ class GitOperationError(Exception):
     """Exception raised when git operations fail."""
 
     pass
+
+
+def _handle_git_operation_failure(
+    operation: str,
+    repo_dir: Path,
+    error_message: str,
+    timeout: int = 300,
+) -> None:
+    """Handle git operation failure by calling OpenCode to fix the issue.
+
+    Args:
+        operation: The name of the git operation that failed
+        repo_dir: Path to the git repository
+        error_message: The error message from the failed operation
+        timeout: Timeout for OpenCode execution in seconds
+    """
+    logger.warning(f"Git operation '{operation}' failed in {repo_dir.name}: {error_message}")
+    logger.info(f"Calling OpenCode to fix the failed git operation: {operation}")
+
+    instructions = (
+        f"Fix the failed git operation '{operation}' in the repository at {repo_dir}. "
+        f"The error was: {error_message}. "
+        f"Please resolve the issue and ensure the git operation completes successfully."
+    )
+
+    try:
+        result = run_opencode(
+            additional_instructions=instructions,
+            working_directory=repo_dir,
+            timeout=timeout,
+            capture_output=True,
+        )
+
+        if result.get("success"):
+            logger.info(f"OpenCode successfully resolved the git operation '{operation}' failure")
+        else:
+            logger.error(
+                f"OpenCode failed to resolve git operation '{operation}' failure: {result.get('error', 'Unknown error')}"
+            )
+    except Exception as e:
+        logger.error(f"Failed to call OpenCode for git operation '{operation}' failure: {str(e)}")
 
 
 def get_local_branches(repo_dir: Path) -> List[Dict[str, Any]]:
@@ -76,8 +119,10 @@ def get_local_branches(repo_dir: Path) -> List[Dict[str, Any]]:
         return branches
 
     except subprocess.CalledProcessError as e:
+        error_msg = f"Failed to get local branches: {e}"
         logger.error(f"Failed to get local branches in {repo_dir}: {e}")
-        raise GitOperationError(f"Failed to get local branches: {e}")
+        _handle_git_operation_failure("get_local_branches", repo_dir, str(e))
+        raise GitOperationError(error_msg)
 
 
 def get_remote_branches(repo_dir: Path) -> set:
@@ -112,8 +157,10 @@ def get_remote_branches(repo_dir: Path) -> set:
         return remote_branches
 
     except subprocess.CalledProcessError as e:
+        error_msg = f"Failed to get remote branches: {e}"
         logger.error(f"Failed to get remote branches in {repo_dir}: {e}")
-        raise GitOperationError(f"Failed to get remote branches: {e}")
+        _handle_git_operation_failure("get_remote_branches", repo_dir, str(e))
+        raise GitOperationError(error_msg)
 
 
 def get_current_branch(repo_dir: Path) -> str:
@@ -139,8 +186,10 @@ def get_current_branch(repo_dir: Path) -> str:
         return result.stdout.strip()
 
     except subprocess.CalledProcessError as e:
+        error_msg = f"Failed to get current branch: {e}"
         logger.error(f"Failed to get current branch in {repo_dir}: {e}")
-        raise GitOperationError(f"Failed to get current branch: {e}")
+        _handle_git_operation_failure("get_current_branch", repo_dir, str(e))
+        raise GitOperationError(error_msg)
 
 
 def delete_branch(repo_dir: Path, branch_name: str) -> bool:
@@ -173,7 +222,9 @@ def delete_branch(repo_dir: Path, branch_name: str) -> bool:
         return True
 
     except subprocess.CalledProcessError as e:
+        error_msg = f"Failed to delete branch '{branch_name}': {e}"
         logger.error(f"Failed to delete branch '{branch_name}': {e}")
+        _handle_git_operation_failure("delete_branch", repo_dir, str(e))
         return False
 
 
@@ -200,8 +251,10 @@ def has_changes(repo_dir: Path) -> bool:
         return bool(result.stdout.strip())
 
     except subprocess.CalledProcessError as e:
+        error_msg = f"Failed to check git status: {e}"
         logger.error(f"Failed to check git status in {repo_dir}: {e}")
-        raise GitOperationError(f"Failed to check git status: {e}")
+        _handle_git_operation_failure("has_changes", repo_dir, str(e))
+        raise GitOperationError(error_msg)
 
 
 def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = True, timeout: int = 60) -> bool:
@@ -274,7 +327,9 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
             timeout=timeout,
         )
         if reset_result.returncode != 0:
+            error_msg = f"Git reset --hard failed: {reset_result.stderr}"
             logger.error(f"Git reset --hard failed in {repo_dir.name}: {reset_result.stderr}")
+            _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
             return False
 
         # Clean untracked files
@@ -314,16 +369,22 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
 
             return True
         else:
+            error_msg = f"Failed to checkout '{branch}' even after reset: {retry_checkout_result.stderr}"
             logger.error(
                 f"Failed to checkout '{branch}' in {repo_dir.name} even after reset: {retry_checkout_result.stderr}"
             )
+            _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
             return False
 
     except subprocess.TimeoutExpired:
+        error_msg = f"Timeout checking out '{branch}'"
         logger.error(f"Timeout checking out '{branch}' in {repo_dir.name}")
+        _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
         return False
     except Exception as e:
+        error_msg = f"Error checking out '{branch}': {str(e)}"
         logger.error(f"Error checking out '{branch}' in {repo_dir.name}: {str(e)}")
+        _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
         return False
 
 
@@ -393,8 +454,10 @@ def commit_and_push_changes(
         return commit_success, push_success
 
     except subprocess.CalledProcessError as e:
+        error_msg = f"Git operations failed: {e}"
         logger.error(f"Git operations failed: {e}")
-        raise GitOperationError(f"Git operations failed: {e}")
+        _handle_git_operation_failure("commit_and_push_changes", repo_dir, str(e))
+        raise GitOperationError(error_msg)
 
     finally:
         os.chdir(original_cwd)
