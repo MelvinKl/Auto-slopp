@@ -3,7 +3,6 @@
 This worker iterates through all open PRs and updates each branch with the latest main.
 """
 
-import json
 import logging
 import subprocess
 from pathlib import Path
@@ -14,6 +13,7 @@ from auto_slopp.utils.git_operations import (
     merge_main_into_branch,
     push_branch,
 )
+from auto_slopp.utils.github_operations import get_open_pr_branches
 from auto_slopp.utils.repository_utils import validate_repository
 from auto_slopp.worker import Worker
 
@@ -108,28 +108,7 @@ class UpdatePRBranchesWorker(Worker):
 
     def _get_open_pr_branches(self, repo_dir: Path) -> List[str]:
         """Get list of branches from open PRs in the repository."""
-        try:
-            result = subprocess.run(
-                ["gh", "pr", "list", "--state=open", "--json=headRefName"],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-
-            if result.returncode != 0:
-                self.logger.error(f"Failed to list PRs in {repo_dir.name}: {result.stderr}")
-                return []
-
-            prs = json.loads(result.stdout)
-            return [pr["headRefName"] for pr in prs]
-
-        except subprocess.TimeoutExpired:
-            self.logger.error(f"Timeout getting PRs from {repo_dir.name}")
-            return []
-        except Exception as e:
-            self.logger.error(f"Error getting PRs from {repo_dir.name}: {str(e)}")
-            return []
+        return get_open_pr_branches(repo_dir)
 
     def _checkout_branch(self, repo_dir: Path, branch: str) -> bool:
         """Checkout a specific branch in the repository."""

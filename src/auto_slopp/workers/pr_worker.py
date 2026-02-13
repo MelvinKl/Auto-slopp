@@ -14,6 +14,7 @@ from auto_slopp.utils.git_operations import (
     merge_main_into_branch,
     push_branch,
 )
+from auto_slopp.utils.github_operations import get_open_pr_branches
 from auto_slopp.utils.opencode import run_opencode
 from auto_slopp.utils.repository_utils import discover_repositories, validate_repository
 from auto_slopp.worker import Worker
@@ -188,34 +189,7 @@ class PRWorker(Worker):
         Returns:
             List of branch names from open PRs
         """
-        try:
-            result = subprocess.run(
-                ["gh", "pr", "list", "--state=open", "--json=headRefName"],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-
-            if result.returncode != 0:
-                # Check both stdout and stderr for error messages
-                pr_error = result.stderr.strip() or result.stdout.strip()
-                self.logger.error(f"Failed to list PRs in {repo_dir.name}: {pr_error}")
-                return []
-
-            import json
-
-            prs = json.loads(result.stdout)
-            branches = [pr["headRefName"] for pr in prs]
-
-            return branches
-
-        except subprocess.TimeoutExpired:
-            self.logger.error(f"Timeout getting PRs from {repo_dir.name}")
-            return []
-        except Exception as e:
-            self.logger.error(f"Error getting PRs from {repo_dir.name}: {str(e)}")
-            return []
+        return get_open_pr_branches(repo_dir)
 
     def _checkout_branch(self, repo_dir: Path, branch: str) -> bool:
         """Checkout a specific branch in the repository.
