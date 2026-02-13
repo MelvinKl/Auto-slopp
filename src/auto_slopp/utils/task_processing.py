@@ -14,7 +14,7 @@ from auto_slopp.utils.file_operations import (
     rename_processed_file,
 )
 from auto_slopp.utils.git_operations import commit_and_push_changes
-from auto_slopp.utils.opencode import run_opencode
+from auto_slopp.utils.opencode import execute_openagent_with_instructions, run_opencode
 
 logger = logging.getLogger(__name__)
 
@@ -61,42 +61,6 @@ def create_file_result(text_file: Path) -> Dict[str, Any]:
     }
 
 
-def execute_openagent_with_instructions(
-    instructions: str, work_dir: Path, agent_args: list, timeout: int
-) -> Dict[str, Any]:
-    """Execute OpenAgent with specific instructions.
-
-    Args:
-        instructions: Text instructions to pass to OpenAgent
-        work_dir: Working directory for OpenAgent execution
-        agent_args: Additional arguments to pass to OpenAgent
-        timeout: Timeout for OpenAgent execution in seconds
-
-    Returns:
-        Dictionary containing OpenAgent execution results
-    """
-    logger.info(f"Executing OpenAgent with instructions length: {len(instructions)}")
-
-    # Use the centralized opencode utility
-    result = run_opencode(
-        additional_instructions=instructions,
-        working_directory=work_dir,
-        timeout=timeout,
-        agent_args=agent_args,
-        capture_output=True,
-    )
-
-    # Log execution result
-    if result["success"]:
-        logger.info(f"OpenAgent execution completed successfully with return code: {result['return_code']}")
-    else:
-        logger.error(f"OpenAgent execution failed with return code: {result['return_code']}")
-        if result.get("error"):
-            logger.error(f"Error: {result['error']}")
-
-    return result
-
-
 def process_text_file(
     text_file: Path,
     task_repo_dir: Path,
@@ -132,7 +96,7 @@ def process_text_file(
 
         result["instructions"] = instructions
         logger.info(f"Loaded instructions from {text_file.name}")
-        instructions = f"Create a new branch that starts with ai/ with base origin/main and implement the following:\n{instructions}\nKeep your implementation simple. Only implement what is required. Ensure that 'make test' runs successful. Check if you need to update the README.md. Push your changes and create a pull request on github."
+        instructions = f"Create a new branch that starts with ai/ from base origin/main and implement the following:\n{instructions}\nKeep your implementation simple. Only implement what is required. Ensure that 'make test' runs successful. Only push if ALL tests are successful. Check if you need to update the README.md. Push your changes and create a pull request on github."
         # Execute OpenAgent with the instructions
         if not dry_run:
             openagent_result = execute_openagent_with_instructions(instructions, task_repo_dir, agent_args, timeout)
