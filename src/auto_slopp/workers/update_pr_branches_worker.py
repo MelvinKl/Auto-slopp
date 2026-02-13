@@ -9,7 +9,10 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
-from auto_slopp.utils.git_operations import checkout_branch_resilient
+from auto_slopp.utils.git_operations import (
+    checkout_branch_resilient,
+    merge_main_into_branch,
+)
 from auto_slopp.utils.repository_utils import validate_repository
 from auto_slopp.worker import Worker
 
@@ -142,47 +145,16 @@ class UpdatePRBranchesWorker(Worker):
 
     def _merge_main(self, repo_dir: Path) -> bool:
         """Merge origin/main into the current branch."""
-        try:
-            self.logger.info(f"Merging origin/main into current branch in {repo_dir.name}")
+        self.logger.info(f"Merging origin/main into current branch in {repo_dir.name}")
 
-            fetch_result = subprocess.run(
-                ["git", "fetch", "origin", "main:main"],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-            if fetch_result.returncode != 0:
-                self.logger.error(f"Failed to fetch main: {fetch_result.stderr}")
-                return False
+        success, message = merge_main_into_branch(repo_dir=repo_dir, branch="current")
 
-            merge_result = subprocess.run(
-                ["git", "merge", "origin/main", "--no-edit"],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-            if merge_result.returncode != 0:
-                self.logger.warning(f"Merge had conflicts or failed: {merge_result.stderr}")
-                subprocess.run(
-                    ["git", "merge", "--abort"],
-                    cwd=repo_dir,
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                )
-                return False
-
-            self.logger.info("Successfully merged origin/main into current branch")
-            return True
-
-        except subprocess.TimeoutExpired:
-            self.logger.error("Timeout merging main")
+        if not success:
+            self.logger.warning(f"Merge failed: {message}")
             return False
-        except Exception as e:
-            self.logger.error(f"Error merging main: {str(e)}")
-            return False
+
+        self.logger.info("Successfully merged origin/main into current branch")
+        return True
 
     def _push_branch(self, repo_dir: Path, branch: str) -> bool:
         """Push the updated branch to remote."""
