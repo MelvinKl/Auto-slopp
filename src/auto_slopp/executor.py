@@ -6,6 +6,8 @@ import traceback
 from pathlib import Path
 from typing import Any, Optional, Type
 
+import anyio
+
 from auto_slopp.discovery import discover_workers
 from auto_slopp.worker import Worker
 from settings.main import settings
@@ -210,3 +212,12 @@ def run_executor(
         task_path=task_path or settings.base_task_path,
     )
     executor.start()
+
+
+async def async_sleep(duration: float) -> None:
+    """Async sleep using anyio.
+
+    Args:
+        duration: Sleep duration in seconds
+    """
+    await anyio.sleep(duration)
