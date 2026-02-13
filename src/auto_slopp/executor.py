@@ -126,6 +126,7 @@ class Executor:
             "TaskProcessorWorker",
             "RenovateTestWorker",
             "StaleBranchCleanupWorker",
+            "PRWorker",
         }
 
         return worker_class.__name__ in workers_requiring_iteration

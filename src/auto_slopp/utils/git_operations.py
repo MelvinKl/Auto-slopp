@@ -249,7 +249,7 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
 
             # Pull latest changes for the branch
             pull_result = subprocess.run(
-                ["git", "pull", "origin", branch],
+                ["git", "pull", "--rebase=false", "origin", branch],
                 cwd=repo_dir,
                 capture_output=True,
                 text=True,
@@ -303,7 +303,7 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
 
             # Pull latest changes for the branch
             pull_result = subprocess.run(
-                ["git", "pull", "origin", branch],
+                ["git", "pull", "--rebase=false", "origin", branch],
                 cwd=repo_dir,
                 capture_output=True,
                 text=True,

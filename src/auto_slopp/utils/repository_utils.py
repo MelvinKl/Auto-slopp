@@ -20,7 +20,12 @@ def is_git_repository(repo_dir: Path) -> bool:
     """
     try:
         git_dir = repo_dir / ".git"
-        return git_dir.exists() and git_dir.is_dir()
+        # Check for .git as a directory (normal repo) or as a file (worktree)
+        if git_dir.is_dir():
+            return True
+        if git_dir.is_file():
+            return True
+        return False
     except Exception:
         return False
 
