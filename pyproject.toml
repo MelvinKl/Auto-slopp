@@ -34,6 +34,9 @@ packages = ["src/auto_slopp"]
 
 [project.scripts]
 auto-slopp = "auto_slopp.main:main"
+coverage = "coverage.cmdline:main"
+"coverage-3.14" = "coverage.cmdline:main_deprecated"
+coverage3 = "coverage.cmdline:main_deprecated"
 
 [tool.black]
 line-length = 120
