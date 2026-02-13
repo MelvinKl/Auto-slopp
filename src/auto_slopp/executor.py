@@ -1,5 +1,6 @@
 """Endless loop executor for running Worker instances."""
 
+import subprocess
 import sys
 import time
 import traceback
@@ -57,6 +58,9 @@ class Executor:
     def _run_iteration(self) -> None:
         """Run a single iteration of worker discovery and execution."""
         try:
+            # Update task_repo before running workers
+            self._update_task_repo()
+
             # Discover worker classes
             workers = discover_workers(self.search_path)
 
@@ -73,6 +77,45 @@ class Executor:
         except Exception as e:
             print(f"Error in iteration: {e}")
             traceback.print_exc()
+
+    def _update_task_repo(self) -> None:
+        """Pull and push changes in the task_repo."""
+        try:
+            task_repo_path = settings.task_repo_path
+            if not task_repo_path.exists():
+                print(f"Task repo path does not exist: {task_repo_path}")
+                return
+
+            if not (task_repo_path / ".git").exists():
+                print(f"Task repo path is not a git repository: {task_repo_path}")
+                return
+
+            # Pull from origin/main
+            pull_result = subprocess.run(
+                ["git", "pull", "origin", "main"],
+                cwd=task_repo_path,
+                capture_output=True,
+                text=True,
+            )
+            if pull_result.returncode == 0:
+                print("Pulled latest changes from origin/main in task_repo")
+            else:
+                print(f"Failed to pull from origin/main in task_repo: {pull_result.stderr}")
+
+            # Push to origin/main
+            push_result = subprocess.run(
+                ["git", "push", "origin", "main"],
+                cwd=task_repo_path,
+                capture_output=True,
+                text=True,
+            )
+            if push_result.returncode == 0:
+                print("Pushed changes to origin/main in task_repo")
+            else:
+                print(f"Failed to push to origin/main in task_repo: {push_result.stderr}")
+
+        except Exception as e:
+            print(f"Error updating task_repo: {e}")
 
     def _instantiate_worker(self, worker_class: Type[Worker]) -> Worker:
         """Instantiate a worker with appropriate arguments.

@@ -24,6 +24,9 @@ class UpdatePRBranchesWorker(Worker):
     def __init__(self):
         """Initialize UpdatePRBranchesWorker."""
         self.logger = logging.getLogger("auto_slopp.workers.UpdatePRBranchesWorker")
+        # TODO: git operations belong into the git_operations file NOT into this file. If you add them here they aren't't reusable. Also: There is error handling available in the git_operations.
+        # TODO: create a new file for github_operations and move ALL operations for github there. Not only from this file, from all files.
+        pass
 
     def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
         """Execute PR branch update workflow for a single repository.
@@ -60,7 +63,9 @@ class UpdatePRBranchesWorker(Worker):
                 f"Repository is invalid: {repo_path.name} - {repo_info.get('errors', ['Unknown error'])}"
             )
             results["success"] = False
-            results["error"] = f"Invalid repository: {repo_info.get('errors', ['Unknown error'])}"
+            results["error"] = (
+                f"Invalid repository: {repo_info.get('errors', ['Unknown error'])}"
+            )
             return results
 
         pr_branches = self._get_open_pr_branches(repo_path)
@@ -115,7 +120,9 @@ class UpdatePRBranchesWorker(Worker):
             )
 
             if result.returncode != 0:
-                self.logger.error(f"Failed to list PRs in {repo_dir.name}: {result.stderr}")
+                self.logger.error(
+                    f"Failed to list PRs in {repo_dir.name}: {result.stderr}"
+                )
                 return []
 
             prs = json.loads(result.stdout)
@@ -130,7 +137,9 @@ class UpdatePRBranchesWorker(Worker):
 
     def _checkout_branch(self, repo_dir: Path, branch: str) -> bool:
         """Checkout a specific branch in the repository."""
-        success = checkout_branch_resilient(repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60)
+        success = checkout_branch_resilient(
+            repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60
+        )
 
         if success:
             self.logger.info(f"Successfully checked out {branch} in {repo_dir.name}")
@@ -153,22 +162,18 @@ class UpdatePRBranchesWorker(Worker):
         return True
 
     def _push_branch(self, repo_dir: Path, branch: str) -> bool:
-        """Push the updated branch to remote.
+        """Push the updated branch to remote."""
+        try:
+            self.logger.info(f"Pushing branch {branch} to remote")
 
-        Args:
-            repo_dir: Path to the repository directory
-            branch: Branch name to push
+            success = push_branch(repo_dir=repo_dir, branch=branch, force=True)
 
-        Returns:
-            True if push successful, False otherwise
-        """
-        self.logger.info(f"Pushing branch {branch} to remote")
+            if not success:
+                self.logger.error(f"Failed to push branch {branch}")
+                return False
 
-        success = push_branch(repo_dir=repo_dir, branch=branch, force=True)
-
-        if not success:
-            self.logger.error(f"Failed to push branch {branch}")
+            self.logger.info(f"Successfully pushed branch {branch}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Error pushing branch {branch}: {str(e)}")
             return False
-
-        self.logger.info(f"Successfully pushed branch {branch}")
-        return True
