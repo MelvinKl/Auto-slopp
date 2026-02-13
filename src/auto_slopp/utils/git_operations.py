@@ -415,6 +415,14 @@ def merge_main_into_branch(
             merge_error = merge_result.stderr.strip() or merge_result.stdout.strip()
             logger.warning(f"Merge had conflicts or failed: {merge_error}")
 
+            if "CONFLICT" in merge_error:
+                logger.info("Merge conflict detected, calling OpenCode to resolve")
+                _handle_git_operation_failure("merge_main_into_branch", repo_dir, merge_error)
+                return (
+                    False,
+                    f"Merge conflict detected and OpenCode attempted resolution: {merge_error}",
+                )
+
             abort_result = _run_git_command(repo_dir, "merge", "--abort", check=False, timeout=timeout)
             if abort_result.returncode != 0:
                 abort_error = abort_result.stderr.strip() or abort_result.stdout.strip()
