@@ -63,9 +63,7 @@ class UpdatePRBranchesWorker(Worker):
                 f"Repository is invalid: {repo_path.name} - {repo_info.get('errors', ['Unknown error'])}"
             )
             results["success"] = False
-            results["error"] = (
-                f"Invalid repository: {repo_info.get('errors', ['Unknown error'])}"
-            )
+            results["error"] = f"Invalid repository: {repo_info.get('errors', ['Unknown error'])}"
             return results
 
         pr_branches = self._get_open_pr_branches(repo_path)
@@ -120,9 +118,7 @@ class UpdatePRBranchesWorker(Worker):
             )
 
             if result.returncode != 0:
-                self.logger.error(
-                    f"Failed to list PRs in {repo_dir.name}: {result.stderr}"
-                )
+                self.logger.error(f"Failed to list PRs in {repo_dir.name}: {result.stderr}")
                 return []
 
             prs = json.loads(result.stdout)
@@ -137,9 +133,7 @@ class UpdatePRBranchesWorker(Worker):
 
     def _checkout_branch(self, repo_dir: Path, branch: str) -> bool:
         """Checkout a specific branch in the repository."""
-        success = checkout_branch_resilient(
-            repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60
-        )
+        success = checkout_branch_resilient(repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60)
 
         if success:
             self.logger.info(f"Successfully checked out {branch} in {repo_dir.name}")
