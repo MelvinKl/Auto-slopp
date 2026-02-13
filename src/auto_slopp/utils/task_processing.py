@@ -64,6 +64,7 @@ def create_file_result(text_file: Path) -> Dict[str, Any]:
 def process_text_file(
     text_file: Path,
     task_repo_dir: Path,
+    repo_dir: Path,
     dry_run: bool = False,
     agent_args: Optional[list] = None,
     timeout: int = 600,
@@ -72,8 +73,9 @@ def process_text_file(
     """Process a single text file with instructions.
 
     Args:
-        text_file: Path to the text file
+        text_file: Path to the text file (in task_repo_dir)
         task_repo_dir: Directory in task_repo_path for this repository
+        repo_dir: Directory where OpenCode should execute the instructions
         dry_run: If True, skip actual OpenAgent execution and git operations
         agent_args: Additional arguments to pass to OpenAgent
         timeout: Timeout for OpenAgent execution in seconds
@@ -99,7 +101,7 @@ def process_text_file(
         instructions = f"Create a new branch that starts with ai/ from base origin/main and implement the following:\n{instructions}\nKeep your implementation simple. Only implement what is required. Ensure that 'make test' runs successful. Only push if ALL tests are successful. Check if you need to update the README.md. Push your changes and create a pull request on github."
         # Execute OpenAgent with the instructions
         if not dry_run:
-            openagent_result = execute_openagent_with_instructions(instructions, task_repo_dir, agent_args, timeout)
+            openagent_result = execute_openagent_with_instructions(instructions, repo_dir, agent_args, timeout)
             result["openagent_executed"] = openagent_result["success"]
 
             if not openagent_result["success"]:
@@ -187,7 +189,15 @@ def process_repository(
 
         # Process each text file
         for text_file in text_files:
-            file_result = process_text_file(text_file, task_repo_dir, dry_run, agent_args, timeout, counter_start)
+            file_result = process_text_file(
+                text_file,
+                task_repo_dir,
+                repo_dir,
+                dry_run,
+                agent_args,
+                timeout,
+                counter_start,
+            )
             result["processed_files"].append(file_result)
 
             if file_result["success"]:
@@ -207,15 +217,15 @@ def process_repository(
         if not dry_run and result["success"]:
             push_result = run_opencode(
                 additional_instructions="git push origin main",
-                working_directory=task_repo_dir,
+                working_directory=repo_dir,
                 timeout=60,
                 capture_output=True,
             )
             if push_result["success"]:
-                logger.info(f"Successfully pushed changes from {task_repo_dir.name}")
+                logger.info(f"Successfully pushed changes from {repo_dir.name}")
             else:
                 logger.warning(
-                    f"Failed to push changes from {task_repo_dir.name}: {push_result.get('error', 'Unknown error')}"
+                    f"Failed to push changes from {repo_dir.name}: {push_result.get('error', 'Unknown error')}"
                 )
     except Exception as e:
         logger.error(f"Error processing repository {repo_dir.name}: {str(e)}")
