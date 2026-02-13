@@ -12,6 +12,7 @@ from typing import Any, Dict, List
 from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     merge_main_into_branch,
+    push_branch,
 )
 from auto_slopp.utils.repository_utils import validate_repository
 from auto_slopp.worker import Worker
@@ -152,14 +153,22 @@ class UpdatePRBranchesWorker(Worker):
         return True
 
     def _push_branch(self, repo_dir: Path, branch: str) -> bool:
-        """Push the updated branch to remote."""
-        try:
-            raise NotImplementedError()
-            # TODO: use git_operations
+        """Push the updated branch to remote.
 
-        except subprocess.TimeoutExpired:
-            self.logger.error(f"Timeout pushing branch {branch}")
+        Args:
+            repo_dir: Path to the repository directory
+            branch: Branch name to push
+
+        Returns:
+            True if push successful, False otherwise
+        """
+        self.logger.info(f"Pushing branch {branch} to remote")
+
+        success = push_branch(repo_dir=repo_dir, branch=branch, force=True)
+
+        if not success:
+            self.logger.error(f"Failed to push branch {branch}")
             return False
-        except Exception as e:
-            self.logger.error(f"Error pushing branch {branch}: {str(e)}")
-            return False
+
+        self.logger.info(f"Successfully pushed branch {branch}")
+        return True
