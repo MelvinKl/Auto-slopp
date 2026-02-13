@@ -194,7 +194,9 @@ class PRWorker(Worker):
             )
 
             if result.returncode != 0:
-                self.logger.error(f"Failed to list PRs in {repo_dir.name}: {result.stderr}")
+                # Check both stdout and stderr for error messages
+                pr_error = result.stderr.strip() or result.stdout.strip()
+                self.logger.error(f"Failed to list PRs in {repo_dir.name}: {pr_error}")
                 return []
 
             import json
@@ -251,7 +253,9 @@ class PRWorker(Worker):
                 timeout=60,
             )
             if fetch_result.returncode != 0:
-                self.logger.error(f"Failed to fetch main: {fetch_result.stderr}")
+                # Check both stdout and stderr for error messages
+                fetch_error = fetch_result.stderr.strip() or fetch_result.stdout.strip()
+                self.logger.error(f"Failed to fetch main: {fetch_error}")
                 return False
 
             merge_result = subprocess.run(
@@ -262,7 +266,9 @@ class PRWorker(Worker):
                 timeout=60,
             )
             if merge_result.returncode != 0:
-                self.logger.warning(f"Merge had conflicts or failed: {merge_result.stderr}")
+                # Check both stdout and stderr for error messages
+                merge_error = merge_result.stderr.strip() or merge_result.stdout.strip()
+                self.logger.warning(f"Merge had conflicts or failed: {merge_error}")
                 resolve_result = subprocess.run(
                     ["git", "merge", "--abort"],
                     cwd=repo_dir,
@@ -271,7 +277,8 @@ class PRWorker(Worker):
                     timeout=30,
                 )
                 if resolve_result.returncode != 0:
-                    self.logger.error(f"Failed to abort merge: {resolve_result.stderr}")
+                    resolve_error = resolve_result.stderr.strip() or resolve_result.stdout.strip()
+                    self.logger.error(f"Failed to abort merge: {resolve_error}")
                 return False
 
             self.logger.info(f"Successfully merged origin/main into {branch}")
@@ -306,7 +313,9 @@ class PRWorker(Worker):
             )
 
             if result.returncode != 0:
-                self.logger.error(f"Failed to push branch {branch}: {result.stderr}")
+                # Check both stdout and stderr for error messages
+                push_error = result.stderr.strip() or result.stdout.strip()
+                self.logger.error(f"Failed to push branch {branch}: {push_error}")
                 return False
 
             self.logger.info(f"Successfully pushed branch {branch}")
