@@ -165,6 +165,9 @@ class PRWorker(Worker):
                         verify_result = self._run_tests(repo_dir)
                         result["test_results"][-1]["fix_success"] = verify_result["success"]
                         result["test_results"][-1]["fix_output"] = verify_result.get("output", "")
+                        if verify_result["success"]:
+                            self.logger.info(f"Tests fixed successfully for {branch}, pushing changes")
+                            self._push_branch(repo_dir, branch)
                     else:
                         result["test_results"][-1]["fix_success"] = False
                         result["test_results"][-1]["fix_error"] = fix_result.get("error", "Unknown fix error")
