@@ -88,10 +88,14 @@ class RenovateTestWorker(Worker):
                 # Only count as error if there's an actual error message
                 if repo_result.get("error"):
                     results["repositories_with_errors"] = 1
-                    results["errors"].append(f"{repo_path.name}: {repo_result.get('error', 'Unknown error')}")
+                    results["errors"].append(
+                        f"{repo_path.name}: {repo_result.get('error', 'Unknown error')}"
+                    )
             else:
                 results["repositories_with_errors"] = 1
-                results["errors"].append(f"{repo_path.name}: {repo_result.get('error', 'Unknown error')}")
+                results["errors"].append(
+                    f"{repo_path.name}: {repo_result.get('error', 'Unknown error')}"
+                )
                 results["success"] = False
 
         self.logger.info(
@@ -127,7 +131,9 @@ class RenovateTestWorker(Worker):
             result["branches_checked_out"] = renovate_branches
 
             if not renovate_branches:
-                self.logger.info(f"No renovate branches found in {repo_dir.name}, skipping")
+                self.logger.info(
+                    f"No renovate branches found in {repo_dir.name}, skipping"
+                )
                 result["success"] = True
                 result["error"] = None
                 return result
@@ -139,6 +145,11 @@ class RenovateTestWorker(Worker):
                 # Checkout the branch
                 if not self._checkout_branch(repo_dir, branch):
                     result["error"] = f"Failed to checkout branch {branch}"
+                    continue
+
+                # Merge with origin/main before testing
+                if not self._merge_main(repo_dir):
+                    result["error"] = f"Failed to merge origin/main into {branch}"
                     continue
 
                 # Run tests
@@ -154,17 +165,25 @@ class RenovateTestWorker(Worker):
 
                 # If tests failed, use OpenAgent to fix them
                 if not test_result["success"]:
-                    self.logger.info(f"Tests failed for {branch} in {repo_dir.name}, using OpenAgent to fix")
+                    self.logger.info(
+                        f"Tests failed for {branch} in {repo_dir.name}, using OpenAgent to fix"
+                    )
                     fix_result = self._fix_tests_with_openagent(repo_dir)
                     if fix_result["success"]:
                         result["tests_fixed"] = True
                         # Re-run tests to verify fix
                         verify_result = self._run_tests(repo_dir)
-                        result["test_results"][-1]["fix_success"] = verify_result["success"]
-                        result["test_results"][-1]["fix_output"] = verify_result.get("output", "")
+                        result["test_results"][-1]["fix_success"] = verify_result[
+                            "success"
+                        ]
+                        result["test_results"][-1]["fix_output"] = verify_result.get(
+                            "output", ""
+                        )
                     else:
                         result["test_results"][-1]["fix_success"] = False
-                        result["test_results"][-1]["fix_error"] = fix_result.get("error", "Unknown fix error")
+                        result["test_results"][-1]["fix_error"] = fix_result.get(
+                            "error", "Unknown fix error"
+                        )
                 else:
                     result["test_results"][-1]["fix_success"] = True  # No fix needed
 
@@ -195,7 +214,9 @@ class RenovateTestWorker(Worker):
             )
 
             if result.returncode != 0:
-                self.logger.error(f"Failed to list branches in {repo_dir.name}: {result.stderr}")
+                self.logger.error(
+                    f"Failed to list branches in {repo_dir.name}: {result.stderr}"
+                )
                 return []
 
             branches = []
@@ -227,7 +248,9 @@ class RenovateTestWorker(Worker):
             True if checkout successful, False otherwise
         """
         # Use the resilient checkout function from git_operations
-        success = checkout_branch_resilient(repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60)
+        success = checkout_branch_resilient(
+            repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60
+        )
 
         if success:
             self.logger.info(f"Successfully checked out {branch} in {repo_dir.name}")
@@ -235,6 +258,48 @@ class RenovateTestWorker(Worker):
             self.logger.error(f"Failed to checkout {branch} in {repo_dir.name}")
 
         return success
+
+    def _merge_main(self, repo_dir: Path) -> bool:
+        """Merge origin/main into the current branch.
+
+        Args:
+            repo_dir: Path to the repository directory
+
+        Returns:
+            True if merge successful, False otherwise
+        """
+        try:
+            subprocess.run(
+                ["git", "fetch", "origin", "main"],
+                cwd=repo_dir,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+
+            result = subprocess.run(
+                ["git", "merge", "origin/main", "--no-edit"],
+                cwd=repo_dir,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+
+            if result.returncode != 0:
+                self.logger.warning(
+                    f"Merge conflict or error merging origin/main: {result.stderr}"
+                )
+                return False
+
+            self.logger.info(f"Successfully merged origin/main into {repo_dir.name}")
+            return True
+
+        except subprocess.TimeoutExpired:
+            self.logger.error(f"Timeout merging origin/main in {repo_dir.name}")
+            return False
+        except Exception as e:
+            self.logger.error(f"Error merging origin/main in {repo_dir.name}: {str(e)}")
+            return False
 
     def _run_tests(self, repo_dir: Path) -> Dict[str, Any]:
         """Run make test in the repository.
