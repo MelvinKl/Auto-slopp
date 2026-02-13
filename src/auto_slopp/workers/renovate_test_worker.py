@@ -18,7 +18,7 @@ from auto_slopp.worker import Worker
 class RenovateTestWorker(Worker):
     """Worker for testing renovate branches and fixing failures with OpenAgent."""
 
-    def __init__(self, timeout: int = 600):
+    def __init__(self, timeout: int = 7200):
         """Initialize RenovateTestWorker.
 
         Args:
@@ -88,10 +88,14 @@ class RenovateTestWorker(Worker):
                 # Only count as error if there's an actual error message
                 if repo_result.get("error"):
                     results["repositories_with_errors"] = 1
-                    results["errors"].append(f"{repo_path.name}: {repo_result.get('error', 'Unknown error')}")
+                    results["errors"].append(
+                        f"{repo_path.name}: {repo_result.get('error', 'Unknown error')}"
+                    )
             else:
                 results["repositories_with_errors"] = 1
-                results["errors"].append(f"{repo_path.name}: {repo_result.get('error', 'Unknown error')}")
+                results["errors"].append(
+                    f"{repo_path.name}: {repo_result.get('error', 'Unknown error')}"
+                )
                 results["success"] = False
 
         self.logger.info(
@@ -127,7 +131,9 @@ class RenovateTestWorker(Worker):
             result["branches_checked_out"] = renovate_branches
 
             if not renovate_branches:
-                self.logger.info(f"No renovate branches found in {repo_dir.name}, skipping")
+                self.logger.info(
+                    f"No renovate branches found in {repo_dir.name}, skipping"
+                )
                 result["success"] = True
                 result["error"] = None
                 return result
@@ -154,17 +160,25 @@ class RenovateTestWorker(Worker):
 
                 # If tests failed, use OpenAgent to fix them
                 if not test_result["success"]:
-                    self.logger.info(f"Tests failed for {branch} in {repo_dir.name}, using OpenAgent to fix")
+                    self.logger.info(
+                        f"Tests failed for {branch} in {repo_dir.name}, using OpenAgent to fix"
+                    )
                     fix_result = self._fix_tests_with_openagent(repo_dir)
                     if fix_result["success"]:
                         result["tests_fixed"] = True
                         # Re-run tests to verify fix
                         verify_result = self._run_tests(repo_dir)
-                        result["test_results"][-1]["fix_success"] = verify_result["success"]
-                        result["test_results"][-1]["fix_output"] = verify_result.get("output", "")
+                        result["test_results"][-1]["fix_success"] = verify_result[
+                            "success"
+                        ]
+                        result["test_results"][-1]["fix_output"] = verify_result.get(
+                            "output", ""
+                        )
                     else:
                         result["test_results"][-1]["fix_success"] = False
-                        result["test_results"][-1]["fix_error"] = fix_result.get("error", "Unknown fix error")
+                        result["test_results"][-1]["fix_error"] = fix_result.get(
+                            "error", "Unknown fix error"
+                        )
                 else:
                     result["test_results"][-1]["fix_success"] = True  # No fix needed
 
@@ -195,7 +209,9 @@ class RenovateTestWorker(Worker):
             )
 
             if result.returncode != 0:
-                self.logger.error(f"Failed to list branches in {repo_dir.name}: {result.stderr}")
+                self.logger.error(
+                    f"Failed to list branches in {repo_dir.name}: {result.stderr}"
+                )
                 return []
 
             branches = []
@@ -227,7 +243,9 @@ class RenovateTestWorker(Worker):
             True if checkout successful, False otherwise
         """
         # Use the resilient checkout function from git_operations
-        success = checkout_branch_resilient(repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60)
+        success = checkout_branch_resilient(
+            repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60
+        )
 
         if success:
             self.logger.info(f"Successfully checked out {branch} in {repo_dir.name}")
