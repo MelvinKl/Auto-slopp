@@ -126,6 +126,7 @@ class Executor:
             "TaskProcessorWorker",
             "RenovateTestWorker",
             "StaleBranchCleanupWorker",
+            "PRWorker",
         }
 
         return worker_class.__name__ in workers_requiring_iteration
@@ -158,19 +159,25 @@ class Executor:
                 worker = self._instantiate_worker(worker_class)
 
                 # Map repo_task_path to corresponding subdirectory
-                repo_task_path = self.task_path / subdirectory.name if self.task_path else None
+                repo_task_path = (
+                    self.task_path / subdirectory.name if self.task_path else None
+                )
 
                 # Execute worker on single subdirectory
                 start_time = time.time()
                 result = worker.run(subdirectory, repo_task_path)
                 execution_time = time.time() - start_time
 
-                print(f"Worker {worker_class.__name__} on {subdirectory.name} completed in {execution_time:.2f}s")
+                print(
+                    f"Worker {worker_class.__name__} on {subdirectory.name} completed in {execution_time:.2f}s"
+                )
                 if result is not None:
                     print(f"Result: {result}")
 
             except Exception as e:
-                print(f"Error executing worker {worker_class.__name__} on {subdirectory.name}: {e}")
+                print(
+                    f"Error executing worker {worker_class.__name__} on {subdirectory.name}: {e}"
+                )
                 traceback.print_exc()
 
     def _execute_worker_single(self, worker_class: Type[Worker]) -> None:

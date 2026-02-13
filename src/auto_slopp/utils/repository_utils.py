@@ -20,7 +20,12 @@ def is_git_repository(repo_dir: Path) -> bool:
     """
     try:
         git_dir = repo_dir / ".git"
-        return git_dir.exists() and git_dir.is_dir()
+        # Check for .git as a directory (normal repo) or as a file (worktree)
+        if git_dir.is_dir():
+            return True
+        if git_dir.is_file():
+            return True
+        return False
     except Exception:
         return False
 
@@ -131,7 +136,9 @@ def validate_repository(repo_dir: Path) -> Dict[str, Any]:
     return result
 
 
-def discover_repositories(repo_path: Path, validate: bool = True) -> List[Dict[str, Any]]:
+def discover_repositories(
+    repo_path: Path, validate: bool = True
+) -> List[Dict[str, Any]]:
     """Discover all git repositories in the given path.
 
     Args:
@@ -212,7 +219,9 @@ def get_repository_status(repo_dir: Path) -> Dict[str, Any]:
 
         status = {
             "valid": True,
-            "current_branch": branch_result.stdout.strip() if branch_result.returncode == 0 else None,
+            "current_branch": branch_result.stdout.strip()
+            if branch_result.returncode == 0
+            else None,
             "is_clean": len(status_result.stdout.strip()) == 0,
             "changed_files": [],
             "ahead": 0,
