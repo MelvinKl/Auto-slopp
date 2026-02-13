@@ -101,7 +101,7 @@ The `make test` target includes comprehensive validation:
 
 1. **Code Formatting**: Black code formatting validation
 2. **Import Sorting**: isort import organization checks  
-3. **Linting**: flake8 code quality checks
+3. **Linting**: flake8 code quality checks with McCabe complexity analysis
 4. **Security**: Safety dependency scan + Bandit security linter
 5. **Testing**: Full pytest test suite execution
 
