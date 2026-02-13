@@ -13,6 +13,8 @@ This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get sta
 
 This ensures consistent import behavior, better readability, and follows security best practices.
 
+**CRITICAL:** ALL imports must be at the top of the file. Do not place imports in the middle or end of files.
+
 ## Quick Reference
 
 ```bash
@@ -44,7 +46,10 @@ bd sync               # Sync with git
 7. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
+- Work is NOT complete until `make test` succeeds
 - Work is NOT complete until `git push` succeeds
 - NEVER stop before pushing - that leaves work stranded locally
 - NEVER say "ready to push when you are" - YOU must push
+- If 'make test' fails, resolve and retry until it succeeds
 - If push fails, resolve and retry until it succeeds
+

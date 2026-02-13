@@ -153,38 +153,31 @@ def run_opencode(
             "working_directory": str(working_dir),
             "command": " ".join(cmd),
             "return_code": -1,
-            "timeout": True,
-            "error": error_msg,
-        }
-
-    except FileNotFoundError:
-        execution_time = time.time() - start_time
-        error_msg = "OpenCode command not found - is it installed and in PATH?"
-        logger.error(error_msg)
-
-        return {
-            "success": False,
-            "execution_time": execution_time,
-            "timestamp": datetime.now().isoformat(),
-            "working_directory": str(working_dir),
-            "command": " ".join(cmd),
-            "return_code": -1,
             "timeout": False,
             "error": error_msg,
         }
 
-    except Exception as e:
-        execution_time = time.time() - start_time
-        error_msg = f"Unexpected error executing OpenCode: {str(e)}"
-        logger.error(error_msg)
 
-        return {
-            "success": False,
-            "execution_time": execution_time,
-            "timestamp": datetime.now().isoformat(),
-            "working_directory": str(working_dir),
-            "command": " ".join(cmd),
-            "return_code": -1,
-            "timeout": False,
-            "error": error_msg,
-        }
+def execute_openagent_with_instructions(
+    instructions: str,
+    work_dir: Path,
+    agent_args: Optional[List[str]] = None,
+    timeout: int = 7200,
+) -> Dict[str, Any]:
+    """Execute OpenAgent with specific instructions.
+
+    Args:
+        instructions: The instructions to pass to OpenAgent
+        work_dir: Working directory for command execution
+        agent_args: Additional arguments to pass to OpenAgent
+        timeout: Command execution timeout in seconds
+
+    Returns:
+        Dictionary containing execution results.
+    """
+    return run_opencode(
+        additional_instructions=instructions,
+        working_directory=work_dir,
+        agent_args=agent_args,
+        timeout=timeout,
+    )

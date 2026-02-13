@@ -14,14 +14,14 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from auto_slopp.base.opencode_worker import OpenCodeWorker
 from auto_slopp.utils.file_operations import ensure_directory_exists
 from auto_slopp.utils.git_operations import checkout_branch_resilient
 from auto_slopp.utils.repository_utils import discover_repositories
 from auto_slopp.utils.task_processing import process_repository
+from auto_slopp.worker import Worker
 
 
-class TaskProcessorWorker(OpenCodeWorker):
+class TaskProcessorWorker(Worker):
     """Worker for processing text file instructions with OpenCode.
 
     This worker maps repositories from repo_path to task_repo_path,
@@ -46,9 +46,10 @@ class TaskProcessorWorker(OpenCodeWorker):
             agent_args: Additional arguments to pass to OpenCode
             dry_run: If True, skip actual OpenCode execution and git operations
         """
-        super().__init__(agent_args=agent_args, timeout=timeout, process_all_repos=False)
         self.task_repo_path = task_repo_path
         self.counter_start = counter_start
+        self.timeout = timeout
+        self.agent_args = agent_args or []
         self.dry_run = dry_run
         self.logger = logging.getLogger("auto_slopp.workers.TaskProcessorWorker")
 
