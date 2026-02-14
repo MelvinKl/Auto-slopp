@@ -12,6 +12,24 @@ A Python-based automation framework for task execution with pluggable worker sys
 - **Comprehensive Testing**: Full test suite with pytest and mocked dependencies
 - **Real-time Monitoring**: Telegram bot integration for instant error notifications and status updates
 
+## Important Setup Recommendation
+
+It is recommended to set the coding machine to allow everything it requires for its job. It is **not** recommended to let it ask for permission as this will break the flow of the auto slopper.
+
+### opencode.json Example
+
+Auto-slopp works well with [opencode.ai](https://opencode.ai). Here is an example configuration:
+
+```json
+{
+  "plugin": [
+    "opencode-beads",
+  ],
+  "permission": "allow",
+  "$schema": "https://opencode.ai/config.json",
+}
+```
+
 ## Installation
 
 ### Prerequisites
