@@ -12,6 +12,16 @@ A Python-based automation framework for task execution with pluggable worker sys
 - **Comprehensive Testing**: Full test suite with pytest and mocked dependencies
 - **Real-time Monitoring**: Telegram bot integration for instant error notifications and status updates
 
+## Recommended Addons
+
+### OpenAgentsControl
+
+[**OpenAgentsControl**](https://github.com/darrenhinde/OpenAgentsControl) is a recommended addon when using opencode. It is **required for the default settings** to work properly.
+
+- **Repository**: https://github.com/darrenhinde/OpenAgentsControl
+- **Required**: Yes (for default settings)
+- **Recommended**: Yes (when using opencode)
+
 ## Installation
 
 ### Prerequisites
