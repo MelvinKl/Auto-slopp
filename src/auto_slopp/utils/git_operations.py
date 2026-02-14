@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from auto_slopp.utils.opencode import run_opencode
+from auto_slopp.utils.slop_machine import run_slop_machine
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ def _handle_git_operation_failure(
     )
 
     try:
-        result = run_opencode(
+        result = run_slop_machine(
             additional_instructions=instructions,
             working_directory=repo_dir,
             timeout=timeout,

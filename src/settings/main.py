@@ -93,6 +93,11 @@ class Settings(BaseSettings):
         default=False, description="Disable notification sound for Telegram messages"
     )
 
+    coding_cli: str = Field(
+        default="opencode",
+        description="The coding CLI to use (e.g., opencode, claude)",
+    )
+
     model_config = {
         "env_prefix": "AUTO_SLOPP_",
         "env_file": ".env",
