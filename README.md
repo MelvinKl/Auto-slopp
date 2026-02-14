@@ -30,6 +30,16 @@ Auto-slopp works well with [opencode.ai](https://opencode.ai). Here is an exampl
 }
 ```
 
+## Recommended Addons
+
+### OpenAgentsControl
+
+[**OpenAgentsControl**](https://github.com/darrenhinde/OpenAgentsControl) is a recommended addon when using opencode. It is **required for the default settings** to work properly.
+
+- **Repository**: https://github.com/darrenhinde/OpenAgentsControl
+- **Required**: Yes (for default settings)
+- **Recommended**: Yes (when using opencode)
+
 ## Installation
 
 ### Prerequisites
