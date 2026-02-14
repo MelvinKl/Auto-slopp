@@ -12,7 +12,7 @@ This document verifies that the task worker properly pulls the newest changes fr
 ```python
 # Pull latest changes from the git repo only if we have files to process
 if not dry_run:
-    pull_result = run_opencode(
+    pull_result = run_slop_machine(
         additional_instructions="git pull origin main",
         working_directory=task_repo_dir,
         timeout=60,
@@ -37,7 +37,7 @@ if not dry_run:
 ### ✅ Integration Points:
 
 - **TaskProcessorWorker**: Uses `process_repository()` function from `task_processing.py`
-- **OpenCode Integration**: Uses centralized `run_opencode()` utility
+- **OpenCode Integration**: Uses centralized `run_slop_machine()` utility
 - **Logging**: Comprehensive logging for monitoring and debugging
 
 ## Test Results:
