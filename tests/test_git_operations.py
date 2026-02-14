@@ -58,14 +58,17 @@ class TestCheckoutBranchResilient:
         assert mock_subprocess_run.call_count == 6
 
     @patch("auto_slopp.utils.git_operations.subprocess.run")
-    @patch("auto_slopp.utils.git_operations.run_opencode")
-    def test_checkout_failure_after_reset(self, mock_run_opencode, mock_subprocess_run):
+    @patch("auto_slopp.utils.git_operations.run_slop_machine")
+    def test_checkout_failure_after_reset(self, mock_run_slop_machine, mock_subprocess_run):
         """Test checkout failure even after reset."""
         repo_dir = Path("/tmp/test_repo")
         branch = "feature/test"
 
-        # Mock run_opencode to avoid actual execution
-        mock_run_opencode.return_value = {"success": False, "error": "OpenCode failed"}
+        # Mock run_slop_machine to avoid actual execution
+        mock_run_slop_machine.return_value = {
+            "success": False,
+            "error": "Coding CLI failed",
+        }
 
         # Mock git commands: both checkout attempts fail
         mock_subprocess_run.side_effect = [
@@ -82,14 +85,17 @@ class TestCheckoutBranchResilient:
         assert mock_subprocess_run.call_count == 5
 
     @patch("auto_slopp.utils.git_operations.subprocess.run")
-    @patch("auto_slopp.utils.git_operations.run_opencode")
-    def test_checkout_reset_failure(self, mock_run_opencode, mock_subprocess_run):
+    @patch("auto_slopp.utils.git_operations.run_slop_machine")
+    def test_checkout_reset_failure(self, mock_run_slop_machine, mock_subprocess_run):
         """Test checkout failure when reset itself fails."""
         repo_dir = Path("/tmp/test_repo")
         branch = "feature/test"
 
-        # Mock run_opencode to avoid actual execution
-        mock_run_opencode.return_value = {"success": False, "error": "OpenCode failed"}
+        # Mock run_slop_machine to avoid actual execution
+        mock_run_slop_machine.return_value = {
+            "success": False,
+            "error": "Coding CLI failed",
+        }
 
         # Mock git commands: checkout fails, reset also fails
         mock_subprocess_run.side_effect = [

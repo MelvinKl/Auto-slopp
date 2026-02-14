@@ -15,8 +15,8 @@ from auto_slopp.utils.git_operations import (
     push_branch,
 )
 from auto_slopp.utils.github_operations import get_open_pr_branches
-from auto_slopp.utils.opencode import run_opencode
 from auto_slopp.utils.repository_utils import discover_repositories, validate_repository
+from auto_slopp.utils.slop_machine import run_slop_machine
 from auto_slopp.worker import Worker
 
 
@@ -159,8 +159,8 @@ class PRWorker(Worker):
                 )
 
                 if not test_result["success"]:
-                    self.logger.info(f"Tests failed for {branch} in {repo_dir.name}, using OpenCode to fix")
-                    fix_result = self._fix_tests_with_opencode(repo_dir)
+                    self.logger.info(f"Tests failed for {branch} in {repo_dir.name}, using coding CLI to fix")
+                    fix_result = self._fix_tests_with_slop_machine(repo_dir)
                     if fix_result["success"]:
                         result["tests_fixed"] = True
                         verify_result = self._run_tests(repo_dir)
@@ -289,18 +289,18 @@ class PRWorker(Worker):
                 "error": f"Error running tests: {str(e)}",
             }
 
-    def _fix_tests_with_opencode(self, repo_dir: Path) -> Dict[str, Any]:
+    def _fix_tests_with_slop_machine(self, repo_dir: Path) -> Dict[str, Any]:
         """Use OpenCode to fix failing tests.
 
         Args:
             repo_dir: Path to the repository directory
 
         Returns:
-            Dictionary containing OpenCode execution results
+            Dictionary containing coding CLI execution results
         """
         additional_instructions = "'make test' is failing fix it and push the changes"
 
-        result = run_opencode(
+        result = run_slop_machine(
             additional_instructions=additional_instructions,
             working_directory=repo_dir,
             timeout=self.timeout,

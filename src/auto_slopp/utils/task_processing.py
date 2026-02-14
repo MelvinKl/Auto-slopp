@@ -14,7 +14,10 @@ from auto_slopp.utils.file_operations import (
     rename_processed_file,
 )
 from auto_slopp.utils.git_operations import commit_and_push_changes
-from auto_slopp.utils.opencode import execute_openagent_with_instructions, run_opencode
+from auto_slopp.utils.slop_machine import (
+    execute_openagent_with_instructions,
+    run_slop_machine,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +223,7 @@ def process_repository(
 
         # Push the changes to remote
         if not dry_run and result["success"]:
-            push_result = run_opencode(
+            push_result = run_slop_machine(
                 additional_instructions="git push origin main",
                 working_directory=repo_dir,
                 timeout=60,

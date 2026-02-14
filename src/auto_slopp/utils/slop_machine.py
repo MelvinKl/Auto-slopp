@@ -1,6 +1,6 @@
-"""OpenCode execution utilities for auto-slopp workers.
+"""Slop-machine execution utilities for auto-slopp workers.
 
-This module provides a centralized utility for executing OpenCode commands
+This module provides a centralized utility for executing coding CLI commands
 with consistent error handling, logging, and result formatting.
 """
 
@@ -11,26 +11,28 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from settings.main import settings
+
 logger = logging.getLogger(__name__)
 
 
-def run_opencode(
+def run_slop_machine(
     additional_instructions: Optional[str] = None,
     working_directory: Optional[Path] = None,
     timeout: int = 7200,
     agent_args: Optional[List[str]] = None,
     capture_output: bool = True,
 ) -> Dict[str, Any]:
-    """Execute OpenCode with the specified parameters.
+    """Execute coding CLI with the specified parameters.
 
-    This centralized utility handles OpenCode execution with consistent
+    This centralized utility handles coding CLI execution with consistent
     error handling, logging, and result formatting across all workers.
 
     Args:
-        additional_instructions: Additional instructions to pass to OpenCode
-        working_directory: Directory where OpenCode should be executed
+        additional_instructions: Additional instructions to pass to the coding CLI
+        working_directory: Directory where the coding CLI should be executed
         timeout: Command execution timeout in seconds (default: 7200)
-        agent_args: Additional arguments to pass to OpenCode
+        agent_args: Additional arguments to pass to the coding CLI
         capture_output: Whether to capture stdout/stderr (default: True)
 
     Returns:
@@ -51,7 +53,7 @@ def run_opencode(
     Examples:
         Basic usage:
         ```python
-        result = run_opencode(
+        result = run_slop_machine(
             additional_instructions="Fix the failing tests",
             working_directory=Path("/path/to/repo"),
             timeout=1800
@@ -60,7 +62,7 @@ def run_opencode(
 
         With custom agent arguments:
         ```python
-        result = run_opencode(
+        result = run_slop_machine(
             additional_instructions="Implement new feature",
             working_directory=Path("/path/to/repo"),
             agent_args=["--verbose", "--debug"],
@@ -70,7 +72,7 @@ def run_opencode(
 
         Without output capture (for interactive commands):
         ```python
-        result = run_opencode(
+        result = run_slop_machine(
             additional_instructions="Run interactive setup",
             working_directory=Path("/path/to/repo"),
             capture_output=False
@@ -79,26 +81,23 @@ def run_opencode(
     """
     start_time = time.time()
 
-    # Set default values
     agent_args = agent_args or []
     working_dir = working_directory or Path.cwd()
+    coding_cli = settings.coding_cli
 
     logger.info(
-        f"Executing OpenCode with instructions: {additional_instructions if additional_instructions else 'None'}..."
+        f"Executing {coding_cli} with instructions: {additional_instructions if additional_instructions else 'None'}..."
     )
     logger.info(f"Working directory: {working_dir}")
     logger.info(f"Timeout: {timeout}s")
     logger.info(f"Agent args: {agent_args}")
 
-    # Build the OpenCode command
-    cmd = ["opencode", "--agent", "openagent", "run"] + agent_args
+    cmd = [coding_cli, "--agent", "openagent", "run"] + agent_args
 
-    # Add additional instructions as the last argument if provided
     if additional_instructions:
         cmd.append(additional_instructions)
 
     try:
-        # Execute the command
         result = subprocess.run(
             cmd,
             cwd=working_dir,
@@ -110,7 +109,6 @@ def run_opencode(
         execution_time = time.time() - start_time
         success = result.returncode == 0
 
-        # Prepare the standardized result
         execution_result = {
             "success": success,
             "execution_time": execution_time,
@@ -121,7 +119,6 @@ def run_opencode(
             "timeout": False,
         }
 
-        # Add output if captured
         if capture_output:
             execution_result.update(
                 {
@@ -133,9 +130,9 @@ def run_opencode(
             )
 
         if success:
-            logger.info(f"OpenCode completed successfully in {execution_time:.2f}s")
+            logger.info(f"{coding_cli} completed successfully in {execution_time:.2f}s")
         else:
-            logger.error(f"OpenCode failed with return code {result.returncode} in {execution_time:.2f}s")
+            logger.error(f"{coding_cli} failed with return code {result.returncode} in {execution_time:.2f}s")
             if capture_output and result.stderr:
                 logger.error(f"stderr: {result.stderr}")
 
@@ -143,7 +140,7 @@ def run_opencode(
 
     except subprocess.TimeoutExpired:
         execution_time = time.time() - start_time
-        error_msg = f"OpenCode timed out after {timeout} seconds"
+        error_msg = f"{coding_cli} timed out after {timeout} seconds"
         logger.error(error_msg)
 
         return {
@@ -175,7 +172,7 @@ def execute_openagent_with_instructions(
     Returns:
         Dictionary containing execution results.
     """
-    return run_opencode(
+    return run_slop_machine(
         additional_instructions=instructions,
         working_directory=work_dir,
         agent_args=agent_args,
