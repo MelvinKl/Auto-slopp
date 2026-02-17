@@ -60,6 +60,130 @@ def _run_gh_command(
         raise GitHubOperationError(f"GitHub command timed out: {e}")
 
 
+def get_open_issues(repo_dir: Path) -> List[Dict[str, Any]]:
+    """Get list of open issues in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+
+    Returns:
+        List of dictionaries containing issue information (number, title, body, url).
+
+    Raises:
+        GitHubOperationError: If gh command fails
+    """
+    try:
+        result = _run_gh_command(
+            repo_dir,
+            "issue",
+            "list",
+            "--state=open",
+            "--json=number,title,body,url",
+            check=False,
+        )
+
+        if result.returncode != 0:
+            issue_error = result.stderr.strip() or result.stdout.strip()
+            logger.error(f"Failed to list issues in {repo_dir.name}: {issue_error}")
+            return []
+
+        issues = json.loads(result.stdout)
+        return issues
+
+    except GitHubOperationError as e:
+        logger.error(f"Error getting issues from {repo_dir.name}: {str(e)}")
+        return []
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse issue list JSON from {repo_dir.name}: {str(e)}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error getting issues from {repo_dir.name}: {str(e)}")
+        return []
+
+
+def close_issue(repo_dir: Path, issue_number: int) -> bool:
+    """Close an issue in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+        issue_number: Issue number to close
+
+    Returns:
+        True if successful, False otherwise.
+    """
+    try:
+        result = _run_gh_command(
+            repo_dir,
+            "issue",
+            "close",
+            str(issue_number),
+            check=False,
+        )
+        return result.returncode == 0
+
+    except GitHubOperationError as e:
+        logger.error(f"Error closing issue #{issue_number} in {repo_dir.name}: {str(e)}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error closing issue #{issue_number} in {repo_dir.name}: {str(e)}")
+        return False
+
+
+def create_pull_request(
+    repo_dir: Path,
+    title: str,
+    body: str,
+    head: str,
+    base: str = "main",
+) -> Optional[Dict[str, Any]]:
+    """Create a pull request in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+        title: PR title
+        body: PR body
+        head: Branch name to merge from
+        base: Branch name to merge into (default: main)
+
+    Returns:
+        Dictionary containing PR info (url, number) or None if failed.
+    """
+    try:
+        result = _run_gh_command(
+            repo_dir,
+            "pr",
+            "create",
+            "--title",
+            title,
+            "--body",
+            body,
+            "--head",
+            head,
+            "--base",
+            base,
+            "--json=url,number",
+            check=False,
+        )
+
+        if result.returncode != 0:
+            pr_error = result.stderr.strip() or result.stdout.strip()
+            logger.error(f"Failed to create PR in {repo_dir.name}: {pr_error}")
+            return None
+
+        pr_data = json.loads(result.stdout)
+        return pr_data
+
+    except GitHubOperationError as e:
+        logger.error(f"Error creating PR in {repo_dir.name}: {str(e)}")
+        return None
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse PR creation JSON from {repo_dir.name}: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error creating PR in {repo_dir.name}: {str(e)}")
+        return None
+
+
 def get_open_pr_branches(repo_dir: Path) -> List[str]:
     """Get list of branches from open PRs in the repository.
 
