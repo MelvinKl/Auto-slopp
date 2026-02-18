@@ -13,7 +13,8 @@ from auto_slopp.utils.file_operations import (
     read_file_content,
     rename_processed_file,
 )
-from auto_slopp.utils.git_operations import commit_and_push_changes
+from auto_slopp.utils.git_operations import commit_and_push_changes, get_current_branch
+from auto_slopp.utils.github_operations import create_pull_request
 from auto_slopp.utils.opencode import execute_openagent_with_instructions, run_opencode
 
 logger = logging.getLogger(__name__)
@@ -107,6 +108,37 @@ def process_text_file(
             if not openagent_result["success"]:
                 result["error"] = f"OpenCode execution failed: {openagent_result.get('error', 'Unknown error')}"
                 return result
+
+            current_branch = get_current_branch(repo_dir)
+            logger.info(f"Current branch after OpenCode execution: {current_branch}")
+
+            push_branch_result = run_opencode(
+                additional_instructions=f"git push -u origin {current_branch}",
+                working_directory=repo_dir,
+                timeout=60,
+                capture_output=True,
+            )
+
+            if not push_branch_result["success"]:
+                logger.warning(
+                    f"Failed to push branch {current_branch}: {push_branch_result.get('error', 'Unknown error')}"
+                )
+
+            pr_result = create_pull_request(
+                repo_dir=repo_dir,
+                title=f"AI: {text_file.stem}",
+                body=f"Automated changes from processing {text_file.name}",
+                head=current_branch,
+                base="main",
+            )
+
+            if pr_result:
+                logger.info(f"Created PR #{pr_result.get('number')}: {pr_result.get('url')}")
+                result["pr_created"] = True
+                result["pr_url"] = pr_result.get("url")
+            else:
+                logger.warning("Failed to create pull request")
+                result["pr_created"] = False
         else:
             logger.info(f"DRY RUN: Would execute OpenAgent with instructions from {text_file.name}")
             result["openagent_executed"] = True
