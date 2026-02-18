@@ -13,11 +13,10 @@ from auto_slopp.utils.file_operations import (
     read_file_content,
     rename_processed_file,
 )
-from auto_slopp.utils.git_operations import commit_and_push_changes
-from auto_slopp.utils.slop_machine import (
-    execute_openagent_with_instructions,
-    run_slop_machine,
-)
+from auto_slopp.utils.git_operations import commit_and_push_changes, get_current_branch
+from auto_slopp.utils.github_operations import create_pull_request
+from auto_slopp.utils.opencode import execute_openagent_with_instructions, run_opencode
+from auto_slopp.utils.slop_machine import run_slop_machine
 
 logger = logging.getLogger(__name__)
 
@@ -104,14 +103,53 @@ def process_text_file(
         instructions = f"Create a new branch that starts with ai/ from base origin/main and implement the following:\n{instructions}\nKeep your implementation simple. Only implement what is required. Check if there are components you can reuse. Ensure that 'make test' runs successful. Only push if ALL tests are successful. Check if you need to update the README.md. Push your changes and create a pull request on github."
         # Execute OpenAgent with the instructions
         if not dry_run:
-            openagent_result = execute_openagent_with_instructions(instructions, repo_dir, agent_args, timeout)
+            openagent_result = execute_openagent_with_instructions(
+                instructions, repo_dir, agent_args, timeout
+            )
             result["openagent_executed"] = openagent_result["success"]
 
             if not openagent_result["success"]:
-                result["error"] = f"OpenCode execution failed: {openagent_result.get('error', 'Unknown error')}"
+                result["error"] = (
+                    f"OpenCode execution failed: {openagent_result.get('error', 'Unknown error')}"
+                )
                 return result
+
+            current_branch = get_current_branch(repo_dir)
+            logger.info(f"Current branch after OpenCode execution: {current_branch}")
+
+            push_branch_result = run_opencode(
+                additional_instructions=f"git push -u origin {current_branch}",
+                working_directory=repo_dir,
+                timeout=60,
+                capture_output=True,
+            )
+
+            if not push_branch_result["success"]:
+                logger.warning(
+                    f"Failed to push branch {current_branch}: {push_branch_result.get('error', 'Unknown error')}"
+                )
+
+            pr_result = create_pull_request(
+                repo_dir=repo_dir,
+                title=f"AI: {text_file.stem}",
+                body=f"Automated changes from processing {text_file.name}",
+                head=current_branch,
+                base="main",
+            )
+
+            if pr_result:
+                logger.info(
+                    f"Created PR #{pr_result.get('number')}: {pr_result.get('url')}"
+                )
+                result["pr_created"] = True
+                result["pr_url"] = pr_result.get("url")
+            else:
+                logger.warning("Failed to create pull request")
+                result["pr_created"] = False
         else:
-            logger.info(f"DRY RUN: Would execute OpenAgent with instructions from {text_file.name}")
+            logger.info(
+                f"DRY RUN: Would execute OpenAgent with instructions from {text_file.name}"
+            )
             result["openagent_executed"] = True
 
         # Rename the file with counter and .used suffix
@@ -187,7 +225,9 @@ def process_repository(
         text_files = find_text_files(task_repo_dir)
 
         if not text_files:
-            logger.info(f"No .txt files found in {task_repo_dir.name} (task repository)")
+            logger.info(
+                f"No .txt files found in {task_repo_dir.name} (task repository)"
+            )
             result["success"] = True
             return result
 
@@ -217,7 +257,9 @@ def process_repository(
                 if file_result.get("git_operations", False):
                     result["git_operations"] += 1
             else:
-                result["errors"].append(file_result.get("error", "Unknown processing error"))
+                result["errors"].append(
+                    file_result.get("error", "Unknown processing error")
+                )
 
         result["success"] = len(result["errors"]) == 0
 
