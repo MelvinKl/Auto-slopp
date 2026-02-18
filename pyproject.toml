@@ -16,15 +16,27 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.4.0",
+    "pytest>=8.3.5",
     "pytest-cov>=4.1.0",
-    "coverage>=7.3.0",
-    "flake8>=6.0.0",
-    "flake8-docstrings>=1.7.0",
-    "flake8-import-order>=0.18.2",
-    "flake8-bugbear>=23.7.10",
-    "black>=23.7.0",
-    "isort>=5.12.0",
+    "coverage>=7.8.0",
+    "flake8>=7.2.0",
+    "flake8-black>=0.4.0",
+    "flake8-pyproject>=1.2.3",
+    "flake8-quotes>=3.4.0",
+    "flake8-bandit>=4.1.1",
+    "flake8-bugbear>=25.0.0",
+    "flake8-builtins>=3.0.0",
+    "flake8-comprehensions>=3.15.0",
+    "flake8-eradicate>=1.5.0",
+    "flake8-pytest-style>=2.1.0",
+    "pep8-naming>=0.15.1",
+    "flake8-eol>=0.0.8",
+    "flake8-exceptions>=0.0.1a0",
+    "flake8-simplify>=0.30.0",
+    "flake8-wot>=0.2.0",
+    "flake8-tidy-imports>=4.10.0",
+    "black>=25.1.0",
+    "isort>=7.0.0",
     "safety>=2.3.0",
     "bandit>=1.7.0",
 ]
@@ -62,11 +74,38 @@ max-complexity = 8
 max-annotations-complexity = 3
 docstring-convention = 'numpy'
 max-line-length = 120
-ignore = ["E203", "W503", "E704", "D406", "D407"]
-inline-quotes = '"'
-docstring-quotes = '"""'
-multiline-quotes = '"""'
-dictionaries = ["en_US", "python", "technical", "pandas"]
+extend-ignore = [
+    "E203",
+    "W503",
+    "Q000",
+    "WOT001",
+    "SIM105",
+    "SIM117",
+    "S101",
+    "S105",
+    "S106",
+    "S108",
+    "S110",
+    "S403",
+    "S404",
+    "S405",
+    "S603",
+    "S605",
+    "S607",
+    "S608",
+    "S609",
+    "C901",
+    "E501",
+    "F401",
+    "F811",
+    "F841",
+    "B007",
+    "D104",
+    "D202",
+    "D401",
+    "I100",
+    "I201",
+]
 ban-relative-imports = true
 per-file-ignores = """
   ./tests/*: S101,I252
@@ -105,10 +144,4 @@ filterwarnings = [
     "ignore::UserWarning",
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
-]
-
-[dependency-groups]
-dev = [
-    "pytest>=9.0.2",
-    "pre-commit>=3.6.0",
 ]
