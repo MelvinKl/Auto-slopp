@@ -15,8 +15,10 @@ from auto_slopp.utils.file_operations import (
 )
 from auto_slopp.utils.git_operations import commit_and_push_changes, get_current_branch
 from auto_slopp.utils.github_operations import create_pull_request
-from auto_slopp.utils.opencode import execute_openagent_with_instructions, run_opencode
-from auto_slopp.utils.slop_machine import run_slop_machine
+from auto_slopp.utils.slop_machine import (
+    execute_openagent_with_instructions,
+    run_slop_machine,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +115,7 @@ def process_text_file(
             current_branch = get_current_branch(repo_dir)
             logger.info(f"Current branch after OpenCode execution: {current_branch}")
 
-            push_branch_result = run_opencode(
+            push_branch_result = run_slop_machine(
                 additional_instructions=f"git push -u origin {current_branch}",
                 working_directory=repo_dir,
                 timeout=60,
