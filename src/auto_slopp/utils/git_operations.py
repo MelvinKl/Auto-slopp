@@ -270,6 +270,7 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
 
         if fetch_first:
             logger.debug(f"Fetching latest changes for {repo_dir.name}")
+            fetch_timed_out = False
             try:
                 fetch_result = _run_git_command(repo_dir, "fetch", "origin", check=False, timeout=timeout)
                 if fetch_result.returncode != 0:
@@ -278,8 +279,66 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
             except GitOperationError as e:
                 if "timed out" in str(e).lower():
                     logger.warning(f"Fetch timed out for {repo_dir.name}, continuing with checkout anyway")
+                    fetch_timed_out = True
                 else:
                     logger.warning(f"Fetch error for {repo_dir.name}: {e}")
+
+            if fetch_timed_out:
+                try:
+                    checkout_result = _run_git_command(repo_dir, "checkout", branch, check=False, timeout=timeout)
+                except GitOperationError as e:
+                    if "timed out" in str(e).lower():
+                        logger.warning(
+                            f"Checkout timed out for {repo_dir.name}, branch '{branch}' may not exist remotely, trying local checkout"
+                        )
+                        checkout_result = _run_git_command(
+                            repo_dir,
+                            "checkout",
+                            branch,
+                            "-f",
+                            check=False,
+                            timeout=timeout,
+                        )
+                    else:
+                        raise
+
+                if checkout_result.returncode == 0:
+                    logger.info(
+                        f"Successfully checked out '{branch}' in {repo_dir.name} (fetch was skipped due to timeout)"
+                    )
+                    return True
+
+                checkout_error = checkout_result.stderr.strip() or checkout_result.stdout.strip()
+                logger.warning(f"Checkout failed for '{branch}' in {repo_dir.name}: {checkout_error}")
+                logger.info(f"Attempting git reset --hard and retry for '{branch}' in {repo_dir.name}")
+
+                reset_result = _run_git_command(repo_dir, "reset", "--hard", check=False, timeout=timeout)
+                if reset_result.returncode != 0:
+                    reset_error = reset_result.stderr.strip() or reset_result.stdout.strip()
+                    error_msg = f"Git reset --hard failed: {reset_error}"
+                    logger.error(f"Git reset --hard failed in {repo_dir.name}: {reset_error}")
+                    _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
+                    return False
+
+                clean_result = _run_git_command(repo_dir, "clean", "-fd", check=False, timeout=timeout)
+                if clean_result.returncode != 0:
+                    clean_error = clean_result.stderr.strip() or clean_result.stdout.strip()
+                    logger.warning(f"Git clean failed in {repo_dir.name}: {clean_error}")
+
+                retry_checkout_result = _run_git_command(
+                    repo_dir, "checkout", branch, "-f", check=False, timeout=timeout
+                )
+                if retry_checkout_result.returncode == 0:
+                    logger.info(
+                        f"Successfully checked out '{branch}' in {repo_dir.name} after reset (fetch was skipped)"
+                    )
+                    return True
+                else:
+                    retry_error = retry_checkout_result.stderr.strip() or retry_checkout_result.stdout.strip()
+                    error_msg = f"Failed to checkout '{branch}' even after reset: {retry_error}"
+                    logger.error(f"Failed to checkout '{branch}' in {repo_dir.name} even after reset: {retry_error}")
+                    _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
+                    return False
 
         checkout_result = _run_git_command(repo_dir, "checkout", branch, check=False, timeout=timeout)
 
