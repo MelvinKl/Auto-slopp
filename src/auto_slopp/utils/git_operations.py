@@ -270,10 +270,16 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
 
         if fetch_first:
             logger.debug(f"Fetching latest changes for {repo_dir.name}")
-            fetch_result = _run_git_command(repo_dir, "fetch", "origin", check=False, timeout=timeout)
-            if fetch_result.returncode != 0:
-                fetch_error = fetch_result.stderr.strip() or fetch_result.stdout.strip()
-                logger.warning(f"Fetch failed for {repo_dir.name}: {fetch_error}")
+            try:
+                fetch_result = _run_git_command(repo_dir, "fetch", "origin", check=False, timeout=timeout)
+                if fetch_result.returncode != 0:
+                    fetch_error = fetch_result.stderr.strip() or fetch_result.stdout.strip()
+                    logger.warning(f"Fetch failed for {repo_dir.name}: {fetch_error}")
+            except GitOperationError as e:
+                if "timed out" in str(e).lower():
+                    logger.warning(f"Fetch timed out for {repo_dir.name}, continuing with checkout anyway")
+                else:
+                    logger.warning(f"Fetch error for {repo_dir.name}: {e}")
 
         checkout_result = _run_git_command(repo_dir, "checkout", branch, check=False, timeout=timeout)
 
