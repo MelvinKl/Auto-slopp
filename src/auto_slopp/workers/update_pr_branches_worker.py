@@ -112,7 +112,7 @@ class UpdatePRBranchesWorker(Worker):
 
     def _checkout_branch(self, repo_dir: Path, branch: str) -> bool:
         """Checkout a specific branch in the repository."""
-        success = checkout_branch_resilient(repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60)
+        success = checkout_branch_resilient(repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=180)
 
         if success:
             self.logger.info(f"Successfully checked out {branch} in {repo_dir.name}")

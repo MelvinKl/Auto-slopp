@@ -199,7 +199,7 @@ class TaskProcessorWorker(Worker):
                 repo_dir=task_path,
                 branch="main",
                 fetch_first=True,
-                timeout=60,
+                timeout=180,
             )
 
             if pull_success:

@@ -129,7 +129,7 @@ class GitHubIssueWorker(Worker):
                 repo_dir=repo_dir,
                 branch="main",
                 fetch_first=True,
-                timeout=60,
+                timeout=180,
             )
             if not pull_success:
                 self.logger.warning(f"Failed to pull latest changes from {repo_dir.name}")

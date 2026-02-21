@@ -201,7 +201,7 @@ class PRWorker(Worker):
         Returns:
             True if checkout successful, False otherwise
         """
-        success = checkout_branch_resilient(repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=60)
+        success = checkout_branch_resilient(repo_dir=repo_dir, branch=branch, fetch_first=True, timeout=180)
 
         if success:
             self.logger.info(f"Successfully checked out {branch} in {repo_dir.name}")

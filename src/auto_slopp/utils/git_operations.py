@@ -55,12 +55,8 @@ def _run_git_command(
         )
         return result
     except subprocess.CalledProcessError as e:
-        error_output = (
-            (e.stderr.strip() or e.stdout.strip()) if e.stderr or e.stdout else str(e)
-        )
-        logger.error(
-            f"Git command 'git {' '.join(args)}' failed in {repo_dir}: {error_output}"
-        )
+        error_output = (e.stderr.strip() or e.stdout.strip()) if e.stderr or e.stdout else str(e)
+        logger.error(f"Git command 'git {' '.join(args)}' failed in {repo_dir}: {error_output}")
         raise GitOperationError(f"Git command failed: {error_output}")
     except (subprocess.TimeoutExpired, TimeoutError) as e:
         logger.error(f"Git command 'git {' '.join(args)}' timed out in {repo_dir}")
@@ -81,9 +77,7 @@ def _handle_git_operation_failure(
         error_message: The error message from the failed operation
         timeout: Timeout for OpenCode execution in seconds
     """
-    logger.warning(
-        f"Git operation '{operation}' failed in {repo_dir.name}: {error_message}"
-    )
+    logger.warning(f"Git operation '{operation}' failed in {repo_dir.name}: {error_message}")
     logger.info(f"Calling OpenCode to fix the failed git operation: {operation}")
 
     instructions = (
@@ -101,17 +95,13 @@ def _handle_git_operation_failure(
         )
 
         if result.get("success"):
-            logger.info(
-                f"OpenCode successfully resolved the git operation '{operation}' failure"
-            )
+            logger.info(f"OpenCode successfully resolved the git operation '{operation}' failure")
         else:
             logger.error(
                 f"OpenCode failed to resolve git operation '{operation}' failure: {result.get('error', 'Unknown error')}"
             )
     except Exception as e:
-        logger.error(
-            f"Failed to call OpenCode for git operation '{operation}' failure: {str(e)}"
-        )
+        logger.error(f"Failed to call OpenCode for git operation '{operation}' failure: {str(e)}")
 
 
 def get_local_branches(repo_dir: Path) -> List[Dict[str, Any]]:
@@ -238,9 +228,7 @@ def delete_branch(repo_dir: Path, branch_name: str) -> bool:
 
     except subprocess.CalledProcessError as e:
         # Check both stdout and stderr for error messages
-        error_output = (
-            (e.stderr.strip() or e.stdout.strip()) if e.stderr or e.stdout else str(e)
-        )
+        error_output = (e.stderr.strip() or e.stdout.strip()) if e.stderr or e.stdout else str(e)
         error_msg = f"Failed to delete branch '{branch_name}': {error_output}"
         logger.error(f"Failed to delete branch '{branch_name}': {error_output}")
         _handle_git_operation_failure("delete_branch", repo_dir, error_msg)
@@ -263,9 +251,7 @@ def has_changes(repo_dir: Path) -> bool:
     return bool(result.stdout.strip())
 
 
-def checkout_branch_resilient(
-    repo_dir: Path, branch: str, fetch_first: bool = True, timeout: int = 60
-) -> bool:
+def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = True, timeout: int = 180) -> bool:
     """Checkout a git branch with enhanced resilience.
 
     If checkout fails, performs a git reset --hard and retries.
@@ -286,28 +272,23 @@ def checkout_branch_resilient(
             logger.debug(f"Fetching latest changes for {repo_dir.name}")
             fetch_timed_out = False
             try:
-                fetch_result = _run_git_command(
-                    repo_dir, "fetch", "origin", check=False, timeout=timeout
-                )
+                fetch_result = _run_git_command(repo_dir, "fetch", "origin", check=False, timeout=timeout)
                 if fetch_result.returncode != 0:
-                    fetch_error = (
-                        fetch_result.stderr.strip() or fetch_result.stdout.strip()
-                    )
+                    fetch_error = fetch_result.stderr.strip() or fetch_result.stdout.strip()
                     logger.warning(f"Fetch failed for {repo_dir.name}: {fetch_error}")
             except GitOperationError as e:
                 if "timed out" in str(e).lower():
-                    logger.warning(
-                        f"Fetch timed out for {repo_dir.name}, continuing with checkout anyway"
-                    )
+                    logger.warning(f"Fetch timed out for {repo_dir.name}, continuing with checkout anyway")
                     fetch_timed_out = True
                 else:
                     logger.warning(f"Fetch error for {repo_dir.name}: {e}")
+            except Exception as e:
+                logger.warning(f"Fetch encountered error for {repo_dir.name}: {e}, continuing with checkout anyway")
+                fetch_timed_out = True
 
             if fetch_timed_out:
                 try:
-                    checkout_result = _run_git_command(
-                        repo_dir, "checkout", branch, check=False, timeout=timeout
-                    )
+                    checkout_result = _run_git_command(repo_dir, "checkout", branch, check=False, timeout=timeout)
                 except GitOperationError as e:
                     if "timed out" in str(e).lower():
                         logger.warning(
@@ -339,42 +320,22 @@ def checkout_branch_resilient(
                     )
                     return True
 
-                checkout_error = (
-                    checkout_result.stderr.strip() or checkout_result.stdout.strip()
-                )
-                logger.warning(
-                    f"Checkout failed for '{branch}' in {repo_dir.name}: {checkout_error}"
-                )
-                logger.info(
-                    f"Attempting git reset --hard and retry for '{branch}' in {repo_dir.name}"
-                )
+                checkout_error = checkout_result.stderr.strip() or checkout_result.stdout.strip()
+                logger.warning(f"Checkout failed for '{branch}' in {repo_dir.name}: {checkout_error}")
+                logger.info(f"Attempting git reset --hard and retry for '{branch}' in {repo_dir.name}")
 
-                reset_result = _run_git_command(
-                    repo_dir, "reset", "--hard", check=False, timeout=timeout
-                )
+                reset_result = _run_git_command(repo_dir, "reset", "--hard", check=False, timeout=timeout)
                 if reset_result.returncode != 0:
-                    reset_error = (
-                        reset_result.stderr.strip() or reset_result.stdout.strip()
-                    )
+                    reset_error = reset_result.stderr.strip() or reset_result.stdout.strip()
                     error_msg = f"Git reset --hard failed: {reset_error}"
-                    logger.error(
-                        f"Git reset --hard failed in {repo_dir.name}: {reset_error}"
-                    )
-                    _handle_git_operation_failure(
-                        "checkout_branch_resilient", repo_dir, error_msg
-                    )
+                    logger.error(f"Git reset --hard failed in {repo_dir.name}: {reset_error}")
+                    _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
                     return False
 
-                clean_result = _run_git_command(
-                    repo_dir, "clean", "-fd", check=False, timeout=timeout
-                )
+                clean_result = _run_git_command(repo_dir, "clean", "-fd", check=False, timeout=timeout)
                 if clean_result.returncode != 0:
-                    clean_error = (
-                        clean_result.stderr.strip() or clean_result.stdout.strip()
-                    )
-                    logger.warning(
-                        f"Git clean failed in {repo_dir.name}: {clean_error}"
-                    )
+                    clean_error = clean_result.stderr.strip() or clean_result.stdout.strip()
+                    logger.warning(f"Git clean failed in {repo_dir.name}: {clean_error}")
 
                 retry_checkout_result = _run_git_command(
                     repo_dir, "checkout", branch, "-f", check=False, timeout=timeout
@@ -385,24 +346,13 @@ def checkout_branch_resilient(
                     )
                     return True
                 else:
-                    retry_error = (
-                        retry_checkout_result.stderr.strip()
-                        or retry_checkout_result.stdout.strip()
-                    )
-                    error_msg = (
-                        f"Failed to checkout '{branch}' even after reset: {retry_error}"
-                    )
-                    logger.error(
-                        f"Failed to checkout '{branch}' in {repo_dir.name} even after reset: {retry_error}"
-                    )
-                    _handle_git_operation_failure(
-                        "checkout_branch_resilient", repo_dir, error_msg
-                    )
+                    retry_error = retry_checkout_result.stderr.strip() or retry_checkout_result.stdout.strip()
+                    error_msg = f"Failed to checkout '{branch}' even after reset: {retry_error}"
+                    logger.error(f"Failed to checkout '{branch}' in {repo_dir.name} even after reset: {retry_error}")
+                    _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
                     return False
 
-        checkout_result = _run_git_command(
-            repo_dir, "checkout", branch, check=False, timeout=timeout
-        )
+        checkout_result = _run_git_command(repo_dir, "checkout", branch, check=False, timeout=timeout)
 
         if checkout_result.returncode == 0:
             logger.info(f"Successfully checked out '{branch}' in {repo_dir.name}")
@@ -418,49 +368,31 @@ def checkout_branch_resilient(
             )
             if pull_result.returncode != 0:
                 pull_error = pull_result.stderr.strip() or pull_result.stdout.strip()
-                logger.warning(
-                    f"Pull failed for branch '{branch}' in {repo_dir.name}: {pull_error}"
-                )
+                logger.warning(f"Pull failed for branch '{branch}' in {repo_dir.name}: {pull_error}")
 
             return True
 
-        checkout_error = (
-            checkout_result.stderr.strip() or checkout_result.stdout.strip()
-        )
-        logger.warning(
-            f"Initial checkout failed for '{branch}' in {repo_dir.name}: {checkout_error}"
-        )
-        logger.info(
-            f"Attempting git reset --hard and retry for '{branch}' in {repo_dir.name}"
-        )
+        checkout_error = checkout_result.stderr.strip() or checkout_result.stdout.strip()
+        logger.warning(f"Initial checkout failed for '{branch}' in {repo_dir.name}: {checkout_error}")
+        logger.info(f"Attempting git reset --hard and retry for '{branch}' in {repo_dir.name}")
 
-        reset_result = _run_git_command(
-            repo_dir, "reset", "--hard", check=False, timeout=timeout
-        )
+        reset_result = _run_git_command(repo_dir, "reset", "--hard", check=False, timeout=timeout)
         if reset_result.returncode != 0:
             reset_error = reset_result.stderr.strip() or reset_result.stdout.strip()
             error_msg = f"Git reset --hard failed: {reset_error}"
             logger.error(f"Git reset --hard failed in {repo_dir.name}: {reset_error}")
-            _handle_git_operation_failure(
-                "checkout_branch_resilient", repo_dir, error_msg
-            )
+            _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
             return False
 
-        clean_result = _run_git_command(
-            repo_dir, "clean", "-fd", check=False, timeout=timeout
-        )
+        clean_result = _run_git_command(repo_dir, "clean", "-fd", check=False, timeout=timeout)
         if clean_result.returncode != 0:
             clean_error = clean_result.stderr.strip() or clean_result.stdout.strip()
             logger.warning(f"Git clean failed in {repo_dir.name}: {clean_error}")
 
-        retry_checkout_result = _run_git_command(
-            repo_dir, "checkout", branch, check=False, timeout=timeout
-        )
+        retry_checkout_result = _run_git_command(repo_dir, "checkout", branch, check=False, timeout=timeout)
 
         if retry_checkout_result.returncode == 0:
-            logger.info(
-                f"Successfully checked out '{branch}' in {repo_dir.name} after reset"
-            )
+            logger.info(f"Successfully checked out '{branch}' in {repo_dir.name} after reset")
 
             pull_result = _run_git_command(
                 repo_dir,
@@ -473,23 +405,14 @@ def checkout_branch_resilient(
             )
             if pull_result.returncode != 0:
                 pull_error = pull_result.stderr.strip() or pull_result.stdout.strip()
-                logger.warning(
-                    f"Pull failed for branch '{branch}' in {repo_dir.name}: {pull_error}"
-                )
+                logger.warning(f"Pull failed for branch '{branch}' in {repo_dir.name}: {pull_error}")
 
             return True
         else:
-            retry_error = (
-                retry_checkout_result.stderr.strip()
-                or retry_checkout_result.stdout.strip()
-            )
+            retry_error = retry_checkout_result.stderr.strip() or retry_checkout_result.stdout.strip()
             error_msg = f"Failed to checkout '{branch}' even after reset: {retry_error}"
-            logger.error(
-                f"Failed to checkout '{branch}' in {repo_dir.name} even after reset: {retry_error}"
-            )
-            _handle_git_operation_failure(
-                "checkout_branch_resilient", repo_dir, error_msg
-            )
+            logger.error(f"Failed to checkout '{branch}' in {repo_dir.name} even after reset: {retry_error}")
+            _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
             return False
 
     except GitOperationError as e:
@@ -499,9 +422,7 @@ def checkout_branch_resilient(
         return False
 
 
-def push_branch(
-    repo_dir: Path, branch: str, force: bool = True, timeout: int = 60
-) -> bool:
+def push_branch(repo_dir: Path, branch: str, force: bool = True, timeout: int = 60) -> bool:
     """Push a branch to the remote repository.
 
     Args:
@@ -525,9 +446,7 @@ def push_branch(
     if result.returncode != 0:
         push_error = result.stderr.strip() or result.stdout.strip()
         error_msg = f"Failed to push branch '{branch}': {push_error}"
-        logger.error(
-            f"Failed to push branch '{branch}' in {repo_dir.name}: {push_error}"
-        )
+        logger.error(f"Failed to push branch '{branch}' in {repo_dir.name}: {push_error}")
         _handle_git_operation_failure("push_branch", repo_dir, error_msg)
         return False
 
@@ -553,9 +472,7 @@ def merge_main_into_branch(
         GitOperationError: If git operations fail
     """
     try:
-        fetch_result = _run_git_command(
-            repo_dir, "fetch", remote_name, "main:main", check=False, timeout=timeout
-        )
+        fetch_result = _run_git_command(repo_dir, "fetch", remote_name, "main:main", check=False, timeout=timeout)
         if fetch_result.returncode != 0:
             fetch_error = fetch_result.stderr.strip() or fetch_result.stdout.strip()
             error_msg = f"Failed to fetch main: {fetch_error}"
@@ -577,17 +494,13 @@ def merge_main_into_branch(
 
             if "CONFLICT" in merge_error:
                 logger.info("Merge conflict detected, calling OpenCode to resolve")
-                _handle_git_operation_failure(
-                    "merge_main_into_branch", repo_dir, merge_error
-                )
+                _handle_git_operation_failure("merge_main_into_branch", repo_dir, merge_error)
                 return (
                     False,
                     f"Merge conflict detected and OpenCode attempted resolution: {merge_error}",
                 )
 
-            abort_result = _run_git_command(
-                repo_dir, "merge", "--abort", check=False, timeout=timeout
-            )
+            abort_result = _run_git_command(repo_dir, "merge", "--abort", check=False, timeout=timeout)
             if abort_result.returncode != 0:
                 abort_error = abort_result.stderr.strip() or abort_result.stdout.strip()
                 logger.error(f"Failed to abort merge: {abort_error}")
@@ -599,9 +512,7 @@ def merge_main_into_branch(
 
     except GitOperationError as e:
         error_msg = f"Error merging main into branch '{branch}': {str(e)}"
-        logger.error(
-            f"Error merging main into branch '{branch}' in {repo_dir.name}: {str(e)}"
-        )
+        logger.error(f"Error merging main into branch '{branch}' in {repo_dir.name}: {str(e)}")
         _handle_git_operation_failure("merge_main_into_branch", repo_dir, error_msg)
         return False, error_msg
 
@@ -615,9 +526,7 @@ def is_bare_repository(repo_dir: Path) -> bool:
     Returns:
         True if the repository is bare, False otherwise.
     """
-    result = _run_git_command(
-        repo_dir, "rev-parse", "--is-bare-repository", check=False
-    )
+    result = _run_git_command(repo_dir, "rev-parse", "--is-bare-repository", check=False)
     return result.stdout.strip() == "true"
 
 
@@ -656,17 +565,13 @@ def get_default_branch(repo_dir: Path) -> Optional[str]:
     Returns:
         Name of the default branch, or None if not found.
     """
-    result = _run_git_command(
-        repo_dir, "config", "--get", "init.defaultBranch", check=False
-    )
+    result = _run_git_command(repo_dir, "config", "--get", "init.defaultBranch", check=False)
 
     if result.returncode == 0:
         return result.stdout.strip()
 
     for branch in ["main", "master", "develop"]:
-        branch_result = _run_git_command(
-            repo_dir, "rev-parse", "--verify", branch, check=False
-        )
+        branch_result = _run_git_command(repo_dir, "rev-parse", "--verify", branch, check=False)
         if branch_result.returncode == 0:
             return branch
 
@@ -687,9 +592,7 @@ def branch_exists(repo_dir: Path, branch: str) -> bool:
     return result.returncode == 0
 
 
-def get_ahead_behind(
-    repo_dir: Path, remote: str = "origin", branch: Optional[str] = None
-) -> Tuple[int, int]:
+def get_ahead_behind(repo_dir: Path, remote: str = "origin", branch: Optional[str] = None) -> Tuple[int, int]:
     """Get ahead/behind count between local and remote branch.
 
     Args:
@@ -724,9 +627,7 @@ def get_ahead_behind(
     return 0, 0
 
 
-def pull_from_remote(
-    repo_dir: Path, remote: str = "origin", branch: str = "main"
-) -> Tuple[bool, str]:
+def pull_from_remote(repo_dir: Path, remote: str = "origin", branch: str = "main") -> Tuple[bool, str]:
     """Pull changes from a remote branch.
 
     Args:
@@ -746,9 +647,7 @@ def pull_from_remote(
     return False, error_msg
 
 
-def push_to_remote(
-    repo_dir: Path, remote: str = "origin", branch: Optional[str] = None
-) -> Tuple[bool, str]:
+def push_to_remote(repo_dir: Path, remote: str = "origin", branch: Optional[str] = None) -> Tuple[bool, str]:
     """Push changes to a remote branch.
 
     Args:
@@ -880,9 +779,7 @@ def commit_all_changes(repo_dir: Path, commit_message: str) -> Tuple[bool, str]:
         return False, f"Commit failed: {error_msg}"
 
 
-def pull_from_remote(
-    repo_dir: Path, remote: str = "origin", branch: str = "main"
-) -> Tuple[bool, str]:
+def pull_from_remote(repo_dir: Path, remote: str = "origin", branch: str = "main") -> Tuple[bool, str]:
     """Pull changes from a remote branch.
 
     Args:
@@ -902,9 +799,7 @@ def pull_from_remote(
     return False, error_msg
 
 
-def push_to_remote(
-    repo_dir: Path, remote: str = "origin", branch: Optional[str] = None
-) -> Tuple[bool, str]:
+def push_to_remote(repo_dir: Path, remote: str = "origin", branch: Optional[str] = None) -> Tuple[bool, str]:
     """Push changes to a remote branch.
 
     Args:
