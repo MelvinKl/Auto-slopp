@@ -118,9 +118,9 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
         result = _run_gh_command(
             repo_dir,
             "issue",
-            "comment",
+            "view",
             str(issue_number),
-            "--json=body,author,createdAt",
+            "--json=comments",
             check=False,
         )
 
@@ -129,7 +129,21 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
             logger.error(f"Failed to get comments for issue #{issue_number} in {repo_dir.name}: {comment_error}")
             return []
 
-        comments = json.loads(result.stdout)
+        data = json.loads(result.stdout)
+        # Extract comments from the issue view response
+        raw_comments = data.get("comments", [])
+
+        # Transform to expected format
+        comments = []
+        for comment in raw_comments:
+            comments.append(
+                {
+                    "body": comment.get("body", ""),
+                    "author": comment.get("author", {}).get("login") if comment.get("author") else None,
+                    "createdAt": comment.get("createdAt"),
+                }
+            )
+
         return comments
 
     except GitHubOperationError as e:
