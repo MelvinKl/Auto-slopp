@@ -16,9 +16,9 @@ A Python-based automation framework for task execution with pluggable worker sys
 
 It is recommended to set the coding machine to allow everything it requires for its job. It is **not** recommended to let it ask for permission as this will break the flow of the auto slopper.
 
-### opencode.json Example
+### slop-machine.json Example
 
-Auto-slopp works well with [opencode.ai](https://opencode.ai). Here is an example configuration:
+Auto-slopp works well with [opencode.ai](https://opencode.ai) (or other AI coding CLIs like Claude Code). Here is an example configuration:
 
 ```json
 {
@@ -30,11 +30,13 @@ Auto-slopp works well with [opencode.ai](https://opencode.ai). Here is an exampl
 }
 ```
 
+**Note**: The AI coding CLI command is configurable via the `AUTO_SLOPP_CLI_COMMAND` environment variable (defaults to `opencode`). You can set it to `claude-code` or other coding CLIs.
+
 ## Recommended Addons
 
 ### OpenAgentsControl
 
-[**OpenAgentsControl**](https://github.com/darrenhinde/OpenAgentsControl) is a recommended addon when using opencode. It is **required for the default settings** to work properly.
+[**OpenAgentsControl**](https://github.com/darrenhinde/OpenAgentsControl) is a recommended addon when using the opencode CLI. It is **required for the default settings** to work properly.
 
 - **Repository**: https://github.com/darrenhinde/OpenAgentsControl
 - **Required**: Yes (for default settings)

@@ -15,7 +15,10 @@ from auto_slopp.utils.file_operations import (
 )
 from auto_slopp.utils.git_operations import commit_and_push_changes, get_current_branch
 from auto_slopp.utils.github_operations import create_pull_request
-from auto_slopp.utils.opencode import execute_openagent_with_instructions, run_opencode
+from auto_slopp.utils.slop_machine import (
+    execute_openagent_with_instructions,
+    run_opencode,
+)
 
 logger = logging.getLogger(__name__)
 

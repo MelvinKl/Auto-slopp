@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from auto_slopp.utils.opencode import run_opencode
+from auto_slopp.utils.slop_machine import run_opencode
 
 logger = logging.getLogger(__name__)
 
