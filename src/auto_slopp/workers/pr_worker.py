@@ -15,8 +15,8 @@ from auto_slopp.utils.git_operations import (
     push_branch,
 )
 from auto_slopp.utils.github_operations import get_open_pr_branches
-from auto_slopp.utils.opencode import run_opencode
 from auto_slopp.utils.repository_utils import discover_repositories, validate_repository
+from auto_slopp.utils.slop_machine import run_opencode
 from auto_slopp.worker import Worker
 
 

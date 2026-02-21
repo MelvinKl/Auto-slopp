@@ -22,7 +22,7 @@ from auto_slopp.utils.github_operations import (
     create_pull_request,
     get_open_issues,
 )
-from auto_slopp.utils.opencode import execute_openagent_with_instructions
+from auto_slopp.utils.slop_machine import execute_openagent_with_instructions
 from auto_slopp.worker import Worker
 
 

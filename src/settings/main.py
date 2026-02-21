@@ -99,6 +99,11 @@ class Settings(BaseSettings):
         "env_file_encoding": "utf-8",
     }
 
+    cli_command: str = Field(
+        default="opencode",
+        description="CLI command to use for AI coding (e.g., opencode, claude)",
+    )
+
 
 # Load .env file automatically before creating settings instance
 load_dotenv(override=True)
