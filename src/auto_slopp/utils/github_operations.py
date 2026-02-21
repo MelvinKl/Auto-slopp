@@ -101,6 +101,48 @@ def get_open_issues(repo_dir: Path) -> List[Dict[str, Any]]:
         return []
 
 
+def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]]:
+    """Get list of comments on an issue in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+        issue_number: Issue number to get comments for
+
+    Returns:
+        List of dictionaries containing comment information (body, author, createdAt).
+
+    Raises:
+        GitHubOperationError: If gh command fails
+    """
+    try:
+        result = _run_gh_command(
+            repo_dir,
+            "issue",
+            "comment",
+            str(issue_number),
+            "--json=body,author,createdAt",
+            check=False,
+        )
+
+        if result.returncode != 0:
+            comment_error = result.stderr.strip() or result.stdout.strip()
+            logger.error(f"Failed to get comments for issue #{issue_number} in {repo_dir.name}: {comment_error}")
+            return []
+
+        comments = json.loads(result.stdout)
+        return comments
+
+    except GitHubOperationError as e:
+        logger.error(f"Error getting comments for issue #{issue_number} from {repo_dir.name}: {str(e)}")
+        return []
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse comment JSON for issue #{issue_number} from {repo_dir.name}: {str(e)}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error getting comments for issue #{issue_number} from {repo_dir.name}: {str(e)}")
+        return []
+
+
 def close_issue(repo_dir: Path, issue_number: int) -> bool:
     """Close an issue in the repository.
 
