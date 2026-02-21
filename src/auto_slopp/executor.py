@@ -161,16 +161,7 @@ class Executor:
         Returns:
             True if worker should be executed for each subdirectory
         """
-        # Workers that currently handle their own directory iteration
-        # should be handled by the orchestrator instead
-        workers_requiring_iteration = {
-            "TaskProcessorWorker",
-            "RenovateTestWorker",
-            "StaleBranchCleanupWorker",
-            "PRWorker",
-        }
-
-        return worker_class.__name__ in workers_requiring_iteration
+        return True
 
     def _execute_worker_with_directories(self, worker_class: Type[Worker]) -> None:
         """Execute worker for each subdirectory in repo_path.
