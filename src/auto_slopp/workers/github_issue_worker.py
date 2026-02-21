@@ -19,6 +19,7 @@ from auto_slopp.utils.git_operations import (
 )
 from auto_slopp.utils.github_operations import (
     close_issue,
+    comment_on_issue,
     create_pull_request,
     get_open_issues,
 )
@@ -201,7 +202,14 @@ class GitHubIssueWorker(Worker):
             close_success = close_issue(repo_dir, issue_number)
             result["issue_closed"] = close_success
 
-            if not close_success:
+            if close_success:
+                pr_url = pr_result.get("url", "")
+                comment = f"Completed by PR: {pr_url}"
+                comment_success = comment_on_issue(repo_dir, issue_number, comment)
+                result["issue_commented"] = comment_success
+                if not comment_success:
+                    self.logger.warning(f"Failed to add comment to issue #{issue_number}")
+            else:
                 self.logger.warning(f"Failed to close issue #{issue_number}")
 
             result["success"] = True

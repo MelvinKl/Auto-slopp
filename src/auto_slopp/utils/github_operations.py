@@ -129,6 +129,37 @@ def close_issue(repo_dir: Path, issue_number: int) -> bool:
         return False
 
 
+def comment_on_issue(repo_dir: Path, issue_number: int, comment: str) -> bool:
+    """Add a comment to an issue in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+        issue_number: Issue number to comment on
+        comment: Comment text to add
+
+    Returns:
+        True if successful, False otherwise.
+    """
+    try:
+        result = _run_gh_command(
+            repo_dir,
+            "issue",
+            "comment",
+            str(issue_number),
+            "--body",
+            comment,
+            check=False,
+        )
+        return result.returncode == 0
+
+    except GitHubOperationError as e:
+        logger.error(f"Error commenting on issue #{issue_number} in {repo_dir.name}: {str(e)}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error commenting on issue #{issue_number} in {repo_dir.name}: {str(e)}")
+        return False
+
+
 def create_pull_request(
     repo_dir: Path,
     title: str,
