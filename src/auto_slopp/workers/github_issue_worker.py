@@ -21,6 +21,7 @@ from auto_slopp.utils.github_operations import (
     close_issue,
     comment_on_issue,
     create_pull_request,
+    get_issue_comments,
     get_open_issues,
 )
 from auto_slopp.utils.slop_machine import execute_openagent_with_instructions
@@ -152,6 +153,9 @@ class GitHubIssueWorker(Worker):
 
         self.logger.info(f"Processing issue #{issue_number}: {issue_title}")
 
+        comments = get_issue_comments(repo_dir, issue_number)
+        comment_texts = [comment.get("body", "") or "" for comment in comments]
+
         result = {
             "repository": repo_dir.name,
             "issue_number": issue_number,
@@ -164,7 +168,7 @@ class GitHubIssueWorker(Worker):
         }
 
         try:
-            instructions = self._build_instructions(issue_title, issue_body)
+            instructions = self._build_instructions(issue_title, issue_body, comment_texts)
             branch_name = f"ai/issue-{issue_number}-{issue_title[:30].replace(' ', '-').lower()}"
 
             if self.dry_run:
@@ -220,21 +224,26 @@ class GitHubIssueWorker(Worker):
 
         return result
 
-    def _build_instructions(self, issue_title: str, issue_body: str) -> str:
-        """Build the instructions string from issue title and body.
+    def _build_instructions(self, issue_title: str, issue_body: str, comments: Optional[List[str]] = None) -> str:
+        """Build the instructions string from issue title, body, and comments.
 
         Args:
             issue_title: Issue title
             issue_body: Issue body
+            comments: List of comment bodies
 
         Returns:
             Complete instructions string
         """
         body_text = f"\n{issue_body}" if issue_body else ""
+        comments_text = ""
+        if comments:
+            comments_text = "\nComments:\n" + "\n".join(f"- {comment}" for comment in comments if comment)
         return (
             f"Create a new branch that starts with ai/ from base origin/main and implement the following:\n"
             f"Title: {issue_title}\n"
             f"Description:{body_text}\n"
+            f"{comments_text}\n"
             f"Keep your implementation simple. Only implement what is required. Check if there are components you can reuse. "
             f"Ensure that 'make test' runs successful. Only push if ALL tests are successful. "
             f"Check if you need to update the README.md. Push your changes and create a pull request on github."
