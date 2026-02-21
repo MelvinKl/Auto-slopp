@@ -299,7 +299,7 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
         logger.warning(f"Initial checkout failed for '{branch}' in {repo_dir.name}: {checkout_error}")
         logger.info(f"Attempting git reset --hard and retry for '{branch}' in {repo_dir.name}")
 
-        reset_result = _run_git_command(repo_dir, "reset", "--hard", check=False, timeout=timeout)
+        reset_result = _run_git_command(repo_dir, "reset", "--hard", "HEAD", check=False, timeout=timeout)
         if reset_result.returncode != 0:
             reset_error = reset_result.stderr.strip() or reset_result.stdout.strip()
             error_msg = f"Git reset --hard failed: {reset_error}"
