@@ -93,6 +93,16 @@ class Settings(BaseSettings):
         default=False, description="Disable notification sound for Telegram messages"
     )
 
+    cli_command: str = Field(
+        default="opencode",
+        description="CLI command to execute for automation tasks (e.g., opencode, claude)",
+    )
+
+    cli_args: list = Field(
+        default=["--agent", "openagent", "--model", "opencode/glm-5-free", "run"],
+        description="Arguments to pass to the CLI command",
+    )
+
     model_config = {
         "env_prefix": "AUTO_SLOPP_",
         "env_file": ".env",

@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from auto_slopp.utils.cli_executor import execute_with_instructions
 from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     commit_and_push_changes,
@@ -24,7 +25,6 @@ from auto_slopp.utils.github_operations import (
     get_issue_comments,
     get_open_issues,
 )
-from auto_slopp.utils.opencode import execute_openagent_with_instructions
 from auto_slopp.worker import Worker
 
 
@@ -177,9 +177,7 @@ class GitHubIssueWorker(Worker):
                 result["success"] = True
                 return result
 
-            openagent_result = execute_openagent_with_instructions(
-                instructions, repo_dir, self.agent_args, self.timeout
-            )
+            openagent_result = execute_with_instructions(instructions, repo_dir, self.agent_args, self.timeout)
             result["openagent_executed"] = openagent_result["success"]
 
             if not openagent_result["success"]:

@@ -16,9 +16,11 @@ A Python-based automation framework for task execution with pluggable worker sys
 
 It is recommended to set the coding machine to allow everything it requires for its job. It is **not** recommended to let it ask for permission as this will break the flow of the auto slopper.
 
-### opencode.json Example
+### CLI Configuration
 
-Auto-slopp works well with [opencode.ai](https://opencode.ai). Here is an example configuration:
+Auto-slopp supports configurable CLI tools for automation. By default, it uses [opencode.ai](https://opencode.ai), but you can configure it to use other CLI tools like Claude Code.
+
+#### opencode.json Example (for opencode.ai)
 
 ```json
 {
@@ -30,6 +32,23 @@ Auto-slopp works well with [opencode.ai](https://opencode.ai). Here is an exampl
 }
 ```
 
+#### Environment Variables for CLI Configuration
+
+You can customize the CLI command and arguments via environment variables:
+
+```bash
+# CLI command to use (default: opencode)
+AUTO_SLOPP_CLI_COMMAND=opencode
+
+# Arguments to pass to the CLI command (default: ["--agent", "openagent", "--model", "opencode/glm-5-free", "run"])
+# For opencode.ai:
+AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "--model", "opencode/glm-5-free", "run"]'
+
+# For Claude Code, you might use:
+# AUTO_SLOPP_CLI_COMMAND=claude
+# AUTO_SLOPP_CLI_ARGS='[]'
+```
+
 ## Recommended Addons
 
 ### OpenAgentsControl
@@ -37,7 +56,7 @@ Auto-slopp works well with [opencode.ai](https://opencode.ai). Here is an exampl
 [**OpenAgentsControl**](https://github.com/darrenhinde/OpenAgentsControl) is a recommended addon when using opencode. It is **required for the default settings** to work properly.
 
 - **Repository**: https://github.com/darrenhinde/OpenAgentsControl
-- **Required**: Yes (for default settings)
+- **Required**: Yes (for default settings with opencode)
 - **Recommended**: Yes (when using opencode)
 
 ## Installation
@@ -184,6 +203,10 @@ Create a `.env` file in the project root:
 AUTO_SLOPP_BASE_REPO_PATH=/path/to/your/repo
 AUTO_SLOPP_BASE_TASK_PATH=/path/to/your/tasks
 AUTO_SLOPP_DEBUG=false
+
+# CLI configuration (optional - defaults to opencode)
+AUTO_SLOPP_CLI_COMMAND=opencode
+AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "--model", "opencode/glm-5-free", "run"]'
 
 # Telegram logging (optional)
 AUTO_SLOPP_TELEGRAM_ENABLED=true
@@ -355,6 +378,10 @@ class Settings(BaseSettings):
     executor_sleep_interval: float = Field(default=1.0)
     debug: bool = Field(default=False)
 
+    # CLI Configuration
+    cli_command: str = Field(default="opencode", description="CLI command to execute")
+    cli_args: list = Field(default=["--agent", "openagent", "--model", "opencode/glm-5-free", "run"])
+
     # Telegram integration
     telegram_enabled: bool = Field(default=False)
     telegram_bot_token: Optional[str] = Field(default=None)
@@ -445,6 +472,10 @@ export AUTO_SLOPP_DEBUG=false
 export AUTO_SLOPP_TELEGRAM_ENABLED=true
 export AUTO_SLOPP_TELEGRAM_BOT_TOKEN=prod_bot_token
 export AUTO_SLOPP_TELEGRAM_CHAT_ID=prod_chat_id
+
+# CLI configuration (optional)
+export AUTO_SLOPP_CLI_COMMAND=opencode
+export AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "--model", "opencode/glm-5-free", "run"]'
 ```
 
 ### .env File
@@ -456,6 +487,10 @@ AUTO_SLOPP_BASE_TASK_PATH=/home/user/tasks
 AUTO_SLOPP_WORKER_SEARCH_PATH=/home/user/custom-workers
 AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=2.0
 AUTO_SLOPP_DEBUG=false
+
+# CLI configuration (optional - defaults to opencode)
+AUTO_SLOPP_CLI_COMMAND=opencode
+AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "--model", "opencode/glm-5-free", "run"]'
 
 # Telegram settings
 AUTO_SLOPP_TELEGRAM_ENABLED=true
