@@ -348,6 +348,8 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
 def create_and_checkout_branch(repo_dir: Path, branch: str, base_branch: str = "main", timeout: int = 60) -> bool:
     """Create a new branch and check it out.
 
+    If the branch already exists, checks it out instead of creating a new one.
+
     Args:
         repo_dir: Path to the git repository
         branch: Name of the new branch to create
@@ -358,6 +360,10 @@ def create_and_checkout_branch(repo_dir: Path, branch: str, base_branch: str = "
         True if successful, False otherwise.
     """
     try:
+        if branch_exists(repo_dir, branch):
+            logger.info(f"Branch '{branch}' already exists in {repo_dir.name}, checking it out")
+            return checkout_branch_resilient(repo_dir, branch, fetch_first=False, timeout=timeout)
+
         logger.info(f"Creating and checking out branch '{branch}' from '{base_branch}' in {repo_dir.name}")
 
         result = _run_git_command(
