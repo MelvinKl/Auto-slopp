@@ -132,9 +132,7 @@ def run_slop_machine(
         if success:
             logger.info(f"{cli_cmd} completed successfully in {execution_time:.2f}s")
         else:
-            logger.error(
-                f"{cli_cmd} failed with return code {result.returncode} in {execution_time:.2f}s"
-            )
+            logger.error(f"{cli_cmd} failed with return code {result.returncode} in {execution_time:.2f}s")
             if capture_output and result.stderr:
                 logger.error(f"stderr: {result.stderr}")
 
