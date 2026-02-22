@@ -75,6 +75,7 @@ class UpdatePRBranchesWorker(Worker):
             self.logger.error(f"Failed to get open PR branches: {str(e)}")
             results["success"] = False
             results["error"] = str(e)
+            self.logger.info(f"UpdatePRBranchesWorker failed for {repo_path.name}. Error: {str(e)}")
             return results
 
         if not pr_branches:
