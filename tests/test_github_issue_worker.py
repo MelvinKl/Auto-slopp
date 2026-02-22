@@ -84,18 +84,28 @@ class TestGitHubIssueWorker:
         """Test instruction building."""
         worker = GitHubIssueWorker(dry_run=True)
 
-        instructions = worker._build_instructions("Fix bug", "This is a bug")
+        instructions = worker._build_instructions("Fix bug", "This is a bug", branch_name="ai/issue-1-fix-bug")
         assert "Fix bug" in instructions
         assert "This is a bug" in instructions
-        assert "ai/" in instructions
+        assert "ai/issue-1-fix-bug" in instructions
+        assert "Working on branch" in instructions
 
     def test_build_instructions_empty_body(self):
         """Test instruction building with empty body."""
         worker = GitHubIssueWorker(dry_run=True)
 
-        instructions = worker._build_instructions("Test issue", "")
+        instructions = worker._build_instructions("Test issue", "", branch_name="ai/issue-2-test-issue")
         assert "Test issue" in instructions
-        assert "ai/" in instructions
+        assert "ai/issue-2-test-issue" in instructions
+
+    def test_build_instructions_no_branch(self):
+        """Test instruction building without branch name."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        instructions = worker._build_instructions("Test issue", "Test body")
+        assert "Test issue" in instructions
+        assert "Test body" in instructions
+        assert "Implement the following:" in instructions
 
     def test_create_error_result(self):
         """Test error result creation."""
