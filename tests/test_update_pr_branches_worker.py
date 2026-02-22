@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from auto_slopp.utils.github_operations import GitHubOperationError
 from auto_slopp.workers.update_pr_branches_worker import UpdatePRBranchesWorker
 
 
@@ -88,15 +89,15 @@ class TestUpdatePRBranchesWorker:
         """Test error handling when getting PR branches fails."""
         worker = UpdatePRBranchesWorker()
 
-        with patch("subprocess.run") as mock_run:
+        with patch("auto_slopp.utils.github_operations.subprocess.run") as mock_run:
             mock_run.return_value = Mock(
                 stdout="",
                 stderr="Error getting PRs",
                 returncode=1,
             )
 
-            branches = worker._get_open_pr_branches(temp_repo_dir)
-            assert branches == []
+            with pytest.raises(GitHubOperationError):
+                worker._get_open_pr_branches(temp_repo_dir)
 
     @patch("auto_slopp.workers.update_pr_branches_worker.checkout_branch_resilient")
     def test_checkout_branch_success(self, mock_checkout, temp_repo_dir):

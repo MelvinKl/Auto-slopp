@@ -13,7 +13,10 @@ from auto_slopp.utils.git_operations import (
     merge_main_into_branch,
     push_branch,
 )
-from auto_slopp.utils.github_operations import get_open_pr_branches
+from auto_slopp.utils.github_operations import (
+    GitHubOperationError,
+    get_open_pr_branches,
+)
 from auto_slopp.utils.repository_utils import validate_repository
 from auto_slopp.worker import Worker
 
@@ -66,7 +69,13 @@ class UpdatePRBranchesWorker(Worker):
             results["error"] = f"Invalid repository: {repo_info.get('errors', ['Unknown error'])}"
             return results
 
-        pr_branches = self._get_open_pr_branches(repo_path)
+        try:
+            pr_branches = self._get_open_pr_branches(repo_path)
+        except GitHubOperationError as e:
+            self.logger.error(f"Failed to get open PR branches: {str(e)}")
+            results["success"] = False
+            results["error"] = str(e)
+            return results
 
         if not pr_branches:
             self.logger.info(f"No open PR branches found in {repo_path.name}")

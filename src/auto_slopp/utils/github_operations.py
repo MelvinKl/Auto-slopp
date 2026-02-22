@@ -301,19 +301,18 @@ def get_open_pr_branches(repo_dir: Path) -> List[str]:
         if result.returncode != 0:
             pr_error = result.stderr.strip() or result.stdout.strip()
             logger.error(f"Failed to list PRs in {repo_dir.name}: {pr_error}")
-            return []
+            raise GitHubOperationError(f"Failed to list PRs: {pr_error}")
 
         prs = json.loads(result.stdout)
         branches = [pr["headRefName"] for pr in prs]
 
         return branches
 
-    except GitHubOperationError as e:
-        logger.error(f"Error getting PRs from {repo_dir.name}: {str(e)}")
-        return []
+    except GitHubOperationError:
+        raise
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse PR list JSON from {repo_dir.name}: {str(e)}")
-        return []
+        raise GitHubOperationError(f"Failed to parse PR list JSON: {str(e)}")
     except Exception as e:
         logger.error(f"Unexpected error getting PRs from {repo_dir.name}: {str(e)}")
-        return []
+        raise GitHubOperationError(f"Unexpected error getting PRs: {str(e)}")
