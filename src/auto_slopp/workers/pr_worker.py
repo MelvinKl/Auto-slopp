@@ -9,13 +9,13 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
+from auto_slopp.utils.cli_executor import run_cli_executor
 from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     merge_main_into_branch,
     push_branch,
 )
 from auto_slopp.utils.github_operations import get_open_pr_branches
-from auto_slopp.utils.opencode import run_opencode
 from auto_slopp.utils.repository_utils import discover_repositories, validate_repository
 from auto_slopp.worker import Worker
 
@@ -300,7 +300,7 @@ class PRWorker(Worker):
         """
         additional_instructions = "'make test' is failing fix it and push the changes"
 
-        result = run_opencode(
+        result = run_cli_executor(
             additional_instructions=additional_instructions,
             working_directory=repo_dir,
             timeout=self.timeout,

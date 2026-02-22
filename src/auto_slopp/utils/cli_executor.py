@@ -1,7 +1,7 @@
-"""OpenCode execution utilities for auto-slopp workers.
+"""CLI executor utilities for auto-slopp workers.
 
-This module provides a centralized utility for executing OpenCode commands
-with consistent error handling, logging, and result formatting.
+This module provides a centralized utility for executing configured CLI commands
+(e.g., opencode, claude code) with consistent error handling, logging, and result formatting.
 """
 
 import logging
@@ -11,26 +11,28 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from settings.main import settings
+
 logger = logging.getLogger(__name__)
 
 
-def run_opencode(
+def run_cli_executor(
     additional_instructions: Optional[str] = None,
     working_directory: Optional[Path] = None,
     timeout: int = 7200,
     agent_args: Optional[List[str]] = None,
     capture_output: bool = True,
 ) -> Dict[str, Any]:
-    """Execute OpenCode with the specified parameters.
+    """Execute the configured CLI command with the specified parameters.
 
-    This centralized utility handles OpenCode execution with consistent
+    This centralized utility handles CLI execution with consistent
     error handling, logging, and result formatting across all workers.
 
     Args:
-        additional_instructions: Additional instructions to pass to OpenCode
-        working_directory: Directory where OpenCode should be executed
+        additional_instructions: Additional instructions to pass to the CLI
+        working_directory: Directory where the CLI should be executed
         timeout: Command execution timeout in seconds (default: 7200)
-        agent_args: Additional arguments to pass to OpenCode
+        agent_args: Additional arguments to pass to the CLI
         capture_output: Whether to capture stdout/stderr (default: True)
 
     Returns:
@@ -51,7 +53,7 @@ def run_opencode(
     Examples:
         Basic usage:
         ```python
-        result = run_opencode(
+        result = run_cli_executor(
             additional_instructions="Fix the failing tests",
             working_directory=Path("/path/to/repo"),
             timeout=1800
@@ -60,7 +62,7 @@ def run_opencode(
 
         With custom agent arguments:
         ```python
-        result = run_opencode(
+        result = run_cli_executor(
             additional_instructions="Implement new feature",
             working_directory=Path("/path/to/repo"),
             agent_args=["--verbose", "--debug"],
@@ -70,7 +72,7 @@ def run_opencode(
 
         Without output capture (for interactive commands):
         ```python
-        result = run_opencode(
+        result = run_cli_executor(
             additional_instructions="Run interactive setup",
             working_directory=Path("/path/to/repo"),
             capture_output=False
@@ -79,26 +81,25 @@ def run_opencode(
     """
     start_time = time.time()
 
-    # Set default values
     agent_args = agent_args or []
     working_dir = working_directory or Path.cwd()
 
+    cli_command = settings.cli_command
+    cli_base_args = settings.cli_args
+
     logger.info(
-        f"Executing OpenCode with instructions: {additional_instructions if additional_instructions else 'None'}..."
+        f"Executing {cli_command} with instructions: {additional_instructions if additional_instructions else 'None'}..."
     )
     logger.info(f"Working directory: {working_dir}")
     logger.info(f"Timeout: {timeout}s")
     logger.info(f"Agent args: {agent_args}")
 
-    # Build the OpenCode command
-    cmd = ["opencode", "--agent", "openagent", "--model", "opencode/glm-5-free", "run"] + agent_args
+    cmd = [cli_command] + cli_base_args + agent_args
 
-    # Add additional instructions as the last argument if provided
     if additional_instructions:
         cmd.append(additional_instructions)
 
     try:
-        # Execute the command
         result = subprocess.run(
             cmd,
             cwd=working_dir,
@@ -110,7 +111,6 @@ def run_opencode(
         execution_time = time.time() - start_time
         success = result.returncode == 0
 
-        # Prepare the standardized result
         execution_result = {
             "success": success,
             "execution_time": execution_time,
@@ -121,7 +121,6 @@ def run_opencode(
             "timeout": False,
         }
 
-        # Add output if captured
         if capture_output:
             execution_result.update(
                 {
@@ -133,9 +132,9 @@ def run_opencode(
             )
 
         if success:
-            logger.info(f"OpenCode completed successfully in {execution_time:.2f}s")
+            logger.info(f"{cli_command} completed successfully in {execution_time:.2f}s")
         else:
-            logger.error(f"OpenCode failed with return code {result.returncode} in {execution_time:.2f}s")
+            logger.error(f"{cli_command} failed with return code {result.returncode} in {execution_time:.2f}s")
             if capture_output and result.stderr:
                 logger.error(f"stderr: {result.stderr}")
 
@@ -143,7 +142,7 @@ def run_opencode(
 
     except subprocess.TimeoutExpired:
         execution_time = time.time() - start_time
-        error_msg = f"OpenCode timed out after {timeout} seconds"
+        error_msg = f"{cli_command} timed out after {timeout} seconds"
         logger.error(error_msg)
 
         return {
@@ -158,26 +157,87 @@ def run_opencode(
         }
 
 
+def execute_with_instructions(
+    instructions: str,
+    work_dir: Path,
+    agent_args: Optional[List[str]] = None,
+    timeout: int = 7200,
+) -> Dict[str, Any]:
+    """Execute CLI with specific instructions.
+
+    Args:
+        instructions: The instructions to pass to the CLI
+        work_dir: Working directory for command execution
+        agent_args: Additional arguments to pass to the CLI
+        timeout: Command execution timeout in seconds
+
+    Returns:
+        Dictionary containing execution results.
+    """
+    return run_cli_executor(
+        additional_instructions=instructions,
+        working_directory=work_dir,
+        agent_args=agent_args,
+        timeout=timeout,
+    )
+
+
+def run_opencode(
+    additional_instructions: Optional[str] = None,
+    working_directory: Optional[Path] = None,
+    timeout: int = 7200,
+    agent_args: Optional[List[str]] = None,
+    capture_output: bool = True,
+) -> Dict[str, Any]:
+    """Backward-compatible wrapper for run_cli_executor.
+
+    This function is deprecated and will be removed in a future version.
+    Use run_cli_executor instead.
+
+    Args:
+        additional_instructions: Additional instructions to pass to the CLI
+        working_directory: Directory where the CLI should be executed
+        timeout: Command execution timeout in seconds (default: 7200)
+        agent_args: Additional arguments to pass to the CLI
+        capture_output: Whether to capture stdout/stderr (default: True)
+
+    Returns:
+        Dictionary containing execution results.
+    """
+    logger.warning("run_opencode is deprecated, use run_cli_executor instead")
+    return run_cli_executor(
+        additional_instructions=additional_instructions,
+        working_directory=working_directory,
+        timeout=timeout,
+        agent_args=agent_args,
+        capture_output=capture_output,
+    )
+
+
 def execute_openagent_with_instructions(
     instructions: str,
     work_dir: Path,
     agent_args: Optional[List[str]] = None,
     timeout: int = 7200,
 ) -> Dict[str, Any]:
-    """Execute OpenAgent with specific instructions.
+    """Backward-compatible wrapper for execute_with_instructions.
+
+    This function is deprecated and will be removed in a future version.
+    Use execute_with_instructions instead.
 
     Args:
-        instructions: The instructions to pass to OpenAgent
+        instructions: The instructions to pass to the CLI
         work_dir: Working directory for command execution
-        agent_args: Additional arguments to pass to OpenAgent
+        agent_args: Additional arguments to pass to the CLI
         timeout: Command execution timeout in seconds
 
     Returns:
         Dictionary containing execution results.
     """
-    return run_opencode(
-        additional_instructions=instructions,
-        working_directory=work_dir,
+    logger.warning("execute_openagent_with_instructions is deprecated, use execute_with_instructions instead")
+    return execute_with_instructions(
+        instructions=instructions,
+        work_dir=work_dir,
         agent_args=agent_args,
         timeout=timeout,
     )

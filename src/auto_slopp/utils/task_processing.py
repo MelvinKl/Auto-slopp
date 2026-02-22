@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from auto_slopp.utils.cli_executor import execute_with_instructions, run_cli_executor
 from auto_slopp.utils.file_operations import (
     find_text_files,
     read_file_content,
@@ -15,7 +16,6 @@ from auto_slopp.utils.file_operations import (
 )
 from auto_slopp.utils.git_operations import commit_and_push_changes, get_current_branch
 from auto_slopp.utils.github_operations import create_pull_request
-from auto_slopp.utils.opencode import execute_openagent_with_instructions, run_opencode
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,7 @@ def process_text_file(
         instructions = f"Create a new branch that starts with ai/ from base origin/main and implement the following:\n{instructions}\nKeep your implementation simple. Only implement what is required. Check if there are components you can reuse. Ensure that 'make test' runs successful. Only push if ALL tests are successful. Check if you need to update the README.md. Push your changes and create a pull request on github."
         # Execute OpenAgent with the instructions
         if not dry_run:
-            openagent_result = execute_openagent_with_instructions(instructions, repo_dir, agent_args, timeout)
+            openagent_result = execute_with_instructions(instructions, repo_dir, agent_args, timeout)
             result["openagent_executed"] = openagent_result["success"]
 
             if not openagent_result["success"]:
@@ -112,7 +112,7 @@ def process_text_file(
             current_branch = get_current_branch(repo_dir)
             logger.info(f"Current branch after OpenCode execution: {current_branch}")
 
-            push_branch_result = run_opencode(
+            push_branch_result = run_cli_executor(
                 additional_instructions=f"git push -u origin {current_branch}",
                 working_directory=repo_dir,
                 timeout=60,
@@ -252,7 +252,7 @@ def process_repository(
 
         # Push the changes to remote
         if not dry_run and result["success"]:
-            push_result = run_opencode(
+            push_result = run_cli_executor(
                 additional_instructions="git push origin main",
                 working_directory=repo_dir,
                 timeout=60,
