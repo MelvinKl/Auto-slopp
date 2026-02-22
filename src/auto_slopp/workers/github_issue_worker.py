@@ -17,6 +17,7 @@ from auto_slopp.utils.cli_executor import execute_with_instructions
 from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     commit_and_push_changes,
+    create_and_checkout_branch,
 )
 from auto_slopp.utils.github_operations import (
     close_issue,
@@ -175,6 +176,11 @@ class GitHubIssueWorker(Worker):
                 self.logger.info(f"DRY RUN: Would create branch {branch_name} and execute instructions")
                 result["openagent_executed"] = True
                 result["success"] = True
+                return result
+
+            branch_created = create_and_checkout_branch(repo_dir, branch_name, base_branch="main")
+            if not branch_created:
+                result["error"] = f"Failed to create branch {branch_name}"
                 return result
 
             openagent_result = execute_with_instructions(instructions, repo_dir, self.agent_args, self.timeout)
