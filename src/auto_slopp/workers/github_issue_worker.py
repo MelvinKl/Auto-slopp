@@ -185,9 +185,9 @@ class GitHubIssueWorker(Worker):
                 result["error"] = f"OpenCode execution failed: {openagent_result.get('error', 'Unknown error')}"
                 return result
 
-            actual_branch = get_current_branch(repo_dir)
-            if actual_branch == "main" or actual_branch == "master":
-                result["error"] = "OpenCode did not create a new branch (still on main)"
+            current_branch = get_current_branch(repo_dir)
+            if current_branch in ("main", "master"):
+                result["error"] = f"CLI did not create a new branch, still on '{current_branch}'"
                 return result
 
             pr_body = f"Closes #{issue_number}\n\n{issue_body}"
@@ -195,7 +195,7 @@ class GitHubIssueWorker(Worker):
                 repo_dir,
                 title=issue_title,
                 body=pr_body,
-                head=actual_branch,
+                head=current_branch,
                 base="main",
             )
 
