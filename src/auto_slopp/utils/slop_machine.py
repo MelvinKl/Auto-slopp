@@ -86,6 +86,7 @@ def run_slop_machine(
     working_dir = working_directory or Path.cwd()
 
     cli_cmd = settings.cli_command
+    cli_args = settings.cli_args
     logger.info(
         f"Executing {cli_cmd} with instructions: {additional_instructions if additional_instructions else 'None'}..."
     )
@@ -93,7 +94,7 @@ def run_slop_machine(
     logger.info(f"Timeout: {timeout}s")
     logger.info(f"Agent args: {agent_args}")
 
-    cmd = [cli_cmd, "--agent", "openagent", "run"] + agent_args
+    cmd = [cli_cmd] + cli_args + agent_args
 
     if additional_instructions:
         cmd.append(additional_instructions)

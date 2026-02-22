@@ -187,6 +187,10 @@ AUTO_SLOPP_BASE_REPO_PATH=/path/to/your/repo
 AUTO_SLOPP_BASE_TASK_PATH=/path/to/your/tasks
 AUTO_SLOPP_DEBUG=false
 
+# CLI configuration (optional)
+AUTO_SLOPP_CLI_COMMAND=opencode
+AUTO_SLOPP_CLI_ARGS=["--agent", "openagent", "run"]
+
 # Telegram logging (optional)
 AUTO_SLOPP_TELEGRAM_ENABLED=true
 AUTO_SLOPP_TELEGRAM_BOT_TOKEN=your_bot_token

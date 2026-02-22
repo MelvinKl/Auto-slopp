@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from dotenv import load_dotenv
 from pydantic import Field, field_validator
@@ -96,6 +96,11 @@ class Settings(BaseSettings):
     cli_command: str = Field(
         default="opencode",
         description="CLI command to use for AI coding (opencode, claude-code, etc.)",
+    )
+
+    cli_args: List[str] = Field(
+        default=["--agent", "openagent", "run"],
+        description="Arguments to pass to the CLI command before instructions (e.g., ['--agent', 'openagent', 'run'] for opencode)",
     )
 
     model_config = {
