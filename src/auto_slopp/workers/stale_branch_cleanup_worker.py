@@ -5,6 +5,7 @@ and deletes them if their last commit is older than 5 days.
 """
 
 import logging
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
@@ -47,7 +48,7 @@ class StaleBranchCleanupWorker(Worker):
         Returns:
             Dictionary containing cleanup results and statistics.
         """
-        start_time = datetime.now(timezone.utc)
+        start_time = time.time()
         self.logger.info(f"Starting stale branch cleanup for {repo_path}")
 
         # Validate input path
@@ -64,12 +65,12 @@ class StaleBranchCleanupWorker(Worker):
         self._update_results_statistics(results, repo_result)
 
         # Finalize results
-        results["execution_time"] = (datetime.now(timezone.utc) - start_time).total_seconds()
+        results["execution_time"] = time.time() - start_time
         self._log_completion_summary(results)
 
         return results
 
-    def _validate_input_path(self, repo_path: Path, task_path: Path, start_time: datetime) -> Optional[Dict[str, Any]]:
+    def _validate_input_path(self, repo_path: Path, task_path: Path, start_time: float) -> Optional[Dict[str, Any]]:
         """Validate the input repository path.
 
         Args:
@@ -83,8 +84,8 @@ class StaleBranchCleanupWorker(Worker):
         if not repo_path.exists():
             return {
                 "worker_name": "StaleBranchCleanupWorker",
-                "execution_time": (datetime.now(timezone.utc) - start_time).total_seconds(),
-                "timestamp": start_time.isoformat(),
+                "execution_time": time.time() - start_time,
+                "timestamp": start_time,
                 "repo_path": str(repo_path),
                 "task_path": str(task_path),
                 "dry_run": self.dry_run,
@@ -99,7 +100,7 @@ class StaleBranchCleanupWorker(Worker):
             }
         return None
 
-    def _create_results_dict(self, start_time: datetime, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def _create_results_dict(self, start_time: float, repo_path: Path, task_path: Path) -> Dict[str, Any]:
         """Create the initial results dictionary.
 
         Args:
@@ -113,7 +114,7 @@ class StaleBranchCleanupWorker(Worker):
         return {
             "worker_name": "StaleBranchCleanupWorker",
             "execution_time": 0,
-            "timestamp": start_time.isoformat(),
+            "timestamp": start_time,
             "repo_path": str(repo_path),
             "task_path": str(task_path),
             "dry_run": self.dry_run,
