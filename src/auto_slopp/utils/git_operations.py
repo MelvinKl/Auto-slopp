@@ -345,6 +345,44 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
         return False
 
 
+def create_and_checkout_branch(repo_dir: Path, branch: str, base_branch: str = "main", timeout: int = 60) -> bool:
+    """Create a new branch and check it out.
+
+    Args:
+        repo_dir: Path to the git repository
+        branch: Name of the new branch to create
+        base_branch: Name of the base branch to create from (default: main)
+        timeout: Timeout for git commands in seconds
+
+    Returns:
+        True if successful, False otherwise.
+    """
+    try:
+        logger.info(f"Creating and checking out branch '{branch}' from '{base_branch}' in {repo_dir.name}")
+
+        result = _run_git_command(
+            repo_dir,
+            "checkout",
+            "-b",
+            branch,
+            base_branch,
+            check=False,
+            timeout=timeout,
+        )
+
+        if result.returncode == 0:
+            logger.info(f"Successfully created and checked out branch '{branch}' in {repo_dir.name}")
+            return True
+
+        error = result.stderr.strip() or result.stdout.strip()
+        logger.error(f"Failed to create branch '{branch}' in {repo_dir.name}: {error}")
+        return False
+
+    except GitOperationError as e:
+        logger.error(f"Error creating branch '{branch}' in {repo_dir.name}: {str(e)}")
+        return False
+
+
 def push_branch(repo_dir: Path, branch: str, force: bool = True, timeout: int = 60) -> bool:
     """Push a branch to the remote repository.
 
