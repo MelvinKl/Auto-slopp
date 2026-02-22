@@ -238,13 +238,13 @@ class GitHubIssueWorker(Worker):
         if comments:
             comments_text = "\nComments:\n" + "\n".join(f"- {comment}" for comment in comments if comment)
         return (
-            f"Create a new branch that starts with ai/ from base origin/main and implement the following:\n"
+            f"Create a new branch that starts with ai/ from base origin/main if no branch or PR is linked in the issue. If there is a branch/PR linked in the issue use this branch and implement the following:\n"
             f"Title: {issue_title}\n"
             f"Description:{body_text}\n"
             f"{comments_text}\n"
             f"Keep your implementation simple. Only implement what is required. Check if there are components you can reuse. "
             f"Ensure that 'make test' runs successful. Only push if ALL tests are successful. "
-            f"Check if you need to update the README.md. Push your changes and create a pull request on github."
+            f"Check if you need to update the README.md."
         )
 
     def _create_error_result(
