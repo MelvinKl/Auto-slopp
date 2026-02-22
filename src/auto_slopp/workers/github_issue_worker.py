@@ -86,9 +86,7 @@ class GitHubIssueWorker(Worker):
             pass  # No issues to process
         elif issue_result["success"]:
             results["issues_processed"] += 1
-            results["openagent_executions"] += issue_result.get(
-                "openagent_executions", 0
-            )
+            results["openagent_executions"] += issue_result.get("openagent_executions", 0)
             results["prs_created"] += issue_result.get("prs_created", 0)
             results["issues_closed"] += issue_result.get("issues_closed", 0)
         else:
@@ -100,9 +98,7 @@ class GitHubIssueWorker(Worker):
 
         return results
 
-    def _create_results_dict(
-        self, start_time: float, repo_path: Path, task_path: Path
-    ) -> Dict[str, Any]:
+    def _create_results_dict(self, start_time: float, repo_path: Path, task_path: Path) -> Dict[str, Any]:
         """Create the initial results dictionary."""
         return {
             "worker_name": "GitHubIssueWorker",
@@ -140,9 +136,7 @@ class GitHubIssueWorker(Worker):
                 timeout=60,
             )
             if not pull_success:
-                self.logger.warning(
-                    f"Failed to pull latest changes from {repo_dir.name}"
-                )
+                self.logger.warning(f"Failed to pull latest changes from {repo_dir.name}")
 
         issues = get_open_issues(repo_dir)
 
@@ -176,44 +170,30 @@ class GitHubIssueWorker(Worker):
         }
 
         try:
-            instructions = self._build_instructions(
-                issue_title, issue_body, comment_texts
-            )
-            branch_name = (
-                f"ai/issue-{issue_number}-{issue_title[:30].replace(' ', '-').lower()}"
-            )
+            instructions = self._build_instructions(issue_title, issue_body, comment_texts)
+            branch_name = f"ai/issue-{issue_number}-{issue_title[:30].replace(' ', '-').lower()}"
 
             if self.dry_run:
-                self.logger.info(
-                    f"DRY RUN: Would create branch {branch_name} and execute instructions"
-                )
+                self.logger.info(f"DRY RUN: Would create branch {branch_name} and execute instructions")
                 result["openagent_executed"] = True
                 result["success"] = True
                 return result
 
-            branch_created = create_and_checkout_branch(
-                repo_dir, branch_name, base_branch="main"
-            )
+            branch_created = create_and_checkout_branch(repo_dir, branch_name, base_branch="main")
             if not branch_created:
                 result["error"] = f"Failed to create branch {branch_name}"
                 return result
 
-            openagent_result = execute_with_instructions(
-                instructions, repo_dir, self.agent_args, self.timeout
-            )
+            openagent_result = execute_with_instructions(instructions, repo_dir, self.agent_args, self.timeout)
             result["openagent_executed"] = openagent_result["success"]
 
             if not openagent_result["success"]:
-                result["error"] = (
-                    f"OpenCode execution failed: {openagent_result.get('error', 'Unknown error')}"
-                )
+                result["error"] = f"OpenCode execution failed: {openagent_result.get('error', 'Unknown error')}"
                 return result
 
             current_branch = get_current_branch(repo_dir)
             if current_branch in ("main", "master"):
-                result["error"] = (
-                    f"CLI did not create a new branch, still on '{current_branch}'"
-                )
+                result["error"] = f"CLI did not create a new branch, still on '{current_branch}'"
                 return result
 
             pr_body = f"Closes #{issue_number}\n\n{issue_body}"
@@ -228,9 +208,7 @@ class GitHubIssueWorker(Worker):
             if pr_result:
                 result["pr_created"] = True
                 result["pr_url"] = pr_result.get("url", "")
-                self.logger.info(
-                    f"Created PR for issue #{issue_number}: {pr_result.get('url', 'N/A')}"
-                )
+                self.logger.info(f"Created PR for issue #{issue_number}: {pr_result.get('url', 'N/A')}")
             else:
                 result["error"] = "Failed to create pull request"
                 return result
@@ -244,9 +222,7 @@ class GitHubIssueWorker(Worker):
                 comment_success = comment_on_issue(repo_dir, issue_number, comment)
                 result["issue_commented"] = comment_success
                 if not comment_success:
-                    self.logger.warning(
-                        f"Failed to add comment to issue #{issue_number}"
-                    )
+                    self.logger.warning(f"Failed to add comment to issue #{issue_number}")
             else:
                 self.logger.warning(f"Failed to close issue #{issue_number}")
 
@@ -258,9 +234,7 @@ class GitHubIssueWorker(Worker):
 
         return result
 
-    def _build_instructions(
-        self, issue_title: str, issue_body: str, comments: Optional[List[str]] = None
-    ) -> str:
+    def _build_instructions(self, issue_title: str, issue_body: str, comments: Optional[List[str]] = None) -> str:
         """Build the instructions string from issue title, body, and comments.
 
         Args:
@@ -274,9 +248,7 @@ class GitHubIssueWorker(Worker):
         body_text = f"\n{issue_body}" if issue_body else ""
         comments_text = ""
         if comments:
-            comments_text = "\nComments:\n" + "\n".join(
-                f"- {comment}" for comment in comments if comment
-            )
+            comments_text = "\nComments:\n" + "\n".join(f"- {comment}" for comment in comments if comment)
         return (
             f"Create a new branch that starts with ai/ from base origin/main if no branch or PR is linked in the issue. If there is a branch/PR linked in the issue use this branch and implement the following:\n"
             f"Title: {issue_title}\n"
