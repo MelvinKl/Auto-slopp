@@ -70,6 +70,10 @@ class UpdatePRBranchesWorker(Worker):
 
         if not pr_branches:
             self.logger.info(f"No open PR branches found in {repo_path.name}")
+            self.logger.info(
+                f"UpdatePRBranchesWorker completed for {repo_path.name}. "
+                f"Updated: {results['branches_updated']}, Failed: {results['branches_failed']}"
+            )
             return results
 
         for branch in pr_branches:
