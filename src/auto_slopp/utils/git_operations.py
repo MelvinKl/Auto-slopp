@@ -345,6 +345,64 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
         return False
 
 
+def create_and_checkout_branch(
+    repo_dir: Path,
+    branch_name: str,
+    base_branch: str = "main",
+    fetch_first: bool = True,
+    timeout: int = 60,
+) -> bool:
+    """Create a new branch from a base branch and checkout.
+
+    Args:
+        repo_dir: Path to the git repository
+        branch_name: Name of the new branch to create
+        base_branch: Base branch to create from (default: main)
+        fetch_first: Whether to fetch from remote before creating
+        timeout: Timeout for individual git commands in seconds
+
+    Returns:
+        True if branch creation and checkout successful, False otherwise
+    """
+    try:
+        logger.info(f"Creating branch '{branch_name}' from '{base_branch}' in {repo_dir.name}")
+
+        if fetch_first:
+            logger.debug(f"Fetching latest changes for {repo_dir.name}")
+            fetch_result = _run_git_command(repo_dir, "fetch", "origin", check=False, timeout=timeout)
+            if fetch_result.returncode != 0:
+                fetch_error = fetch_result.stderr.strip() or fetch_result.stdout.strip()
+                logger.warning(f"Fetch failed for {repo_dir.name}: {fetch_error}")
+
+        checkout_result = _run_git_command(repo_dir, "checkout", base_branch, check=False, timeout=timeout)
+        if checkout_result.returncode != 0:
+            checkout_error = checkout_result.stderr.strip() or checkout_result.stdout.strip()
+            logger.error(f"Failed to checkout base branch '{base_branch}': {checkout_error}")
+            return False
+
+        create_result = _run_git_command(repo_dir, "checkout", "-b", branch_name, check=False, timeout=timeout)
+        if create_result.returncode != 0:
+            create_error = create_result.stderr.strip() or create_result.stdout.strip()
+            if "already exists" in create_error:
+                logger.info(f"Branch '{branch_name}' already exists, checking it out")
+                switch_result = _run_git_command(repo_dir, "checkout", branch_name, check=False, timeout=timeout)
+                if switch_result.returncode != 0:
+                    switch_error = switch_result.stderr.strip() or switch_result.stdout.strip()
+                    logger.error(f"Failed to checkout existing branch '{branch_name}': {switch_error}")
+                    return False
+                return True
+            logger.error(f"Failed to create branch '{branch_name}': {create_error}")
+            return False
+
+        logger.info(f"Successfully created and checked out branch '{branch_name}'")
+        return True
+
+    except GitOperationError as e:
+        error_msg = f"Error creating branch '{branch_name}': {str(e)}"
+        logger.error(f"Error creating branch '{branch_name}' in {repo_dir.name}: {str(e)}")
+        return False
+
+
 def push_branch(repo_dir: Path, branch: str, force: bool = True, timeout: int = 60) -> bool:
     """Push a branch to the remote repository.
 
