@@ -44,11 +44,11 @@ pytest -x
 # Run specific test file
 pytest tests/test_worker.py
 
-# Run specific test class
-pytest tests/test_example_workers.py::TestSimpleLogger
+  # Run specific test class
+  pytest tests/test_task_processor_worker.py::TestTaskProcessorWorker
 
-# Run specific test method
-pytest tests/test_example_workers.py::TestSimpleLogger::test_init_default
+  # Run specific test method
+  pytest tests/test_worker.py::TestWorker::test_worker_is_abstract
 ```
 
 ### Running Specific Test Categories
@@ -72,13 +72,14 @@ pytest -m "not performance"
 tests/
 ├── conftest.py              # Pytest configuration and shared fixtures
 ├── test_discovery.py         # Worker discovery tests
-├── test_example_workers.py  # Example worker implementation tests
-├── test_integration.py       # CI/CD integration tests
 ├── test_main.py             # Main entry point tests
-├── test_performance.py      # Performance benchmarking tests
 ├── test_settings.py         # Configuration tests
 ├── test_telegram_handler.py # Telegram integration tests
-└── test_worker.py           # Base worker class tests
+├── test_worker.py           # Base worker class tests
+├── test_task_processor_worker.py  # TaskProcessor tests
+├── test_git_operations.py    # Git operations tests
+├── test_file_operations.py   # File operations tests
+└── test_*_worker.py         # Other worker tests
 ```
 
 ### Key Fixtures
