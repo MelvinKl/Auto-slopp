@@ -89,6 +89,16 @@ class TestGitHubIssueWorker:
         assert "This is a bug" in instructions
         assert "ai/" in instructions
 
+    def test_build_instructions_with_branch_name(self):
+        """Test instruction building with branch name provided."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        instructions = worker._build_instructions("Fix bug", "This is a bug", branch_name="ai/issue-1-fix-bug")
+        assert "Fix bug" in instructions
+        assert "This is a bug" in instructions
+        assert "already on branch 'ai/issue-1-fix-bug'" in instructions
+        assert "Create a new branch" not in instructions
+
     def test_build_instructions_empty_body(self):
         """Test instruction building with empty body."""
         worker = GitHubIssueWorker(dry_run=True)

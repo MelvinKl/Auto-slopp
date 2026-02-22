@@ -169,8 +169,8 @@ class GitHubIssueWorker(Worker):
         }
 
         try:
-            instructions = self._build_instructions(issue_title, issue_body, comment_texts)
             branch_name = f"ai/issue-{issue_number}-{issue_title[:30].replace(' ', '-').lower()}"
+            instructions = self._build_instructions(issue_title, issue_body, comment_texts, branch_name=branch_name)
 
             if self.dry_run:
                 self.logger.info(f"DRY RUN: Would create branch {branch_name} and execute instructions")
@@ -228,13 +228,20 @@ class GitHubIssueWorker(Worker):
 
         return result
 
-    def _build_instructions(self, issue_title: str, issue_body: str, comments: Optional[List[str]] = None) -> str:
+    def _build_instructions(
+        self,
+        issue_title: str,
+        issue_body: str,
+        comments: Optional[List[str]] = None,
+        branch_name: Optional[str] = None,
+    ) -> str:
         """Build the instructions string from issue title, body, and comments.
 
         Args:
             issue_title: Issue title
             issue_body: Issue body
             comments: List of comment bodies
+            branch_name: Name of the branch already created for this issue
 
         Returns:
             Complete instructions string
@@ -243,8 +250,23 @@ class GitHubIssueWorker(Worker):
         comments_text = ""
         if comments:
             comments_text = "\nComments:\n" + "\n".join(f"- {comment}" for comment in comments if comment)
+
+        branch_instruction = ""
+        if branch_name:
+            branch_instruction = (
+                f"You are already on branch '{branch_name}'. "
+                f"Work on this branch, implement the changes, commit them, and push.\n"
+            )
+        else:
+            branch_instruction = (
+                "Create a new branch that starts with ai/ from base origin/main "
+                "if no branch or PR is linked in the issue. "
+                "If there is a branch/PR linked in the issue use this branch.\n"
+            )
+
         return (
-            f"Create a new branch that starts with ai/ from base origin/main if no branch or PR is linked in the issue. If there is a branch/PR linked in the issue use this branch and implement the following:\n"
+            f"{branch_instruction}"
+            f"Implement the following:\n"
             f"Title: {issue_title}\n"
             f"Description:{body_text}\n"
             f"{comments_text}\n"
