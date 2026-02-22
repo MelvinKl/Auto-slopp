@@ -91,7 +91,7 @@ def run_opencode(
     logger.info(f"Agent args: {agent_args}")
 
     # Build the OpenCode command
-    cmd = ["opencode", "--agent", "openagent", "run"] + agent_args
+    cmd = ["opencode", "--agent", "openagent", "--model", "opencode/glm-5-free", "run"] + agent_args
 
     # Add additional instructions as the last argument if provided
     if additional_instructions:
