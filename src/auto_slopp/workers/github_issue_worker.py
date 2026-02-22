@@ -17,6 +17,7 @@ from auto_slopp.utils.cli_executor import execute_with_instructions
 from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     commit_and_push_changes,
+    get_current_branch,
 )
 from auto_slopp.utils.github_operations import (
     close_issue,
@@ -184,12 +185,17 @@ class GitHubIssueWorker(Worker):
                 result["error"] = f"OpenCode execution failed: {openagent_result.get('error', 'Unknown error')}"
                 return result
 
+            actual_branch = get_current_branch(repo_dir)
+            if actual_branch == "main" or actual_branch == "master":
+                result["error"] = "OpenCode did not create a new branch (still on main)"
+                return result
+
             pr_body = f"Closes #{issue_number}\n\n{issue_body}"
             pr_result = create_pull_request(
                 repo_dir,
                 title=issue_title,
                 body=pr_body,
-                head=branch_name,
+                head=actual_branch,
                 base="main",
             )
 
