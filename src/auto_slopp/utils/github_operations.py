@@ -248,7 +248,6 @@ def create_pull_request(
             head,
             "--base",
             base,
-            "--json=url,number",
             check=False,
         )
 
@@ -257,14 +256,20 @@ def create_pull_request(
             logger.error(f"Failed to create PR in {repo_dir.name}: {pr_error}")
             return None
 
-        pr_data = json.loads(result.stdout)
-        return pr_data
+        pr_url = result.stdout.strip()
+        pr_number = None
+        if pr_url:
+            parts = pr_url.rstrip("/").split("/")
+            if parts:
+                try:
+                    pr_number = int(parts[-1])
+                except ValueError, IndexError:
+                    pass
+
+        return {"url": pr_url, "number": pr_number}
 
     except GitHubOperationError as e:
         logger.error(f"Error creating PR in {repo_dir.name}: {str(e)}")
-        return None
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse PR creation JSON from {repo_dir.name}: {str(e)}")
         return None
     except Exception as e:
         logger.error(f"Unexpected error creating PR in {repo_dir.name}: {str(e)}")
