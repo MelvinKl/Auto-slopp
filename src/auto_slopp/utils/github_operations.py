@@ -101,6 +101,62 @@ def get_open_issues(repo_dir: Path) -> List[Dict[str, Any]]:
         return []
 
 
+def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]]:
+    """Get list of comments on an issue in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+        issue_number: Issue number to get comments for
+
+    Returns:
+        List of dictionaries containing comment information (body, author, createdAt).
+
+    Raises:
+        GitHubOperationError: If gh command fails
+    """
+    try:
+        result = _run_gh_command(
+            repo_dir,
+            "issue",
+            "view",
+            str(issue_number),
+            "--json=comments",
+            check=False,
+        )
+
+        if result.returncode != 0:
+            comment_error = result.stderr.strip() or result.stdout.strip()
+            logger.error(f"Failed to get comments for issue #{issue_number} in {repo_dir.name}: {comment_error}")
+            return []
+
+        data = json.loads(result.stdout)
+        # Extract comments from the issue view response
+        raw_comments = data.get("comments", [])
+
+        # Transform to expected format
+        comments = []
+        for comment in raw_comments:
+            comments.append(
+                {
+                    "body": comment.get("body", ""),
+                    "author": comment.get("author", {}).get("login") if comment.get("author") else None,
+                    "createdAt": comment.get("createdAt"),
+                }
+            )
+
+        return comments
+
+    except GitHubOperationError as e:
+        logger.error(f"Error getting comments for issue #{issue_number} from {repo_dir.name}: {str(e)}")
+        return []
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse comment JSON for issue #{issue_number} from {repo_dir.name}: {str(e)}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error getting comments for issue #{issue_number} from {repo_dir.name}: {str(e)}")
+        return []
+
+
 def close_issue(repo_dir: Path, issue_number: int) -> bool:
     """Close an issue in the repository.
 
@@ -126,6 +182,37 @@ def close_issue(repo_dir: Path, issue_number: int) -> bool:
         return False
     except Exception as e:
         logger.error(f"Unexpected error closing issue #{issue_number} in {repo_dir.name}: {str(e)}")
+        return False
+
+
+def comment_on_issue(repo_dir: Path, issue_number: int, comment: str) -> bool:
+    """Add a comment to an issue in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+        issue_number: Issue number to comment on
+        comment: Comment text to add
+
+    Returns:
+        True if successful, False otherwise.
+    """
+    try:
+        result = _run_gh_command(
+            repo_dir,
+            "issue",
+            "comment",
+            str(issue_number),
+            "--body",
+            comment,
+            check=False,
+        )
+        return result.returncode == 0
+
+    except GitHubOperationError as e:
+        logger.error(f"Error commenting on issue #{issue_number} in {repo_dir.name}: {str(e)}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error commenting on issue #{issue_number} in {repo_dir.name}: {str(e)}")
         return False
 
 
@@ -161,7 +248,6 @@ def create_pull_request(
             head,
             "--base",
             base,
-            "--json=url,number",
             check=False,
         )
 
@@ -170,14 +256,20 @@ def create_pull_request(
             logger.error(f"Failed to create PR in {repo_dir.name}: {pr_error}")
             return None
 
-        pr_data = json.loads(result.stdout)
-        return pr_data
+        pr_url = result.stdout.strip()
+        pr_number = None
+        if pr_url:
+            parts = pr_url.rstrip("/").split("/")
+            if parts:
+                try:
+                    pr_number = int(parts[-1])
+                except ValueError, IndexError:
+                    pass
+
+        return {"url": pr_url, "number": pr_number}
 
     except GitHubOperationError as e:
         logger.error(f"Error creating PR in {repo_dir.name}: {str(e)}")
-        return None
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse PR creation JSON from {repo_dir.name}: {str(e)}")
         return None
     except Exception as e:
         logger.error(f"Unexpected error creating PR in {repo_dir.name}: {str(e)}")
