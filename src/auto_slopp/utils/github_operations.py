@@ -271,6 +271,37 @@ def create_pull_request(
         return None
 
 
+def comment_on_pr(repo_dir: Path, pr_number: int, comment: str) -> bool:
+    """Add a comment to a pull request in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+        pr_number: PR number to comment on
+        comment: Comment text to add
+
+    Returns:
+        True if successful, False otherwise.
+    """
+    try:
+        result = _run_gh_command(
+            repo_dir,
+            "pr",
+            "comment",
+            str(pr_number),
+            "--body",
+            comment,
+            check=False,
+        )
+        return result.returncode == 0
+
+    except GitHubOperationError as e:
+        logger.error(f"Error commenting on PR #{pr_number} in {repo_dir.name}: {str(e)}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error commenting on PR #{pr_number} in {repo_dir.name}: {str(e)}")
+        return False
+
+
 def get_open_pr_branches(repo_dir: Path) -> List[str]:
     """Get list of branches from open PRs in the repository.
 

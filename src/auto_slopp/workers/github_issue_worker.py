@@ -20,6 +20,7 @@ from auto_slopp.utils.git_operations import (
 from auto_slopp.utils.github_operations import (
     close_issue,
     comment_on_issue,
+    comment_on_pr,
     create_pull_request,
     get_issue_comments,
     get_open_issues,
@@ -198,21 +199,29 @@ class GitHubIssueWorker(Worker):
             if pr_result:
                 result["pr_created"] = True
                 result["pr_url"] = pr_result.get("url", "")
+                result["pr_number"] = pr_result.get("number")
                 self.logger.info(f"Created PR for issue #{issue_number}: {pr_result.get('url', 'N/A')}")
             else:
                 result["error"] = "Failed to create pull request"
                 return result
 
+            pr_url = pr_result.get("url", "")
+            pr_number = pr_result.get("number")
+            issue_comment = f"Completed by PR: {pr_url}"
+            comment_success = comment_on_issue(repo_dir, issue_number, issue_comment)
+            result["issue_commented"] = comment_success
+            if not comment_success:
+                self.logger.warning(f"Failed to add comment to issue #{issue_number}")
+
             close_success = close_issue(repo_dir, issue_number)
             result["issue_closed"] = close_success
 
             if close_success:
-                pr_url = pr_result.get("url", "")
-                comment = f"Completed by PR: {pr_url}"
-                comment_success = comment_on_issue(repo_dir, issue_number, comment)
-                result["issue_commented"] = comment_success
-                if not comment_success:
-                    self.logger.warning(f"Failed to add comment to issue #{issue_number}")
+                pr_comment = f"Resolves #{issue_number}"
+                pr_comment_success = comment_on_pr(repo_dir, pr_number, pr_comment)
+                result["pr_commented"] = pr_comment_success
+                if not pr_comment_success:
+                    self.logger.warning(f"Failed to add comment to PR #{pr_number}")
             else:
                 self.logger.warning(f"Failed to close issue #{issue_number}")
 
