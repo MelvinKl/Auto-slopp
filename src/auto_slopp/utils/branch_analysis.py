@@ -138,7 +138,7 @@ def analyze_repository_branches(repo_dir: Path, days_threshold: int, dry_run: bo
         # Update result
         result.update(
             {
-                "success": True,
+                "success": len(failed_deletions) == 0,
                 "branches_deleted": len(deleted_branches),
                 "branches_failed_to_delete": len(failed_deletions),
                 "deleted_branches": deleted_branches,
