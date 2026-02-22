@@ -153,13 +153,6 @@ The `make test` target includes comprehensive validation:
 5. **Testing**: Full pytest test suite execution
 
 All checks must pass for the command to succeed, ensuring code quality and reliability before deployment.
-auto-slopp --repo-path /path/to/repo --task-path /path/to/tasks
-```
-
-Enable debug mode:
-```bash
-auto-slopp --debug
-```
 
 ### Directory Structure
 
@@ -297,47 +290,58 @@ class ConfigurableWorker(Worker):
 
 Auto-slopp automatically discovers worker implementations in the configured search path. Simply place your worker files in a directory that's included in `AUTO_SLOPP_WORKER_SEARCH_PATH` or the default search directory.
 
-## Example Workers
+## Available Workers
 
-The project includes several example workers:
+The project includes several workers for automation tasks:
 
-### SimpleLogger
-Logs basic information about repository and task paths.
+### TaskProcessorWorker
+Processes task files and executes them with CLI tools.
 ```python
-from auto_slopp.example_workers import SimpleLogger
+from auto_slopp.workers import TaskProcessorWorker
+
+# Initialize the worker
+worker = TaskProcessorWorker(
+    task_repo_path=Path("/path/to/tasks"),
+    timeout=300,
+    dry_run=True,
+)
+# Returns: processed files, execution results, git operations
+```
+
+### PRWorker
+Manages pull request operations.
+```python
+from auto_slopp.workers import PRWorker
 
 # Usage is automatic through discovery
-# Result includes: path info, existence checks, file counts
+# Returns: PR status, merge results, branch information
 ```
 
-### FileMonitor
-Scans repository for files matching specific patterns.
+### GitHubIssueWorker
+Handles GitHub issue operations.
 ```python
-from auto_slopp.example_workers import FileMonitor
+from auto_slopp.workers import GitHubIssueWorker
 
-# Configure with custom patterns
-monitor = FileMonitor(file_patterns=["*.py", "*.md", "*.json"])
-# Returns: file counts, sizes, breakdown by type
+# Usage is automatic through discovery
+# Returns: issue status, updates, management results
 ```
 
-### TaskProcessor
-Processes task files with size limits and content analysis.
+### StaleBranchCleanupWorker
+Cleans up stale git branches.
 ```python
-from auto_slopp.example_workers import TaskProcessor
+from auto_slopp.workers import StaleBranchCleanupWorker
 
-# Configure maximum file size
-processor = TaskProcessor(max_file_size=5*1024*1024)  # 5MB
-# Returns: processed files, content previews, metadata
+# Usage is automatic through discovery
+# Returns: cleaned branches, deletion status
 ```
 
-### HeartbeatWorker
-Demonstrates periodic execution with status messages.
+### UpdatePRBranchesWorker
+Updates pull request branches.
 ```python
-from auto_slopp.example_workers import HeartbeatWorker
+from auto_slopp.workers import UpdatePRBranchesWorker
 
-# Custom heartbeat message
-heartbeat = HeartbeatWorker(message="Custom service is running")
-# Returns: timestamp, message, path information
+# Usage is automatic through discovery
+# Returns: updated branches, merge status
 ```
 
 ## API Reference
@@ -443,8 +447,22 @@ Auto-slopp/
 │   │   ├── main.py              # Main entry point
 │   │   ├── worker.py            # Base Worker class
 │   │   ├── executor.py          # Worker discovery and execution
-│   │   ├── example_workers.py    # Example implementations
-│   │   └── telegram_handler.py  # Telegram logging integration
+│   │   ├── discovery.py         # Worker discovery utilities
+│   │   ├── telegram_handler.py  # Telegram logging integration
+│   │   ├── workers/             # Worker implementations
+│   │   │   ├── task_processor_worker.py
+│   │   │   ├── pr_worker.py
+│   │   │   ├── github_issue_worker.py
+│   │   │   ├── stale_branch_cleanup_worker.py
+│   │   │   └── update_pr_branches_worker.py
+│   │   └── utils/               # Utility modules
+│   │       ├── git_operations.py
+│   │       ├── github_operations.py
+│   │       ├── task_processing.py
+│   │       ├── file_operations.py
+│   │       ├── branch_analysis.py
+│   │       ├── repository_utils.py
+│   │       └── cli_executor.py
 │   └── settings/
 │       ├── __init__.py
 │       └── main.py              # Configuration management
@@ -452,7 +470,10 @@ Auto-slopp/
 │   ├── conftest.py              # Test fixtures
 │   ├── test_worker.py
 │   ├── test_settings.py
-│   └── test_telegram_handler.py
+│   ├── test_discovery.py
+│   ├── test_main.py
+│   ├── test_telegram_handler.py
+│   └── test_*_worker.py        # Worker tests
 ├── pyproject.toml               # Project configuration
 └── README.md
 ```

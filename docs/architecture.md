@@ -63,9 +63,9 @@ The system is designed around a pluggable worker architecture:
 │  │ Discovery   │  │ Execution   │  │ Aggregation │         │
 │  └─────────────┘  └─────────────┘  └─────────────┘         │
 ├─────────────────────────────────────────────────────────────┤
-│  Worker System (worker.py, example_workers.py)             │
+│  Worker System (worker.py, workers/)                         │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│  │ Base Worker │  │ Example     │  │ Custom      │         │
+│  │ Base Worker │  │ Built-in    │  │ Custom      │         │
 │  │ Interface   │  │ Workers     │  │ Workers     │         │
 │  └─────────────┘  └─────────────┘  └─────────────┘         │
 ├─────────────────────────────────────────────────────────────┤

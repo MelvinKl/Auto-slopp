@@ -106,8 +106,18 @@ Auto-slopp/
 │   │   ├── worker.py                # Abstract base worker class
 │   │   ├── executor.py              # Worker discovery and execution
 │   │   ├── discovery.py             # Worker discovery utilities
-│   │   ├── example_workers.py       # Example worker implementations
-│   │   └── telegram_handler.py      # Telegram logging integration
+│   │   ├── telegram_handler.py      # Telegram logging integration
+│   │   ├── workers/                 # Worker implementations
+│   │   │   ├── task_processor_worker.py
+│   │   │   ├── pr_worker.py
+│   │   │   ├── github_issue_worker.py
+│   │   │   ├── stale_branch_cleanup_worker.py
+│   │   │   └── update_pr_branches_worker.py
+│   │   └── utils/                   # Utility modules
+│   │       ├── git_operations.py
+│   │       ├── github_operations.py
+│   │       ├── task_processing.py
+│   │       └── cli_executor.py
 │   └── settings/
 │       ├── __init__.py
 │       └── main.py                  # Configuration management
@@ -116,11 +126,10 @@ Auto-slopp/
 │   ├── conftest.py                  # Test fixtures and configuration
 │   ├── test_main.py
 │   ├── test_worker.py
-│   ├── test_executor.py
 │   ├── test_discovery.py
 │   ├── test_settings.py
 │   ├── test_telegram_handler.py
-│   └── test_example_workers.py
+│   └── test_*_worker.py            # Worker tests
 ├── docs/
 │   ├── README.md                    # Documentation index
 │   ├── api-reference.md             # API documentation
