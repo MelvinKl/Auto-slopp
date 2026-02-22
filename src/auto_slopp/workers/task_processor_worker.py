@@ -192,22 +192,21 @@ class TaskProcessorWorker(Worker):
             else:
                 self.logger.warning(f"Failed to initialize git in task directory: {task_path.name}")
 
-        # Pull latest changes from task repository before processing
+        # Checkout task repository branch before processing
         if not self.dry_run:
-            self.logger.info(f"Pulling latest changes from task repository: {task_path.name}")
-            pull_success = checkout_branch_resilient(
+            checkout_success = checkout_branch_resilient(
                 repo_dir=task_path,
                 branch="main",
                 fetch_first=True,
                 timeout=60,
             )
 
-            if pull_success:
-                self.logger.info(f"Successfully pulled latest changes from task repository: {task_path.name}")
+            if checkout_success:
+                self.logger.info(f"Checked out branch in task repository: {task_path.name}")
             else:
-                self.logger.warning(f"Failed to pull latest changes from task repository: {task_path.name}")
+                self.logger.warning(f"Failed to checkout branch in task repository: {task_path.name}")
         else:
-            self.logger.info(f"DRY RUN: Would pull latest changes from task repository: {task_path.name}")
+            self.logger.info(f"DRY RUN: Would checkout branch in task repository: {task_path.name}")
 
         return process_repository(
             repo_dir=repo_dir,
