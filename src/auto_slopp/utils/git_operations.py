@@ -214,26 +214,6 @@ def delete_branch(repo_dir: Path, branch_name: str) -> bool:
         logger.error(f"Failed to delete branch '{branch_name}': {e}")
         return False
 
-        # Delete the branch
-        subprocess.run(
-            ["git", "branch", "-D", branch_name],
-            cwd=repo_dir,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-
-        logger.info(f"Successfully deleted branch '{branch_name}'")
-        return True
-
-    except subprocess.CalledProcessError as e:
-        # Check both stdout and stderr for error messages
-        error_output = (e.stderr.strip() or e.stdout.strip()) if e.stderr or e.stdout else str(e)
-        error_msg = f"Failed to delete branch '{branch_name}': {error_output}"
-        logger.error(f"Failed to delete branch '{branch_name}': {error_output}")
-        _handle_git_operation_failure("delete_branch", repo_dir, error_msg)
-        return False
-
 
 def has_changes(repo_dir: Path) -> bool:
     """Check if there are uncommitted changes in the repository.
@@ -744,46 +724,3 @@ def commit_all_changes(repo_dir: Path, commit_message: str) -> Tuple[bool, str]:
     except GitOperationError as e:
         error_msg = str(e)
         return False, f"Commit failed: {error_msg}"
-
-
-def pull_from_remote(repo_dir: Path, remote: str = "origin", branch: str = "main") -> Tuple[bool, str]:
-    """Pull changes from a remote branch.
-
-    Args:
-        repo_dir: Path to the git repository
-        remote: Remote name (default: origin)
-        branch: Branch name (default: main)
-
-    Returns:
-        Tuple of (success, message).
-    """
-    result = _run_git_command(repo_dir, "pull", remote, branch, check=False)
-
-    if result.returncode == 0:
-        return True, "Pull successful"
-
-    error_msg = result.stderr.strip() or result.stdout.strip()
-    return False, error_msg
-
-
-def push_to_remote(repo_dir: Path, remote: str = "origin", branch: Optional[str] = None) -> Tuple[bool, str]:
-    """Push changes to a remote branch.
-
-    Args:
-        repo_dir: Path to the git repository
-        remote: Remote name (default: origin)
-        branch: Branch name (default: current branch)
-
-    Returns:
-        Tuple of (success, message).
-    """
-    if branch is None:
-        branch = get_current_branch(repo_dir)
-
-    result = _run_git_command(repo_dir, "push", remote, branch, check=False)
-
-    if result.returncode == 0:
-        return True, "Push successful"
-
-    error_msg = result.stderr.strip() or result.stdout.strip()
-    return False, error_msg
