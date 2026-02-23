@@ -28,12 +28,11 @@ class UpdatePRBranchesWorker(Worker):
         # TODO: create a new file for github_operations and move ALL operations for github there. Not only from this file, from all files.
         pass
 
-    def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def run(self, repo_path: Path) -> Dict[str, Any]:
         """Execute PR branch update workflow for a single repository.
 
         Args:
             repo_path: Path to a single repository directory
-            task_path: Path to task directory or file (not used in this worker)
 
         Returns:
             Dictionary containing execution results and summary.

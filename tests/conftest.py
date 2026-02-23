@@ -90,8 +90,8 @@ from auto_slopp.worker import Worker
 class TestWorker(Worker):
     """Test worker for testing purposes."""
 
-    def run(self, repo_path: Path, task_path: Path) -> dict:
-        return {"status": "completed", "repo": str(repo_path), "task": str(task_path)}
+    def run(self, repo_path: Path) -> dict:
+        return {"status": "completed", "repo": str(repo_path)}
 '''
     (workers_dir / "test_worker.py").write_text(worker_code)
 
@@ -107,7 +107,6 @@ def mock_settings():
     """
     settings = MagicMock()
     settings.base_repo_path = Path("/test/repo")
-    settings.base_task_path = Path("/test/tasks")
     settings.worker_search_path = Path("/test/workers")
     settings.executor_sleep_interval = 1.0
     settings.debug = False

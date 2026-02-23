@@ -19,17 +19,15 @@ class Executor:
     their run methods while handling exceptions gracefully.
     """
 
-    def __init__(self, search_path: Path, repo_path: Path, task_path: Path):
+    def __init__(self, search_path: Path, repo_path: Path):
         """Initialize the executor.
 
         Args:
             search_path: Path to search for worker implementations
             repo_path: Path to the repository directory
-            task_path: Path to the task directory or file
         """
         self.search_path = search_path
         self.repo_path = repo_path
-        self.task_path = task_path
         self.running = False
 
     def start(self) -> None:
@@ -40,7 +38,7 @@ class Executor:
         try:
             while self.running:
                 self._run_iteration()
-                time.sleep(settings.executor_sleep_interval)  # Prevent tight loop
+                time.sleep(settings.executor_sleep_interval)
         except KeyboardInterrupt:
             print("\\nReceived interrupt signal, shutting down...")
         except Exception as e:
@@ -92,7 +90,6 @@ class Executor:
         try:
             print(f"Executing worker: {worker_class.__name__}")
 
-            # Check if this worker needs directory iteration (orchestrator-level)
             if self._worker_needs_directory_iteration(worker_class):
                 self._execute_worker_with_directories(worker_class)
             else:
@@ -123,7 +120,6 @@ class Executor:
             print(f"Repository path does not exist: {self.repo_path}")
             return
 
-        # Get all subdirectories in repo_path
         subdirectories = [d for d in self.repo_path.iterdir() if d.is_dir()]
 
         if not subdirectories:
@@ -132,20 +128,14 @@ class Executor:
 
         print(f"Found {len(subdirectories)} subdirectories to process")
 
-        # Execute worker for each subdirectory
         for subdirectory in subdirectories:
             try:
                 print(f"Processing subdirectory: {subdirectory.name}")
 
-                # Instantiate worker
                 worker = self._instantiate_worker(worker_class)
 
-                # Map repo_task_path to corresponding subdirectory
-                repo_task_path = self.task_path / subdirectory.name if self.task_path else None
-
-                # Execute worker on single subdirectory
                 start_time = time.time()
-                result = worker.run(subdirectory, repo_task_path)
+                result = worker.run(subdirectory)
                 execution_time = time.time() - start_time
 
                 print(f"Worker {worker_class.__name__} on {subdirectory.name} completed in {execution_time:.2f}s")
@@ -162,12 +152,10 @@ class Executor:
         Args:
             worker_class: Worker class to instantiate and execute
         """
-        # Instantiate worker with appropriate arguments
         worker = self._instantiate_worker(worker_class)
 
-        # Execute worker
         start_time = time.time()
-        result = worker.run(self.repo_path, self.task_path)
+        result = worker.run(self.repo_path)
         execution_time = time.time() - start_time
 
         print(f"Worker {worker_class.__name__} completed in {execution_time:.2f}s")
@@ -178,18 +166,15 @@ class Executor:
 def run_executor(
     search_path: Optional[Path] = None,
     repo_path: Optional[Path] = None,
-    task_path: Optional[Path] = None,
 ) -> None:
     """Run the executor with the given parameters or settings defaults.
 
     Args:
         search_path: Path to search for worker implementations (optional)
         repo_path: Path to the repository directory (optional)
-        task_path: Path to the task directory or file (optional)
     """
     executor = Executor(
         search_path=search_path or settings.worker_search_path,
         repo_path=repo_path or settings.base_repo_path,
-        task_path=task_path or settings.base_task_path,
     )
     executor.start()

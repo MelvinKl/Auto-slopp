@@ -159,7 +159,7 @@ class Worker(ABC):
     """Abstract base class for all worker implementations."""
     
     @abstractmethod
-    def run(self, repo_path: Path, task_path: Path) -> Any:
+    def run(self, repo_path: Path) -> Any:
         """Execute the worker's automation task."""
         pass
 ```
@@ -202,7 +202,6 @@ class Settings(BaseSettings):
     """Application settings with environment variable support."""
     
     base_repo_path: Path = Field(default_factory=lambda: Path.cwd())
-    base_task_path: Path = Field(default_factory=lambda: Path.cwd() / "tasks")
     debug: bool = Field(default=False)
     
     class Config:
@@ -321,7 +320,6 @@ def mock_settings():
     """Create mock settings for testing."""
     settings = Mock()
     settings.base_repo_path = Path("/test/repo")
-    settings.base_task_path = Path("/test/tasks")
     settings.debug = True
     return settings
 
@@ -329,7 +327,7 @@ def mock_settings():
 def sample_worker():
     """Create a sample worker for testing."""
     class SampleWorker(Worker):
-        def run(self, repo_path, task_path):
+        def run(self, repo_path):
             return {"status": "test", "repo": str(repo_path)}
     return SampleWorker()
 ```
@@ -354,11 +352,11 @@ class TestWorker:
     def test_custom_worker_implementation(self, temp_repo_path):
         """Test custom worker implementation."""
         class TestWorker(Worker):
-            def run(self, repo_path, task_path):
+            def run(self, repo_path):
                 return {"test": True}
         
         worker = TestWorker()
-        result = worker.run(temp_repo_path, temp_repo_path / "task")
+        result = worker.run(temp_repo_path)
         
         assert result["test"] is True
 ```
@@ -381,7 +379,7 @@ class TestExecutor:
 from auto_slopp.worker import Worker
 
 class TestWorker(Worker):
-    def run(self, repo_path, task_path):
+    def run(self, repo_path):
         return {"discovered": True}
 """)
         
@@ -555,11 +553,11 @@ class DebugWorker(Worker):
     def __init__(self):
         self.logger = logging.getLogger(f"{__name__}.DebugWorker")
     
-    def run(self, repo_path, task_path):
-        self.logger.debug(f"Starting worker with repo={repo_path}, task={task_path}")
+    def run(self, repo_path):
+        self.logger.debug(f"Starting worker with repo={repo_path}")
         
         try:
-            result = self._do_work(repo_path, task_path)
+            result = self._do_work(repo_path)
             self.logger.debug(f"Worker completed successfully: {result}")
             return result
         except Exception as e:
@@ -575,7 +573,7 @@ Add breakpoints for debugging:
 import pdb
 
 class DebugWorker(Worker):
-    def run(self, repo_path, task_path):
+    def run(self, repo_path):
         pdb.set_trace()  # Breakpoint
         # ... rest of the code
 ```
@@ -646,14 +644,14 @@ import logging
 class WorkerBase(Worker):
     """Base worker with error handling."""
     
-    def run(self, repo_path: Path, task_path: Path) -> Any:
+    def run(self, repo_path: Path) -> Any:
         try:
-            return self._execute(repo_path, task_path)
+            return self._execute(repo_path)
         except Exception as e:
             self.logger.error(f"Worker {self.__class__.__name__} failed: {e}")
             return {"error": str(e), "status": "failed"}
     
-    def _execute(self, repo_path: Path, task_path: Path) -> Any:
+    def _execute(self, repo_path: Path) -> Any:
         """Override this method in subclasses."""
         raise NotImplementedError
 ```

@@ -12,7 +12,6 @@ from settings.main import settings
 
 def setup_logging() -> None:
     """Set up application logging with optional Telegram integration."""
-    # Configure basic logging
     log_level = logging.DEBUG if settings.debug else logging.INFO
     logging.basicConfig(
         level=log_level,
@@ -20,14 +19,12 @@ def setup_logging() -> None:
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    # Add Telegram handler if enabled
     telegram_handler = setup_telegram_logging(level=log_level)
     if telegram_handler:
         logger = logging.getLogger("auto_slopp")
         logger.addHandler(telegram_handler)
         logger.info("Telegram logging integration enabled")
 
-    # Configure httpx logging to be less noisy
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
@@ -44,7 +41,6 @@ def parse_arguments() -> argparse.Namespace:
 Examples:
   auto-slopp                                    # Use settings defaults
   auto-slopp --repo-path /path/to/repo          # Custom repository path
-  auto-slopp --task-path /path/to/tasks         # Custom task path
   auto-slopp --debug                            # Enable debug mode
         """,
     )
@@ -53,12 +49,6 @@ Examples:
         "--repo-path",
         type=Path,
         help="Path to the repository directory (overrides AUTO_SLOPP_BASE_REPO_PATH)",
-    )
-
-    parser.add_argument(
-        "--task-path",
-        type=Path,
-        help="Path to the task directory or file (overrides AUTO_SLOPP_BASE_TASK_PATH)",
     )
 
     parser.add_argument(
@@ -80,22 +70,17 @@ Examples:
 
 def main() -> None:
     """Main entry point for Auto-slopp."""
-    # Parse command line arguments
     args = parse_arguments()
 
-    # Override settings with command line arguments if provided
     repo_path = args.repo_path or settings.base_repo_path
-    task_path = args.task_path or settings.base_task_path
     search_path = args.search_path or settings.worker_search_path
     debug = args.debug or settings.debug
 
-    # Set up logging
     setup_logging()
     logger = logging.getLogger("auto_slopp")
 
     logger.info("Auto-slopp starting...")
     logger.info(f"Repository path: {repo_path}")
-    logger.info(f"Task path: {task_path}")
     logger.info(f"Search path: {search_path}")
     logger.info(f"Debug mode: {debug}")
     logger.info(f"Telegram logging: {'enabled' if settings.telegram_enabled else 'disabled'}")
@@ -104,7 +89,7 @@ def main() -> None:
         logger.debug("Debug mode enabled - showing detailed logs")
 
     try:
-        run_executor(search_path=search_path, repo_path=repo_path, task_path=task_path)
+        run_executor(search_path=search_path, repo_path=repo_path)
     except KeyboardInterrupt:
         logger.info("Shutdown requested by user")
         sys.exit(0)

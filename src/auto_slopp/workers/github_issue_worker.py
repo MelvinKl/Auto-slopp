@@ -56,12 +56,11 @@ class GitHubIssueWorker(Worker):
         self.dry_run = dry_run
         self.logger = logging.getLogger("auto_slopp.workers.GitHubIssueWorker")
 
-    def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def run(self, repo_path: Path) -> Dict[str, Any]:
         """Execute the GitHub issue processing workflow for a single repository.
 
         Args:
             repo_path: Path to the repository directory
-            task_path: Path to the task directory (unused but kept for signature)
 
         Returns:
             Dictionary containing execution results and statistics
@@ -73,11 +72,10 @@ class GitHubIssueWorker(Worker):
             return self._create_error_result(
                 start_time,
                 repo_path,
-                task_path,
                 f"Repository path does not exist: {repo_path}",
             )
 
-        results = self._create_results_dict(start_time, repo_path, task_path)
+        results = self._create_results_dict(start_time, repo_path)
 
         issue_result = self._process_single_issue(repo_path)
         results["issue_results"].append(issue_result)
@@ -98,14 +96,13 @@ class GitHubIssueWorker(Worker):
 
         return results
 
-    def _create_results_dict(self, start_time: float, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def _create_results_dict(self, start_time: float, repo_path: Path) -> Dict[str, Any]:
         """Create the initial results dictionary."""
         return {
             "worker_name": "GitHubIssueWorker",
             "execution_time": 0,
             "timestamp": start_time,
             "repo_path": str(repo_path),
-            "task_path": str(task_path),
             "dry_run": self.dry_run,
             "repositories_processed": 1,
             "repositories_with_errors": 0,
@@ -281,16 +278,13 @@ class GitHubIssueWorker(Worker):
             f"Check if you need to update the README.md."
         )
 
-    def _create_error_result(
-        self, start_time: float, repo_path: Path, task_path: Path, error_msg: str
-    ) -> Dict[str, Any]:
+    def _create_error_result(self, start_time: float, repo_path: Path, error_msg: str) -> Dict[str, Any]:
         """Create an error result dictionary."""
         return {
             "worker_name": "GitHubIssueWorker",
             "execution_time": self._get_elapsed_time(start_time),
             "timestamp": start_time,
             "repo_path": str(repo_path),
-            "task_path": str(task_path),
             "dry_run": self.dry_run,
             "success": False,
             "error": error_msg,

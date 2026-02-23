@@ -30,28 +30,22 @@ class TestUpdatePRBranchesWorker:
             os.system("git commit -m 'Initial commit'")
             yield repo_dir
 
-    @pytest.fixture
-    def temp_task_dir(self):
-        """Create a temporary task directory for testing."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            yield Path(temp_dir) / "test_task"
-
     def test_worker_initialization(self):
         """Test worker initialization."""
         worker = UpdatePRBranchesWorker()
         assert worker is not None
         assert worker.logger is not None
 
-    def test_run_with_nonexistent_repo(self, temp_task_dir):
+    def test_run_with_nonexistent_repo(self):
         """Test run with non-existent repository."""
         worker = UpdatePRBranchesWorker()
-        result = worker.run(Path("/tmp/nonexistent"), temp_task_dir)
+        result = worker.run(Path("/tmp/nonexistent"))
 
         assert result["success"] is False
         assert result["worker_name"] == "UpdatePRBranchesWorker"
         assert "does not exist" in result["error"]
 
-    def test_get_open_pr_branches_empty(self, temp_repo_dir, temp_task_dir):
+    def test_get_open_pr_branches_empty(self, temp_repo_dir):
         """Test getting open PR branches when none exist."""
         worker = UpdatePRBranchesWorker()
 
@@ -181,12 +175,12 @@ class TestUpdatePRBranchesWorker:
 
         assert result is False
 
-    def test_result_structure(self, temp_repo_dir, temp_task_dir):
+    def test_result_structure(self, temp_repo_dir):
         """Test that worker result has correct structure."""
         worker = UpdatePRBranchesWorker()
 
         with patch.object(worker, "_get_open_pr_branches", return_value=[]):
-            result = worker.run(temp_repo_dir, temp_task_dir)
+            result = worker.run(temp_repo_dir)
 
         assert "worker_name" in result
         assert result["worker_name"] == "UpdatePRBranchesWorker"
@@ -200,7 +194,7 @@ class TestUpdatePRBranchesWorker:
 
     @patch("auto_slopp.workers.update_pr_branches_worker.checkout_branch_resilient")
     @patch("subprocess.run")
-    def test_full_workflow(self, mock_run, mock_checkout, temp_repo_dir, temp_task_dir):
+    def test_full_workflow(self, mock_run, mock_checkout, temp_repo_dir):
         """Test full workflow of updating PR branches."""
         worker = UpdatePRBranchesWorker()
 
@@ -224,7 +218,7 @@ class TestUpdatePRBranchesWorker:
 
         mock_run.side_effect = run_side_effect
 
-        result = worker.run(temp_repo_dir, temp_task_dir)
+        result = worker.run(temp_repo_dir)
 
         assert result["success"] is True
         assert result["branches_updated"] == 1

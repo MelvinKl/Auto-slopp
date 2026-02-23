@@ -120,7 +120,7 @@ class Executor:
     def discover_workers(self) -> List[Type[Worker]]:
         """Discover worker implementations dynamically."""
         
-    def execute_workers(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def execute_workers(self, repo_path: Path) -> Dict[str, Any]:
         """Execute all discovered workers."""
 ```
 
@@ -139,7 +139,7 @@ class Worker(ABC):
     """Abstract base class for all worker implementations."""
     
     @abstractmethod
-    def run(self, repo_path: Path, task_path: Path) -> Any:
+    def run(self, repo_path: Path) -> Any:
         """Execute the worker's automation task."""
         pass
 ```
@@ -160,7 +160,6 @@ class Settings(BaseSettings):
     
     # Path configuration
     base_repo_path: Path = Field(default_factory=lambda: Path.cwd())
-    base_task_path: Path = Field(default_factory=lambda: Path.cwd() / "tasks")
     
     # Execution configuration
     debug: bool = Field(default=False)
@@ -226,7 +225,7 @@ Execute → For Each Worker → Instantiate → Run → Collect Results → Aggr
 **Detailed Flow:**
 1. **Worker Iteration**: Each discovered worker is processed
 2. **Instantiation**: Worker instances are created (with configuration if needed)
-3. **Execution**: Worker.run() is called with repo_path and task_path
+3. **Execution**: Worker.run() is called with repo_path
 4. **Result Collection**: Individual worker results are collected
 5. **Aggregation**: Results are aggregated into a unified response
 6. **Error Handling**: Failed workers are logged but don't stop execution
@@ -258,8 +257,7 @@ def main():
     
     # Execute workers
     results = executor.execute_workers(
-        repo_path=settings.base_repo_path,
-        task_path=settings.base_task_path
+        repo_path=settings.base_repo_path
     )
 ```
 
@@ -267,7 +265,7 @@ def main():
 
 ```python
 # executor.py
-def execute_workers(self, repo_path: Path, task_path: Path):
+def execute_workers(self, repo_path: Path):
     results = {}
     
     for worker_class in self.workers:
@@ -276,7 +274,7 @@ def execute_workers(self, repo_path: Path, task_path: Path):
             worker = worker_class()
             
             # Execute worker
-            result = worker.run(repo_path, task_path)
+            result = worker.run(repo_path)
             results[worker_class.__name__] = result
             
         except Exception as e:
@@ -317,7 +315,7 @@ class CustomWorker(Worker):
     def __init__(self, custom_config: str = "default"):
         self.custom_config = custom_config
     
-    def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def run(self, repo_path: Path) -> Dict[str, Any]:
         # Custom automation logic
         return {
             "custom_result": "success",
