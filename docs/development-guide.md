@@ -108,7 +108,6 @@ Auto-slopp/
 │   │   ├── discovery.py             # Worker discovery utilities
 │   │   ├── telegram_handler.py      # Telegram logging integration
 │   │   ├── workers/                 # Worker implementations
-│   │   │   ├── task_processor_worker.py
 │   │   │   ├── pr_worker.py
 │   │   │   ├── github_issue_worker.py
 │   │   │   ├── stale_branch_cleanup_worker.py
@@ -116,7 +115,9 @@ Auto-slopp/
 │   │   └── utils/                   # Utility modules
 │   │       ├── git_operations.py
 │   │       ├── github_operations.py
-│   │       ├── task_processing.py
+│   │       ├── branch_analysis.py
+│   │       ├── file_operations.py
+│   │       ├── repository_utils.py
 │   │       └── cli_executor.py
 │   └── settings/
 │       ├── __init__.py
