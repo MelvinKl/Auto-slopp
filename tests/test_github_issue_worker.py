@@ -2,7 +2,7 @@
 
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -29,13 +29,12 @@ class TestGitHubIssueWorker:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_path = Path(temp_dir) / "repos" / "test_repo"
             repo_path.mkdir(parents=True)
-            task_path = Path(temp_dir) / "tasks"
 
             with patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues:
                 mock_issues.return_value = []
 
                 worker = GitHubIssueWorker(dry_run=True)
-                result = worker.run(repo_path, task_path)
+                result = worker.run(repo_path)
 
                 assert result["success"] is True
                 assert result["repositories_processed"] == 1
@@ -47,7 +46,6 @@ class TestGitHubIssueWorker:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_path = Path(temp_dir) / "repos" / "test_repo"
             repo_path.mkdir(parents=True)
-            task_path = Path(temp_dir) / "tasks"
 
             mock_issue = {
                 "number": 1,
@@ -60,7 +58,7 @@ class TestGitHubIssueWorker:
                 mock_issues.return_value = [mock_issue]
 
                 worker = GitHubIssueWorker(dry_run=True)
-                result = worker.run(repo_path, task_path)
+                result = worker.run(repo_path)
 
                 assert result["success"] is True
                 assert result["repositories_processed"] == 1
@@ -72,10 +70,9 @@ class TestGitHubIssueWorker:
         """Test run with nonexistent repository path."""
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_path = Path(temp_dir) / "nonexistent_repo"
-            task_path = Path(temp_dir) / "tasks"
 
             worker = GitHubIssueWorker(dry_run=True)
-            result = worker.run(repo_path, task_path)
+            result = worker.run(repo_path)
 
             assert result["success"] is False
             assert "error" in result
@@ -115,7 +112,6 @@ class TestGitHubIssueWorker:
         result = worker._create_error_result(
             start_time,
             Path("/test/repo"),
-            Path("/test/tasks"),
             "Test error",
         )
 

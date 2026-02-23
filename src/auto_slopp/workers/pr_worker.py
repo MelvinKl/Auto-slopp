@@ -32,12 +32,11 @@ class PRWorker(Worker):
         self.timeout = timeout
         self.logger = logging.getLogger("auto_slopp.workers.PRWorker")
 
-    def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def run(self, repo_path: Path) -> Dict[str, Any]:
         """Execute PR branch testing workflow for a single repository.
 
         Args:
             repo_path: Path to a single repository directory
-            task_path: Path to task directory or file (not used in this worker)
 
         Returns:
             Dictionary containing execution results and summary.

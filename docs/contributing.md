@@ -241,7 +241,7 @@ class ExampleWorker(Worker):
         self.max_items = max_items
         self.logger = logging.getLogger(__name__)
     
-    def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def run(self, repo_path: Path) -> Dict[str, Any]:
         """Process items with configurable limits."""
         self.logger.info(f"Processing up to {self.max_items} items")
         
@@ -333,7 +333,6 @@ class WorkerResult:
 def execute_workers(
     workers: List[Type[Worker]],
     repo_path: Path,
-    task_path: Path,
     progress_callback: Optional[Callable[[str], None]] = None
 ) -> Dict[str, WorkerResult]:
     """Execute workers and return results."""
@@ -362,10 +361,10 @@ class WorkerExecutionError(WorkerError):
         self.cause = cause
         super().__init__(f"Worker {worker_name} failed: {cause}")
 
-def safe_execute_worker(worker: Worker, repo_path: Path, task_path: Path) -> Optional[Any]:
+def safe_execute_worker(worker: Worker, repo_path: Path) -> Optional[Any]:
     """Safely execute a worker with error handling."""
     try:
-        return worker.run(repo_path, task_path)
+        return worker.run(repo_path)
     except Exception as e:
         logger.error(f"Worker {worker.__class__.__name__} failed: {e}", exc_info=True)
         return None
@@ -413,11 +412,11 @@ class TestWorker:
     def test_custom_worker_implementation(self, temp_repo_path):
         """Test custom worker implementation."""
         class TestWorker(Worker):
-            def run(self, repo_path, task_path):
+            def run(self, repo_path):
                 return {"test": True, "repo": str(repo_path)}
         
         worker = TestWorker()
-        result = worker.run(temp_repo_path, temp_repo_path / "task")
+        result = worker.run(temp_repo_path)
         
         assert result["test"] is True
         assert result["repo"] == str(temp_repo_path)
@@ -429,12 +428,12 @@ class TestWorker:
         mock_getter.return_value = mock_logger
         
         class LoggingWorker(Worker):
-            def run(self, repo_path, task_path):
+            def run(self, repo_path):
                 self.logger.info("Test message")
                 return {"logged": True}
         
         worker = LoggingWorker()
-        worker.run(Path("/test"), Path("/test/task"))
+        worker.run(Path("/test"))
         
         mock_logger.info.assert_called_once_with("Test message")
 ```
@@ -457,11 +456,10 @@ from auto_slopp.worker import Worker
 from pathlib import Path
 
 class TestWorker(Worker):
-    def run(self, repo_path: Path, task_path: Path):
+    def run(self, repo_path: Path):
         return {
             "worker_name": "TestWorker",
-            "repo_exists": repo_path.exists(),
-            "task_exists": task_path.exists()
+            "repo_exists": repo_path.exists()
         }
 """)
         
@@ -472,7 +470,7 @@ class TestWorker(Worker):
         assert len(workers) == 1
         assert workers[0].__name__ == "TestWorker"
         
-        results = executor.execute_workers(tmp_path, tmp_path / "task")
+        results = executor.execute_workers(tmp_path)
         assert "TestWorker" in results
         assert results["TestWorker"]["worker_name"] == "TestWorker"
 ```
@@ -505,7 +503,6 @@ def mock_settings():
     """Create mock settings for testing."""
     settings = Mock()
     settings.base_repo_path = Path("/test/repo")
-    settings.base_task_path = Path("/test/tasks")
     settings.worker_search_path = Path("/test/workers")
     settings.debug = True
     settings.telegram_enabled = False
@@ -515,11 +512,10 @@ def mock_settings():
 def sample_worker_class():
     """Create a sample worker class for testing."""
     class SampleWorker(Worker):
-        def run(self, repo_path, task_path):
+        def run(self, repo_path):
             return {
                 "worker_name": "SampleWorker",
-                "repo_path": str(repo_path),
-                "task_path": str(task_path)
+                "repo_path": str(repo_path)
             }
     return SampleWorker
 ```

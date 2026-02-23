@@ -37,12 +37,11 @@ class StaleBranchCleanupWorker(Worker):
         self.dry_run = dry_run
         self.logger = logging.getLogger("auto_slopp.workers.StaleBranchCleanupWorker")
 
-    def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def run(self, repo_path: Path) -> Dict[str, Any]:
         """Execute stale branch cleanup for a single repository.
 
         Args:
             repo_path: Path to a single repository directory
-            task_path: Path to the task directory or file (unused in worker)
 
         Returns:
             Dictionary containing cleanup results and statistics.
@@ -50,13 +49,11 @@ class StaleBranchCleanupWorker(Worker):
         start_time = datetime.now(timezone.utc)
         self.logger.info(f"Starting stale branch cleanup for {repo_path}")
 
-        # Validate input path
-        validation_result = self._validate_input_path(repo_path, task_path, start_time)
+        validation_result = self._validate_input_path(repo_path, start_time)
         if validation_result:
             return validation_result
 
-        # Initialize results
-        results = self._create_results_dict(start_time, repo_path, task_path)
+        results = self._create_results_dict(start_time, repo_path)
 
         # Process the single repository
         repo_result = self._process_single_repository(repo_path)
@@ -69,12 +66,11 @@ class StaleBranchCleanupWorker(Worker):
 
         return results
 
-    def _validate_input_path(self, repo_path: Path, task_path: Path, start_time: datetime) -> Optional[Dict[str, Any]]:
+    def _validate_input_path(self, repo_path: Path, start_time: datetime) -> Optional[Dict[str, Any]]:
         """Validate the input repository path.
 
         Args:
             repo_path: Path to validate
-            task_path: Task path (for result structure)
             start_time: Start time for error result
 
         Returns:
@@ -86,7 +82,6 @@ class StaleBranchCleanupWorker(Worker):
                 "execution_time": (datetime.now(timezone.utc) - start_time).total_seconds(),
                 "timestamp": start_time.isoformat(),
                 "repo_path": str(repo_path),
-                "task_path": str(task_path),
                 "dry_run": self.dry_run,
                 "days_threshold": self.days_threshold,
                 "success": False,
@@ -99,13 +94,12 @@ class StaleBranchCleanupWorker(Worker):
             }
         return None
 
-    def _create_results_dict(self, start_time: datetime, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def _create_results_dict(self, start_time: datetime, repo_path: Path) -> Dict[str, Any]:
         """Create the initial results dictionary.
 
         Args:
             start_time: Start time of execution
             repo_path: Repository path
-            task_path: Task path
 
         Returns:
             Initialized results dictionary
@@ -115,7 +109,6 @@ class StaleBranchCleanupWorker(Worker):
             "execution_time": 0,
             "timestamp": start_time.isoformat(),
             "repo_path": str(repo_path),
-            "task_path": str(task_path),
             "dry_run": self.dry_run,
             "days_threshold": self.days_threshold,
             "repositories_processed": 0,

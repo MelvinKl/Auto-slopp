@@ -50,7 +50,7 @@ class AnotherClass:
 
 class ValidWorker(Worker):
     """Valid worker class."""
-    def run(self, repo_path: Path, task_path: Path):
+    def run(self, repo_path: Path):
         return {"status": "ok"}
 '''
         (temp_dir / "mixed_workers.py").write_text(worker_code)
@@ -62,24 +62,22 @@ class ValidWorker(Worker):
 
     def test_discover_workers_multiple_files(self, temp_dir):
         """Test discovery across multiple Python files."""
-        # First worker file
         worker1_code = """
 from pathlib import Path
 from auto_slopp.worker import Worker
 
 class Worker1(Worker):
-    def run(self, repo_path: Path, task_path: Path):
+    def run(self, repo_path: Path):
         return {"worker": "1"}
 """
         (temp_dir / "worker1.py").write_text(worker1_code)
 
-        # Second worker file
         worker2_code = """
 from pathlib import Path
 from auto_slopp.worker import Worker
 
 class Worker2(Worker):
-    def run(self, repo_path: Path, task_path: Path):
+    def run(self, repo_path: Path):
         return {"worker": "2"}
 """
         (temp_dir / "worker2.py").write_text(worker2_code)
@@ -92,21 +90,18 @@ class Worker2(Worker):
 
     def test_discover_workers_handles_import_errors_gracefully(self, temp_dir):
         """Test discovery handles import errors without crashing."""
-        # File with invalid syntax
         (temp_dir / "invalid.py").write_text("invalid python syntax !!!")
 
-        # Valid worker file
         valid_worker_code = """
 from pathlib import Path
 from auto_slopp.worker import Worker
 
 class ValidWorker(Worker):
-    def run(self, repo_path: Path, task_path: Path):
+    def run(self, repo_path: Path):
         return {"status": "ok"}
 """
         (temp_dir / "valid.py").write_text(valid_worker_code)
 
-        # Should discover only the valid worker
         result = discover_workers(temp_dir)
         assert len(result) == 1
         assert result[0].__name__ == "ValidWorker"
@@ -121,7 +116,7 @@ from pathlib import Path
 from auto_slopp.worker import Worker
 
 class NestedWorker(Worker):
-    def run(self, repo_path: Path, task_path: Path):
+    def run(self, repo_path: Path):
         return {"nested": True}
 """
         (nested_dir / "worker.py").write_text(worker_code)
@@ -138,45 +133,39 @@ from pathlib import Path
 from auto_slopp.worker import Worker
 
 class InitWorker(Worker):
-    def run(self, repo_path: Path, task_path: Path):
+    def run(self, repo_path: Path):
         return {"from_init": True}
 """
         (temp_dir / "__init__.py").write_text(init_code)
 
         result = discover_workers(temp_dir)
 
-        # Note: __init__.py files are skipped due to import complexity
-        # Workers should be in regular Python files, not __init__.py
         assert len(result) == 0
 
     def test_discover_workers_ignores_test_files(self, temp_dir):
         """Test discovery includes both regular and test workers (filtering is done at higher level)."""
-        # Regular worker
         worker_code = """
 from pathlib import Path
 from auto_slopp.worker import Worker
 
 class RealWorker(Worker):
-    def run(self, repo_path: Path, task_path: Path):
+    def run(self, repo_path: Path):
         return {"real": True}
 """
         (temp_dir / "worker.py").write_text(worker_code)
 
-        # Test file with worker
         test_worker_code = """
 from pathlib import Path
 from auto_slopp.worker import Worker
 
 class TestWorker(Worker):
-    def run(self, repo_path: Path, task_path: Path):
+    def run(self, repo_path: Path):
         return {"test": True}
 """
         (temp_dir / "test_worker.py").write_text(test_worker_code)
 
         result = discover_workers(temp_dir)
 
-        # Note: The discovery mechanism itself doesn't filter test files
-        # That filtering would be done at a higher level if needed
         assert len(result) == 2
         worker_names = {w.__name__ for w in result}
         assert worker_names == {"RealWorker", "TestWorker"}
@@ -188,15 +177,15 @@ from pathlib import Path
 from auto_slopp.worker import Worker
 
 class FirstWorker(Worker):
-    def run(self, repo_path: Path, task_path: Path):
+    def run(self, repo_path: Path):
         return {"worker": "first"}
 
 class SecondWorker(Worker):
-    def run(self, repo_path: Path, task_path: Path):
+    def run(self, repo_path: Path):
         return {"worker": "third"}
 
 class ThirdWorker(Worker):
-    def run(self, repo_path: Path, task_path: Path):
+    def run(self, repo_path: Path):
         return {"worker": "third"}
 """
         (temp_dir / "multi_workers.py").write_text(multi_worker_code)
@@ -236,7 +225,7 @@ class AbstractWorker(Worker):
     def custom_method(self):
         pass
 
-    def run(self, repo_path: Path, task_path: Path):
+    def run(self, repo_path: Path):
         return {"abstract": True}
 
 class ConcreteWorker(AbstractWorker):
@@ -249,6 +238,5 @@ class ConcreteWorker(AbstractWorker):
 
         result = discover_workers(temp_dir)
 
-        # Should only find the concrete worker
         assert len(result) == 1
         assert result[0].__name__ == "ConcreteWorker"

@@ -95,7 +95,7 @@ auto-slopp
 
 Run with custom paths:
 ```bash
-auto-slopp --repo-path /path/to/repo --task-path /path/to/tasks --search-path /path/to/workers
+auto-slopp --repo-path /path/to/repo --search-path /path/to/workers
 ```
 
 ### Development
@@ -163,16 +163,9 @@ AUTO_SLOPP_BASE_REPO_PATH/          # Directory containing git repositories
 ├── repository_a/                    # Each subdirectory is a git repository
 ├── repository_b/
 └── repository_c/
-
-AUTO_SLOPP_BASE_TASK_PATH/         # Git repository with task subdirectories
-├── repository_a/                   # Tasks for repository_a
-├── repository_b/                   # Tasks for repository_b
-└── repository_c/                   # Tasks for repository_c
 ```
 
 - **`AUTO_SLOPP_BASE_REPO_PATH`** (or `--repo-path`): Directory containing multiple git repositories. Auto-slopp iterates over each subdirectory and processes it as a separate repository.
-
-- **`AUTO_SLOPP_BASE_TASK_PATH`** (or `--task-path`): A git repository where each subdirectory corresponds to a repository in `AUTO_SLOPP_BASE_REPO_PATH`. For example, if you have `repository_a` in your repo path, Auto-slopp will look for its tasks in `<task_path>/repository_a`.
 
 **Example:**
 ```bash
@@ -180,11 +173,6 @@ AUTO_SLOPP_BASE_TASK_PATH/         # Git repository with task subdirectories
 AUTO_SLOPP_BASE_REPO_PATH=/root/git/managed
 # /root/git/managed/warhammer_battle_calculator
 # /root/git/managed/Auto-slopp
-
-# Tasks for each repository (subdirectories match repo names)
-AUTO_SLOPP_BASE_TASK_PATH=/root/git/repo_task_path
-# /root/git/repo_task_path/warhammer_battle_calculator
-# /root/git/repo_task_path/Auto-slopp
 ```
 
 ### Configuration
@@ -194,7 +182,6 @@ Create a `.env` file in the project root:
 ```bash
 # Basic configuration
 AUTO_SLOPP_BASE_REPO_PATH=/path/to/your/repo
-AUTO_SLOPP_BASE_TASK_PATH=/path/to/your/tasks
 AUTO_SLOPP_DEBUG=false
 
 # CLI configuration (optional - defaults to opencode)
@@ -226,13 +213,12 @@ from typing import Any
 class MyCustomWorker(Worker):
     """Custom worker for my specific automation task."""
 
-    def run(self, repo_path: Path, task_path: Path) -> Any:
+    def run(self, repo_path: Path) -> Any:
         """
         Execute the worker's automation task.
 
         Args:
             repo_path: Path to the repository directory
-            task_path: Path to the task directory or file
 
         Returns:
             Any result data from the worker execution
@@ -241,7 +227,6 @@ class MyCustomWorker(Worker):
         result = {
             "status": "completed",
             "repo": str(repo_path),
-            "task": str(task_path),
             "processed_items": 42
         }
 
@@ -271,7 +256,7 @@ class ConfigurableWorker(Worker):
         self.enable_logging = enable_logging
         self.logger = logging.getLogger("auto_slopp.workers.ConfigurableWorker")
 
-    def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def run(self, repo_path: Path) -> Dict[str, Any]:
         """Process items with configurable limits."""
         if self.enable_logging:
             self.logger.info(f"Processing up to {self.max_items} items")
@@ -293,20 +278,6 @@ Auto-slopp automatically discovers worker implementations in the configured sear
 ## Available Workers
 
 The project includes several workers for automation tasks:
-
-### TaskProcessorWorker
-Processes task files and executes them with CLI tools.
-```python
-from auto_slopp.workers import TaskProcessorWorker
-
-# Initialize the worker
-worker = TaskProcessorWorker(
-    task_repo_path=Path("/path/to/tasks"),
-    timeout=300,
-    dry_run=True,
-)
-# Returns: processed files, execution results, git operations
-```
 
 ### PRWorker
 Manages pull request operations.
@@ -353,13 +324,12 @@ class Worker(ABC):
     """Abstract base class for all worker implementations."""
 
     @abstractmethod
-    def run(self, repo_path: Path, task_path: Path) -> Any:
+    def run(self, repo_path: Path) -> Any:
         """
         Execute the worker's automation task.
 
         Args:
             repo_path: Path to the repository directory
-            task_path: Path to the task directory or file
 
         Returns:
             Any result data from the worker execution
@@ -375,7 +345,6 @@ Configuration is managed through the `Settings` class using Pydantic:
 class Settings(BaseSettings):
     # Paths
     base_repo_path: Path = Field(default_factory=lambda: Path.cwd())
-    base_task_path: Path = Field(default_factory=lambda: Path.cwd() / "tasks")
     worker_search_path: Path = Field(default_factory=lambda: Path(__file__).parent.parent)
 
     # Execution
@@ -402,7 +371,6 @@ auto-slopp [OPTIONS]
 
 Options:
   --repo-path PATH      Repository directory (overrides AUTO_SLOPP_BASE_REPO_PATH)
-  --task-path PATH     Task directory or file (overrides AUTO_SLOPP_BASE_TASK_PATH)
   --search-path PATH   Worker search path (overrides AUTO_SLOPP_WORKER_SEARCH_PATH)
   --debug              Enable debug mode (overrides AUTO_SLOPP_DEBUG)
   --version            Show version and exit
@@ -450,7 +418,6 @@ Auto-slopp/
 │   │   ├── discovery.py         # Worker discovery utilities
 │   │   ├── telegram_handler.py  # Telegram logging integration
 │   │   ├── workers/             # Worker implementations
-│   │   │   ├── task_processor_worker.py
 │   │   │   ├── pr_worker.py
 │   │   │   ├── github_issue_worker.py
 │   │   │   ├── stale_branch_cleanup_worker.py
@@ -458,7 +425,6 @@ Auto-slopp/
 │   │   └── utils/               # Utility modules
 │   │       ├── git_operations.py
 │   │       ├── github_operations.py
-│   │       ├── task_processing.py
 │   │       ├── file_operations.py
 │   │       ├── branch_analysis.py
 │   │       ├── repository_utils.py
@@ -486,7 +452,6 @@ Auto-slopp/
 # Development environment
 export AUTO_SLOPP_DEBUG=true
 export AUTO_SLOPP_BASE_REPO_PATH=./dev-repo
-export AUTO_SLOPP_BASE_TASK_PATH=./tasks
 
 # Production environment
 export AUTO_SLOPP_DEBUG=false
@@ -504,7 +469,6 @@ export AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "--model", "opencode/glm-5-
 ```bash
 # .env
 AUTO_SLOPP_BASE_REPO_PATH=/home/user/projects/my-automation
-AUTO_SLOPP_BASE_TASK_PATH=/home/user/tasks
 AUTO_SLOPP_WORKER_SEARCH_PATH=/home/user/custom-workers
 AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=2.0
 AUTO_SLOPP_DEBUG=false
