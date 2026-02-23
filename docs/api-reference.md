@@ -30,13 +30,12 @@ class Worker(ABC):
     """Abstract base class for all worker implementations."""
     
     @abstractmethod
-    def run(self, repo_path: Path, task_path: Path) -> Any:
+    def run(self, repo_path: Path) -> Any:
         """
         Execute the worker's automation task.
 
         Args:
             repo_path: Path to the repository directory
-            task_path: Path to the task directory or file
 
         Returns:
             Any result data from the worker execution
@@ -57,12 +56,11 @@ from typing import Dict, Any
 class MyWorker(Worker):
     """Custom worker implementation."""
     
-    def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def run(self, repo_path: Path) -> Dict[str, Any]:
         """Execute custom automation logic."""
         result = {
             "status": "completed",
             "repo_path": str(repo_path),
-            "task_path": str(task_path),
             "processed_items": 42
         }
         return result
@@ -104,13 +102,12 @@ class Executor:
         """
         pass
     
-    def execute_workers(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def execute_workers(self, repo_path: Path) -> Dict[str, Any]:
         """
         Execute all discovered workers.
 
         Args:
             repo_path: Path to the repository directory
-            task_path: Path to the task directory or file
 
         Returns:
             Dictionary containing execution results from all workers
@@ -162,11 +159,6 @@ class Settings(BaseSettings):
     base_repo_path: Path = Field(
         default_factory=lambda: Path.cwd(),
         description="Base path for repository operations"
-    )
-    
-    base_task_path: Path = Field(
-        default_factory=lambda: Path.cwd() / "tasks",
-        description="Base path for task operations"
     )
     
     worker_search_path: Path = Field(
@@ -329,9 +321,9 @@ def setup_telegram_logging(
 
 ```python
 class SimpleLogger(Worker):
-    """Logs basic information about repository and task paths."""
+    """Logs basic information about repository path."""
     
-    def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def run(self, repo_path: Path) -> Dict[str, Any]:
         """
         Log path information and return basic details.
 
@@ -356,7 +348,7 @@ class FileMonitor(Worker):
         """
         self.file_patterns = file_patterns or ["*"]
     
-    def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def run(self, repo_path: Path) -> Dict[str, Any]:
         """
         Scan repository and return file statistics.
 
@@ -381,7 +373,7 @@ class TaskProcessor(Worker):
         """
         self.max_file_size = max_file_size
     
-    def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def run(self, repo_path: Path) -> Dict[str, Any]:
         """
         Process task files and return analysis results.
 
@@ -406,7 +398,7 @@ class HeartbeatWorker(Worker):
         """
         self.message = message
     
-    def run(self, repo_path: Path, task_path: Path) -> Dict[str, Any]:
+    def run(self, repo_path: Path) -> Dict[str, Any]:
         """
         Generate heartbeat status message.
 
@@ -431,7 +423,7 @@ The executor implements graceful error handling:
 
 ```python
 try:
-    result = executor.execute_workers(repo_path, task_path)
+    result = executor.execute_workers(repo_path)
 except ImportError as e:
     logger.error(f"Failed to import workers: {e}")
     # Handle import errors
