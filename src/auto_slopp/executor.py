@@ -7,11 +7,6 @@ from pathlib import Path
 from typing import Any, Optional, Type
 
 from auto_slopp.discovery import discover_workers
-from auto_slopp.utils.git_operations import (
-    commit_all_changes,
-    pull_from_remote,
-    push_to_remote,
-)
 from auto_slopp.worker import Worker
 from settings.main import settings
 
@@ -62,10 +57,6 @@ class Executor:
     def _run_iteration(self) -> None:
         """Run a single iteration of worker discovery and execution."""
         try:
-            # Update task_repo before running workers
-            self._update_task_repo()
-
-            # Discover worker classes
             workers = discover_workers(self.search_path)
 
             if not workers:
@@ -74,46 +65,12 @@ class Executor:
 
             print(f"Found {len(workers)} workers: {[w.__name__ for w in workers]}")
 
-            # Execute each worker
             for worker_class in workers:
                 self._execute_worker(worker_class)
 
         except Exception as e:
             print(f"Error in iteration: {e}")
             traceback.print_exc()
-
-    def _update_task_repo(self) -> None:
-        """Pull and push changes in the task_repo."""
-        try:
-            task_repo_path = settings.task_repo_path
-            if not task_repo_path.exists():
-                print(f"Task repo path does not exist: {task_repo_path}")
-                return
-
-            if not (task_repo_path / ".git").exists():
-                print(f"Task repo path is not a git repository: {task_repo_path}")
-                return
-
-            commit_success, commit_msg = commit_all_changes(task_repo_path, "Auto-slopp: auto-commit changes")
-            if commit_success:
-                print(f"Committed changes in task_repo: {commit_msg}")
-            else:
-                print(f"No changes or commit failed in task_repo: {commit_msg}")
-
-            pull_success, pull_msg = pull_from_remote(task_repo_path, "origin", "main")
-            if pull_success:
-                print("Pulled latest changes from origin/main in task_repo")
-            else:
-                print(f"Failed to pull from origin/main in task_repo: {pull_msg}")
-
-            push_success, push_msg = push_to_remote(task_repo_path, "origin", "main")
-            if push_success:
-                print("Pushed changes to origin/main in task_repo")
-            else:
-                print(f"Failed to push to origin/main in task_repo: {push_msg}")
-
-        except Exception as e:
-            print(f"Error updating task_repo: {e}")
 
     def _instantiate_worker(self, worker_class: Type[Worker]) -> Worker:
         """Instantiate a worker with appropriate arguments.
@@ -124,13 +81,6 @@ class Executor:
         Returns:
             Instantiated worker instance
         """
-        # Special handling for TaskProcessorWorker which requires task_repo_path
-        if worker_class.__name__ == "TaskProcessorWorker":
-            from settings.main import settings
-
-            return worker_class(task_repo_path=settings.task_repo_path)
-
-        # Default instantiation for simple workers
         return worker_class()
 
     def _execute_worker(self, worker_class: Type[Worker]) -> None:

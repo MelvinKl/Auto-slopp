@@ -294,20 +294,6 @@ Auto-slopp automatically discovers worker implementations in the configured sear
 
 The project includes several workers for automation tasks:
 
-### TaskProcessorWorker
-Processes task files and executes them with CLI tools.
-```python
-from auto_slopp.workers import TaskProcessorWorker
-
-# Initialize the worker
-worker = TaskProcessorWorker(
-    task_repo_path=Path("/path/to/tasks"),
-    timeout=300,
-    dry_run=True,
-)
-# Returns: processed files, execution results, git operations
-```
-
 ### PRWorker
 Manages pull request operations.
 ```python
@@ -450,7 +436,6 @@ Auto-slopp/
 │   │   ├── discovery.py         # Worker discovery utilities
 │   │   ├── telegram_handler.py  # Telegram logging integration
 │   │   ├── workers/             # Worker implementations
-│   │   │   ├── task_processor_worker.py
 │   │   │   ├── pr_worker.py
 │   │   │   ├── github_issue_worker.py
 │   │   │   ├── stale_branch_cleanup_worker.py
@@ -458,7 +443,6 @@ Auto-slopp/
 │   │   └── utils/               # Utility modules
 │   │       ├── git_operations.py
 │   │       ├── github_operations.py
-│   │       ├── task_processing.py
 │   │       ├── file_operations.py
 │   │       ├── branch_analysis.py
 │   │       ├── repository_utils.py
