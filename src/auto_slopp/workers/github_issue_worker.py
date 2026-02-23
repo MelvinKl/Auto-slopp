@@ -2,7 +2,7 @@
 
 This worker:
 1. Searches each repository for open issues on GitHub
-2. Uses issue title/body as instructions (similar to TaskProcessorWorker)
+2. Uses issue title/body as instructions
 3. Creates a new branch starting with ai/
 4. Executes instructions using OpenCode
 5. Creates a PR and closes the issue

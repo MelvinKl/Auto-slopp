@@ -358,31 +358,6 @@ class FileMonitor(Worker):
         pass
 ```
 
-### TaskProcessor
-
-```python
-class TaskProcessor(Worker):
-    """Processes task files with size limits and content analysis."""
-    
-    def __init__(self, max_file_size: int = 5 * 1024 * 1024):
-        """
-        Initialize task processor.
-
-        Args:
-            max_file_size: Maximum file size to process in bytes
-        """
-        self.max_file_size = max_file_size
-    
-    def run(self, repo_path: Path) -> Dict[str, Any]:
-        """
-        Process task files and return analysis results.
-
-        Returns:
-            Dictionary with processed files, content previews, and metadata
-        """
-        pass
-```
-
 ### HeartbeatWorker
 
 ```python

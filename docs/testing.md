@@ -45,7 +45,7 @@ pytest -x
 pytest tests/test_worker.py
 
   # Run specific test class
-  pytest tests/test_task_processor_worker.py::TestTaskProcessorWorker
+  pytest tests/test_worker.py::TestWorkerBase
 
   # Run specific test method
   pytest tests/test_worker.py::TestWorker::test_worker_is_abstract
@@ -76,7 +76,7 @@ tests/
 ├── test_settings.py         # Configuration tests
 ├── test_telegram_handler.py # Telegram integration tests
 ├── test_worker.py           # Base worker class tests
-├── test_task_processor_worker.py  # TaskProcessor tests
+├── test_github_issue_worker.py  # GitHubIssueWorker tests
 ├── test_git_operations.py    # Git operations tests
 ├── test_file_operations.py   # File operations tests
 └── test_*_worker.py         # Other worker tests
@@ -115,7 +115,7 @@ The performance tests include:
 - **SimpleLogger**: Basic worker execution speed
 - **FileMonitor**: File scanning performance with large datasets
 - **DirectoryScanner**: Directory traversal performance
-- **TaskProcessor**: File processing performance
+- **GitHubIssueWorker**: Issue processing performance
 - **Executor**: Overall executor performance
 - **Memory Usage**: Efficiency with large files
 - **Concurrency**: Race condition detection
