@@ -72,7 +72,7 @@ class UpdatePRBranchesWorker(Worker):
         try:
             pr_branches = self._get_open_pr_branches(repo_path)
         except GitHubOperationError as e:
-            self.logger.error(f"Failed to get open PR branches: {str(e)}")
+            self.logger.warning(f"Failed to get open PR branches: {str(e)}")
             results["success"] = False
             results["error"] = str(e)
             self.logger.info(f"UpdatePRBranchesWorker failed for {repo_path.name}. Error: {str(e)}")

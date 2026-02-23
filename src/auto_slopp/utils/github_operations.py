@@ -300,7 +300,7 @@ def get_open_pr_branches(repo_dir: Path) -> List[str]:
 
         if result.returncode != 0:
             pr_error = result.stderr.strip() or result.stdout.strip()
-            logger.error(f"Failed to list PRs in {repo_dir.name}: {pr_error}")
+            logger.warning(f"Failed to list PRs in {repo_dir.name}: {pr_error}")
             raise GitHubOperationError(f"Failed to list PRs: {pr_error}")
 
         prs = json.loads(result.stdout)
