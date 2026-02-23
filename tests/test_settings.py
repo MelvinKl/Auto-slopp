@@ -22,7 +22,7 @@ class TestSettings:
 
         # Act & Assert - Check that settings are loaded (from .env)
         assert test_settings.base_repo_path == Path("~/git/managed").expanduser()
-        assert test_settings.base_task_path == Path("~/git/repo_task_path").expanduser()
+        assert test_settings.base_task_path == Path.cwd() / "tasks"  # Uses default since not in .env
         assert test_settings.executor_sleep_interval == 30.0  # From .env
         assert test_settings.debug is False
         assert test_settings.telegram_enabled is True  # From .env
