@@ -118,3 +118,49 @@ class TestGitHubIssueWorker:
         assert result["success"] is False
         assert result["error"] == "Test error"
         assert result["worker_name"] == "GitHubIssueWorker"
+
+    def test_run_with_no_changes(self):
+        """Test run when no changes are made - should close issue with comment."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            mock_issue = {
+                "number": 1,
+                "title": "Test Issue",
+                "body": "This is a test issue",
+                "url": "https://github.com/test/repo/issues/1",
+            }
+
+            with (
+                patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues,
+                patch("auto_slopp.workers.github_issue_worker.create_and_checkout_branch") as mock_create_branch,
+                patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute,
+                patch("auto_slopp.workers.github_issue_worker.get_current_branch") as mock_get_branch,
+                patch("auto_slopp.workers.github_issue_worker.comment_on_issue") as mock_comment,
+                patch("auto_slopp.workers.github_issue_worker.close_issue") as mock_close,
+                patch("auto_slopp.workers.github_issue_worker.delete_branch") as mock_delete,
+                patch("auto_slopp.workers.github_issue_worker.checkout_branch_resilient") as mock_checkout,
+            ):
+                mock_issues.return_value = [mock_issue]
+                mock_create_branch.return_value = True
+                mock_execute.return_value = {"success": True}
+                mock_get_branch.return_value = "main"
+                mock_comment.return_value = True
+                mock_close.return_value = True
+                mock_delete.return_value = True
+                mock_checkout.return_value = True
+
+                worker = GitHubIssueWorker(dry_run=False)
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                assert result["issues_processed"] == 1
+                assert result["issues_closed"] == 1
+                assert result["issue_results"][0]["no_changes"] is True
+                assert result["issue_results"][0]["issue_closed"] is True
+                assert result["issue_results"][0]["issue_commented"] is True
+
+                mock_close.assert_called_once()
+                mock_comment.assert_called_once()
+                mock_delete.assert_called_once()
