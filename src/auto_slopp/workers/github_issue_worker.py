@@ -18,7 +18,9 @@ from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     commit_and_push_changes,
     create_and_checkout_branch,
+    delete_branch,
     get_current_branch,
+    has_changes,
 )
 from auto_slopp.utils.github_operations import (
     close_issue,
@@ -212,7 +214,22 @@ class GitHubIssueWorker(Worker):
 
             current_branch = get_current_branch(repo_dir)
             if current_branch in ("main", "master"):
-                result["error"] = f"CLI did not create a new branch, still on '{current_branch}'"
+                self.logger.info(f"No changes made for issue #{issue_number}, closing issue with comment")
+
+                no_changes_comment = (
+                    "No changes required for this issue. The task has been reviewed and no modifications are needed."
+                )
+                comment_success = comment_on_issue(repo_dir, issue_number, no_changes_comment)
+                result["issue_commented"] = comment_success
+
+                close_success = close_issue(repo_dir, issue_number)
+                result["issue_closed"] = close_success
+                result["issues_closed"] = 1 if close_success else 0
+
+                delete_branch(repo_dir, branch_name)
+
+                result["success"] = True
+                result["no_changes"] = True
                 return result
 
             pr_body = f"Closes #{issue_number}\n\n{issue_body}"
