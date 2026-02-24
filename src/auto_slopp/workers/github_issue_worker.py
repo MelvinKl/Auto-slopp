@@ -18,7 +18,9 @@ from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     commit_and_push_changes,
     create_and_checkout_branch,
+    delete_branch,
     get_current_branch,
+    has_changes,
 )
 from auto_slopp.utils.github_operations import (
     close_issue,
@@ -78,19 +80,34 @@ class GitHubIssueWorker(Worker):
 
         results = self._create_results_dict(start_time, repo_path)
 
-        issue_result = self._process_single_issue(repo_path)
-        results["issue_results"].append(issue_result)
-
-        if issue_result.get("no_issues", False):
-            pass  # No issues to process
-        elif issue_result["success"]:
-            results["issues_processed"] += 1
-            results["openagent_executions"] += issue_result.get("openagent_executions", 0)
-            results["prs_created"] += issue_result.get("prs_created", 0)
-            results["issues_closed"] += issue_result.get("issues_closed", 0)
-        else:
+        if not self._checkout_main_branch(repo_dir=repo_path):
             results["repositories_with_errors"] += 1
             results["success"] = False
+            results["execution_time"] = self._get_elapsed_time(start_time)
+            self._log_completion_summary(results)
+            return results
+
+        issues = get_open_issues(repo_path)
+
+        if not issues:
+            self.logger.info(f"No open issues found in {repo_path.name}")
+            results["execution_time"] = self._get_elapsed_time(start_time)
+            self._log_completion_summary(results)
+            return results
+
+        for issue in issues:
+            issue_result = self._process_single_issue(repo_path, issue)
+            results["issue_results"].append(issue_result)
+
+            if issue_result["success"]:
+                results["issues_processed"] += 1
+                results["openagent_executions"] += issue_result.get("openagent_executions", 0)
+                results["prs_created"] += issue_result.get("prs_created", 0)
+                results["issues_closed"] += issue_result.get("issues_closed", 0)
+            else:
+                self.logger.warning(
+                    f"Failed to process issue #{issue.get('number')}: {issue_result.get('error', 'Unknown error')}"
+                )
 
         results["execution_time"] = self._get_elapsed_time(start_time)
         self._log_completion_summary(results)
@@ -115,17 +132,15 @@ class GitHubIssueWorker(Worker):
             "success": True,
         }
 
-    def _process_single_issue(self, repo_dir: Path) -> Dict[str, Any]:
-        """Process a single issue from the repository.
+    def _checkout_main_branch(self, repo_dir: Path) -> bool:
+        """Checkout the main branch and pull latest changes.
 
         Args:
             repo_dir: Path to the repository directory
 
         Returns:
-            Processing result for this issue
+            True if successful, False otherwise
         """
-        self.logger.info(f"Processing GitHub issues for: {repo_dir.name}")
-
         if not self.dry_run:
             pull_success = checkout_branch_resilient(
                 repo_dir=repo_dir,
@@ -135,18 +150,21 @@ class GitHubIssueWorker(Worker):
             )
             if not pull_success:
                 self.logger.warning(f"Failed to pull latest changes from {repo_dir.name}")
+                return False
+        return True
 
-        issues = get_open_issues(repo_dir)
+    def _process_single_issue(self, repo_dir: Path, issue: Dict[str, Any]) -> Dict[str, Any]:
+        """Process a single issue from the repository.
 
-        if not issues:
-            self.logger.info(f"No open issues found in {repo_dir.name}")
-            return {
-                "repository": repo_dir.name,
-                "success": True,
-                "no_issues": True,
-            }
+        Args:
+            repo_dir: Path to the repository directory
+            issue: The issue dictionary from GitHub API
 
-        issue = issues[0]
+        Returns:
+            Processing result for this issue
+        """
+        self.logger.info(f"Processing GitHub issue for: {repo_dir.name}")
+
         issue_number = issue["number"]
         issue_title = issue["title"]
         issue_body = issue.get("body", "") or ""
@@ -162,8 +180,11 @@ class GitHubIssueWorker(Worker):
             "issue_title": issue_title,
             "success": False,
             "openagent_executed": False,
+            "openagent_executions": 0,
             "pr_created": False,
+            "prs_created": 0,
             "issue_closed": False,
+            "issues_closed": 0,
             "error": None,
         }
 
@@ -184,6 +205,8 @@ class GitHubIssueWorker(Worker):
 
             openagent_result = execute_with_instructions(instructions, repo_dir, self.agent_args, self.timeout)
             result["openagent_executed"] = openagent_result["success"]
+            if openagent_result["success"]:
+                result["openagent_executions"] = 1
 
             if not openagent_result["success"]:
                 result["error"] = f"OpenCode execution failed: {openagent_result.get('error', 'Unknown error')}"
@@ -191,7 +214,22 @@ class GitHubIssueWorker(Worker):
 
             current_branch = get_current_branch(repo_dir)
             if current_branch in ("main", "master"):
-                result["error"] = f"CLI did not create a new branch, still on '{current_branch}'"
+                self.logger.info(f"No changes made for issue #{issue_number}, closing issue with comment")
+
+                no_changes_comment = (
+                    "No changes required for this issue. The task has been reviewed and no modifications are needed."
+                )
+                comment_success = comment_on_issue(repo_dir, issue_number, no_changes_comment)
+                result["issue_commented"] = comment_success
+
+                close_success = close_issue(repo_dir, issue_number)
+                result["issue_closed"] = close_success
+                result["issues_closed"] = 1 if close_success else 0
+
+                delete_branch(repo_dir, branch_name)
+
+                result["success"] = True
+                result["no_changes"] = True
                 return result
 
             pr_body = f"Closes #{issue_number}\n\n{issue_body}"

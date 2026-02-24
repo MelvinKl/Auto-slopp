@@ -417,6 +417,8 @@ Auto-slopp/
 │   │   ├── executor.py          # Worker discovery and execution
 │   │   ├── discovery.py         # Worker discovery utilities
 │   │   ├── telegram_handler.py  # Telegram logging integration
+│   │   ├── base/                # Base classes
+│   │   │   └── __init__.py
 │   │   ├── workers/             # Worker implementations
 │   │   │   ├── pr_worker.py
 │   │   │   ├── github_issue_worker.py

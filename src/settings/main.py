@@ -82,7 +82,7 @@ class Settings(BaseSettings):
     )
 
     cli_args: list = Field(
-        default=["--agent", "openagent", "--model", "opencode/glm-5-free", "run"],
+        default=["--agent", "openagent", "run"],
         description="Arguments to pass to the CLI command",
     )
 

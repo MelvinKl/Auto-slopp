@@ -84,7 +84,13 @@ def get_open_issues(repo_dir: Path) -> List[Dict[str, Any]]:
 
         if result.returncode != 0:
             issue_error = result.stderr.strip() or result.stdout.strip()
-            logger.error(f"Failed to list issues in {repo_dir.name}: {issue_error}")
+            if "Could not resolve to a Repository" in issue_error:
+                logger.warning(
+                    f"Cannot access repository {repo_dir.name}: likely permission denied or repository not found. "
+                    f"Verify the GitHub token has access to this repository."
+                )
+            else:
+                logger.error(f"Failed to list issues in {repo_dir.name}: {issue_error}")
             return []
 
         issues = json.loads(result.stdout)
@@ -300,7 +306,13 @@ def get_open_pr_branches(repo_dir: Path) -> List[str]:
 
         if result.returncode != 0:
             pr_error = result.stderr.strip() or result.stdout.strip()
-            logger.error(f"Failed to list PRs in {repo_dir.name}: {pr_error}")
+            if "Could not resolve to a Repository" in pr_error:
+                logger.warning(
+                    f"Cannot access repository {repo_dir.name}: likely permission denied or repository not found. "
+                    f"Verify the GitHub token has access to this repository."
+                )
+            else:
+                logger.error(f"Failed to list PRs in {repo_dir.name}: {pr_error}")
             return []
 
         prs = json.loads(result.stdout)
