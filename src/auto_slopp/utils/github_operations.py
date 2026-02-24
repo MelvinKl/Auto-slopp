@@ -329,3 +329,48 @@ def get_open_pr_branches(repo_dir: Path) -> List[str]:
     except Exception as e:
         logger.error(f"Unexpected error getting PRs from {repo_dir.name}: {str(e)}")
         return []
+
+
+def get_pr_for_branch(repo_dir: Path, branch: str) -> Optional[Dict[str, Any]]:
+    """Get PR info for a specific branch if it exists.
+
+    Args:
+        repo_dir: Path to the git repository
+        branch: Branch name to check for PR
+
+    Returns:
+        Dictionary with PR info (url, number, state) or None if no PR exists.
+    """
+    try:
+        result = _run_gh_command(
+            repo_dir,
+            "pr",
+            "view",
+            branch,
+            "--json=number,url,state",
+            check=False,
+        )
+
+        if result.returncode != 0:
+            pr_error = result.stderr.strip() or result.stdout.strip()
+            if "no pull request" in pr_error.lower() or "could not find" in pr_error.lower():
+                return None
+            logger.error(f"Failed to get PR for branch {branch} in {repo_dir.name}: {pr_error}")
+            return None
+
+        pr_data = json.loads(result.stdout)
+        return {
+            "url": pr_data.get("url", ""),
+            "number": pr_data.get("number"),
+            "state": pr_data.get("state", "UNKNOWN"),
+        }
+
+    except GitHubOperationError as e:
+        logger.error(f"Error getting PR for branch {branch} from {repo_dir.name}: {str(e)}")
+        return None
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse PR JSON for branch {branch} from {repo_dir.name}: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error getting PR for branch {branch} from {repo_dir.name}: {str(e)}")
+        return None
