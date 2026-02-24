@@ -26,6 +26,7 @@ from auto_slopp.utils.github_operations import (
     create_pull_request,
     get_issue_comments,
     get_open_issues,
+    get_pr_for_branch,
 )
 from auto_slopp.worker import Worker
 
@@ -194,27 +195,42 @@ class GitHubIssueWorker(Worker):
                 return result
 
             pr_body = f"Closes #{issue_number}\n\n{issue_body}"
-            pr_result = create_pull_request(
-                repo_dir,
-                title=issue_title,
-                body=pr_body,
-                head=current_branch,
-                base="main",
-            )
 
-            if pr_result:
+            existing_pr = get_pr_for_branch(repo_dir, current_branch)
+            if existing_pr and existing_pr.get("state") == "OPEN":
                 result["pr_created"] = True
-                result["pr_url"] = pr_result.get("url", "")
-                self.logger.info(f"Created PR for issue #{issue_number}: {pr_result.get('url', 'N/A')}")
+                result["pr_url"] = existing_pr.get("url", "")
+                self.logger.info(f"PR already exists for branch '{current_branch}': {existing_pr.get('url', 'N/A')}")
             else:
-                result["error"] = "Failed to create pull request"
-                return result
+                pr_result = create_pull_request(
+                    repo_dir,
+                    title=issue_title,
+                    body=pr_body,
+                    head=current_branch,
+                    base="main",
+                )
+
+                if pr_result:
+                    result["pr_created"] = True
+                    result["pr_url"] = pr_result.get("url", "")
+                    self.logger.info(f"Created PR for issue #{issue_number}: {pr_result.get('url', 'N/A')}")
+                else:
+                    existing_pr = get_pr_for_branch(repo_dir, current_branch)
+                    if existing_pr:
+                        result["pr_created"] = True
+                        result["pr_url"] = existing_pr.get("url", "")
+                        self.logger.info(
+                            f"Using existing PR for branch '{current_branch}': {existing_pr.get('url', 'N/A')}"
+                        )
+                    else:
+                        result["error"] = "Failed to create pull request"
+                        return result
 
             close_success = close_issue(repo_dir, issue_number)
             result["issue_closed"] = close_success
 
             if close_success:
-                pr_url = pr_result.get("url", "")
+                pr_url = result.get("pr_url", "")
                 comment = f"Completed by PR: {pr_url}"
                 comment_success = comment_on_issue(repo_dir, issue_number, comment)
                 result["issue_commented"] = comment_success
