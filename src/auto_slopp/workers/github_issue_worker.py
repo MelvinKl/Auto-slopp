@@ -114,6 +114,27 @@ class GitHubIssueWorker(Worker):
             "success": True,
         }
 
+    def _checkout_main_branch(self, repo_dir: Path) -> bool:
+        """Checkout the main branch and pull latest changes.
+
+        Args:
+            repo_dir: Path to the repository directory
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.dry_run:
+            pull_success = checkout_branch_resilient(
+                repo_dir=repo_dir,
+                branch="main",
+                fetch_first=True,
+                timeout=60,
+            )
+            if not pull_success:
+                self.logger.warning(f"Failed to pull latest changes from {repo_dir.name}")
+                return False
+        return True
+
     def _process_single_issue(self, repo_dir: Path) -> Dict[str, Any]:
         """Process a single issue from the repository.
 
@@ -125,15 +146,12 @@ class GitHubIssueWorker(Worker):
         """
         self.logger.info(f"Processing GitHub issues for: {repo_dir.name}")
 
-        if not self.dry_run:
-            pull_success = checkout_branch_resilient(
-                repo_dir=repo_dir,
-                branch="main",
-                fetch_first=True,
-                timeout=60,
-            )
-            if not pull_success:
-                self.logger.warning(f"Failed to pull latest changes from {repo_dir.name}")
+        if not self._checkout_main_branch(repo_dir):
+            return {
+                "repository": repo_dir.name,
+                "success": False,
+                "error": "Failed to checkout main branch",
+            }
 
         issues = get_open_issues(repo_dir)
 
