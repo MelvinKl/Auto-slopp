@@ -79,19 +79,34 @@ class GitHubIssueWorker(Worker):
 
         results = self._create_results_dict(start_time, repo_path)
 
-        issue_result = self._process_single_issue(repo_path)
-        results["issue_results"].append(issue_result)
-
-        if issue_result.get("no_issues", False):
-            pass  # No issues to process
-        elif issue_result["success"]:
-            results["issues_processed"] += 1
-            results["openagent_executions"] += issue_result.get("openagent_executions", 0)
-            results["prs_created"] += issue_result.get("prs_created", 0)
-            results["issues_closed"] += issue_result.get("issues_closed", 0)
-        else:
+        if not self._checkout_main_branch(repo_dir=repo_path):
             results["repositories_with_errors"] += 1
             results["success"] = False
+            results["execution_time"] = self._get_elapsed_time(start_time)
+            self._log_completion_summary(results)
+            return results
+
+        issues = get_open_issues(repo_path)
+
+        if not issues:
+            self.logger.info(f"No open issues found in {repo_path.name}")
+            results["execution_time"] = self._get_elapsed_time(start_time)
+            self._log_completion_summary(results)
+            return results
+
+        for issue in issues:
+            issue_result = self._process_single_issue(repo_path, issue)
+            results["issue_results"].append(issue_result)
+
+            if issue_result["success"]:
+                results["issues_processed"] += 1
+                results["openagent_executions"] += issue_result.get("openagent_executions", 0)
+                results["prs_created"] += issue_result.get("prs_created", 0)
+                results["issues_closed"] += issue_result.get("issues_closed", 0)
+            else:
+                self.logger.warning(
+                    f"Failed to process issue #{issue.get('number')}: {issue_result.get('error', 'Unknown error')}"
+                )
 
         results["execution_time"] = self._get_elapsed_time(start_time)
         self._log_completion_summary(results)
@@ -137,35 +152,18 @@ class GitHubIssueWorker(Worker):
                 return False
         return True
 
-    def _process_single_issue(self, repo_dir: Path) -> Dict[str, Any]:
+    def _process_single_issue(self, repo_dir: Path, issue: Dict[str, Any]) -> Dict[str, Any]:
         """Process a single issue from the repository.
 
         Args:
             repo_dir: Path to the repository directory
+            issue: The issue dictionary from GitHub API
 
         Returns:
             Processing result for this issue
         """
-        self.logger.info(f"Processing GitHub issues for: {repo_dir.name}")
+        self.logger.info(f"Processing GitHub issue for: {repo_dir.name}")
 
-        if not self._checkout_main_branch(repo_dir):
-            return {
-                "repository": repo_dir.name,
-                "success": False,
-                "error": "Failed to checkout main branch",
-            }
-
-        issues = get_open_issues(repo_dir)
-
-        if not issues:
-            self.logger.info(f"No open issues found in {repo_dir.name}")
-            return {
-                "repository": repo_dir.name,
-                "success": True,
-                "no_issues": True,
-            }
-
-        issue = issues[0]
         issue_number = issue["number"]
         issue_title = issue["title"]
         issue_body = issue.get("body", "") or ""
@@ -181,8 +179,11 @@ class GitHubIssueWorker(Worker):
             "issue_title": issue_title,
             "success": False,
             "openagent_executed": False,
+            "openagent_executions": 0,
             "pr_created": False,
+            "prs_created": 0,
             "issue_closed": False,
+            "issues_closed": 0,
             "error": None,
         }
 
@@ -203,6 +204,8 @@ class GitHubIssueWorker(Worker):
 
             openagent_result = execute_with_instructions(instructions, repo_dir, self.agent_args, self.timeout)
             result["openagent_executed"] = openagent_result["success"]
+            if openagent_result["success"]:
+                result["openagent_executions"] = 1
 
             if not openagent_result["success"]:
                 result["error"] = f"OpenCode execution failed: {openagent_result.get('error', 'Unknown error')}"
