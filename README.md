@@ -433,8 +433,7 @@ Auto-slopp/
 │   │   ├── __init__.py
 │   │   ├── main.py              # Main entry point
 │   │   ├── worker.py            # Base Worker class
-│   │   ├── executor.py          # Worker discovery and execution
-│   │   ├── discovery.py         # Worker discovery utilities
+│   │   ├── executor.py          # Worker execution
 │   │   ├── telegram_handler.py  # Telegram logging integration
 │   │   ├── base/                # Base classes
 │   │   │   └── __init__.py
@@ -457,7 +456,6 @@ Auto-slopp/
 │   ├── conftest.py              # Test fixtures
 │   ├── test_worker.py
 │   ├── test_settings.py
-│   ├── test_discovery.py
 │   ├── test_main.py
 │   ├── test_telegram_handler.py
 │   └── test_*_worker.py        # Worker tests
@@ -615,7 +613,7 @@ AUTO_SLOPP_DEBUG=true auto-slopp
 
 This provides:
 - Detailed execution logs
-- Worker discovery information
+- Worker execution details
 - Configuration loading details
 - Telegram API error messages
 
