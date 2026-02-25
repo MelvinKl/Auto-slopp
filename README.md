@@ -7,7 +7,7 @@ A Python-based automation framework for task execution with pluggable worker sys
 - **Pluggable Worker System**: Abstract base class for creating custom automation workers
 - **Configuration Management**: Pydantic-based settings with environment variable support
 - **Flexible Logging**: Built-in logging with optional Telegram integration for remote notifications
-- **Task Execution**: Automated discovery and execution of worker implementations
+- **Task Execution**: Configurable execution of worker implementations
 - **Modern Python**: Built with Python 3.14+ using uv package manager
 - **Comprehensive Testing**: Full test suite with pytest and mocked dependencies
 - **Real-time Monitoring**: Telegram bot integration for instant error notifications and status updates
@@ -275,9 +275,21 @@ class ConfigurableWorker(Worker):
         }
 ```
 
-### Worker Discovery
+### Worker Configuration
 
-Auto-slopp automatically discovers worker implementations in the configured search path. Simply place your worker files in a directory that's included in `AUTO_SLOPP_WORKER_SEARCH_PATH` or the default search directory.
+Workers are explicitly imported and can be enabled/disabled using the `AUTO_SLOPP_WORKERS_ENABLED` environment variable. By default, all workers are enabled.
+
+#### Enabling/Disabling Workers
+
+To disable specific workers, set the `AUTO_SLOPP_WORKERS_ENABLED` variable in your `.env` file:
+
+```bash
+# Enable only specific workers
+AUTO_SLOPP_WORKERS_ENABLED='["GitHubIssueWorker", "PRWorker"]'
+
+# Disable all workers
+AUTO_SLOPP_WORKERS_ENABLED='[]'
+```
 
 ## Available Workers
 
@@ -288,7 +300,7 @@ Manages pull request operations.
 ```python
 from auto_slopp.workers import PRWorker
 
-# Usage is automatic through discovery
+# Enable in AUTO_SLOPP_WORKERS_ENABLED
 # Returns: PR status, merge results, branch information
 ```
 
@@ -297,7 +309,7 @@ Handles GitHub issue operations.
 ```python
 from auto_slopp.workers import GitHubIssueWorker
 
-# Usage is automatic through discovery
+# Enable in AUTO_SLOPP_WORKERS_ENABLED
 # Returns: issue status, updates, management results
 ```
 
@@ -306,7 +318,7 @@ Cleans up stale git branches.
 ```python
 from auto_slopp.workers import StaleBranchCleanupWorker
 
-# Usage is automatic through discovery
+# Enable in AUTO_SLOPP_WORKERS_ENABLED
 # Returns: cleaned branches, deletion status
 ```
 
@@ -315,7 +327,7 @@ Updates pull request branches.
 ```python
 from auto_slopp.workers import UpdatePRBranchesWorker
 
-# Usage is automatic through discovery
+# Enable in AUTO_SLOPP_WORKERS_ENABLED
 # Returns: updated branches, merge status
 ```
 

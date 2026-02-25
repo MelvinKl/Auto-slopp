@@ -113,3 +113,36 @@ class TestSettings:
 
         assert isinstance(settings, Settings)
         assert hasattr(settings, "base_repo_path")
+
+    def test_workers_enabled_default(self):
+        """Test that workers_enabled has correct default value."""
+        test_settings = Settings()
+
+        assert test_settings.workers_enabled == [
+            "GitHubIssueWorker",
+            "PRWorker",
+            "StaleBranchCleanupWorker",
+            "UpdatePRBranchesWorker",
+        ]
+
+    def test_workers_enabled_custom(self):
+        """Test that workers_enabled can be customized."""
+        env_vars = {
+            "AUTO_SLOPP_WORKERS_ENABLED": '["GitHubIssueWorker"]',
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            test_settings = Settings()
+
+        assert test_settings.workers_enabled == ["GitHubIssueWorker"]
+
+    def test_workers_enabled_empty(self):
+        """Test that workers_enabled can be set to empty list."""
+        env_vars = {
+            "AUTO_SLOPP_WORKERS_ENABLED": "[]",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            test_settings = Settings()
+
+        assert test_settings.workers_enabled == []
