@@ -107,7 +107,12 @@ def mock_settings():
     """
     settings = MagicMock()
     settings.base_repo_path = Path("/test/repo")
-    settings.worker_search_path = Path("/test/workers")
+    settings.workers_enabled = [
+        "GitHubIssueWorker",
+        "PRWorker",
+        "StaleBranchCleanupWorker",
+        "UpdatePRBranchesWorker",
+    ]
     settings.executor_sleep_interval = 1.0
     settings.debug = False
     settings.telegram_enabled = False

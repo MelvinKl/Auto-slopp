@@ -18,7 +18,6 @@ class TestMainApplication:
             args = parse_arguments()
 
             assert args.repo_path is None
-            assert args.search_path is None
             assert args.debug is False
 
     def test_parse_arguments_with_paths(self):
@@ -30,14 +29,11 @@ class TestMainApplication:
                 "auto-slopp",
                 "--repo-path",
                 "/test/repo",
-                "--search-path",
-                "/test/workers",
             ],
         ):
             args = parse_arguments()
 
             assert str(args.repo_path) == "/test/repo"
-            assert str(args.search_path) == "/test/workers"
             assert args.debug is False
 
     def test_parse_arguments_with_debug(self):
@@ -56,15 +52,12 @@ class TestMainApplication:
                 "auto-slopp",
                 "--repo-path",
                 "/my/repo",
-                "--search-path",
-                "/my/workers",
                 "--debug",
             ],
         ):
             args = parse_arguments()
 
             assert str(args.repo_path) == "/my/repo"
-            assert str(args.search_path) == "/my/workers"
             assert args.debug is True
 
     def test_setup_logging_debug_mode(self, mock_settings):
@@ -148,7 +141,6 @@ class TestMainApplication:
             with patch("auto_slopp.main.parse_arguments") as mock_parse:
                 mock_args = MagicMock()
                 mock_args.repo_path = None
-                mock_args.search_path = None
                 mock_args.debug = False
                 mock_parse.return_value = mock_args
 
@@ -169,7 +161,6 @@ class TestMainApplication:
             with patch("auto_slopp.main.parse_arguments") as mock_parse:
                 mock_args = MagicMock()
                 mock_args.repo_path = None
-                mock_args.search_path = None
                 mock_args.debug = False
                 mock_parse.return_value = mock_args
 
@@ -185,7 +176,6 @@ class TestMainApplication:
     def test_main_function_successful_execution(self, mock_run_executor, mock_settings):
         """Test main function executes successfully."""
         mock_settings.base_repo_path = Path("/default/repo")
-        mock_settings.worker_search_path = Path("/default/workers")
         mock_settings.debug = False
         mock_settings.telegram_enabled = False
 
@@ -193,7 +183,6 @@ class TestMainApplication:
             with patch("auto_slopp.main.parse_arguments") as mock_parse:
                 mock_args = MagicMock()
                 mock_args.repo_path = Path("/custom/repo")
-                mock_args.search_path = Path("/custom/workers")
                 mock_args.debug = True
                 mock_parse.return_value = mock_args
 
@@ -208,6 +197,5 @@ class TestMainApplication:
                             main()
 
                             mock_executor.assert_called_once_with(
-                                search_path=Path("/custom/workers"),
                                 repo_path=Path("/custom/repo"),
                             )

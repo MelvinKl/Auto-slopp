@@ -93,9 +93,9 @@ Run Auto-slopp with default settings:
 auto-slopp
 ```
 
-Run with custom paths:
+Run with custom repository path:
 ```bash
-auto-slopp --repo-path /path/to/repo --search-path /path/to/workers
+auto-slopp --repo-path /path/to/repo
 ```
 
 ### Development
@@ -361,7 +361,6 @@ Configuration is managed through the `Settings` class using Pydantic:
 class Settings(BaseSettings):
     # Paths
     base_repo_path: Path = Field(default_factory=lambda: Path.cwd())
-    worker_search_path: Path = Field(default_factory=lambda: Path(__file__).parent.parent)
 
     # Workers - all enabled by default
     workers_enabled: List[str] = Field(default_factory=lambda: [...])
@@ -390,7 +389,6 @@ auto-slopp [OPTIONS]
 
 Options:
   --repo-path PATH      Repository directory (overrides AUTO_SLOPP_BASE_REPO_PATH)
-  --search-path PATH   Worker search path (overrides AUTO_SLOPP_WORKER_SEARCH_PATH)
   --debug              Enable debug mode (overrides AUTO_SLOPP_DEBUG)
   --version            Show version and exit
   --help               Show help message

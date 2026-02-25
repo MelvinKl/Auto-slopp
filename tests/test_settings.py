@@ -32,14 +32,6 @@ class TestSettings:
         assert test_settings.telegram_disable_web_page_preview is True
         assert test_settings.telegram_disable_notification is False
 
-    def test_worker_search_path_default(self):
-        """Test that worker search path defaults correctly."""
-        test_settings = Settings()
-
-        expected_path = Path("~/git/Auto-slopp/src/auto_slopp/workers").expanduser()
-
-        assert test_settings.worker_search_path == expected_path
-
     def test_telegram_api_url_template(self):
         """Test that telegram_api_url contains token placeholder."""
         env_vars_to_clear = {k: v for k, v in os.environ.items() if k.startswith("AUTO_SLOPP_")}
