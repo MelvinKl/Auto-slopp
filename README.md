@@ -184,6 +184,10 @@ Create a `.env` file in the project root:
 AUTO_SLOPP_BASE_REPO_PATH=/path/to/your/repo
 AUTO_SLOPP_DEBUG=false
 
+# Worker configuration (all workers enabled by default)
+# JSON list of enabled workers. Available: GitHubIssueWorker, PRWorker, StaleBranchCleanupWorker, UpdatePRBranchesWorker
+AUTO_SLOPP_WORKERS_ENABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker", "UpdatePRBranchesWorker"]'
+
 # CLI configuration (optional - defaults to opencode)
 AUTO_SLOPP_CLI_COMMAND=opencode
 AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "--model", "opencode/glm-5-free", "run"]'
@@ -347,6 +351,9 @@ class Settings(BaseSettings):
     base_repo_path: Path = Field(default_factory=lambda: Path.cwd())
     worker_search_path: Path = Field(default_factory=lambda: Path(__file__).parent.parent)
 
+    # Workers - all enabled by default
+    workers_enabled: List[str] = Field(default_factory=lambda: [...])
+
     # Execution
     executor_sleep_interval: float = Field(default=1.0)
     debug: bool = Field(default=False)
@@ -455,6 +462,9 @@ Auto-slopp/
 export AUTO_SLOPP_DEBUG=true
 export AUTO_SLOPP_BASE_REPO_PATH=./dev-repo
 
+# Worker configuration - disable specific workers (JSON list format)
+export AUTO_SLOPP_WORKERS_ENABLED='["GitHubIssueWorker", "PRWorker"]'
+
 # Production environment
 export AUTO_SLOPP_DEBUG=false
 export AUTO_SLOPP_TELEGRAM_ENABLED=true
@@ -472,6 +482,7 @@ export AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "--model", "opencode/glm-5-
 # .env
 AUTO_SLOPP_BASE_REPO_PATH=/home/user/projects/my-automation
 AUTO_SLOPP_WORKER_SEARCH_PATH=/home/user/custom-workers
+AUTO_SLOPP_WORKERS_ENABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker", "UpdatePRBranchesWorker"]'
 AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=2.0
 AUTO_SLOPP_DEBUG=false
 

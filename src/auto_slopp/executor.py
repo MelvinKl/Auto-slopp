@@ -1,14 +1,25 @@
 """Endless loop executor for running Worker instances."""
 
-import sys
 import time
 import traceback
 from pathlib import Path
 from typing import Any, Optional, Type
 
-from auto_slopp.discovery import discover_workers
 from auto_slopp.worker import Worker
+from auto_slopp.workers import (
+    GitHubIssueWorker,
+    PRWorker,
+    StaleBranchCleanupWorker,
+    UpdatePRBranchesWorker,
+)
 from settings.main import settings
+
+ALL_WORKERS: list[Type[Worker]] = [
+    GitHubIssueWorker,
+    PRWorker,
+    StaleBranchCleanupWorker,
+    UpdatePRBranchesWorker,
+]
 
 
 class Executor:
@@ -53,17 +64,17 @@ class Executor:
         self.running = False
 
     def _run_iteration(self) -> None:
-        """Run a single iteration of worker discovery and execution."""
+        """Run a single iteration of worker execution."""
         try:
-            workers = discover_workers(self.search_path)
+            enabled_workers = [w for w in ALL_WORKERS if w.__name__ in settings.workers_enabled]
 
-            if not workers:
-                print("No workers found in this iteration")
+            if not enabled_workers:
+                print("No workers enabled")
                 return
 
-            print(f"Found {len(workers)} workers: {[w.__name__ for w in workers]}")
+            print(f"Running {len(enabled_workers)} workers: {[w.__name__ for w in enabled_workers]}")
 
-            for worker_class in workers:
+            for worker_class in enabled_workers:
                 self._execute_worker(worker_class)
 
         except Exception as e:

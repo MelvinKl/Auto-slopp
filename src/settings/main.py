@@ -1,12 +1,18 @@
 """Main settings configuration using Pydantic BaseSettings."""
 
-import os
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from dotenv import load_dotenv
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
+
+DEFAULT_WORKERS = [
+    "GitHubIssueWorker",
+    "PRWorker",
+    "StaleBranchCleanupWorker",
+    "UpdatePRBranchesWorker",
+]
 
 
 class Settings(BaseSettings):
@@ -23,6 +29,11 @@ class Settings(BaseSettings):
     worker_search_path: Path = Field(
         default_factory=lambda: Path(__file__).parent.parent,
         description="Path to search for worker implementations",
+    )
+
+    workers_enabled: List[str] = Field(
+        default_factory=lambda: DEFAULT_WORKERS.copy(),
+        description="List of enabled worker names. All workers are enabled by default.",
     )
 
     @field_validator(
