@@ -21,7 +21,7 @@ class TestSettings:
         assert test_settings.base_repo_path == Path("~/git/managed").expanduser()
         assert test_settings.executor_sleep_interval == 30.0
         assert test_settings.debug is False
-        assert test_settings.telegram_enabled is True
+        assert test_settings.telegram_enabled is False
         assert test_settings.telegram_bot_token == "8257503031:AAEBznkdzNkyA9zN7D-zPniLMmd0mmvRiQA"
         assert test_settings.telegram_chat_id == "7649674603"
         assert test_settings.telegram_api_url == "https://api.telegram.org/bot{token}/sendMessage"
@@ -70,10 +70,10 @@ class TestSettings:
         assert test_settings.telegram_chat_id == "test_chat_id"
 
     def test_optional_telegram_fields(self):
-        """Test optional telegram fields when telegram is enabled."""
+        """Test optional telegram fields use configured values."""
         test_settings = Settings()
 
-        assert test_settings.telegram_enabled is True
+        assert test_settings.telegram_enabled is False
         assert test_settings.telegram_bot_token == "8257503031:AAEBznkdzNkyA9zN7D-zPniLMmd0mmvRiQA"
         assert test_settings.telegram_chat_id == "7649674603"
 
@@ -113,3 +113,26 @@ class TestSettings:
 
         assert isinstance(settings, Settings)
         assert hasattr(settings, "base_repo_path")
+
+    def test_slopmachine_codex_preset(self):
+        """Test codex preset updates cli command and args."""
+        with patch.dict(os.environ, {"AUTO_SLOPP_SLOPMACHINE": "codex"}, clear=True):
+            test_settings = Settings()
+
+        assert test_settings.slopmachine == "codex"
+        assert test_settings.cli_command == "codex"
+        assert test_settings.cli_args == []
+
+    def test_slopmachine_preserves_explicit_cli_overrides(self):
+        """Test explicit CLI settings are not overwritten by preset."""
+        env_vars = {
+            "AUTO_SLOPP_SLOPMACHINE": "codex",
+            "AUTO_SLOPP_CLI_COMMAND": "custom-cli",
+            "AUTO_SLOPP_CLI_ARGS": '["--flag"]',
+        }
+        with patch.dict(os.environ, env_vars, clear=True):
+            test_settings = Settings()
+
+        assert test_settings.slopmachine == "codex"
+        assert test_settings.cli_command == "custom-cli"
+        assert test_settings.cli_args == ["--flag"]
