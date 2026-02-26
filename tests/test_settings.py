@@ -32,14 +32,6 @@ class TestSettings:
         assert test_settings.telegram_disable_web_page_preview is True
         assert test_settings.telegram_disable_notification is False
 
-    def test_worker_search_path_default(self):
-        """Test that worker search path defaults correctly."""
-        test_settings = Settings()
-
-        expected_path = Path("~/git/Auto-slopp/src/auto_slopp/workers").expanduser()
-
-        assert test_settings.worker_search_path == expected_path
-
     def test_telegram_api_url_template(self):
         """Test that telegram_api_url contains token placeholder."""
         env_vars_to_clear = {k: v for k, v in os.environ.items() if k.startswith("AUTO_SLOPP_")}
@@ -113,6 +105,34 @@ class TestSettings:
 
         assert isinstance(settings, Settings)
         assert hasattr(settings, "base_repo_path")
+
+    def test_workers_disabled_default(self):
+        """Test that workers_disabled has correct default value."""
+        test_settings = Settings()
+
+        assert test_settings.workers_disabled == []
+
+    def test_workers_disabled_custom(self):
+        """Test that workers_disabled can be customized."""
+        env_vars = {
+            "AUTO_SLOPP_WORKERS_DISABLED": '["GitHubIssueWorker"]',
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            test_settings = Settings()
+
+        assert test_settings.workers_disabled == ["GitHubIssueWorker"]
+
+    def test_workers_disabled_empty(self):
+        """Test that workers_disabled can be set to empty list."""
+        env_vars = {
+            "AUTO_SLOPP_WORKERS_DISABLED": "[]",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            test_settings = Settings()
+
+        assert test_settings.workers_disabled == []
 
     def test_slopmachine_codex_preset(self):
         """Test codex preset updates cli command and args."""

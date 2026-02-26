@@ -52,12 +52,6 @@ Examples:
     )
 
     parser.add_argument(
-        "--search-path",
-        type=Path,
-        help="Path to search for worker implementations (overrides AUTO_SLOPP_WORKER_SEARCH_PATH)",
-    )
-
-    parser.add_argument(
         "--debug",
         action="store_true",
         help="Enable debug mode with verbose logging (overrides AUTO_SLOPP_DEBUG)",
@@ -73,7 +67,6 @@ def main() -> None:
     args = parse_arguments()
 
     repo_path = args.repo_path or settings.base_repo_path
-    search_path = args.search_path or settings.worker_search_path
     debug = args.debug or settings.debug
 
     setup_logging()
@@ -81,7 +74,6 @@ def main() -> None:
 
     logger.info("Auto-slopp starting...")
     logger.info(f"Repository path: {repo_path}")
-    logger.info(f"Search path: {search_path}")
     logger.info(f"Debug mode: {debug}")
     logger.info(f"Telegram logging: {'enabled' if settings.telegram_enabled else 'disabled'}")
 
@@ -89,7 +81,7 @@ def main() -> None:
         logger.debug("Debug mode enabled - showing detailed logs")
 
     try:
-        run_executor(search_path=search_path, repo_path=repo_path)
+        run_executor(repo_path=repo_path)
     except KeyboardInterrupt:
         logger.info("Shutdown requested by user")
         sys.exit(0)

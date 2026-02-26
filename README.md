@@ -7,7 +7,7 @@ A Python-based automation framework for task execution with pluggable worker sys
 - **Pluggable Worker System**: Abstract base class for creating custom automation workers
 - **Configuration Management**: Pydantic-based settings with environment variable support
 - **Flexible Logging**: Built-in logging with optional Telegram integration for remote notifications
-- **Task Execution**: Automated discovery and execution of worker implementations
+- **Task Execution**: Configurable execution of worker implementations
 - **Modern Python**: Built with Python 3.14+ using uv package manager
 - **Comprehensive Testing**: Full test suite with pytest and mocked dependencies
 - **Real-time Monitoring**: Telegram bot integration for instant error notifications and status updates
@@ -103,9 +103,9 @@ Run Auto-slopp with default settings:
 auto-slopp
 ```
 
-Run with custom paths:
+Run with custom repository path:
 ```bash
-auto-slopp --repo-path /path/to/repo --search-path /path/to/workers
+auto-slopp --repo-path /path/to/repo
 ```
 
 ### Development
@@ -195,8 +195,10 @@ AUTO_SLOPP_BASE_REPO_PATH=/path/to/your/repo
 AUTO_SLOPP_DEBUG=false
 
 # Worker configuration (all workers enabled by default)
-# JSON list of enabled workers. Available: GitHubIssueWorker, PRWorker, StaleBranchCleanupWorker, UpdatePRBranchesWorker
-AUTO_SLOPP_WORKERS_ENABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker", "UpdatePRBranchesWorker"]'
+# JSON list of disabled workers. Available: GitHubIssueWorker, PRWorker, StaleBranchCleanupWorker, UpdatePRBranchesWorker
+# Leave empty to enable all workers, or specify workers to disable:
+AUTO_SLOPP_WORKERS_DISABLED='[]'
+# Example: AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker"]'
 
 # CLI configuration (optional - defaults to opencode)
 AUTO_SLOPP_SLOPMACHINE=opencode
@@ -286,9 +288,21 @@ class ConfigurableWorker(Worker):
         }
 ```
 
-### Worker Discovery
+### Worker Configuration
 
-Auto-slopp automatically discovers worker implementations in the configured search path. Simply place your worker files in a directory that's included in `AUTO_SLOPP_WORKER_SEARCH_PATH` or the default search directory.
+Workers are explicitly defined and can be disabled using the `AUTO_SLOPP_WORKERS_DISABLED` environment variable. By default, all workers are enabled.
+
+#### Disabling Specific Workers
+
+To disable specific workers, set the `AUTO_SLOPP_WORKERS_DISABLED` variable in your `.env` file:
+
+```bash
+# Disable specific workers
+AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker"]'
+
+# Disable all workers
+AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker", "UpdatePRBranchesWorker"]'
+```
 
 ## Available Workers
 
@@ -299,7 +313,7 @@ Manages pull request operations.
 ```python
 from auto_slopp.workers import PRWorker
 
-# Usage is automatic through discovery
+# Disable in AUTO_SLOPP_WORKERS_DISABLED
 # Returns: PR status, merge results, branch information
 ```
 
@@ -308,7 +322,7 @@ Handles GitHub issue operations.
 ```python
 from auto_slopp.workers import GitHubIssueWorker
 
-# Usage is automatic through discovery
+# Disable in AUTO_SLOPP_WORKERS_DISABLED
 # Returns: issue status, updates, management results
 ```
 
@@ -317,7 +331,7 @@ Cleans up stale git branches.
 ```python
 from auto_slopp.workers import StaleBranchCleanupWorker
 
-# Usage is automatic through discovery
+# Disable in AUTO_SLOPP_WORKERS_DISABLED
 # Returns: cleaned branches, deletion status
 ```
 
@@ -326,7 +340,7 @@ Updates pull request branches.
 ```python
 from auto_slopp.workers import UpdatePRBranchesWorker
 
-# Usage is automatic through discovery
+# Disable in AUTO_SLOPP_WORKERS_DISABLED
 # Returns: updated branches, merge status
 ```
 
@@ -360,10 +374,9 @@ Configuration is managed through the `Settings` class using Pydantic:
 class Settings(BaseSettings):
     # Paths
     base_repo_path: Path = Field(default_factory=lambda: Path.cwd())
-    worker_search_path: Path = Field(default_factory=lambda: Path(__file__).parent.parent)
 
     # Workers - all enabled by default
-    workers_enabled: List[str] = Field(default_factory=lambda: [...])
+    workers_disabled: List[str] = Field(default_factory=list)
 
     # Execution
     executor_sleep_interval: float = Field(default=1.0)
@@ -390,7 +403,6 @@ auto-slopp [OPTIONS]
 
 Options:
   --repo-path PATH      Repository directory (overrides AUTO_SLOPP_BASE_REPO_PATH)
-  --search-path PATH   Worker search path (overrides AUTO_SLOPP_WORKER_SEARCH_PATH)
   --debug              Enable debug mode (overrides AUTO_SLOPP_DEBUG)
   --version            Show version and exit
   --help               Show help message
@@ -433,8 +445,7 @@ Auto-slopp/
 │   │   ├── __init__.py
 │   │   ├── main.py              # Main entry point
 │   │   ├── worker.py            # Base Worker class
-│   │   ├── executor.py          # Worker discovery and execution
-│   │   ├── discovery.py         # Worker discovery utilities
+│   │   ├── executor.py          # Worker execution
 │   │   ├── telegram_handler.py  # Telegram logging integration
 │   │   ├── base/                # Base classes
 │   │   │   └── __init__.py
@@ -457,7 +468,6 @@ Auto-slopp/
 │   ├── conftest.py              # Test fixtures
 │   ├── test_worker.py
 │   ├── test_settings.py
-│   ├── test_discovery.py
 │   ├── test_main.py
 │   ├── test_telegram_handler.py
 │   └── test_*_worker.py        # Worker tests
@@ -475,7 +485,7 @@ export AUTO_SLOPP_DEBUG=true
 export AUTO_SLOPP_BASE_REPO_PATH=./dev-repo
 
 # Worker configuration - disable specific workers (JSON list format)
-export AUTO_SLOPP_WORKERS_ENABLED='["GitHubIssueWorker", "PRWorker"]'
+export AUTO_SLOPP_WORKERS_DISABLED='[]'
 
 # Production environment
 export AUTO_SLOPP_DEBUG=false
@@ -615,7 +625,7 @@ AUTO_SLOPP_DEBUG=true auto-slopp
 
 This provides:
 - Detailed execution logs
-- Worker discovery information
+- Worker execution details
 - Configuration loading details
 - Telegram API error messages
 

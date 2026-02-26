@@ -41,19 +41,13 @@ class Settings(BaseSettings):
         description="Base path to the repository directory",
     )
 
-    worker_search_path: Path = Field(
-        default_factory=lambda: Path(__file__).parent.parent,
-        description="Path to search for worker implementations",
-    )
-
-    workers_enabled: List[str] = Field(
-        default_factory=lambda: DEFAULT_WORKERS.copy(),
-        description="List of enabled worker names. All workers are enabled by default.",
+    workers_disabled: List[str] = Field(
+        default_factory=list,
+        description="List of disabled worker names. Empty list means all workers are enabled.",
     )
 
     @field_validator(
         "base_repo_path",
-        "worker_search_path",
         mode="before",
     )
     @classmethod

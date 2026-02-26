@@ -23,21 +23,19 @@ ALL_WORKERS: list[Type[Worker]] = [
 
 
 class Executor:
-    """Main executor that continuously runs discovered workers.
+    """Main executor that continuously runs enabled workers.
 
-    The executor runs in an endless loop, discovering workers,
-    instantiating them with the provided paths, and executing
-    their run methods while handling exceptions gracefully.
+    The executor runs in an endless loop, selecting enabled workers
+    from the predefined list, instantiating them with the provided paths,
+    and executing their run methods while handling exceptions gracefully.
     """
 
-    def __init__(self, search_path: Path, repo_path: Path):
+    def __init__(self, repo_path: Path):
         """Initialize the executor.
 
         Args:
-            search_path: Path to search for worker implementations
             repo_path: Path to the repository directory
         """
-        self.search_path = search_path
         self.repo_path = repo_path
         self.running = False
 
@@ -66,7 +64,7 @@ class Executor:
     def _run_iteration(self) -> None:
         """Run a single iteration of worker execution."""
         try:
-            enabled_workers = [w for w in ALL_WORKERS if w.__name__ in settings.workers_enabled]
+            enabled_workers = [w for w in ALL_WORKERS if w.__name__ not in settings.workers_disabled]
 
             if not enabled_workers:
                 print("No workers enabled")
@@ -175,17 +173,14 @@ class Executor:
 
 
 def run_executor(
-    search_path: Optional[Path] = None,
     repo_path: Optional[Path] = None,
 ) -> None:
     """Run the executor with the given parameters or settings defaults.
 
     Args:
-        search_path: Path to search for worker implementations (optional)
         repo_path: Path to the repository directory (optional)
     """
     executor = Executor(
-        search_path=search_path or settings.worker_search_path,
         repo_path=repo_path or settings.base_repo_path,
     )
     executor.start()
