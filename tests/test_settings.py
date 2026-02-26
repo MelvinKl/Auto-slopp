@@ -21,10 +21,16 @@ class TestSettings:
         assert test_settings.base_repo_path == Path("~/git/managed").expanduser()
         assert test_settings.executor_sleep_interval == 30.0
         assert test_settings.debug is False
-        assert test_settings.telegram_enabled is True
-        assert test_settings.telegram_bot_token == "8257503031:AAEBznkdzNkyA9zN7D-zPniLMmd0mmvRiQA"
+        assert test_settings.telegram_enabled is False
+        assert (
+            test_settings.telegram_bot_token
+            == "8257503031:AAEBznkdzNkyA9zN7D-zPniLMmd0mmvRiQA"
+        )
         assert test_settings.telegram_chat_id == "7649674603"
-        assert test_settings.telegram_api_url == "https://api.telegram.org/bot{token}/sendMessage"
+        assert (
+            test_settings.telegram_api_url
+            == "https://api.telegram.org/bot{token}/sendMessage"
+        )
         assert test_settings.telegram_timeout == 30.0
         assert test_settings.telegram_retry_attempts == 3
         assert test_settings.telegram_retry_delay == 1.0
@@ -34,7 +40,9 @@ class TestSettings:
 
     def test_telegram_api_url_template(self):
         """Test that telegram_api_url contains token placeholder."""
-        env_vars_to_clear = {k: v for k, v in os.environ.items() if k.startswith("AUTO_SLOPP_")}
+        env_vars_to_clear = {
+            k: v for k, v in os.environ.items() if k.startswith("AUTO_SLOPP_")
+        }
         with patch.dict(os.environ, env_vars_to_clear, clear=True):
             with patch("dotenv.load_dotenv", return_value=None):
                 test_settings = Settings()
@@ -62,11 +70,14 @@ class TestSettings:
         assert test_settings.telegram_chat_id == "test_chat_id"
 
     def test_optional_telegram_fields(self):
-        """Test optional telegram fields when telegram is enabled."""
+        """Test optional telegram fields use configured values."""
         test_settings = Settings()
 
-        assert test_settings.telegram_enabled is True
-        assert test_settings.telegram_bot_token == "8257503031:AAEBznkdzNkyA9zN7D-zPniLMmd0mmvRiQA"
+        assert test_settings.telegram_enabled is False
+        assert (
+            test_settings.telegram_bot_token
+            == "8257503031:AAEBznkdzNkyA9zN7D-zPniLMmd0mmvRiQA"
+        )
         assert test_settings.telegram_chat_id == "7649674603"
 
     def test_env_prefix(self):
@@ -138,3 +149,26 @@ class TestSettings:
             test_settings = Settings()
 
         assert test_settings.workers_enabled == []
+
+    def test_slopmachine_codex_preset(self):
+        """Test codex preset updates cli command and args."""
+        with patch.dict(os.environ, {"AUTO_SLOPP_SLOPMACHINE": "codex"}, clear=True):
+            test_settings = Settings()
+
+        assert test_settings.slopmachine == "codex"
+        assert test_settings.cli_command == "codex"
+        assert test_settings.cli_args == []
+
+    def test_slopmachine_preserves_explicit_cli_overrides(self):
+        """Test explicit CLI settings are not overwritten by preset."""
+        env_vars = {
+            "AUTO_SLOPP_SLOPMACHINE": "codex",
+            "AUTO_SLOPP_CLI_COMMAND": "custom-cli",
+            "AUTO_SLOPP_CLI_ARGS": '["--flag"]',
+        }
+        with patch.dict(os.environ, env_vars, clear=True):
+            test_settings = Settings()
+
+        assert test_settings.slopmachine == "codex"
+        assert test_settings.cli_command == "custom-cli"
+        assert test_settings.cli_args == ["--flag"]

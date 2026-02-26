@@ -37,15 +37,20 @@ Auto-slopp supports configurable CLI tools for automation. By default, it uses [
 You can customize the CLI command and arguments via environment variables:
 
 ```bash
+# Use a pre-defined slopmachine preset (default: opencode)
+# Available: opencode, codex
+AUTO_SLOPP_SLOPMACHINE=opencode
+
 # CLI command to use (default: opencode)
 AUTO_SLOPP_CLI_COMMAND=opencode
 
-# Arguments to pass to the CLI command (default: ["--agent", "openagent", "--model", "opencode/glm-5-free", "run"])
+# Arguments to pass to the CLI command (default: ["--agent", "openagent", "run"])
 # For opencode.ai:
-AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "--model", "opencode/glm-5-free", "run"]'
+AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "run"]'
 
-# For Claude Code, you might use:
-# AUTO_SLOPP_CLI_COMMAND=claude
+# For codex preset:
+# AUTO_SLOPP_SLOPMACHINE=codex
+# AUTO_SLOPP_CLI_COMMAND=codex
 # AUTO_SLOPP_CLI_ARGS='[]'
 ```
 
@@ -189,8 +194,9 @@ AUTO_SLOPP_DEBUG=false
 AUTO_SLOPP_WORKERS_ENABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker", "UpdatePRBranchesWorker"]'
 
 # CLI configuration (optional - defaults to opencode)
+AUTO_SLOPP_SLOPMACHINE=opencode
 AUTO_SLOPP_CLI_COMMAND=opencode
-AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "--model", "opencode/glm-5-free", "run"]'
+AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "run"]'
 
 # Telegram logging (optional)
 AUTO_SLOPP_TELEGRAM_ENABLED=true
@@ -370,8 +376,9 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False)
 
     # CLI Configuration
+    slopmachine: Literal["opencode", "codex"] = Field(default="opencode")
     cli_command: str = Field(default="opencode", description="CLI command to execute")
-    cli_args: list = Field(default=["--agent", "openagent", "--model", "opencode/glm-5-free", "run"])
+    cli_args: list = Field(default=["--agent", "openagent", "run"])
 
     # Telegram integration
     telegram_enabled: bool = Field(default=False)
