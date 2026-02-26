@@ -78,7 +78,7 @@ def get_open_issues(repo_dir: Path) -> List[Dict[str, Any]]:
             "issue",
             "list",
             "--state=open",
-            "--json=number,title,body,url",
+            "--json=number,title,body,url,author,labels",
             check=False,
         )
 
