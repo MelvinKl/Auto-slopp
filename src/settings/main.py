@@ -23,6 +23,10 @@ SLOPMACHINE_PRESETS = {
         "cli_command": "codex",
         "cli_args": ["--dangerously-bypass-approvals-and-sandbox"],
     },
+    "claude": {
+        "cli_command": "claude",
+        "cli_args": [],
+    },
 }
 
 
@@ -102,7 +106,7 @@ class Settings(BaseSettings):
         description="Arguments to pass to the CLI command",
     )
 
-    slopmachine: Literal["opencode", "codex"] = Field(
+    slopmachine: Literal["opencode", "codex", "claude"] = Field(
         default="opencode",
         description="Pre-defined CLI preset to use for task execution",
     )

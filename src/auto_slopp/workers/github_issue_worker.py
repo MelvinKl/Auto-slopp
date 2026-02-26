@@ -4,7 +4,7 @@ This worker:
 1. Searches each repository for open issues on GitHub
 2. Uses issue title/body as instructions
 3. Creates a new branch starting with ai/
-4. Executes instructions using OpenCode
+4. Executes instructions using the configured CLI tool
 5. Creates a PR and closes the issue
 """
 
@@ -31,13 +31,14 @@ from auto_slopp.utils.github_operations import (
     get_pr_for_branch,
 )
 from auto_slopp.worker import Worker
+from settings.main import settings
 
 
 class GitHubIssueWorker(Worker):
     """Worker for processing GitHub issues as instructions.
 
     This worker searches each repository for open issues on GitHub,
-    uses the issue title and body as instructions for OpenCode,
+    uses the issue title and body as instructions for the configured CLI tool,
     creates a new branch, executes the instructions, and creates a PR.
     """
 
@@ -50,9 +51,9 @@ class GitHubIssueWorker(Worker):
         """Initialize the GitHubIssueWorker.
 
         Args:
-            timeout: Timeout for OpenCode execution in seconds
-            agent_args: Additional arguments to pass to OpenCode
-            dry_run: If True, skip actual OpenCode execution and git operations
+            timeout: Timeout for CLI execution in seconds
+            agent_args: Additional arguments to pass to the CLI tool
+            dry_run: If True, skip actual CLI execution and git operations
         """
         self.timeout = timeout
         self.agent_args = agent_args or []
@@ -94,6 +95,8 @@ class GitHubIssueWorker(Worker):
             results["execution_time"] = self._get_elapsed_time(start_time)
             self._log_completion_summary(results)
             return results
+
+        issues = self._filter_renovate_issues(issues)
 
         for issue in issues:
             issue_result = self._process_single_issue(repo_path, issue)
@@ -153,6 +156,44 @@ class GitHubIssueWorker(Worker):
                 return False
         return True
 
+    def _is_renovate_issue(self, issue: Dict[str, Any]) -> bool:
+        """Check if an issue is created by Renovate.
+
+        Args:
+            issue: The issue dictionary from GitHub API
+
+        Returns:
+            True if the issue is from Renovate, False otherwise
+        """
+        author = issue.get("author", {})
+        author_login = author.get("login", "") if author else ""
+        if author_login in ("renovate[bot]", "renovate"):
+            return True
+
+        labels = issue.get("labels", [])
+        label_names = [label.get("name", "") for label in labels]
+        if "renovate" in label_names:
+            return True
+
+        return False
+
+    def _filter_renovate_issues(self, issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Filter out issues created by Renovate.
+
+        Args:
+            issues: List of issue dictionaries
+
+        Returns:
+            List of issues with renovate issues removed
+        """
+        filtered = []
+        for issue in issues:
+            if self._is_renovate_issue(issue):
+                self.logger.info(f"Skipping renovate issue #{issue.get('number')}: {issue.get('title')}")
+            else:
+                filtered.append(issue)
+        return filtered
+
     def _process_single_issue(self, repo_dir: Path, issue: Dict[str, Any]) -> Dict[str, Any]:
         """Process a single issue from the repository.
 
@@ -209,7 +250,8 @@ class GitHubIssueWorker(Worker):
                 result["openagent_executions"] = 1
 
             if not openagent_result["success"]:
-                result["error"] = f"OpenCode execution failed: {openagent_result.get('error', 'Unknown error')}"
+                cli_tool = settings.cli_command
+                result["error"] = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
                 return result
 
             current_branch = get_current_branch(repo_dir)
@@ -361,10 +403,11 @@ class GitHubIssueWorker(Worker):
 
     def _log_completion_summary(self, results: Dict[str, Any]) -> None:
         """Log completion summary."""
+        cli_tool = settings.cli_command
         self.logger.info(
             f"GitHubIssueWorker completed. Processed: "
             f"{results['issues_processed']}, "
-            f"OpenCode executions: {results['openagent_executions']}, "
+            f"{cli_tool} executions: {results['openagent_executions']}, "
             f"PRs created: {results['prs_created']}, "
             f"Issues closed: {results['issues_closed']}, "
             f"Errors: {results['repositories_with_errors']}"

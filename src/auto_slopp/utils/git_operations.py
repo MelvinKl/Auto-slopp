@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from auto_slopp.utils.cli_executor import run_cli_executor
+from settings.main import settings
 
 logger = logging.getLogger(__name__)
 
@@ -69,16 +70,17 @@ def _handle_git_operation_failure(
     error_message: str,
     timeout: int = 300,
 ) -> None:
-    """Handle git operation failure by calling OpenCode to fix the issue.
+    """Handle git operation failure by calling the configured CLI tool to fix the issue.
 
     Args:
         operation: The name of the git operation that failed
         repo_dir: Path to the git repository
         error_message: The error message from the failed operation
-        timeout: Timeout for OpenCode execution in seconds
+        timeout: Timeout for CLI execution in seconds
     """
+    cli_tool = settings.cli_command
     logger.warning(f"Git operation '{operation}' failed in {repo_dir.name}: {error_message}")
-    logger.info(f"Calling OpenCode to fix the failed git operation: {operation}")
+    logger.info(f"Calling {cli_tool} to fix the failed git operation: {operation}")
 
     instructions = (
         f"Fix the failed git operation '{operation}' in the repository at {repo_dir}. "
@@ -95,13 +97,13 @@ def _handle_git_operation_failure(
         )
 
         if result.get("success"):
-            logger.info(f"OpenCode successfully resolved the git operation '{operation}' failure")
+            logger.info(f"{cli_tool} successfully resolved the git operation '{operation}' failure")
         else:
             logger.error(
-                f"OpenCode failed to resolve git operation '{operation}' failure: {result.get('error', 'Unknown error')}"
+                f"{cli_tool} failed to resolve git operation '{operation}' failure: {result.get('error', 'Unknown error')}"
             )
     except Exception as e:
-        logger.error(f"Failed to call OpenCode for git operation '{operation}' failure: {str(e)}")
+        logger.error(f"Failed to call {cli_tool} for git operation '{operation}' failure: {str(e)}")
 
 
 def get_local_branches(repo_dir: Path) -> List[Dict[str, Any]]:
@@ -460,11 +462,12 @@ def merge_main_into_branch(
             logger.warning(f"Merge had conflicts or failed: {merge_error}")
 
             if "CONFLICT" in merge_error:
-                logger.info("Merge conflict detected, calling OpenCode to resolve")
+                cli_tool = settings.cli_command
+                logger.info(f"Merge conflict detected, calling {cli_tool} to resolve")
                 _handle_git_operation_failure("merge_main_into_branch", repo_dir, merge_error)
                 return (
                     False,
-                    f"Merge conflict detected and OpenCode attempted resolution: {merge_error}",
+                    f"Merge conflict detected and {cli_tool} attempted resolution: {merge_error}",
                 )
 
             abort_result = _run_git_command(repo_dir, "merge", "--abort", check=False, timeout=timeout)
