@@ -21,7 +21,7 @@ SLOPMACHINE_PRESETS = {
     },
     "codex": {
         "cli_command": "codex",
-        "cli_args": [],
+        "cli_args": ["--dangerously-bypass-approvals-and-sandbox"],
     },
 }
 
