@@ -141,7 +141,7 @@ class TestSettings:
 
         assert test_settings.slopmachine == "codex"
         assert test_settings.cli_command == "codex"
-        assert test_settings.cli_args == []
+        assert test_settings.cli_args == ["--dangerously-bypass-approvals-and-sandbox"]
 
     def test_slopmachine_preserves_explicit_cli_overrides(self):
         """Test explicit CLI settings are not overwritten by preset."""
