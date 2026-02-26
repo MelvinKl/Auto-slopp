@@ -16,6 +16,35 @@ from settings.main import settings
 logger = logging.getLogger(__name__)
 
 
+CODEX_SUBCOMMANDS = {
+    "exec",
+    "review",
+    "login",
+    "logout",
+    "mcp",
+    "mcp-server",
+    "app-server",
+    "completion",
+    "sandbox",
+    "debug",
+    "apply",
+    "resume",
+    "fork",
+    "cloud",
+    "features",
+    "help",
+}
+
+
+def _codex_has_subcommand(args: List[str]) -> bool:
+    """Return True when codex arguments already include a subcommand."""
+    for arg in args:
+        if arg.startswith("-"):
+            continue
+        return arg in CODEX_SUBCOMMANDS
+    return False
+
+
 def run_cli_executor(
     additional_instructions: Optional[str] = None,
     working_directory: Optional[Path] = None,
@@ -94,7 +123,14 @@ def run_cli_executor(
     logger.info(f"Timeout: {timeout}s")
     logger.info(f"Agent args: {agent_args}")
 
-    cmd = [cli_command] + cli_base_args + agent_args
+    cmd_args = cli_base_args + agent_args
+
+    # Codex defaults to interactive mode unless a subcommand is supplied.
+    # In automation this runs without a TTY, so route to non-interactive exec by default.
+    if cli_command == "codex" and not _codex_has_subcommand(cmd_args):
+        cmd_args = ["exec"] + cmd_args
+
+    cmd = [cli_command] + cmd_args
 
     if additional_instructions:
         cmd.append(additional_instructions)
