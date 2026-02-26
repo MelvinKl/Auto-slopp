@@ -38,7 +38,7 @@ You can customize the CLI command and arguments via environment variables:
 
 ```bash
 # Use a pre-defined slopmachine preset (default: opencode)
-# Available: opencode, codex
+# Available: opencode, codex, claude
 AUTO_SLOPP_SLOPMACHINE=opencode
 
 # CLI command to use (default: opencode)
@@ -51,6 +51,11 @@ AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "run"]'
 # For codex preset:
 # AUTO_SLOPP_SLOPMACHINE=codex
 # AUTO_SLOPP_CLI_COMMAND=codex
+# AUTO_SLOPP_CLI_ARGS='[]'
+
+# For claude preset:
+# AUTO_SLOPP_SLOPMACHINE=claude
+# AUTO_SLOPP_CLI_COMMAND=claude
 # AUTO_SLOPP_CLI_ARGS='[]'
 ```
 
@@ -365,7 +370,7 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False)
 
     # CLI Configuration
-    slopmachine: Literal["opencode", "codex"] = Field(default="opencode")
+    slopmachine: Literal["opencode", "codex", "claude"] = Field(default="opencode")
     cli_command: str = Field(default="opencode", description="CLI command to execute")
     cli_args: list = Field(default=["--agent", "openagent", "run"])
 
