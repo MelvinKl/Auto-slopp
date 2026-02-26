@@ -1,7 +1,7 @@
 """PR branch testing worker for auto-slopp automation system.
 
 This worker iterates through all open PRs, updates each branch with latest main,
-runs tests, and uses OpenCode to fix any failing tests.
+runs tests, and uses the configured CLI tool to fix any failing tests.
 """
 
 import logging
@@ -18,10 +18,11 @@ from auto_slopp.utils.git_operations import (
 from auto_slopp.utils.github_operations import get_open_pr_branches
 from auto_slopp.utils.repository_utils import discover_repositories, validate_repository
 from auto_slopp.worker import Worker
+from settings.main import settings
 
 
 class PRWorker(Worker):
-    """Worker for testing open PR branches and fixing failures with OpenCode."""
+    """Worker for testing open PR branches and fixing failures with the configured CLI tool."""
 
     def __init__(self, timeout: int = 600):
         """Initialize PRWorker.
@@ -158,8 +159,9 @@ class PRWorker(Worker):
                 )
 
                 if not test_result["success"]:
-                    self.logger.info(f"Tests failed for {branch} in {repo_dir.name}, using OpenCode to fix")
-                    fix_result = self._fix_tests_with_opencode(repo_dir)
+                    cli_tool = settings.cli_command
+                    self.logger.info(f"Tests failed for {branch} in {repo_dir.name}, using {cli_tool} to fix")
+                    fix_result = self._fix_tests_with_cli(repo_dir)
                     if fix_result["success"]:
                         result["tests_fixed"] = True
                         verify_result = self._run_tests(repo_dir)
@@ -288,14 +290,14 @@ class PRWorker(Worker):
                 "error": f"Error running tests: {str(e)}",
             }
 
-    def _fix_tests_with_opencode(self, repo_dir: Path) -> Dict[str, Any]:
-        """Use OpenCode to fix failing tests.
+    def _fix_tests_with_cli(self, repo_dir: Path) -> Dict[str, Any]:
+        """Use the configured CLI tool to fix failing tests.
 
         Args:
             repo_dir: Path to the repository directory
 
         Returns:
-            Dictionary containing OpenCode execution results
+            Dictionary containing CLI execution results
         """
         additional_instructions = "'make test' is failing fix it and push the changes"
 
