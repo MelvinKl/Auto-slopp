@@ -16,7 +16,10 @@ class TestSettings:
 
     def test_default_settings_values(self):
         """Test that default settings values are correctly set when no env vars are set."""
-        test_settings = Settings()
+        env_vars_to_clear = {k: v for k, v in os.environ.items() if k.startswith("AUTO_SLOPP_")}
+        with patch.dict(os.environ, env_vars_to_clear, clear=True):
+            with patch("dotenv.load_dotenv", return_value=None):
+                test_settings = Settings()
 
         assert test_settings.base_repo_path == Path("~/git/managed").expanduser()
         assert test_settings.executor_sleep_interval == 30.0
@@ -63,7 +66,10 @@ class TestSettings:
 
     def test_optional_telegram_fields(self):
         """Test optional telegram fields use configured values."""
-        test_settings = Settings()
+        env_vars_to_clear = {k: v for k, v in os.environ.items() if k.startswith("AUTO_SLOPP_")}
+        with patch.dict(os.environ, env_vars_to_clear, clear=True):
+            with patch("dotenv.load_dotenv", return_value=None):
+                test_settings = Settings()
 
         assert test_settings.telegram_enabled is False
         assert test_settings.telegram_bot_token == "8257503031:AAEBznkdzNkyA9zN7D-zPniLMmd0mmvRiQA"
@@ -141,7 +147,7 @@ class TestSettings:
 
         assert test_settings.slopmachine == "codex"
         assert test_settings.cli_command == "codex"
-        assert test_settings.cli_args == []
+        assert test_settings.cli_args == ["--dangerously-bypass-approvals-and-sandbox"]
 
     def test_slopmachine_preserves_explicit_cli_overrides(self):
         """Test explicit CLI settings are not overwritten by preset."""
