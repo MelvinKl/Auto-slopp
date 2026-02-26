@@ -96,6 +96,8 @@ class GitHubIssueWorker(Worker):
             self._log_completion_summary(results)
             return results
 
+        issues = self._filter_renovate_issues(issues)
+
         for issue in issues:
             issue_result = self._process_single_issue(repo_path, issue)
             results["issue_results"].append(issue_result)
@@ -153,6 +155,44 @@ class GitHubIssueWorker(Worker):
                 self.logger.warning(f"Failed to pull latest changes from {repo_dir.name}")
                 return False
         return True
+
+    def _is_renovate_issue(self, issue: Dict[str, Any]) -> bool:
+        """Check if an issue is created by Renovate.
+
+        Args:
+            issue: The issue dictionary from GitHub API
+
+        Returns:
+            True if the issue is from Renovate, False otherwise
+        """
+        author = issue.get("author", {})
+        author_login = author.get("login", "") if author else ""
+        if author_login in ("renovate[bot]", "renovate"):
+            return True
+
+        labels = issue.get("labels", [])
+        label_names = [label.get("name", "") for label in labels]
+        if "renovate" in label_names:
+            return True
+
+        return False
+
+    def _filter_renovate_issues(self, issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Filter out issues created by Renovate.
+
+        Args:
+            issues: List of issue dictionaries
+
+        Returns:
+            List of issues with renovate issues removed
+        """
+        filtered = []
+        for issue in issues:
+            if self._is_renovate_issue(issue):
+                self.logger.info(f"Skipping renovate issue #{issue.get('number')}: {issue.get('title')}")
+            else:
+                filtered.append(issue)
+        return filtered
 
     def _process_single_issue(self, repo_dir: Path, issue: Dict[str, Any]) -> Dict[str, Any]:
         """Process a single issue from the repository.

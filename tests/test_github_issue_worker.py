@@ -164,3 +164,124 @@ class TestGitHubIssueWorker:
                 mock_close.assert_called_once()
                 mock_comment.assert_called_once()
                 mock_delete.assert_called_once()
+
+    def test_is_renovate_issue_by_author_renovate_bot(self):
+        """Test detection of renovate issues by author renovate[bot]."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        issue = {
+            "number": 1,
+            "title": "Update dependencies",
+            "body": "Update dependencies",
+            "url": "https://github.com/test/repo/issues/1",
+            "author": {"login": "renovate[bot]"},
+        }
+
+        assert worker._is_renovate_issue(issue) is True
+
+    def test_is_renovate_issue_by_author_renovate(self):
+        """Test detection of renovate issues by author renovate."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        issue = {
+            "number": 1,
+            "title": "Update dependencies",
+            "body": "Update dependencies",
+            "url": "https://github.com/test/repo/issues/1",
+            "author": {"login": "renovate"},
+        }
+
+        assert worker._is_renovate_issue(issue) is True
+
+    def test_is_renovate_issue_by_label(self):
+        """Test detection of renovate issues by renovate label."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        issue = {
+            "number": 1,
+            "title": "Update dependencies",
+            "body": "Update dependencies",
+            "url": "https://github.com/test/repo/issues/1",
+            "labels": [{"name": "renovate"}],
+        }
+
+        assert worker._is_renovate_issue(issue) is True
+
+    def test_is_renovate_issue_false(self):
+        """Test that regular issues are not detected as renovate."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        issue = {
+            "number": 1,
+            "title": "Fix bug",
+            "body": "Fix a bug",
+            "url": "https://github.com/test/repo/issues/1",
+            "author": {"login": "developer"},
+            "labels": [{"name": "bug"}],
+        }
+
+        assert worker._is_renovate_issue(issue) is False
+
+    def test_filter_renovate_issues(self):
+        """Test filtering out renovate issues from list."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        issues = [
+            {
+                "number": 1,
+                "title": "Regular Issue",
+                "body": "A regular issue",
+                "author": {"login": "developer"},
+            },
+            {
+                "number": 2,
+                "title": "Renovate Issue",
+                "body": "Update dependencies",
+                "author": {"login": "renovate[bot]"},
+            },
+            {
+                "number": 3,
+                "title": "Another Regular Issue",
+                "body": "Another regular issue",
+                "author": {"login": "developer"},
+            },
+        ]
+
+        filtered = worker._filter_renovate_issues(issues)
+
+        assert len(filtered) == 2
+        assert filtered[0]["number"] == 1
+        assert filtered[1]["number"] == 3
+
+    def test_run_skips_renovate_issues(self):
+        """Test that worker skips renovate issues."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            issues = [
+                {
+                    "number": 1,
+                    "title": "Regular Issue",
+                    "body": "A regular issue",
+                    "url": "https://github.com/test/repo/issues/1",
+                    "author": {"login": "developer"},
+                },
+                {
+                    "number": 2,
+                    "title": "Renovate Issue",
+                    "body": "Update dependencies",
+                    "url": "https://github.com/test/repo/issues/2",
+                    "author": {"login": "renovate[bot]"},
+                },
+            ]
+
+            with patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues:
+                mock_issues.return_value = issues
+
+                worker = GitHubIssueWorker(dry_run=True)
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                assert result["issues_processed"] == 1
+                assert result["issue_results"][0]["issue_number"] == 1
