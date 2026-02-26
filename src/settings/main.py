@@ -1,10 +1,10 @@
 """Main settings configuration using Pydantic BaseSettings."""
 
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from dotenv import load_dotenv
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 DEFAULT_WORKERS = [
@@ -13,6 +13,17 @@ DEFAULT_WORKERS = [
     "StaleBranchCleanupWorker",
     "UpdatePRBranchesWorker",
 ]
+
+SLOPMACHINE_PRESETS = {
+    "opencode": {
+        "cli_command": "opencode",
+        "cli_args": ["--agent", "openagent", "run"],
+    },
+    "codex": {
+        "cli_command": "codex",
+        "cli_args": ["--dangerously-bypass-approvals-and-sandbox"],
+    },
+}
 
 
 class Settings(BaseSettings):
@@ -96,6 +107,23 @@ class Settings(BaseSettings):
         default=["--agent", "openagent", "run"],
         description="Arguments to pass to the CLI command",
     )
+
+    slopmachine: Literal["opencode", "codex"] = Field(
+        default="opencode",
+        description="Pre-defined CLI preset to use for task execution",
+    )
+
+    @model_validator(mode="after")
+    def apply_slopmachine_preset(self):
+        """Apply pre-defined CLI settings unless explicitly overridden."""
+        preset = SLOPMACHINE_PRESETS[self.slopmachine]
+
+        if "cli_command" not in self.model_fields_set:
+            self.cli_command = preset["cli_command"]
+        if "cli_args" not in self.model_fields_set:
+            self.cli_args = preset["cli_args"].copy()
+
+        return self
 
     model_config = {
         "env_prefix": "AUTO_SLOPP_",
