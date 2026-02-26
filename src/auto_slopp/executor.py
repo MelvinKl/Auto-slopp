@@ -64,7 +64,7 @@ class Executor:
     def _run_iteration(self) -> None:
         """Run a single iteration of worker execution."""
         try:
-            enabled_workers = [w for w in ALL_WORKERS if w.__name__ in settings.workers_enabled]
+            enabled_workers = [w for w in ALL_WORKERS if w.__name__ not in settings.workers_disabled]
 
             if not enabled_workers:
                 print("No workers enabled")

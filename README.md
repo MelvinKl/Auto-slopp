@@ -190,8 +190,10 @@ AUTO_SLOPP_BASE_REPO_PATH=/path/to/your/repo
 AUTO_SLOPP_DEBUG=false
 
 # Worker configuration (all workers enabled by default)
-# JSON list of enabled workers. Available: GitHubIssueWorker, PRWorker, StaleBranchCleanupWorker, UpdatePRBranchesWorker
-AUTO_SLOPP_WORKERS_ENABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker", "UpdatePRBranchesWorker"]'
+# JSON list of disabled workers. Available: GitHubIssueWorker, PRWorker, StaleBranchCleanupWorker, UpdatePRBranchesWorker
+# Leave empty to enable all workers, or specify workers to disable:
+AUTO_SLOPP_WORKERS_DISABLED='[]'
+# Example: AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker"]'
 
 # CLI configuration (optional - defaults to opencode)
 AUTO_SLOPP_SLOPMACHINE=opencode
@@ -283,18 +285,18 @@ class ConfigurableWorker(Worker):
 
 ### Worker Configuration
 
-Workers are explicitly imported and can be enabled/disabled using the `AUTO_SLOPP_WORKERS_ENABLED` environment variable. By default, all workers are enabled.
+Workers are explicitly defined and can be disabled using the `AUTO_SLOPP_WORKERS_DISABLED` environment variable. By default, all workers are enabled.
 
-#### Enabling/Disabling Workers
+#### Disabling Specific Workers
 
-To disable specific workers, set the `AUTO_SLOPP_WORKERS_ENABLED` variable in your `.env` file:
+To disable specific workers, set the `AUTO_SLOPP_WORKERS_DISABLED` variable in your `.env` file:
 
 ```bash
-# Enable only specific workers
-AUTO_SLOPP_WORKERS_ENABLED='["GitHubIssueWorker", "PRWorker"]'
+# Disable specific workers
+AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker"]'
 
 # Disable all workers
-AUTO_SLOPP_WORKERS_ENABLED='[]'
+AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker", "UpdatePRBranchesWorker"]'
 ```
 
 ## Available Workers
@@ -306,7 +308,7 @@ Manages pull request operations.
 ```python
 from auto_slopp.workers import PRWorker
 
-# Enable in AUTO_SLOPP_WORKERS_ENABLED
+# Disable in AUTO_SLOPP_WORKERS_DISABLED
 # Returns: PR status, merge results, branch information
 ```
 
@@ -315,7 +317,7 @@ Handles GitHub issue operations.
 ```python
 from auto_slopp.workers import GitHubIssueWorker
 
-# Enable in AUTO_SLOPP_WORKERS_ENABLED
+# Disable in AUTO_SLOPP_WORKERS_DISABLED
 # Returns: issue status, updates, management results
 ```
 
@@ -324,7 +326,7 @@ Cleans up stale git branches.
 ```python
 from auto_slopp.workers import StaleBranchCleanupWorker
 
-# Enable in AUTO_SLOPP_WORKERS_ENABLED
+# Disable in AUTO_SLOPP_WORKERS_DISABLED
 # Returns: cleaned branches, deletion status
 ```
 
@@ -333,7 +335,7 @@ Updates pull request branches.
 ```python
 from auto_slopp.workers import UpdatePRBranchesWorker
 
-# Enable in AUTO_SLOPP_WORKERS_ENABLED
+# Disable in AUTO_SLOPP_WORKERS_DISABLED
 # Returns: updated branches, merge status
 ```
 
@@ -369,7 +371,7 @@ class Settings(BaseSettings):
     base_repo_path: Path = Field(default_factory=lambda: Path.cwd())
 
     # Workers - all enabled by default
-    workers_enabled: List[str] = Field(default_factory=lambda: [...])
+    workers_disabled: List[str] = Field(default_factory=list)
 
     # Execution
     executor_sleep_interval: float = Field(default=1.0)
@@ -478,7 +480,7 @@ export AUTO_SLOPP_DEBUG=true
 export AUTO_SLOPP_BASE_REPO_PATH=./dev-repo
 
 # Worker configuration - disable specific workers (JSON list format)
-export AUTO_SLOPP_WORKERS_ENABLED='["GitHubIssueWorker", "PRWorker"]'
+export AUTO_SLOPP_WORKERS_DISABLED='[]'
 
 # Production environment
 export AUTO_SLOPP_DEBUG=false

@@ -22,15 +22,9 @@ class TestSettings:
         assert test_settings.executor_sleep_interval == 30.0
         assert test_settings.debug is False
         assert test_settings.telegram_enabled is False
-        assert (
-            test_settings.telegram_bot_token
-            == "8257503031:AAEBznkdzNkyA9zN7D-zPniLMmd0mmvRiQA"
-        )
+        assert test_settings.telegram_bot_token == "8257503031:AAEBznkdzNkyA9zN7D-zPniLMmd0mmvRiQA"
         assert test_settings.telegram_chat_id == "7649674603"
-        assert (
-            test_settings.telegram_api_url
-            == "https://api.telegram.org/bot{token}/sendMessage"
-        )
+        assert test_settings.telegram_api_url == "https://api.telegram.org/bot{token}/sendMessage"
         assert test_settings.telegram_timeout == 30.0
         assert test_settings.telegram_retry_attempts == 3
         assert test_settings.telegram_retry_delay == 1.0
@@ -40,9 +34,7 @@ class TestSettings:
 
     def test_telegram_api_url_template(self):
         """Test that telegram_api_url contains token placeholder."""
-        env_vars_to_clear = {
-            k: v for k, v in os.environ.items() if k.startswith("AUTO_SLOPP_")
-        }
+        env_vars_to_clear = {k: v for k, v in os.environ.items() if k.startswith("AUTO_SLOPP_")}
         with patch.dict(os.environ, env_vars_to_clear, clear=True):
             with patch("dotenv.load_dotenv", return_value=None):
                 test_settings = Settings()
@@ -74,10 +66,7 @@ class TestSettings:
         test_settings = Settings()
 
         assert test_settings.telegram_enabled is False
-        assert (
-            test_settings.telegram_bot_token
-            == "8257503031:AAEBznkdzNkyA9zN7D-zPniLMmd0mmvRiQA"
-        )
+        assert test_settings.telegram_bot_token == "8257503031:AAEBznkdzNkyA9zN7D-zPniLMmd0mmvRiQA"
         assert test_settings.telegram_chat_id == "7649674603"
 
     def test_env_prefix(self):
@@ -117,38 +106,33 @@ class TestSettings:
         assert isinstance(settings, Settings)
         assert hasattr(settings, "base_repo_path")
 
-    def test_workers_enabled_default(self):
-        """Test that workers_enabled has correct default value."""
+    def test_workers_disabled_default(self):
+        """Test that workers_disabled has correct default value."""
         test_settings = Settings()
 
-        assert test_settings.workers_enabled == [
-            "GitHubIssueWorker",
-            "PRWorker",
-            "StaleBranchCleanupWorker",
-            "UpdatePRBranchesWorker",
-        ]
+        assert test_settings.workers_disabled == []
 
-    def test_workers_enabled_custom(self):
-        """Test that workers_enabled can be customized."""
+    def test_workers_disabled_custom(self):
+        """Test that workers_disabled can be customized."""
         env_vars = {
-            "AUTO_SLOPP_WORKERS_ENABLED": '["GitHubIssueWorker"]',
+            "AUTO_SLOPP_WORKERS_DISABLED": '["GitHubIssueWorker"]',
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
             test_settings = Settings()
 
-        assert test_settings.workers_enabled == ["GitHubIssueWorker"]
+        assert test_settings.workers_disabled == ["GitHubIssueWorker"]
 
-    def test_workers_enabled_empty(self):
-        """Test that workers_enabled can be set to empty list."""
+    def test_workers_disabled_empty(self):
+        """Test that workers_disabled can be set to empty list."""
         env_vars = {
-            "AUTO_SLOPP_WORKERS_ENABLED": "[]",
+            "AUTO_SLOPP_WORKERS_DISABLED": "[]",
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
             test_settings = Settings()
 
-        assert test_settings.workers_enabled == []
+        assert test_settings.workers_disabled == []
 
     def test_slopmachine_codex_preset(self):
         """Test codex preset updates cli command and args."""
