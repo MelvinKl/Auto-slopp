@@ -60,7 +60,7 @@ class Settings(BaseSettings):
         return v
 
     executor_sleep_interval: float = Field(
-        default=1.0, description="Sleep interval between executor iterations in seconds"
+        default=60.0, description="Sleep interval between executor iterations in seconds"
     )
 
     debug: bool = Field(default=False, description="Enable debug mode with verbose logging")
