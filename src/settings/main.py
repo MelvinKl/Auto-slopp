@@ -17,7 +17,13 @@ DEFAULT_WORKERS = [
 SLOPMACHINE_PRESETS = {
     "opencode": {
         "cli_command": "opencode",
-        "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"],
+        "cli_args": [
+            "--agent",
+            "openagent",
+            "--model",
+            "zai-coding-plan/glm-4.7",
+            "run",
+        ],
     },
     "codex": {
         "cli_command": "codex",
@@ -60,7 +66,8 @@ class Settings(BaseSettings):
         return v
 
     executor_sleep_interval: float = Field(
-        default=60.0, description="Sleep interval between executor iterations in seconds"
+        default=60.0,
+        description="Sleep interval between executor iterations in seconds",
     )
 
     debug: bool = Field(default=False, description="Enable debug mode with verbose logging")
@@ -104,6 +111,11 @@ class Settings(BaseSettings):
     cli_args: list = Field(
         default=["--agent", "openagent", "run"],
         description="Arguments to pass to the CLI command",
+    )
+
+    slop_timeout: int = Field(
+        default=14400,
+        description="Timeout for slopmachine execution in seconds (default: 4 hours)",
     )
 
     slopmachine: Literal["opencode", "codex", "claude"] = Field(

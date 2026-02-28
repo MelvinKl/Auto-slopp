@@ -24,13 +24,13 @@ from settings.main import settings
 class PRWorker(Worker):
     """Worker for testing open PR branches and fixing failures with the configured CLI tool."""
 
-    def __init__(self, timeout: int = 600):
+    def __init__(self, timeout: int | None = None):
         """Initialize PRWorker.
 
         Args:
-            timeout: Timeout for test execution and OpenAgent fixes in seconds
+            timeout: Timeout for test execution and OpenAgent fixes in seconds (default: from settings.slop_timeout)
         """
-        self.timeout = timeout
+        self.timeout = timeout if timeout is not None else settings.slop_timeout
         self.logger = logging.getLogger("auto_slopp.workers.PRWorker")
 
     def run(self, repo_path: Path) -> Dict[str, Any]:
