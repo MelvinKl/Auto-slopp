@@ -583,7 +583,7 @@ For comprehensive Telegram logging setup and configuration, see the [Telegram Lo
 
 ### Features
 
-- **Real-time notifications** for errors and warnings
+- **Real-time notifications** for errors and warnings (WARNING level and above by default)
 - **Configurable log levels** and message formatting
 - **Retry logic** for network failures and rate limiting
 - **HTML/Markdown formatting** support

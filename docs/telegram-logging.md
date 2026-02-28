@@ -196,7 +196,7 @@ AUTO_SLOPP_TELEGRAM_DISABLE_WEB_PAGE_PREVIEW=true
 
 ### Automatic Integration
 
-When Telegram logging is enabled, Auto-slopp automatically integrates with the main logging system. You don't need to modify your existing code - just configure the environment variables.
+When Telegram logging is enabled, Auto-slopp automatically integrates with the main logging system. By default, only WARNING level and higher log messages are sent to Telegram, while INFO and DEBUG messages appear only in console logs. This reduces noise while ensuring you receive important notifications. You don't need to modify your existing code - just configure the environment variables.
 
 ### Manual Integration
 

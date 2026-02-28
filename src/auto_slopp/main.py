@@ -19,7 +19,7 @@ def setup_logging() -> None:
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    telegram_handler = setup_telegram_logging(level=log_level)
+    telegram_handler = setup_telegram_logging(level=logging.WARNING)
     if telegram_handler:
         logger = logging.getLogger("auto_slopp")
         logger.addHandler(telegram_handler)

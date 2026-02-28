@@ -1,5 +1,6 @@
 """Tests for main application functionality."""
 
+import logging
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -113,7 +114,7 @@ class TestMainApplication:
 
                     setup_logging()
 
-                    mock_telegram.assert_called_once_with(level=20)
+                    mock_telegram.assert_called_once_with(level=logging.WARNING)
                     mock_logger.addHandler.assert_called_once_with(mock_handler)
 
     def test_setup_logging_httpx_logging_configured(self, mock_settings):
