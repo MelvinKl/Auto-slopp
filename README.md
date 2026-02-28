@@ -48,6 +48,9 @@ AUTO_SLOPP_CLI_COMMAND=opencode
 # For opencode.ai:
 AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "run"]'
 
+# Timeout for slopmachine execution in seconds (default: 14400, 4 hours)
+AUTO_SLOPP_SLOP_TIMEOUT=14400
+
 # For codex preset:
 # AUTO_SLOPP_SLOPMACHINE=codex
 # AUTO_SLOPP_CLI_COMMAND=codex
@@ -204,6 +207,9 @@ AUTO_SLOPP_WORKERS_DISABLED='[]'
 AUTO_SLOPP_SLOPMACHINE=opencode
 AUTO_SLOPP_CLI_COMMAND=opencode
 AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "run"]'
+
+# Timeout for slopmachine execution in seconds (default: 14400, 4 hours)
+AUTO_SLOPP_SLOP_TIMEOUT=14400
 
 # Telegram logging (optional)
 AUTO_SLOPP_TELEGRAM_ENABLED=true
@@ -386,6 +392,7 @@ class Settings(BaseSettings):
     slopmachine: Literal["opencode", "codex", "claude"] = Field(default="opencode")
     cli_command: str = Field(default="opencode", description="CLI command to execute")
     cli_args: list = Field(default=["--agent", "openagent", "run"])
+    slop_timeout: int = Field(default=14400, description="Timeout for slopmachine execution in seconds")
 
     # Telegram integration
     telegram_enabled: bool = Field(default=False)
@@ -496,6 +503,9 @@ export AUTO_SLOPP_TELEGRAM_CHAT_ID=prod_chat_id
 # CLI configuration (optional)
 export AUTO_SLOPP_CLI_COMMAND=opencode
 export AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "--model", "opencode/glm-5-free", "run"]'
+
+# Timeout for slopmachine execution in seconds (default: 14400, 4 hours)
+export AUTO_SLOPP_SLOP_TIMEOUT=14400
 ```
 
 ### .env File
@@ -511,6 +521,9 @@ AUTO_SLOPP_DEBUG=false
 # CLI configuration (optional - defaults to opencode)
 AUTO_SLOPP_CLI_COMMAND=opencode
 AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "--model", "opencode/glm-5-free", "run"]'
+
+# Timeout for slopmachine execution in seconds (default: 14400, 4 hours)
+AUTO_SLOPP_SLOP_TIMEOUT=14400
 
 # Telegram settings
 AUTO_SLOPP_TELEGRAM_ENABLED=true

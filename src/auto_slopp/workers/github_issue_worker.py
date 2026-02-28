@@ -44,18 +44,18 @@ class GitHubIssueWorker(Worker):
 
     def __init__(
         self,
-        timeout: int = 7200,
+        timeout: int | None = None,
         agent_args: Optional[List[str]] = None,
         dry_run: bool = False,
     ):
         """Initialize the GitHubIssueWorker.
 
         Args:
-            timeout: Timeout for CLI execution in seconds
+            timeout: Timeout for CLI execution in seconds (default: from settings.slop_timeout)
             agent_args: Additional arguments to pass to the CLI tool
             dry_run: If True, skip actual CLI execution and git operations
         """
-        self.timeout = timeout
+        self.timeout = timeout if timeout is not None else settings.slop_timeout
         self.agent_args = agent_args or []
         self.dry_run = dry_run
         self.logger = logging.getLogger("auto_slopp.workers.GitHubIssueWorker")
