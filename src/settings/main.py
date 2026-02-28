@@ -17,7 +17,7 @@ DEFAULT_WORKERS = [
 SLOPMACHINE_PRESETS = {
     "opencode": {
         "cli_command": "opencode",
-        "cli_args": ["--agent", "openagent", "run"],
+        "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"],
     },
     "codex": {
         "cli_command": "codex",
