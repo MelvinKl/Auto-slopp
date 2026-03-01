@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
+from auto_slopp.utils.cli_executor import run_cli_executor
 from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     merge_main_into_branch,
@@ -16,17 +17,20 @@ from auto_slopp.utils.git_operations import (
 from auto_slopp.utils.github_operations import get_open_pr_branches
 from auto_slopp.utils.repository_utils import validate_repository
 from auto_slopp.worker import Worker
+from settings.main import settings
 
 
 class UpdatePRBranchesWorker(Worker):
     """Worker for updating open PR branches with latest main."""
 
-    def __init__(self):
-        """Initialize UpdatePRBranchesWorker."""
+    def __init__(self, timeout: int | None = None):
+        """Initialize UpdatePRBranchesWorker.
+
+        Args:
+            timeout: Timeout for slopmachine execution in seconds (default: from settings.slop_timeout)
+        """
+        self.timeout = timeout if timeout is not None else settings.slop_timeout
         self.logger = logging.getLogger("auto_slopp.workers.UpdatePRBranchesWorker")
-        # TODO: git operations belong into the git_operations file NOT into this file. If you add them here they aren't't reusable. Also: There is error handling available in the git_operations.
-        # TODO: create a new file for github_operations and move ALL operations for github there. Not only from this file, from all files.
-        pass
 
     def run(self, repo_path: Path) -> Dict[str, Any]:
         """Execute PR branch update workflow for a single repository.
@@ -78,14 +82,36 @@ class UpdatePRBranchesWorker(Worker):
                 "branch": branch,
                 "success": False,
                 "error": None,
+                "fix_attempted": False,
+                "fix_success": False,
             }
 
             if not self._checkout_branch(repo_path, branch):
                 branch_result["error"] = "Failed to checkout branch"
                 results["branches_failed"] += 1
             elif not self._merge_main(repo_path):
-                branch_result["error"] = "Failed to merge origin/main"
-                results["branches_failed"] += 1
+                cli_tool = settings.cli_command
+                self.logger.info(f"Merge failed for {branch} in {repo_path.name}, using {cli_tool} to fix")
+                fix_result = self._fix_merge_with_cli(repo_path)
+                branch_result["fix_attempted"] = True
+
+                if fix_result["success"]:
+                    branch_result["fix_success"] = True
+                    if not self._merge_main(repo_path):
+                        branch_result["error"] = "Failed to merge origin/main after fix attempt"
+                        results["branches_failed"] += 1
+                    elif not self._push_branch(repo_path, branch):
+                        branch_result["error"] = "Failed to push branch after fix"
+                        results["branches_failed"] += 1
+                    else:
+                        branch_result["success"] = True
+                        results["branches_updated"] += 1
+                else:
+                    branch_result["fix_success"] = False
+                    branch_result["error"] = (
+                        f"Failed to fix merge conflicts: {fix_result.get('error', 'Unknown error')}"
+                    )
+                    results["branches_failed"] += 1
             elif not self._push_branch(repo_path, branch):
                 branch_result["error"] = "Failed to push branch"
                 results["branches_failed"] += 1
@@ -149,3 +175,29 @@ class UpdatePRBranchesWorker(Worker):
         except Exception as e:
             self.logger.error(f"Error pushing branch {branch}: {str(e)}")
             return False
+
+    def _fix_merge_with_cli(self, repo_dir: Path) -> Dict[str, Any]:
+        """Use the configured CLI tool to fix merge conflicts.
+
+        Args:
+            repo_dir: Path to the repository directory
+
+        Returns:
+            Dictionary containing CLI execution results
+        """
+        additional_instructions = "Fix the merge conflicts and complete the merge, then push the changes"
+
+        result = run_cli_executor(
+            additional_instructions=additional_instructions,
+            working_directory=repo_dir,
+            timeout=self.timeout,
+            agent_args=[],
+            capture_output=True,
+        )
+
+        return {
+            "success": result["success"],
+            "output": result.get("stdout", ""),
+            "error": result.get("error") if not result["success"] else None,
+            "return_code": result["return_code"],
+        }
