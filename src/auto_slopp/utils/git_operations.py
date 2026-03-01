@@ -6,6 +6,7 @@ used across different workers.
 
 import logging
 import os
+import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +16,28 @@ from auto_slopp.utils.cli_executor import run_cli_executor
 from settings.main import settings
 
 logger = logging.getLogger(__name__)
+
+
+def sanitize_branch_name(name: str, max_length: int = 50) -> str:
+    """Sanitize a string to be used as a valid git branch name.
+
+    Args:
+        name: The string to sanitize
+        max_length: Maximum length of the resulting branch name (default: 50)
+
+    Returns:
+        A sanitized branch name with only valid characters
+    """
+    name = name.strip()
+    name = name[:max_length]
+
+    name = re.sub(r"[^\w-]", "-", name)
+
+    name = re.sub(r"-+", "-", name)
+
+    name = name.strip("-")
+
+    return name or "branch"
 
 
 class GitOperationError(Exception):
@@ -747,46 +770,3 @@ def commit_all_changes(repo_dir: Path, commit_message: str) -> Tuple[bool, str]:
     except GitOperationError as e:
         error_msg = str(e)
         return False, f"Commit failed: {error_msg}"
-
-
-def pull_from_remote(repo_dir: Path, remote: str = "origin", branch: str = "main") -> Tuple[bool, str]:
-    """Pull changes from a remote branch.
-
-    Args:
-        repo_dir: Path to the git repository
-        remote: Remote name (default: origin)
-        branch: Branch name (default: main)
-
-    Returns:
-        Tuple of (success, message).
-    """
-    result = _run_git_command(repo_dir, "pull", remote, branch, check=False)
-
-    if result.returncode == 0:
-        return True, "Pull successful"
-
-    error_msg = result.stderr.strip() or result.stdout.strip()
-    return False, error_msg
-
-
-def push_to_remote(repo_dir: Path, remote: str = "origin", branch: Optional[str] = None) -> Tuple[bool, str]:
-    """Push changes to a remote branch.
-
-    Args:
-        repo_dir: Path to the git repository
-        remote: Remote name (default: origin)
-        branch: Branch name (default: current branch)
-
-    Returns:
-        Tuple of (success, message).
-    """
-    if branch is None:
-        branch = get_current_branch(repo_dir)
-
-    result = _run_git_command(repo_dir, "push", remote, branch, check=False)
-
-    if result.returncode == 0:
-        return True, "Push successful"
-
-    error_msg = result.stderr.strip() or result.stdout.strip()
-    return False, error_msg
