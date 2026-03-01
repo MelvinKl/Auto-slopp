@@ -378,7 +378,7 @@ class TestGitHubIssueWorker:
             assert worker._should_process_issue(issue_with_label) is True
 
     def test_should_process_issue_with_allowed_creator(self):
-        """Test that issues from allowed creator are processed."""
+        """Test that issues without 'ai' label are skipped even if from allowed creator."""
         from unittest.mock import patch
 
         with patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings:
@@ -394,7 +394,7 @@ class TestGitHubIssueWorker:
                 "labels": [{"name": "bug"}],
             }
 
-            assert worker._should_process_issue(issue_from_allowed_creator) is True
+            assert worker._should_process_issue(issue_from_allowed_creator) is False
 
     def test_should_process_issue_without_label_and_not_allowed_creator(self):
         """Test that issues without required label and not from allowed creator are skipped."""
@@ -435,7 +435,7 @@ class TestGitHubIssueWorker:
             assert worker._should_process_issue(issue_with_both) is True
 
     def test_filter_by_label_and_creator(self):
-        """Test filtering issues by label and creator."""
+        """Test filtering issues by label only."""
         from unittest.mock import patch
 
         with patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings:
@@ -473,10 +473,9 @@ class TestGitHubIssueWorker:
 
             filtered = worker._filter_by_label_and_creator(issues)
 
-            assert len(filtered) == 3
+            assert len(filtered) == 2
             assert filtered[0]["number"] == 1
-            assert filtered[1]["number"] == 2
-            assert filtered[2]["number"] == 4
+            assert filtered[1]["number"] == 4
 
     def test_run_filters_issues_by_label_and_creator(self):
         """Test that run method filters issues by label and creator."""

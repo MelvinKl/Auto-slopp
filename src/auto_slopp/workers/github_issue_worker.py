@@ -216,7 +216,7 @@ class GitHubIssueWorker(Worker):
         author_login = author.get("login", "") if author else ""
         is_allowed_creator = author_login == allowed_creator
 
-        return has_required_label or is_allowed_creator
+        return has_required_label
 
     def _filter_by_label_and_creator(self, issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Filter issues based on required label and allowed creator.
