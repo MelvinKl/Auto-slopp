@@ -123,6 +123,16 @@ class Settings(BaseSettings):
         description="Pre-defined CLI preset to use for task execution",
     )
 
+    github_issue_worker_required_label: str = Field(
+        default="ai",
+        description="Required label for GitHubIssueWorker to process an issue",
+    )
+
+    github_issue_worker_allowed_creator: str = Field(
+        default="MelvinKl",
+        description="Allowed GitHub username for GitHubIssueWorker to process issues",
+    )
+
     @model_validator(mode="after")
     def apply_slopmachine_preset(self):
         """Apply pre-defined CLI settings unless explicitly overridden."""

@@ -98,6 +98,7 @@ class GitHubIssueWorker(Worker):
             return results
 
         issues = self._filter_renovate_issues(issues)
+        issues = self._filter_by_label_and_creator(issues)
 
         for issue in issues:
             issue_result = self._process_single_issue(repo_path, issue)
@@ -193,6 +194,49 @@ class GitHubIssueWorker(Worker):
                 self.logger.info(f"Skipping renovate issue #{issue.get('number')}: {issue.get('title')}")
             else:
                 filtered.append(issue)
+        return filtered
+
+    def _should_process_issue(self, issue: Dict[str, Any]) -> bool:
+        """Check if an issue should be processed based on label and creator.
+
+        Args:
+            issue: The issue dictionary from GitHub API
+
+        Returns:
+            True if the issue should be processed, False otherwise
+        """
+        required_label = settings.github_issue_worker_required_label
+        allowed_creator = settings.github_issue_worker_allowed_creator
+
+        labels = issue.get("labels", [])
+        label_names = [label.get("name", "") for label in labels]
+
+        has_required_label = required_label in label_names
+        author = issue.get("author", {})
+        author_login = author.get("login", "") if author else ""
+        is_allowed_creator = author_login == allowed_creator
+
+        return has_required_label or is_allowed_creator
+
+    def _filter_by_label_and_creator(self, issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Filter issues based on required label and allowed creator.
+
+        Args:
+            issues: List of issue dictionaries
+
+        Returns:
+            List of issues that have the required label or are created by the allowed creator
+        """
+        filtered = []
+        for issue in issues:
+            if self._should_process_issue(issue):
+                filtered.append(issue)
+            else:
+                self.logger.info(
+                    f"Skipping issue #{issue.get('number')} '{issue.get('title')}': "
+                    f"missing label '{settings.github_issue_worker_required_label}' "
+                    f"and not created by '{settings.github_issue_worker_allowed_creator}'"
+                )
         return filtered
 
     def _process_single_issue(self, repo_dir: Path, issue: Dict[str, Any]) -> Dict[str, Any]:
