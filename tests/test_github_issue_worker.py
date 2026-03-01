@@ -30,7 +30,9 @@ class TestGitHubIssueWorker:
             repo_path = Path(temp_dir) / "repos" / "test_repo"
             repo_path.mkdir(parents=True)
 
-            with patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues:
+            with patch(
+                "auto_slopp.workers.github_issue_worker.get_open_issues"
+            ) as mock_issues:
                 mock_issues.return_value = []
 
                 worker = GitHubIssueWorker(dry_run=True)
@@ -55,7 +57,9 @@ class TestGitHubIssueWorker:
                 "labels": [{"name": "ai"}],
             }
 
-            with patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues:
+            with patch(
+                "auto_slopp.workers.github_issue_worker.get_open_issues"
+            ) as mock_issues:
                 mock_issues.return_value = [mock_issue]
 
                 worker = GitHubIssueWorker(dry_run=True)
@@ -91,7 +95,9 @@ class TestGitHubIssueWorker:
         """Test instruction building with branch name provided."""
         worker = GitHubIssueWorker(dry_run=True)
 
-        instructions = worker._build_instructions("Fix bug", "This is a bug", branch_name="ai/issue-1-fix-bug")
+        instructions = worker._build_instructions(
+            "Fix bug", "This is a bug", branch_name="ai/issue-1-fix-bug"
+        )
         assert "Fix bug" in instructions
         assert "This is a bug" in instructions
         assert "already on branch 'ai/issue-1-fix-bug'" in instructions
@@ -135,14 +141,30 @@ class TestGitHubIssueWorker:
             }
 
             with (
-                patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues,
-                patch("auto_slopp.workers.github_issue_worker.create_and_checkout_branch") as mock_create_branch,
-                patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute,
-                patch("auto_slopp.workers.github_issue_worker.get_current_branch") as mock_get_branch,
-                patch("auto_slopp.workers.github_issue_worker.comment_on_issue") as mock_comment,
-                patch("auto_slopp.workers.github_issue_worker.close_issue") as mock_close,
-                patch("auto_slopp.workers.github_issue_worker.delete_branch") as mock_delete,
-                patch("auto_slopp.workers.github_issue_worker.checkout_branch_resilient") as mock_checkout,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.get_open_issues"
+                ) as mock_issues,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.create_and_checkout_branch"
+                ) as mock_create_branch,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.execute_with_instructions"
+                ) as mock_execute,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.get_current_branch"
+                ) as mock_get_branch,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.comment_on_issue"
+                ) as mock_comment,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.close_issue"
+                ) as mock_close,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.delete_branch"
+                ) as mock_delete,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.checkout_branch_resilient"
+                ) as mock_checkout,
             ):
                 mock_issues.return_value = [mock_issue]
                 mock_create_branch.return_value = True
@@ -279,7 +301,9 @@ class TestGitHubIssueWorker:
                 },
             ]
 
-            with patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues:
+            with patch(
+                "auto_slopp.workers.github_issue_worker.get_open_issues"
+            ) as mock_issues:
                 mock_issues.return_value = issues
 
                 worker = GitHubIssueWorker(dry_run=True)
@@ -343,7 +367,9 @@ class TestGitHubIssueWorker:
                     "labels": [{"name": "ai"}],
                 }
 
-                with patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues:
+                with patch(
+                    "auto_slopp.workers.github_issue_worker.get_open_issues"
+                ) as mock_issues:
                     mock_issues.return_value = [issue]
 
                     result = worker.run(repo_path)
@@ -353,10 +379,14 @@ class TestGitHubIssueWorker:
 
                     from auto_slopp.utils.git_operations import sanitize_branch_name
 
-                    sanitized_title = sanitize_branch_name(test_case["title"][:30].lower())
+                    sanitized_title = sanitize_branch_name(
+                        test_case["title"][:30].lower()
+                    )
                     expected_branch = f"ai/issue-{i}-{sanitized_title}"
 
-                    assert result["issue_results"][0]["issue_title"] == test_case["title"]
+                    assert (
+                        result["issue_results"][0]["issue_title"] == test_case["title"]
+                    )
 
     def test_should_process_issue_with_required_label(self):
         """Test that issues with required label are processed regardless of creator."""
@@ -377,8 +407,8 @@ class TestGitHubIssueWorker:
 
             assert worker._should_process_issue(issue_with_label) is True
 
-    def test_should_process_issue_without_required_label(self):
-        """Test that issues without 'ai' label are skipped regardless of creator."""
+    def test_should_process_issue_with_allowed_creator(self):
+        """Test that issues without 'ai' label are skipped even if from allowed creator."""
         from unittest.mock import patch
 
         with patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings:
@@ -478,7 +508,7 @@ class TestGitHubIssueWorker:
             assert filtered[1]["number"] == 4
 
     def test_should_process_issue_case_insensitive_label(self):
-        """Test that label check is case-insensitive regardless of creator."""
+        """Test that label check is case-insensitive."""
         from unittest.mock import patch
 
         with patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings:
@@ -499,15 +529,17 @@ class TestGitHubIssueWorker:
                 issue = {
                     "number": 1,
                     "title": "Test Issue",
-                    "author": {"login": "other_user"},
+                    "author": {"login": "MelvinKl"},
                     "labels": [{"name": test_case["label"]}],
                 }
 
                 result = worker._should_process_issue(issue)
-                assert result == test_case["expected"], f"Failed for label '{test_case['label']}'"
+                assert result == test_case["expected"], (
+                    f"Failed for label '{test_case['label']}'"
+                )
 
     def test_run_filters_issues_by_label_and_creator(self):
-        """Test that run method filters issues by label only (creator is ignored)."""
+        """Test that run method filters issues by label and creator."""
         from unittest.mock import patch
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -518,7 +550,7 @@ class TestGitHubIssueWorker:
                 {
                     "number": 1,
                     "title": "AI Task",
-                    "author": {"login": "other_user"},
+                    "author": {"login": "MelvinKl"},
                     "labels": [{"name": "ai"}],
                     "url": "https://github.com/test/repo/issues/1",
                 },
@@ -532,8 +564,12 @@ class TestGitHubIssueWorker:
             ]
 
             with (
-                patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
-                patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings"
+                ) as mock_settings,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.get_open_issues"
+                ) as mock_issues,
             ):
                 mock_settings.github_issue_worker_required_label = "ai"
                 mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
