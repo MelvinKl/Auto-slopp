@@ -52,6 +52,7 @@ class TestGitHubIssueWorker:
                 "title": "Test Issue",
                 "body": "This is a test issue",
                 "url": "https://github.com/test/repo/issues/1",
+                "labels": [{"name": "ai"}],
             }
 
             with patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues:
@@ -130,6 +131,7 @@ class TestGitHubIssueWorker:
                 "title": "Test Issue",
                 "body": "This is a test issue",
                 "url": "https://github.com/test/repo/issues/1",
+                "labels": [{"name": "ai"}],
             }
 
             with (
@@ -266,6 +268,7 @@ class TestGitHubIssueWorker:
                     "body": "A regular issue",
                     "url": "https://github.com/test/repo/issues/1",
                     "author": {"login": "developer"},
+                    "labels": [{"name": "ai"}],
                 },
                 {
                     "number": 2,
@@ -337,6 +340,7 @@ class TestGitHubIssueWorker:
                     "title": test_case["title"],
                     "body": "Test body",
                     "url": f"https://github.com/test/repo/issues/{i}",
+                    "labels": [{"name": "ai"}],
                 }
 
                 with patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues:
@@ -353,3 +357,163 @@ class TestGitHubIssueWorker:
                     expected_branch = f"ai/issue-{i}-{sanitized_title}"
 
                     assert result["issue_results"][0]["issue_title"] == test_case["title"]
+
+    def test_should_process_issue_with_required_label(self):
+        """Test that issues with required label are processed."""
+        from unittest.mock import patch
+
+        with patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings:
+            mock_settings.github_issue_worker_required_label = "ai"
+            mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
+
+            worker = GitHubIssueWorker(dry_run=True)
+
+            issue_with_label = {
+                "number": 1,
+                "title": "AI Task",
+                "author": {"login": "other_user"},
+                "labels": [{"name": "ai"}],
+            }
+
+            assert worker._should_process_issue(issue_with_label) is True
+
+    def test_should_process_issue_with_allowed_creator(self):
+        """Test that issues from allowed creator are processed."""
+        from unittest.mock import patch
+
+        with patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings:
+            mock_settings.github_issue_worker_required_label = "ai"
+            mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
+
+            worker = GitHubIssueWorker(dry_run=True)
+
+            issue_from_allowed_creator = {
+                "number": 2,
+                "title": "Regular Task",
+                "author": {"login": "MelvinKl"},
+                "labels": [{"name": "bug"}],
+            }
+
+            assert worker._should_process_issue(issue_from_allowed_creator) is True
+
+    def test_should_process_issue_without_label_and_not_allowed_creator(self):
+        """Test that issues without required label and not from allowed creator are skipped."""
+        from unittest.mock import patch
+
+        with patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings:
+            mock_settings.github_issue_worker_required_label = "ai"
+            mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
+
+            worker = GitHubIssueWorker(dry_run=True)
+
+            issue_without_label = {
+                "number": 3,
+                "title": "Regular Task",
+                "author": {"login": "other_user"},
+                "labels": [{"name": "bug"}],
+            }
+
+            assert worker._should_process_issue(issue_without_label) is False
+
+    def test_should_process_issue_with_both_label_and_allowed_creator(self):
+        """Test that issues with both label and allowed creator are processed."""
+        from unittest.mock import patch
+
+        with patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings:
+            mock_settings.github_issue_worker_required_label = "ai"
+            mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
+
+            worker = GitHubIssueWorker(dry_run=True)
+
+            issue_with_both = {
+                "number": 4,
+                "title": "AI Task",
+                "author": {"login": "MelvinKl"},
+                "labels": [{"name": "ai"}],
+            }
+
+            assert worker._should_process_issue(issue_with_both) is True
+
+    def test_filter_by_label_and_creator(self):
+        """Test filtering issues by label and creator."""
+        from unittest.mock import patch
+
+        with patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings:
+            mock_settings.github_issue_worker_required_label = "ai"
+            mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
+
+            worker = GitHubIssueWorker(dry_run=True)
+
+            issues = [
+                {
+                    "number": 1,
+                    "title": "AI Task",
+                    "author": {"login": "other_user"},
+                    "labels": [{"name": "ai"}],
+                },
+                {
+                    "number": 2,
+                    "title": "MelvinKl Task",
+                    "author": {"login": "MelvinKl"},
+                    "labels": [{"name": "bug"}],
+                },
+                {
+                    "number": 3,
+                    "title": "Other Task",
+                    "author": {"login": "other_user"},
+                    "labels": [{"name": "bug"}],
+                },
+                {
+                    "number": 4,
+                    "title": "AI Task by MelvinKl",
+                    "author": {"login": "MelvinKl"},
+                    "labels": [{"name": "ai"}],
+                },
+            ]
+
+            filtered = worker._filter_by_label_and_creator(issues)
+
+            assert len(filtered) == 3
+            assert filtered[0]["number"] == 1
+            assert filtered[1]["number"] == 2
+            assert filtered[2]["number"] == 4
+
+    def test_run_filters_issues_by_label_and_creator(self):
+        """Test that run method filters issues by label and creator."""
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            issues = [
+                {
+                    "number": 1,
+                    "title": "AI Task",
+                    "author": {"login": "other_user"},
+                    "labels": [{"name": "ai"}],
+                    "url": "https://github.com/test/repo/issues/1",
+                },
+                {
+                    "number": 2,
+                    "title": "Other Task",
+                    "author": {"login": "other_user"},
+                    "labels": [{"name": "bug"}],
+                    "url": "https://github.com/test/repo/issues/2",
+                },
+            ]
+
+            with (
+                patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
+                patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues,
+            ):
+                mock_settings.github_issue_worker_required_label = "ai"
+                mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
+                mock_issues.return_value = issues
+
+                worker = GitHubIssueWorker(dry_run=True)
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                assert result["issues_processed"] == 1
+                assert result["issue_results"][0]["issue_number"] == 1
