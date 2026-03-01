@@ -21,6 +21,7 @@ from auto_slopp.utils.git_operations import (
     delete_branch,
     get_current_branch,
     has_changes,
+    sanitize_branch_name,
 )
 from auto_slopp.utils.github_operations import (
     close_issue,
@@ -230,7 +231,7 @@ class GitHubIssueWorker(Worker):
         }
 
         try:
-            branch_name = f"ai/issue-{issue_number}-{issue_title[:30].replace(' ', '-').lower()}"
+            branch_name = f"ai/issue-{issue_number}-{sanitize_branch_name(issue_title[:30].lower())}"
             instructions = self._build_instructions(issue_title, issue_body, comment_texts, branch_name=branch_name)
 
             if self.dry_run:

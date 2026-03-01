@@ -285,3 +285,71 @@ class TestGitHubIssueWorker:
                 assert result["success"] is True
                 assert result["issues_processed"] == 1
                 assert result["issue_results"][0]["issue_number"] == 1
+
+    def test_branch_name_sanitization(self):
+        """Test that branch names are properly sanitized from issue titles."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            test_cases = [
+                {"title": "Fix bug", "expected": "ai/issue-1-fix-bug"},
+                {"title": "Fix: bug", "expected": "ai/issue-2-fix-bug"},
+                {
+                    "title": "Feature: Add new functionality",
+                    "expected": "ai/issue-3-feature-add-new-functio",
+                },
+                {
+                    "title": "Issue with:colon",
+                    "expected": "ai/issue-4-issue-with-colon",
+                },
+                {
+                    "title": "Issue with?question",
+                    "expected": "ai/issue-5-issue-with-question",
+                },
+                {
+                    "title": "Issue with*asterisk",
+                    "expected": "ai/issue-6-issue-with-asterisk",
+                },
+                {
+                    "title": "Issue with[brackets]",
+                    "expected": "ai/issue-7-issue-with-brackets",
+                },
+                {
+                    "title": "Issue\\with\\backslash",
+                    "expected": "ai/issue-8-issue-with-backslash",
+                },
+                {
+                    "title": "  Issue with spaces  ",
+                    "expected": "ai/issue-9-issue-with-spaces",
+                },
+                {
+                    "title": "Issue---with---dashes",
+                    "expected": "ai/issue-10-issue-with-dashes",
+                },
+            ]
+
+            for i, test_case in enumerate(test_cases, start=1):
+                issue = {
+                    "number": i,
+                    "title": test_case["title"],
+                    "body": "Test body",
+                    "url": f"https://github.com/test/repo/issues/{i}",
+                }
+
+                with patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues:
+                    mock_issues.return_value = [issue]
+
+                    result = worker.run(repo_path)
+
+                    assert result["success"] is True
+                    assert result["issues_processed"] == 1
+
+                    from auto_slopp.utils.git_operations import sanitize_branch_name
+
+                    sanitized_title = sanitize_branch_name(test_case["title"][:30].lower())
+                    expected_branch = f"ai/issue-{i}-{sanitized_title}"
+
+                    assert result["issue_results"][0]["issue_title"] == test_case["title"]
