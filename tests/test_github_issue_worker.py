@@ -359,7 +359,7 @@ class TestGitHubIssueWorker:
                     assert result["issue_results"][0]["issue_title"] == test_case["title"]
 
     def test_should_process_issue_with_required_label(self):
-        """Test that issues with required label are processed."""
+        """Test that issues with required label are processed regardless of creator."""
         from unittest.mock import patch
 
         with patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings:
@@ -377,8 +377,8 @@ class TestGitHubIssueWorker:
 
             assert worker._should_process_issue(issue_with_label) is True
 
-    def test_should_process_issue_with_allowed_creator(self):
-        """Test that issues without 'ai' label are skipped even if from allowed creator."""
+    def test_should_process_issue_without_required_label(self):
+        """Test that issues without 'ai' label are skipped regardless of creator."""
         from unittest.mock import patch
 
         with patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings:
@@ -477,8 +477,37 @@ class TestGitHubIssueWorker:
             assert filtered[0]["number"] == 1
             assert filtered[1]["number"] == 4
 
+    def test_should_process_issue_case_insensitive_label(self):
+        """Test that label check is case-insensitive regardless of creator."""
+        from unittest.mock import patch
+
+        with patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings:
+            mock_settings.github_issue_worker_required_label = "ai"
+            mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
+
+            worker = GitHubIssueWorker(dry_run=True)
+
+            test_cases = [
+                {"label": "ai", "expected": True},
+                {"label": "AI", "expected": True},
+                {"label": "Ai", "expected": True},
+                {"label": "aI", "expected": True},
+                {"label": "bug", "expected": False},
+            ]
+
+            for test_case in test_cases:
+                issue = {
+                    "number": 1,
+                    "title": "Test Issue",
+                    "author": {"login": "other_user"},
+                    "labels": [{"name": test_case["label"]}],
+                }
+
+                result = worker._should_process_issue(issue)
+                assert result == test_case["expected"], f"Failed for label '{test_case['label']}'"
+
     def test_run_filters_issues_by_label_and_creator(self):
-        """Test that run method filters issues by label and creator."""
+        """Test that run method filters issues by label only (creator is ignored)."""
         from unittest.mock import patch
 
         with tempfile.TemporaryDirectory() as temp_dir:

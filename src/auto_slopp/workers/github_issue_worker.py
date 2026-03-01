@@ -197,7 +197,7 @@ class GitHubIssueWorker(Worker):
         return filtered
 
     def _should_process_issue(self, issue: Dict[str, Any]) -> bool:
-        """Check if an issue should be processed based on label and creator.
+        """Check if an issue should be processed based on label.
 
         Args:
             issue: The issue dictionary from GitHub API
@@ -206,17 +206,12 @@ class GitHubIssueWorker(Worker):
             True if the issue should be processed, False otherwise
         """
         required_label = settings.github_issue_worker_required_label
-        allowed_creator = settings.github_issue_worker_allowed_creator
 
         labels = issue.get("labels", [])
         label_names = [label.get("name", "") for label in labels]
+        label_names_lower = [label.lower() for label in label_names]
 
-        has_required_label = required_label in label_names
-        author = issue.get("author", {})
-        author_login = author.get("login", "") if author else ""
-        is_allowed_creator = author_login == allowed_creator
-
-        return has_required_label and is_allowed_creator
+        return required_label.lower() in label_names_lower
 
     def _filter_by_label_and_creator(self, issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Filter issues based on required label and allowed creator.
