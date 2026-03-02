@@ -10,7 +10,6 @@ from auto_slopp.workers import (
     GitHubIssueWorker,
     PRWorker,
     StaleBranchCleanupWorker,
-    UpdatePRBranchesWorker,
 )
 from settings.main import settings
 
@@ -18,7 +17,6 @@ ALL_WORKERS: list[Type[Worker]] = [
     GitHubIssueWorker,
     PRWorker,
     StaleBranchCleanupWorker,
-    UpdatePRBranchesWorker,
 ]
 
 

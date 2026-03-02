@@ -141,8 +141,16 @@ class PRWorker(Worker):
                     continue
 
                 if not self._update_branch_with_main(repo_dir, branch):
-                    result["error"] = f"Failed to update branch {branch} with main"
-                    continue
+                    cli_tool = settings.cli_command
+                    self.logger.info(f"Merge failed for {branch} in {repo_dir.name}, using {cli_tool} to fix")
+                    fix_result = self._fix_merge_with_cli(repo_dir)
+                    if fix_result["success"]:
+                        if not self._update_branch_with_main(repo_dir, branch):
+                            result["error"] = f"Failed to update branch {branch} with main after fix attempt"
+                            continue
+                    else:
+                        result["error"] = f"Failed to fix merge conflicts: {fix_result.get('error', 'Unknown error')}"
+                        continue
 
                 if not self._push_branch(repo_dir, branch):
                     result["error"] = f"Failed to push branch {branch}"
@@ -167,6 +175,8 @@ class PRWorker(Worker):
                         verify_result = self._run_tests(repo_dir)
                         result["test_results"][-1]["fix_success"] = verify_result["success"]
                         result["test_results"][-1]["fix_output"] = verify_result.get("output", "")
+                        if verify_result["success"] and not self._push_branch(repo_dir, branch):
+                            self.logger.warning(f"Failed to push branch {branch} after fixing tests")
                     else:
                         result["test_results"][-1]["fix_success"] = False
                         result["test_results"][-1]["fix_error"] = fix_result.get("error", "Unknown fix error")
@@ -300,6 +310,32 @@ class PRWorker(Worker):
             Dictionary containing CLI execution results
         """
         additional_instructions = "'make test' is failing fix it and push the changes"
+
+        result = run_cli_executor(
+            additional_instructions=additional_instructions,
+            working_directory=repo_dir,
+            timeout=self.timeout,
+            agent_args=[],
+            capture_output=True,
+        )
+
+        return {
+            "success": result["success"],
+            "output": result.get("stdout", ""),
+            "error": result.get("error") if not result["success"] else None,
+            "return_code": result["return_code"],
+        }
+
+    def _fix_merge_with_cli(self, repo_dir: Path) -> Dict[str, Any]:
+        """Use the configured CLI tool to fix merge conflicts.
+
+        Args:
+            repo_dir: Path to the repository directory
+
+        Returns:
+            Dictionary containing CLI execution results
+        """
+        additional_instructions = "Fix the merge conflicts and complete the merge, then push the changes"
 
         result = run_cli_executor(
             additional_instructions=additional_instructions,

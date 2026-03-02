@@ -111,7 +111,6 @@ def mock_settings():
         "GitHubIssueWorker",
         "PRWorker",
         "StaleBranchCleanupWorker",
-        "UpdatePRBranchesWorker",
     ]
     settings.executor_sleep_interval = 1.0
     settings.debug = False
