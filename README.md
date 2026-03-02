@@ -198,7 +198,7 @@ AUTO_SLOPP_BASE_REPO_PATH=/path/to/your/repo
 AUTO_SLOPP_DEBUG=false
 
 # Worker configuration (all workers enabled by default)
-# JSON list of disabled workers. Available: GitHubIssueWorker, PRWorker, StaleBranchCleanupWorker, UpdatePRBranchesWorker
+# JSON list of disabled workers. Available: GitHubIssueWorker, PRWorker, StaleBranchCleanupWorker
 # Leave empty to enable all workers, or specify workers to disable:
 AUTO_SLOPP_WORKERS_DISABLED='[]'
 # Example: AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker"]'
@@ -307,7 +307,7 @@ To disable specific workers, set the `AUTO_SLOPP_WORKERS_DISABLED` variable in y
 AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker"]'
 
 # Disable all workers
-AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker", "UpdatePRBranchesWorker"]'
+AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker"]'
 ```
 
 ## Available Workers
@@ -339,15 +339,6 @@ from auto_slopp.workers import StaleBranchCleanupWorker
 
 # Disable in AUTO_SLOPP_WORKERS_DISABLED
 # Returns: cleaned branches, deletion status
-```
-
-### UpdatePRBranchesWorker
-Updates pull request branches.
-```python
-from auto_slopp.workers import UpdatePRBranchesWorker
-
-# Disable in AUTO_SLOPP_WORKERS_DISABLED
-# Returns: updated branches, merge status
 ```
 
 ## API Reference
@@ -459,8 +450,7 @@ Auto-slopp/
 │   │   ├── workers/             # Worker implementations
 │   │   │   ├── pr_worker.py
 │   │   │   ├── github_issue_worker.py
-│   │   │   ├── stale_branch_cleanup_worker.py
-│   │   │   └── update_pr_branches_worker.py
+│   │   │   └── stale_branch_cleanup_worker.py
 │   │   └── utils/               # Utility modules
 │   │       ├── git_operations.py
 │   │       ├── github_operations.py
@@ -514,7 +504,7 @@ export AUTO_SLOPP_SLOP_TIMEOUT=14400
 # .env
 AUTO_SLOPP_BASE_REPO_PATH=/home/user/projects/my-automation
 AUTO_SLOPP_WORKER_SEARCH_PATH=/home/user/custom-workers
-AUTO_SLOPP_WORKERS_ENABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker", "UpdatePRBranchesWorker"]'
+AUTO_SLOPP_WORKERS_ENABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker"]'
 AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=2.0
 AUTO_SLOPP_DEBUG=false
 

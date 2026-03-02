@@ -11,7 +11,6 @@ DEFAULT_WORKERS = [
     "GitHubIssueWorker",
     "PRWorker",
     "StaleBranchCleanupWorker",
-    "UpdatePRBranchesWorker",
 ]
 
 SLOPMACHINE_PRESETS = {
