@@ -210,8 +210,9 @@ class GitHubIssueWorker(Worker):
 
         labels = issue.get("labels", [])
         label_names = [label.get("name", "") for label in labels]
+        label_names_lower = [label.lower() for label in label_names]
 
-        has_required_label = required_label in label_names
+        has_required_label = required_label.lower() in label_names_lower
         author = issue.get("author", {})
         author_login = author.get("login", "") if author else ""
         is_allowed_creator = author_login == allowed_creator

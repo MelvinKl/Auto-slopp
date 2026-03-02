@@ -52,6 +52,7 @@ class TestGitHubIssueWorker:
                 "title": "Test Issue",
                 "body": "This is a test issue",
                 "url": "https://github.com/test/repo/issues/1",
+                "author": {"login": "MelvinKl"},
                 "labels": [{"name": "ai"}],
             }
 
@@ -131,6 +132,7 @@ class TestGitHubIssueWorker:
                 "title": "Test Issue",
                 "body": "This is a test issue",
                 "url": "https://github.com/test/repo/issues/1",
+                "author": {"login": "MelvinKl"},
                 "labels": [{"name": "ai"}],
             }
 
@@ -267,7 +269,7 @@ class TestGitHubIssueWorker:
                     "title": "Regular Issue",
                     "body": "A regular issue",
                     "url": "https://github.com/test/repo/issues/1",
-                    "author": {"login": "developer"},
+                    "author": {"login": "MelvinKl"},
                     "labels": [{"name": "ai"}],
                 },
                 {
@@ -340,6 +342,7 @@ class TestGitHubIssueWorker:
                     "title": test_case["title"],
                     "body": "Test body",
                     "url": f"https://github.com/test/repo/issues/{i}",
+                    "author": {"login": "MelvinKl"},
                     "labels": [{"name": "ai"}],
                 }
 
@@ -359,7 +362,7 @@ class TestGitHubIssueWorker:
                     assert result["issue_results"][0]["issue_title"] == test_case["title"]
 
     def test_should_process_issue_with_required_label(self):
-        """Test that issues with required label are processed."""
+        """Test that issues with required label from allowed creator are processed."""
         from unittest.mock import patch
 
         with patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings:
@@ -371,7 +374,7 @@ class TestGitHubIssueWorker:
             issue_with_label = {
                 "number": 1,
                 "title": "AI Task",
-                "author": {"login": "other_user"},
+                "author": {"login": "MelvinKl"},
                 "labels": [{"name": "ai"}],
             }
 
@@ -435,7 +438,7 @@ class TestGitHubIssueWorker:
             assert worker._should_process_issue(issue_with_both) is True
 
     def test_filter_by_label_and_creator(self):
-        """Test filtering issues by label only."""
+        """Test filtering issues by label and creator."""
         from unittest.mock import patch
 
         with patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings:
@@ -473,9 +476,37 @@ class TestGitHubIssueWorker:
 
             filtered = worker._filter_by_label_and_creator(issues)
 
-            assert len(filtered) == 2
-            assert filtered[0]["number"] == 1
-            assert filtered[1]["number"] == 4
+            assert len(filtered) == 1
+            assert filtered[0]["number"] == 4
+
+    def test_should_process_issue_case_insensitive_label(self):
+        """Test that label check is case-insensitive."""
+        from unittest.mock import patch
+
+        with patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings:
+            mock_settings.github_issue_worker_required_label = "ai"
+            mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
+
+            worker = GitHubIssueWorker(dry_run=True)
+
+            test_cases = [
+                {"label": "ai", "expected": True},
+                {"label": "AI", "expected": True},
+                {"label": "Ai", "expected": True},
+                {"label": "aI", "expected": True},
+                {"label": "bug", "expected": False},
+            ]
+
+            for test_case in test_cases:
+                issue = {
+                    "number": 1,
+                    "title": "Test Issue",
+                    "author": {"login": "MelvinKl"},
+                    "labels": [{"name": test_case["label"]}],
+                }
+
+                result = worker._should_process_issue(issue)
+                assert result == test_case["expected"], f"Failed for label '{test_case['label']}'"
 
     def test_run_filters_issues_by_label_and_creator(self):
         """Test that run method filters issues by label and creator."""
@@ -489,7 +520,7 @@ class TestGitHubIssueWorker:
                 {
                     "number": 1,
                     "title": "AI Task",
-                    "author": {"login": "other_user"},
+                    "author": {"login": "MelvinKl"},
                     "labels": [{"name": "ai"}],
                     "url": "https://github.com/test/repo/issues/1",
                 },
