@@ -58,8 +58,8 @@ AUTO_SLOPP_CLI_CONFIGURATIONS='[
   }
 ]'
 
-# Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
-AUTO_SLOPP_SLOP_TIMEOUT=7200
+# Timeout for slopmachine execution in seconds (default: 14400, 4 hours)
+AUTO_SLOPP_SLOP_TIMEOUT=14400
 ```
 
 ## Recommended Addons
@@ -224,8 +224,8 @@ AUTO_SLOPP_CLI_CONFIGURATIONS='[
   }
 ]'
 
-# Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
-AUTO_SLOPP_SLOP_TIMEOUT=7200
+# Timeout for slopmachine execution in seconds (default: 14400, 4 hours)
+AUTO_SLOPP_SLOP_TIMEOUT=14400
 
 # Telegram logging (optional)
 AUTO_SLOPP_TELEGRAM_ENABLED=true
@@ -397,7 +397,7 @@ class Settings(BaseSettings):
 
     # CLI Configuration
     cli_configurations: List[CLIConfiguration] = Field(default_factory=list)
-    slop_timeout: int = Field(default=7200, description="Timeout for slopmachine execution in seconds")
+    slop_timeout: int = Field(default=14400, description="Timeout for slopmachine execution in seconds")
 
     # Telegram integration
     telegram_enabled: bool = Field(default=False)
@@ -524,8 +524,8 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
   }
 ]'
 
-# Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
-export AUTO_SLOPP_SLOP_TIMEOUT=7200
+# Timeout for slopmachine execution in seconds (default: 14400, 4 hours)
+export AUTO_SLOPP_SLOP_TIMEOUT=14400
 ```
 
 ### .env File
@@ -558,8 +558,8 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
   }
 ]'
 
-# Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
-export AUTO_SLOPP_SLOP_TIMEOUT=7200
+# Timeout for slopmachine execution in seconds (default: 14400, 4 hours)
+export AUTO_SLOPP_SLOP_TIMEOUT=14400
 
 # Telegram settings
 AUTO_SLOPP_TELEGRAM_ENABLED=true

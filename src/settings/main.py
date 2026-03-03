@@ -112,8 +112,8 @@ class Settings(BaseSettings):
     )
 
     slop_timeout: int = Field(
-        default=7200,
-        description="Timeout for slopmachine execution in seconds (default: 2 hours)",
+        default=14400,
+        description="Timeout for slopmachine execution in seconds (default: 4 hours)",
     )
 
     github_issue_worker_required_label: str = Field(
