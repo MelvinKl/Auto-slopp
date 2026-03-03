@@ -547,3 +547,42 @@ class TestGitHubIssueWorker:
                 assert result["success"] is True
                 assert result["issues_processed"] == 1
                 assert result["issue_results"][0]["issue_number"] == 1
+
+    def test_run_ignores_comments_not_from_issue_author(self):
+        """Test that only issue-author comments are included in instructions."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            issue = {
+                "number": 1,
+                "title": "Test issue",
+                "body": "Issue body",
+                "url": "https://github.com/test/repo/issues/1",
+                "author": {"login": "MelvinKl"},
+                "labels": [{"name": "ai"}],
+            }
+
+            with (
+                patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues,
+                patch("auto_slopp.workers.github_issue_worker.get_issue_comments") as mock_comments,
+                patch.object(GitHubIssueWorker, "_build_instructions") as mock_build_instructions,
+            ):
+                mock_issues.return_value = [issue]
+                mock_comments.return_value = [
+                    {"body": "Author comment", "author": "MelvinKl"},
+                    {"body": "Other user comment", "author": "other-user"},
+                    {"body": "Bot comment", "author": "some-bot"},
+                ]
+                mock_build_instructions.return_value = "instructions"
+
+                worker = GitHubIssueWorker(dry_run=True)
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                assert result["issues_processed"] == 1
+
+                call_args = mock_build_instructions.call_args
+                assert call_args.args[0] == "Test issue"
+                assert call_args.args[1] == "Issue body"
+                assert call_args.args[2] == ["Author comment"]
