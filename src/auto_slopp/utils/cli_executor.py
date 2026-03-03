@@ -51,22 +51,26 @@ def _codex_has_subcommand(args: List[str]) -> bool:
 
 def _get_cli_configurations() -> List[Dict[str, Any]]:
     """Return configured CLI configurations ordered by preference."""
-    configs = getattr(settings, "cli_configurations", None)
-    if configs:
-        return [
-            {
-                "cli_command": config.cli_command,
-                "cli_args": list(config.cli_args),
-            }
-            for config in configs
-        ]
-
     return [
         {
-            "cli_command": settings.cli_command,
-            "cli_args": list(settings.cli_args),
+            "cli_command": config.cli_command,
+            "cli_args": list(config.cli_args),
         }
+        for config in settings.cli_configurations
     ]
+
+
+def get_active_cli_command() -> str:
+    """Return the command name of the currently active CLI configuration."""
+    configs = _get_cli_configurations()
+    if not configs:
+        return "unknown"
+
+    index = _active_cli_configuration_index
+    if index >= len(configs):
+        index = 0
+
+    return configs[index]["cli_command"]
 
 
 def _build_command(
@@ -77,7 +81,7 @@ def _build_command(
 ) -> List[str]:
     """Build command list from CLI configuration and invocation inputs."""
     cmd_args = list(cli_base_args) + list(agent_args)
-    
+
     cmd = [cli_command] + cmd_args
 
     if additional_instructions:

@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
-from auto_slopp.utils.cli_executor import run_cli_executor
+from auto_slopp.utils.cli_executor import get_active_cli_command, run_cli_executor
 from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     merge_main_into_branch,
@@ -141,7 +141,7 @@ class PRWorker(Worker):
                     continue
 
                 if not self._update_branch_with_main(repo_dir, branch):
-                    cli_tool = settings.cli_command
+                    cli_tool = get_active_cli_command()
                     self.logger.info(f"Merge failed for {branch} in {repo_dir.name}, using {cli_tool} to fix")
                     fix_result = self._fix_merge_with_cli(repo_dir)
                     if fix_result["success"]:
@@ -165,7 +165,7 @@ class PRWorker(Worker):
                 tests_successful = test_result["success"]
 
                 if not test_result["success"]:
-                    cli_tool = settings.cli_command
+                    cli_tool = get_active_cli_command()
                     self.logger.info(f"Tests failed for {branch} in {repo_dir.name}, using {cli_tool} to fix")
                     fix_result = self._fix_tests_with_cli(repo_dir)
                     if fix_result["success"]:

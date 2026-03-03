@@ -13,31 +13,6 @@ DEFAULT_WORKERS = [
     "StaleBranchCleanupWorker",
 ]
 
-SLOPMACHINE_PRESETS = {
-    "opencode": {
-        "cli_command": "opencode",
-        "cli_args": [
-            "--agent",
-            "openagent",
-            "--model",
-            "zai-coding-plan/glm-4.7-flash",
-            "run",
-        ],
-    },
-    "codex": {
-        "cli_command": "codex",
-        "cli_args": ["--dangerously-bypass-approvals-and-sandbox"],
-    },
-    "claude": {
-        "cli_command": "claude",
-        "cli_args": [],
-    },
-    "gemini": {
-        "cli_command": "gemini",
-        "cli_args": ["--yolo", "-p"],
-    },
-}
-
 
 class CLIConfiguration(BaseModel):
     """Single CLI configuration entry for tiered failover."""
@@ -118,17 +93,19 @@ class Settings(BaseSettings):
         default=False, description="Disable notification sound for Telegram messages"
     )
 
-    cli_command: str = Field(
-        default="opencode",
-        description="CLI command to execute for automation tasks (e.g., opencode, claude, gemini)",
-    )
-
-    cli_args: list = Field(
-        default=["--agent", "openagent", "run"],
-        description="Arguments to pass to the CLI command",
-    )
     cli_configurations: List[CLIConfiguration] = Field(
-        default_factory=list,
+        default_factory=lambda: [
+            CLIConfiguration(cli_command="gemini", cli_args=["--yolo", "-p"]),
+            CLIConfiguration(cli_command="codex", cli_args=["--dangerously-bypass-approvals-and-sandbox", "exec"]),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"],
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"],
+            ),
+        ],
         description=(
             "Tiered CLI configurations ordered by preference. " "Lower index entries are preferred and used first."
         ),
@@ -137,11 +114,6 @@ class Settings(BaseSettings):
     slop_timeout: int = Field(
         default=14400,
         description="Timeout for slopmachine execution in seconds (default: 4 hours)",
-    )
-
-    slopmachine: Literal["opencode", "codex", "claude", "gemini"] = Field(
-        default="opencode",
-        description="Pre-defined CLI preset to use for task execution",
     )
 
     github_issue_worker_required_label: str = Field(
@@ -153,33 +125,6 @@ class Settings(BaseSettings):
         default="MelvinKl",
         description="Allowed GitHub username for GitHubIssueWorker to process issues",
     )
-
-    @model_validator(mode="after")
-    def apply_slopmachine_preset(self):
-        """Apply pre-defined CLI settings unless explicitly overridden."""
-        preset = SLOPMACHINE_PRESETS[self.slopmachine]
-
-        if "cli_command" not in self.model_fields_set:
-            self.cli_command = preset["cli_command"]
-        if "cli_args" not in self.model_fields_set:
-            self.cli_args = preset["cli_args"].copy()
-
-        if "cli_configurations" not in self.model_fields_set:
-            self.cli_configurations = [
-                CLIConfiguration(
-                    cli_command=self.cli_command,
-                    cli_args=list(self.cli_args),
-                )
-            ]
-        elif not self.cli_configurations:
-            raise ValueError("cli_configurations must contain at least one configuration")
-
-        # Keep legacy single-CLI fields aligned with effective preferred configuration.
-        preferred = self.cli_configurations[0]
-        self.cli_command = preferred.cli_command
-        self.cli_args = list(preferred.cli_args)
-
-        return self
 
     model_config = {
         "env_prefix": "AUTO_SLOPP_",
