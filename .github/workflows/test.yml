@@ -1,13 +1,13 @@
-name: Lint
+name: Tests
 
 on:
   push:
-    branches: [ main, rework/python ]
+    branches: [ "**" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "**" ]
 
 jobs:
-  lint:
+  test:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,13 +25,8 @@ jobs:
 
     - name: Install dependencies
       run: |
-        python --version
-        make --version || true
         make dev-install
 
-    - name: Verify tools and run linting
+    - name: Run tests
       run: |
-        echo "=== Verifying tools ==="
-        which black isort flake8 bandit safety || true
-        echo "=== Running linting ==="
-        make lint
+        make test

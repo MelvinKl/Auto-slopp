@@ -12,7 +12,72 @@ from auto_slopp.utils.git_operations import (
     get_current_branch,
     get_local_branches,
     get_remote_branches,
+    merge_main_into_branch,
 )
+
+
+class TestMergeMainIntoBranch:
+    """Test cases for merge_main_into_branch function."""
+
+    @patch("auto_slopp.utils.git_operations.get_current_branch")
+    @patch("auto_slopp.utils.git_operations._run_git_command")
+    def test_merge_main_on_main_branch(self, mock_run_git, mock_get_branch):
+        """Test merge main while on main branch."""
+        repo_dir = Path("/tmp/test_repo")
+        mock_get_branch.return_value = "main"
+
+        # Mock successful fetch and merge
+        mock_run_git.side_effect = [
+            Mock(returncode=0, stderr=""),  # git fetch origin main
+            Mock(returncode=0, stderr=""),  # git merge FETCH_HEAD
+        ]
+
+        success, message = merge_main_into_branch(repo_dir, "main")
+
+        assert success is True
+        assert message == "Merge successful"
+        # Check fetch command was called without :main
+        mock_run_git.assert_any_call(repo_dir, "fetch", "origin", "main", check=False, timeout=60)
+
+    @patch("auto_slopp.utils.git_operations.get_current_branch")
+    @patch("auto_slopp.utils.git_operations._run_git_command")
+    def test_merge_main_on_feature_branch(self, mock_run_git, mock_get_branch):
+        """Test merge main while on feature branch."""
+        repo_dir = Path("/tmp/test_repo")
+        mock_get_branch.return_value = "feature/test"
+
+        # Mock successful fetch and merge
+        mock_run_git.side_effect = [
+            Mock(returncode=0, stderr=""),  # git fetch origin main:main
+            Mock(returncode=0, stderr=""),  # git merge FETCH_HEAD
+        ]
+
+        success, message = merge_main_into_branch(repo_dir, "feature/test")
+
+        assert success is True
+        assert message == "Merge successful"
+        # Check fetch command was called with :main
+        mock_run_git.assert_any_call(repo_dir, "fetch", "origin", "main:main", check=False, timeout=60)
+
+    @patch("auto_slopp.utils.git_operations.get_current_branch")
+    @patch("auto_slopp.utils.git_operations._run_git_command")
+    def test_merge_main_fetch_fails_fallback(self, mock_run_git, mock_get_branch):
+        """Test fallback when main:main fetch fails."""
+        repo_dir = Path("/tmp/test_repo")
+        mock_get_branch.return_value = "feature/test"
+
+        # Mock git commands: first fetch fails, second succeeds, merge succeeds
+        mock_run_git.side_effect = [
+            Mock(returncode=1, stderr="refusing to fetch into current branch"),  # git fetch origin main:main (fails)
+            Mock(returncode=0, stderr=""),  # git fetch origin main (succeeds)
+            Mock(returncode=0, stderr=""),  # git merge FETCH_HEAD
+        ]
+
+        success, message = merge_main_into_branch(repo_dir, "feature/test")
+
+        assert success is True
+        assert message == "Merge successful"
+        assert mock_run_git.call_count == 3
 
 
 class TestCheckoutBranchResilient:

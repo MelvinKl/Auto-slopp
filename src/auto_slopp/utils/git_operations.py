@@ -464,7 +464,19 @@ def merge_main_into_branch(
         GitOperationError: If git operations fail
     """
     try:
-        fetch_result = _run_git_command(repo_dir, "fetch", remote_name, "main:main", check=False, timeout=timeout)
+        # Determine if we can safely fetch main:main (not on main branch)
+        current_branch = get_current_branch(repo_dir)
+
+        # If we are on main, fetch main:main will fail, so we just fetch main
+        # If we are NOT on main, we try to update local main, but fall back if it fails
+        if current_branch == "main":
+            fetch_result = _run_git_command(repo_dir, "fetch", remote_name, "main", check=False, timeout=timeout)
+        else:
+            # Try to update local main, but if it fails (e.g. non-fast-forward), fall back to just fetching main
+            fetch_result = _run_git_command(repo_dir, "fetch", remote_name, "main:main", check=False, timeout=timeout)
+            if fetch_result.returncode != 0:
+                fetch_result = _run_git_command(repo_dir, "fetch", remote_name, "main", check=False, timeout=timeout)
+
         if fetch_result.returncode != 0:
             fetch_error = fetch_result.stderr.strip() or fetch_result.stdout.strip()
             error_msg = f"Failed to fetch main: {fetch_error}"
@@ -475,7 +487,7 @@ def merge_main_into_branch(
         merge_result = _run_git_command(
             repo_dir,
             "merge",
-            f"{remote_name}/main",
+            "FETCH_HEAD",
             "--no-edit",
             check=False,
             timeout=timeout,
