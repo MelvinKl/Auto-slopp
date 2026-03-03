@@ -51,11 +51,15 @@ AUTO_SLOPP_CLI_CONFIGURATIONS='[
   {
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"]
+  },
+  {
+    "cli_command": "opencode",
+    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"]
   }
 ]'
 
-# Timeout for slopmachine execution in seconds (default: 14400, 4 hours)
-AUTO_SLOPP_SLOP_TIMEOUT=14400
+# Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
+AUTO_SLOPP_SLOP_TIMEOUT=7200
 ```
 
 ## Recommended Addons
@@ -199,13 +203,29 @@ AUTO_SLOPP_DEBUG=false
 AUTO_SLOPP_WORKERS_DISABLED='[]'
 # Example: AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker"]'
 
-# CLI configuration (optional - defaults to opencode)
-AUTO_SLOPP_SLOPMACHINE=opencode
-AUTO_SLOPP_CLI_COMMAND=opencode
-AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "run"]'
+# CLI configuration (optional)
+# Lower index entries are preferred and used first.
+AUTO_SLOPP_CLI_CONFIGURATIONS='[
+  {
+    "cli_command": "gemini",
+    "cli_args": ["--yolo", "-p"]
+  },
+  {
+    "cli_command": "codex",
+    "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"]
+  },
+  {
+    "cli_command": "opencode",
+    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"]
+  },
+  {
+    "cli_command": "opencode",
+    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"]
+  }
+]'
 
-# Timeout for slopmachine execution in seconds (default: 14400, 4 hours)
-AUTO_SLOPP_SLOP_TIMEOUT=14400
+# Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
+AUTO_SLOPP_SLOP_TIMEOUT=7200
 
 # Telegram logging (optional)
 AUTO_SLOPP_TELEGRAM_ENABLED=true
@@ -377,7 +397,7 @@ class Settings(BaseSettings):
 
     # CLI Configuration
     cli_configurations: List[CLIConfiguration] = Field(default_factory=list)
-    slop_timeout: int = Field(default=14400, description="Timeout for slopmachine execution in seconds")
+    slop_timeout: int = Field(default=7200, description="Timeout for slopmachine execution in seconds")
 
     # Telegram integration
     telegram_enabled: bool = Field(default=False)
@@ -485,10 +505,27 @@ export AUTO_SLOPP_TELEGRAM_BOT_TOKEN=prod_bot_token
 export AUTO_SLOPP_TELEGRAM_CHAT_ID=prod_chat_id
 
 # CLI configuration (optional)
-export AUTO_SLOPP_CLI_CONFIGURATIONS='[{"cli_command": "opencode", "cli_args": ["--agent", "openagent", "run"]}]'
+export AUTO_SLOPP_CLI_CONFIGURATIONS='[
+  {
+    "cli_command": "gemini",
+    "cli_args": ["--yolo", "-p"]
+  },
+  {
+    "cli_command": "codex",
+    "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"]
+  },
+  {
+    "cli_command": "opencode",
+    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"]
+  },
+  {
+    "cli_command": "opencode",
+    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"]
+  }
+]'
 
-# Timeout for slopmachine execution in seconds (default: 14400, 4 hours)
-export AUTO_SLOPP_SLOP_TIMEOUT=14400
+# Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
+export AUTO_SLOPP_SLOP_TIMEOUT=7200
 ```
 
 ### .env File
@@ -502,10 +539,27 @@ AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=2.0
 AUTO_SLOPP_DEBUG=false
 
 # CLI configuration (optional)
-export AUTO_SLOPP_CLI_CONFIGURATIONS='[{"cli_command": "opencode", "cli_args": ["--agent", "openagent", "run"]}]'
+export AUTO_SLOPP_CLI_CONFIGURATIONS='[
+  {
+    "cli_command": "gemini",
+    "cli_args": ["--yolo", "-p"]
+  },
+  {
+    "cli_command": "codex",
+    "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"]
+  },
+  {
+    "cli_command": "opencode",
+    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"]
+  },
+  {
+    "cli_command": "opencode",
+    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"]
+  }
+]'
 
-# Timeout for slopmachine execution in seconds (default: 14400, 4 hours)
-export AUTO_SLOPP_SLOP_TIMEOUT=14400
+# Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
+export AUTO_SLOPP_SLOP_TIMEOUT=7200
 
 # Telegram settings
 AUTO_SLOPP_TELEGRAM_ENABLED=true

@@ -134,6 +134,11 @@ class TestSettings:
 
         assert test_settings.workers_disabled == []
 
+    def test_slop_timeout_default(self):
+        """Test default slop_timeout value."""
+        test_settings = Settings()
+        assert test_settings.slop_timeout == 7200
+
     def test_cli_configurations_default(self):
         """Test default tiered CLI configurations."""
         test_settings = Settings()
