@@ -152,10 +152,6 @@ class PRWorker(Worker):
                         result["error"] = f"Failed to fix merge conflicts: {fix_result.get('error', 'Unknown error')}"
                         continue
 
-                if not self._push_branch(repo_dir, branch):
-                    result["error"] = f"Failed to push branch {branch}"
-                    continue
-
                 test_result = self._run_tests(repo_dir)
                 result["test_results"].append(
                     {
@@ -166,6 +162,8 @@ class PRWorker(Worker):
                     }
                 )
 
+                tests_successful = test_result["success"]
+
                 if not test_result["success"]:
                     cli_tool = settings.cli_command
                     self.logger.info(f"Tests failed for {branch} in {repo_dir.name}, using {cli_tool} to fix")
@@ -173,15 +171,19 @@ class PRWorker(Worker):
                     if fix_result["success"]:
                         result["tests_fixed"] = True
                         verify_result = self._run_tests(repo_dir)
+                        tests_successful = verify_result["success"]
                         result["test_results"][-1]["fix_success"] = verify_result["success"]
                         result["test_results"][-1]["fix_output"] = verify_result.get("output", "")
-                        if verify_result["success"] and not self._push_branch(repo_dir, branch):
-                            self.logger.warning(f"Failed to push branch {branch} after fixing tests")
                     else:
+                        tests_successful = False
                         result["test_results"][-1]["fix_success"] = False
                         result["test_results"][-1]["fix_error"] = fix_result.get("error", "Unknown fix error")
                 else:
                     result["test_results"][-1]["fix_success"] = True
+
+                if tests_successful and not self._push_branch(repo_dir, branch):
+                    result["error"] = f"Failed to push branch {branch}"
+                    continue
 
             result["success"] = True
 
