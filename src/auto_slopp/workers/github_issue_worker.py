@@ -13,7 +13,10 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from auto_slopp.utils.cli_executor import execute_with_instructions
+from auto_slopp.utils.cli_executor import (
+    execute_with_instructions,
+    get_active_cli_command,
+)
 from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     commit_and_push_changes,
@@ -299,7 +302,7 @@ class GitHubIssueWorker(Worker):
                 result["openagent_executions"] = 1
 
             if not openagent_result["success"]:
-                cli_tool = settings.cli_command
+                cli_tool = get_active_cli_command()
                 result["error"] = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
                 return result
 
@@ -452,7 +455,7 @@ class GitHubIssueWorker(Worker):
 
     def _log_completion_summary(self, results: Dict[str, Any]) -> None:
         """Log completion summary."""
-        cli_tool = settings.cli_command
+        cli_tool = get_active_cli_command()
         self.logger.info(
             f"GitHubIssueWorker completed. Processed: "
             f"{results['issues_processed']}, "

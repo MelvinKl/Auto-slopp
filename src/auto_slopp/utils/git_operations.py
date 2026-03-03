@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from auto_slopp.utils.cli_executor import run_cli_executor
+from auto_slopp.utils.cli_executor import get_active_cli_command, run_cli_executor
 from settings.main import settings
 
 logger = logging.getLogger(__name__)
@@ -101,7 +101,7 @@ def _handle_git_operation_failure(
         error_message: The error message from the failed operation
         timeout: Timeout for CLI execution in seconds
     """
-    cli_tool = settings.cli_command
+    cli_tool = get_active_cli_command()
     logger.warning(f"Git operation '{operation}' failed in {repo_dir.name}: {error_message}")
     logger.info(f"Calling {cli_tool} to fix the failed git operation: {operation}")
 
@@ -485,7 +485,7 @@ def merge_main_into_branch(
             logger.warning(f"Merge had conflicts or failed: {merge_error}")
 
             if "CONFLICT" in merge_error:
-                cli_tool = settings.cli_command
+                cli_tool = get_active_cli_command()
                 logger.info(f"Merge conflict detected, calling {cli_tool} to resolve")
                 _handle_git_operation_failure("merge_main_into_branch", repo_dir, merge_error)
                 return (

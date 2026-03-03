@@ -134,34 +134,25 @@ class TestSettings:
 
         assert test_settings.workers_disabled == []
 
-    def test_slopmachine_codex_preset(self):
-        """Test codex preset updates cli command and args."""
-        with patch.dict(os.environ, {"AUTO_SLOPP_SLOPMACHINE": "codex"}, clear=True):
-            test_settings = Settings()
+    def test_cli_configurations_default(self):
+        """Test default tiered CLI configurations."""
+        test_settings = Settings()
+        assert len(test_settings.cli_configurations) == 4
+        assert test_settings.cli_configurations[0].cli_command == "gemini"
+        assert test_settings.cli_configurations[1].cli_command == "codex"
+        assert test_settings.cli_configurations[2].cli_command == "opencode"
+        assert "glm-4.7" in str(test_settings.cli_configurations[2].cli_args)
+        assert test_settings.cli_configurations[3].cli_command == "opencode"
+        assert "glm-4.7-flash" in str(test_settings.cli_configurations[3].cli_args)
 
-        assert test_settings.slopmachine == "codex"
-        assert test_settings.cli_command == "codex"
-        assert test_settings.cli_args == ["--dangerously-bypass-approvals-and-sandbox"]
-
-    def test_slopmachine_gemini_preset(self):
-        """Test gemini preset updates cli command and args."""
-        with patch.dict(os.environ, {"AUTO_SLOPP_SLOPMACHINE": "gemini"}, clear=True):
-            test_settings = Settings()
-
-        assert test_settings.slopmachine == "gemini"
-        assert test_settings.cli_command == "gemini"
-        assert test_settings.cli_args == ["--yolo", "-p"]
-
-    def test_slopmachine_preserves_explicit_cli_overrides(self):
-        """Test explicit CLI settings are not overwritten by preset."""
+    def test_cli_configurations_env_override(self):
+        """Test overriding CLI configurations via environment variable."""
         env_vars = {
-            "AUTO_SLOPP_SLOPMACHINE": "codex",
-            "AUTO_SLOPP_CLI_COMMAND": "custom-cli",
-            "AUTO_SLOPP_CLI_ARGS": '["--flag"]',
+            "AUTO_SLOPP_CLI_CONFIGURATIONS": '[{"cli_command": "custom", "cli_args": ["--arg"]}]',
         }
         with patch.dict(os.environ, env_vars, clear=True):
             test_settings = Settings()
 
-        assert test_settings.slopmachine == "codex"
-        assert test_settings.cli_command == "custom-cli"
-        assert test_settings.cli_args == ["--flag"]
+        assert len(test_settings.cli_configurations) == 1
+        assert test_settings.cli_configurations[0].cli_command == "custom"
+        assert test_settings.cli_configurations[0].cli_args == ["--arg"]

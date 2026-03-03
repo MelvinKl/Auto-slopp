@@ -7,6 +7,7 @@ This module provides a centralized utility for executing configured CLI commands
 import logging
 import subprocess
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -14,6 +15,9 @@ from typing import Any, Dict, List, Optional
 from settings.main import settings
 
 logger = logging.getLogger(__name__)
+_active_cli_configuration_index = 0
+_PROBE_INSTRUCTIONS = "are you working?"
+_PROBE_TIMEOUT_SECONDS = 60
 
 
 CODEX_SUBCOMMANDS = {
@@ -43,6 +47,166 @@ def _codex_has_subcommand(args: List[str]) -> bool:
             continue
         return arg in CODEX_SUBCOMMANDS
     return False
+
+
+def _get_cli_configurations() -> List[Dict[str, Any]]:
+    """Return configured CLI configurations ordered by preference."""
+    return [
+        {
+            "cli_command": config.cli_command,
+            "cli_args": list(config.cli_args),
+        }
+        for config in settings.cli_configurations
+    ]
+
+
+def get_active_cli_command() -> str:
+    """Return the command name of the currently active CLI configuration."""
+    configs = _get_cli_configurations()
+    if not configs:
+        return "unknown"
+
+    index = _active_cli_configuration_index
+    if index >= len(configs):
+        index = 0
+
+    return configs[index]["cli_command"]
+
+
+def _build_command(
+    cli_command: str,
+    cli_base_args: List[str],
+    agent_args: List[str],
+    additional_instructions: Optional[str],
+) -> List[str]:
+    """Build command list from CLI configuration and invocation inputs."""
+    cmd_args = list(cli_base_args) + list(agent_args)
+
+    cmd = [cli_command] + cmd_args
+
+    if additional_instructions:
+        cmd.append(additional_instructions)
+
+    return cmd
+
+
+def _execute_command(
+    cli_command: str,
+    cmd: List[str],
+    working_dir: Path,
+    timeout: int,
+    capture_output: bool,
+    start_time: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Execute a fully built command and return standardized result data."""
+    command_start = start_time if start_time is not None else time.time()
+
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=working_dir,
+            capture_output=capture_output,
+            text=True,
+            timeout=timeout,
+        )
+
+        execution_time = time.time() - command_start
+        success = result.returncode == 0
+
+        execution_result = {
+            "success": success,
+            "execution_time": execution_time,
+            "timestamp": datetime.now().isoformat(),
+            "working_directory": str(working_dir),
+            "command": " ".join(cmd),
+            "return_code": result.returncode,
+            "timeout": False,
+        }
+
+        if capture_output:
+            execution_result.update(
+                {
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                    "stdout_lines": result.stdout.splitlines() if result.stdout else [],
+                    "stderr_lines": result.stderr.splitlines() if result.stderr else [],
+                }
+            )
+
+        if success:
+            logger.info(f"{cli_command} completed successfully in {execution_time:.2f}s")
+        else:
+            logger.error(f"{cli_command} failed with return code {result.returncode} in {execution_time:.2f}s")
+            if capture_output and result.stderr:
+                logger.error(f"stderr: {result.stderr}")
+
+        return execution_result
+
+    except subprocess.TimeoutExpired:
+        execution_time = time.time() - command_start
+        error_msg = f"{cli_command} timed out after {timeout} seconds"
+        logger.error(error_msg)
+
+        return {
+            "success": False,
+            "execution_time": execution_time,
+            "timestamp": datetime.now().isoformat(),
+            "working_directory": str(working_dir),
+            "command": " ".join(cmd),
+            "return_code": -1,
+            "timeout": True,
+            "error": error_msg,
+        }
+
+
+def _probe_configuration(config: Dict[str, Any], working_dir: Path) -> bool:
+    """Run quick health probe for one configuration."""
+    cmd = _build_command(
+        cli_command=config["cli_command"],
+        cli_base_args=config["cli_args"],
+        agent_args=[],
+        additional_instructions=_PROBE_INSTRUCTIONS,
+    )
+    result = _execute_command(
+        cli_command=config["cli_command"],
+        cmd=cmd,
+        working_dir=working_dir,
+        timeout=_PROBE_TIMEOUT_SECONDS,
+        capture_output=True,
+    )
+    return result["success"]
+
+
+def _rebalance_active_configuration(configs: List[Dict[str, Any]], working_dir: Path) -> None:
+    """Probe all configurations concurrently and switch to the best available."""
+    global _active_cli_configuration_index
+
+    with ThreadPoolExecutor(max_workers=len(configs)) as executor:
+        futures = [executor.submit(_probe_configuration, config, working_dir) for config in configs]
+        probe_results = [future.result() for future in futures]
+
+    for index, healthy in enumerate(probe_results):
+        if healthy:
+            if index != _active_cli_configuration_index:
+                logger.info(
+                    f"Switching active CLI configuration from index {_active_cli_configuration_index} to {index}"
+                )
+            _active_cli_configuration_index = index
+            return
+
+
+def rebalance_configurations(working_dir: Optional[Path] = None) -> None:
+    """Public interface to trigger health-probe and rebalance active configuration.
+
+    This should be called after worker execution to ensure the most preferred
+    healthy configuration is selected for the next task.
+    """
+    cli_configurations = _get_cli_configurations()
+    if _active_cli_configuration_index != 0 and len(cli_configurations) > 1:
+        _rebalance_active_configuration(
+            configs=cli_configurations,
+            working_dir=working_dir or Path.cwd(),
+        )
 
 
 def run_cli_executor(
@@ -108,89 +272,66 @@ def run_cli_executor(
         )
         ```
     """
-    start_time = time.time()
+    global _active_cli_configuration_index
 
+    start_time = time.time()
     agent_args = agent_args or []
     working_dir = working_directory or Path.cwd()
+    cli_configurations = _get_cli_configurations()
 
-    cli_command = settings.cli_command
-    cli_base_args = settings.cli_args
-
-    logger.info(
-        f"Executing {cli_command} with instructions: {additional_instructions if additional_instructions else 'None'}..."
-    )
+    logger.info(f"Executing with instructions: {additional_instructions if additional_instructions else 'None'}...")
     logger.info(f"Working directory: {working_dir}")
     logger.info(f"Timeout: {timeout}s")
     logger.info(f"Agent args: {agent_args}")
 
-    cmd_args = cli_base_args + agent_args
+    if _active_cli_configuration_index >= len(cli_configurations):
+        _active_cli_configuration_index = 0
 
-    # Codex defaults to interactive mode unless a subcommand is supplied.
-    # In automation this runs without a TTY, so route to non-interactive exec by default.
-    if cli_command == "codex" and not _codex_has_subcommand(cmd_args):
-        cmd_args = ["exec"] + cmd_args
-
-    cmd = [cli_command] + cmd_args
-
-    if additional_instructions:
-        cmd.append(additional_instructions)
-
-    try:
-        result = subprocess.run(
-            cmd,
-            cwd=working_dir,
-            capture_output=capture_output,
-            text=True,
-            timeout=timeout,
+    final_result: Optional[Dict[str, Any]] = None
+    for config_index in range(_active_cli_configuration_index, len(cli_configurations)):
+        config = cli_configurations[config_index]
+        cli_command = config["cli_command"]
+        cmd = _build_command(
+            cli_command=cli_command,
+            cli_base_args=config["cli_args"],
+            agent_args=agent_args,
+            additional_instructions=additional_instructions,
         )
 
-        execution_time = time.time() - start_time
-        success = result.returncode == 0
+        logger.info(f"Using CLI configuration index: {config_index} ({cli_command})")
+        result = _execute_command(
+            cli_command=cli_command,
+            cmd=cmd,
+            working_dir=working_dir,
+            timeout=timeout,
+            capture_output=capture_output,
+            start_time=start_time,
+        )
+        final_result = result
 
-        execution_result = {
-            "success": success,
-            "execution_time": execution_time,
-            "timestamp": datetime.now().isoformat(),
-            "working_directory": str(working_dir),
-            "command": " ".join(cmd),
-            "return_code": result.returncode,
-            "timeout": False,
-        }
+        if result["timeout"] and config_index + 1 < len(cli_configurations):
+            logger.warning(f"Timeout on configuration index {config_index}, trying next configuration")
+            continue
 
-        if capture_output:
-            execution_result.update(
-                {
-                    "stdout": result.stdout,
-                    "stderr": result.stderr,
-                    "stdout_lines": result.stdout.splitlines() if result.stdout else [],
-                    "stderr_lines": result.stderr.splitlines() if result.stderr else [],
-                }
-            )
+        _active_cli_configuration_index = config_index
+        break
 
-        if success:
-            logger.info(f"{cli_command} completed successfully in {execution_time:.2f}s")
-        else:
-            logger.error(f"{cli_command} failed with return code {result.returncode} in {execution_time:.2f}s")
-            if capture_output and result.stderr:
-                logger.error(f"stderr: {result.stderr}")
-
-        return execution_result
-
-    except subprocess.TimeoutExpired:
-        execution_time = time.time() - start_time
-        error_msg = f"{cli_command} timed out after {timeout} seconds"
-        logger.error(error_msg)
-
-        return {
+    if final_result is None:
+        final_result = {
             "success": False,
-            "execution_time": execution_time,
+            "execution_time": time.time() - start_time,
             "timestamp": datetime.now().isoformat(),
             "working_directory": str(working_dir),
-            "command": " ".join(cmd),
+            "command": "",
             "return_code": -1,
             "timeout": False,
-            "error": error_msg,
+            "error": "No CLI configurations available",
         }
+
+    if _active_cli_configuration_index != 0 and len(cli_configurations) > 1:
+        _rebalance_active_configuration(configs=cli_configurations, working_dir=working_dir)
+
+    return final_result
 
 
 def execute_with_instructions(

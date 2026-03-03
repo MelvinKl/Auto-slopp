@@ -34,37 +34,28 @@ Auto-slopp supports configurable CLI tools for automation. By default, it uses [
 
 #### Environment Variables for CLI Configuration
 
-You can customize the CLI command and arguments via environment variables:
+Auto-slopp supports a tiered CLI configuration system. You can define multiple CLI configurations in order of preference. If a preferred configuration times out, the next one in the list will be tried.
 
 ```bash
-# Use a pre-defined slopmachine preset (default: opencode)
-# Available: opencode, codex, claude, gemini
-AUTO_SLOPP_SLOPMACHINE=opencode
-
-# CLI command to use (default: opencode)
-AUTO_SLOPP_CLI_COMMAND=opencode
-
-# Arguments to pass to the CLI command (default: ["--agent", "openagent", "run"])
-# For opencode.ai:
-AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "run"]'
+# Tiered CLI configurations (JSON array of objects)
+# Lower index entries are preferred and used first.
+AUTO_SLOPP_CLI_CONFIGURATIONS='[
+  {
+    "cli_command": "gemini",
+    "cli_args": ["--yolo", "-p"]
+  },
+  {
+    "cli_command": "codex",
+    "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"]
+  },
+  {
+    "cli_command": "opencode",
+    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"]
+  }
+]'
 
 # Timeout for slopmachine execution in seconds (default: 14400, 4 hours)
 AUTO_SLOPP_SLOP_TIMEOUT=14400
-
-# For codex preset:
-# AUTO_SLOPP_SLOPMACHINE=codex
-# AUTO_SLOPP_CLI_COMMAND=codex
-# AUTO_SLOPP_CLI_ARGS='[]'
-
-# For claude preset:
-# AUTO_SLOPP_SLOPMACHINE=claude
-# AUTO_SLOPP_CLI_COMMAND=claude
-# AUTO_SLOPP_CLI_ARGS='[]'
-
-# For gemini preset:
-# AUTO_SLOPP_SLOPMACHINE=gemini
-# AUTO_SLOPP_CLI_COMMAND=gemini
-# AUTO_SLOPP_CLI_ARGS='["--yolo", "-p"]'
 ```
 
 ## Recommended Addons
@@ -385,9 +376,7 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False)
 
     # CLI Configuration
-    slopmachine: Literal["opencode", "codex", "claude", "gemini"] = Field(default="opencode")
-    cli_command: str = Field(default="opencode", description="CLI command to execute")
-    cli_args: list = Field(default=["--agent", "openagent", "run"])
+    cli_configurations: List[CLIConfiguration] = Field(default_factory=list)
     slop_timeout: int = Field(default=14400, description="Timeout for slopmachine execution in seconds")
 
     # Telegram integration
@@ -496,8 +485,7 @@ export AUTO_SLOPP_TELEGRAM_BOT_TOKEN=prod_bot_token
 export AUTO_SLOPP_TELEGRAM_CHAT_ID=prod_chat_id
 
 # CLI configuration (optional)
-export AUTO_SLOPP_CLI_COMMAND=opencode
-export AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "--model", "opencode/glm-5-free", "run"]'
+export AUTO_SLOPP_CLI_CONFIGURATIONS='[{"cli_command": "opencode", "cli_args": ["--agent", "openagent", "run"]}]'
 
 # Timeout for slopmachine execution in seconds (default: 14400, 4 hours)
 export AUTO_SLOPP_SLOP_TIMEOUT=14400
@@ -513,12 +501,11 @@ AUTO_SLOPP_WORKERS_ENABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanu
 AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=2.0
 AUTO_SLOPP_DEBUG=false
 
-# CLI configuration (optional - defaults to opencode)
-AUTO_SLOPP_CLI_COMMAND=opencode
-AUTO_SLOPP_CLI_ARGS='["--agent", "openagent", "--model", "opencode/glm-5-free", "run"]'
+# CLI configuration (optional)
+export AUTO_SLOPP_CLI_CONFIGURATIONS='[{"cli_command": "opencode", "cli_args": ["--agent", "openagent", "run"]}]'
 
 # Timeout for slopmachine execution in seconds (default: 14400, 4 hours)
-AUTO_SLOPP_SLOP_TIMEOUT=14400
+export AUTO_SLOPP_SLOP_TIMEOUT=14400
 
 # Telegram settings
 AUTO_SLOPP_TELEGRAM_ENABLED=true
