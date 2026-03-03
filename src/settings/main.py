@@ -32,6 +32,10 @@ SLOPMACHINE_PRESETS = {
         "cli_command": "claude",
         "cli_args": [],
     },
+    "gemini": {
+        "cli_command": "gemini",
+        "cli_args": ["--yolo", "-p"],
+    },
 }
 
 
@@ -104,7 +108,7 @@ class Settings(BaseSettings):
 
     cli_command: str = Field(
         default="opencode",
-        description="CLI command to execute for automation tasks (e.g., opencode, claude)",
+        description="CLI command to execute for automation tasks (e.g., opencode, claude, gemini)",
     )
 
     cli_args: list = Field(
@@ -117,7 +121,7 @@ class Settings(BaseSettings):
         description="Timeout for slopmachine execution in seconds (default: 4 hours)",
     )
 
-    slopmachine: Literal["opencode", "codex", "claude"] = Field(
+    slopmachine: Literal["opencode", "codex", "claude", "gemini"] = Field(
         default="opencode",
         description="Pre-defined CLI preset to use for task execution",
     )
