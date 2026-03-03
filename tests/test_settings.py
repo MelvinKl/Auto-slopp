@@ -69,11 +69,11 @@ class TestSettings:
         env_vars_to_keep = {k: v for k, v in os.environ.items() if not k.startswith("AUTO_SLOPP_")}
         with patch.dict(os.environ, env_vars_to_keep, clear=True):
             with patch("dotenv.load_dotenv", return_value=None):
-                test_settings = Settings()
+                test_settings = Settings(_env_file=None)
 
         assert test_settings.telegram_enabled is False
-        assert test_settings.telegram_bot_token == "8257503031:AAEBznkdzNkyA9zN7D-zPniLMmd0mmvRiQA"
-        assert test_settings.telegram_chat_id == "7649674603"
+        assert test_settings.telegram_bot_token is None
+        assert test_settings.telegram_chat_id is None
 
     def test_env_prefix(self):
         """Test that environment variables use correct prefix."""
