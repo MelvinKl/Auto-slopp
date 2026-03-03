@@ -16,14 +16,17 @@ class TestSettings:
 
     def test_default_settings_values(self):
         """Test that default settings values are correctly set when no env vars are set."""
-        test_settings = Settings()
+        env_vars_to_keep = {k: v for k, v in os.environ.items() if not k.startswith("AUTO_SLOPP_")}
+        with patch.dict(os.environ, env_vars_to_keep, clear=True):
+            with patch("dotenv.load_dotenv", return_value=None):
+                test_settings = Settings(_env_file=None)
 
-        assert test_settings.base_repo_path == Path("~/git/managed").expanduser()
-        assert test_settings.executor_sleep_interval == 30.0
+        assert test_settings.base_repo_path == Path.cwd()
+        assert test_settings.executor_sleep_interval == 60.0
         assert test_settings.debug is False
         assert test_settings.telegram_enabled is False
-        assert test_settings.telegram_bot_token == "8257503031:AAEBznkdzNkyA9zN7D-zPniLMmd0mmvRiQA"
-        assert test_settings.telegram_chat_id == "7649674603"
+        assert test_settings.telegram_bot_token is None
+        assert test_settings.telegram_chat_id is None
         assert test_settings.telegram_api_url == "https://api.telegram.org/bot{token}/sendMessage"
         assert test_settings.telegram_timeout == 30.0
         assert test_settings.telegram_retry_attempts == 3
@@ -63,7 +66,10 @@ class TestSettings:
 
     def test_optional_telegram_fields(self):
         """Test optional telegram fields use configured values."""
-        test_settings = Settings()
+        env_vars_to_keep = {k: v for k, v in os.environ.items() if not k.startswith("AUTO_SLOPP_")}
+        with patch.dict(os.environ, env_vars_to_keep, clear=True):
+            with patch("dotenv.load_dotenv", return_value=None):
+                test_settings = Settings()
 
         assert test_settings.telegram_enabled is False
         assert test_settings.telegram_bot_token == "8257503031:AAEBznkdzNkyA9zN7D-zPniLMmd0mmvRiQA"
@@ -133,6 +139,11 @@ class TestSettings:
             test_settings = Settings()
 
         assert test_settings.workers_disabled == []
+
+    def test_slop_timeout_default(self):
+        """Test default slop_timeout value."""
+        test_settings = Settings()
+        assert test_settings.slop_timeout == 7200
 
     def test_cli_configurations_default(self):
         """Test default tiered CLI configurations."""
