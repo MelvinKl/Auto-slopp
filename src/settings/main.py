@@ -20,7 +20,7 @@ SLOPMACHINE_PRESETS = {
             "--agent",
             "openagent",
             "--model",
-            "zai-coding-plan/glm-4.7",
+            "zai-coding-plan/glm-4.7-flash",
             "run",
         ],
     },
