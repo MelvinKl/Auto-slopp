@@ -5,6 +5,7 @@ import traceback
 from pathlib import Path
 from typing import Any, Optional, Type
 
+from auto_slopp.utils.cli_executor import rebalance_configurations
 from auto_slopp.worker import Worker
 from auto_slopp.workers import (
     GitHubIssueWorker,
@@ -47,7 +48,7 @@ class Executor:
                 self._run_iteration()
                 time.sleep(settings.executor_sleep_interval)
         except KeyboardInterrupt:
-            print("\\nReceived interrupt signal, shutting down...")
+            print("\nReceived interrupt signal, shutting down...")
         except Exception as e:
             print(f"Fatal error in executor: {e}")
             traceback.print_exc()
@@ -149,6 +150,10 @@ class Executor:
                 if result is not None:
                     print(f"Result: {result}")
 
+                # After each worker execution, probe and rebalance CLI configurations
+                # if the currently active one is not the preferred one.
+                rebalance_configurations(working_dir=subdirectory)
+
             except Exception as e:
                 print(f"Error executing worker {worker_class.__name__} on {subdirectory.name}: {e}")
                 traceback.print_exc()
@@ -168,6 +173,10 @@ class Executor:
         print(f"Worker {worker_class.__name__} completed in {execution_time:.2f}s")
         if result is not None:
             print(f"Result: {result}")
+
+        # After each worker execution, probe and rebalance CLI configurations
+        # if the currently active one is not the preferred one.
+        rebalance_configurations(working_dir=self.repo_path)
 
 
 def run_executor(

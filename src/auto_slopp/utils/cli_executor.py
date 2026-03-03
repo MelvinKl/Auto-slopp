@@ -196,6 +196,20 @@ def _rebalance_active_configuration(configs: List[Dict[str, Any]], working_dir: 
             return
 
 
+def rebalance_configurations(working_dir: Optional[Path] = None) -> None:
+    """Public interface to trigger health-probe and rebalance active configuration.
+
+    This should be called after worker execution to ensure the most preferred
+    healthy configuration is selected for the next task.
+    """
+    cli_configurations = _get_cli_configurations()
+    if _active_cli_configuration_index != 0 and len(cli_configurations) > 1:
+        _rebalance_active_configuration(
+            configs=cli_configurations,
+            working_dir=working_dir or Path.cwd(),
+        )
+
+
 def run_cli_executor(
     additional_instructions: Optional[str] = None,
     working_directory: Optional[Path] = None,
