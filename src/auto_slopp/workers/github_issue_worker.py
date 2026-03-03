@@ -258,8 +258,11 @@ class GitHubIssueWorker(Worker):
 
         self.logger.info(f"Processing issue #{issue_number}: {issue_title}")
 
+        issue_author_login = issue.get("author", {}).get("login", "") if issue.get("author") else ""
         comments = get_issue_comments(repo_dir, issue_number)
-        comment_texts = [comment.get("body", "") or "" for comment in comments]
+        comment_texts = [
+            comment.get("body", "") or "" for comment in comments if comment.get("author") == issue_author_login
+        ]
 
         result = {
             "repository": repo_dir.name,
