@@ -143,6 +143,15 @@ class TestSettings:
         assert test_settings.cli_command == "codex"
         assert test_settings.cli_args == ["--dangerously-bypass-approvals-and-sandbox"]
 
+    def test_slopmachine_gemini_preset(self):
+        """Test gemini preset updates cli command and args."""
+        with patch.dict(os.environ, {"AUTO_SLOPP_SLOPMACHINE": "gemini"}, clear=True):
+            test_settings = Settings()
+
+        assert test_settings.slopmachine == "gemini"
+        assert test_settings.cli_command == "gemini"
+        assert test_settings.cli_args == ["--yolo", "-p"]
+
     def test_slopmachine_preserves_explicit_cli_overrides(self):
         """Test explicit CLI settings are not overwritten by preset."""
         env_vars = {

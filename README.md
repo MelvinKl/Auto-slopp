@@ -38,7 +38,7 @@ You can customize the CLI command and arguments via environment variables:
 
 ```bash
 # Use a pre-defined slopmachine preset (default: opencode)
-# Available: opencode, codex, claude
+# Available: opencode, codex, claude, gemini
 AUTO_SLOPP_SLOPMACHINE=opencode
 
 # CLI command to use (default: opencode)
@@ -60,6 +60,11 @@ AUTO_SLOPP_SLOP_TIMEOUT=14400
 # AUTO_SLOPP_SLOPMACHINE=claude
 # AUTO_SLOPP_CLI_COMMAND=claude
 # AUTO_SLOPP_CLI_ARGS='[]'
+
+# For gemini preset:
+# AUTO_SLOPP_SLOPMACHINE=gemini
+# AUTO_SLOPP_CLI_COMMAND=gemini
+# AUTO_SLOPP_CLI_ARGS='["--yolo", "-p"]'
 ```
 
 ## Recommended Addons
@@ -380,7 +385,7 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False)
 
     # CLI Configuration
-    slopmachine: Literal["opencode", "codex", "claude"] = Field(default="opencode")
+    slopmachine: Literal["opencode", "codex", "claude", "gemini"] = Field(default="opencode")
     cli_command: str = Field(default="opencode", description="CLI command to execute")
     cli_args: list = Field(default=["--agent", "openagent", "run"])
     slop_timeout: int = Field(default=14400, description="Timeout for slopmachine execution in seconds")
