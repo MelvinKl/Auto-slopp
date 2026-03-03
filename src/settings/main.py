@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, Literal, Optional
 
 from dotenv import load_dotenv
-from pydantic import Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 DEFAULT_WORKERS = [
@@ -37,6 +37,18 @@ SLOPMACHINE_PRESETS = {
         "cli_args": ["--yolo", "-p"],
     },
 }
+
+
+class CLIConfiguration(BaseModel):
+    """Single CLI configuration entry for tiered failover."""
+
+    cli_command: str = Field(
+        description="CLI command to execute for automation tasks (e.g., opencode, claude, gemini)",
+    )
+    cli_args: List[str] = Field(
+        default_factory=list,
+        description="Arguments to pass to the CLI command",
+    )
 
 
 class Settings(BaseSettings):
@@ -115,6 +127,12 @@ class Settings(BaseSettings):
         default=["--agent", "openagent", "run"],
         description="Arguments to pass to the CLI command",
     )
+    cli_configurations: List[CLIConfiguration] = Field(
+        default_factory=list,
+        description=(
+            "Tiered CLI configurations ordered by preference. " "Lower index entries are preferred and used first."
+        ),
+    )
 
     slop_timeout: int = Field(
         default=14400,
@@ -145,6 +163,21 @@ class Settings(BaseSettings):
             self.cli_command = preset["cli_command"]
         if "cli_args" not in self.model_fields_set:
             self.cli_args = preset["cli_args"].copy()
+
+        if "cli_configurations" not in self.model_fields_set:
+            self.cli_configurations = [
+                CLIConfiguration(
+                    cli_command=self.cli_command,
+                    cli_args=list(self.cli_args),
+                )
+            ]
+        elif not self.cli_configurations:
+            raise ValueError("cli_configurations must contain at least one configuration")
+
+        # Keep legacy single-CLI fields aligned with effective preferred configuration.
+        preferred = self.cli_configurations[0]
+        self.cli_command = preferred.cli_command
+        self.cli_args = list(preferred.cli_args)
 
         return self
 

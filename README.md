@@ -34,11 +34,26 @@ Auto-slopp supports configurable CLI tools for automation. By default, it uses [
 
 #### Environment Variables for CLI Configuration
 
-You can customize the CLI command and arguments via environment variables:
+Auto-slopp supports a tiered CLI configuration system. You can define multiple CLI configurations in order of preference. If a preferred configuration times out, the next one in the list will be tried.
 
 ```bash
+# Tiered CLI configurations (JSON array of objects)
+# Lower index entries are preferred and used first.
+AUTO_SLOPP_CLI_CONFIGURATIONS='[
+  {
+    "cli_command": "opencode",
+    "cli_args": ["--agent", "openagent", "run"]
+  },
+  {
+    "cli_command": "claude",
+    "cli_args": []
+  }
+]'
+
 # Use a pre-defined slopmachine preset (default: opencode)
 # Available: opencode, codex, claude, gemini
+# Note: Using slopmachine preset will automatically populate cli_configurations 
+# unless AUTO_SLOPP_CLI_CONFIGURATIONS is explicitly set.
 AUTO_SLOPP_SLOPMACHINE=opencode
 
 # CLI command to use (default: opencode)
