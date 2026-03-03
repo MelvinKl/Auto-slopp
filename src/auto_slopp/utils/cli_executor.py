@@ -17,7 +17,7 @@ from settings.main import settings
 logger = logging.getLogger(__name__)
 _active_cli_configuration_index = 0
 _PROBE_INSTRUCTIONS = "are you working?"
-_PROBE_TIMEOUT_SECONDS = 10
+_PROBE_TIMEOUT_SECONDS = 60
 
 
 CODEX_SUBCOMMANDS = {
@@ -77,12 +77,7 @@ def _build_command(
 ) -> List[str]:
     """Build command list from CLI configuration and invocation inputs."""
     cmd_args = list(cli_base_args) + list(agent_args)
-
-    # Codex defaults to interactive mode unless a subcommand is supplied.
-    # In automation this runs without a TTY, so route to non-interactive exec by default.
-    if cli_command == "codex" and not _codex_has_subcommand(cmd_args):
-        cmd_args = ["exec"] + cmd_args
-
+    
     cmd = [cli_command] + cmd_args
 
     if additional_instructions:
