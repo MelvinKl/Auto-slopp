@@ -148,6 +148,9 @@ class PRWorker(Worker):
                         if not self._update_branch_with_main(repo_dir, branch):
                             result["error"] = f"Failed to update branch {branch} with main after fix attempt"
                             continue
+                        if not self._push_after_merge_fix(repo_dir, branch):
+                            result["error"] = f"Failed to push branch {branch} after fixing merge conflicts"
+                            continue
                     else:
                         result["error"] = f"Failed to fix merge conflicts: {fix_result.get('error', 'Unknown error')}"
                         continue
@@ -163,10 +166,15 @@ class PRWorker(Worker):
                         "success": test_result["success"],
                         "output": test_result.get("output", ""),
                         "error": test_result.get("error"),
+                        "fix_attempted": False,
+                        "fix_success": None,
+                        "fix_output": None,
+                        "fix_error": None,
                     }
                 )
 
                 if not test_result["success"]:
+                    result["test_results"][-1]["fix_attempted"] = True
                     cli_tool = settings.cli_command
                     self.logger.info(f"Tests failed for {branch} in {repo_dir.name}, using {cli_tool} to fix")
                     fix_result = self._fix_tests_with_cli(repo_dir)
@@ -175,13 +183,12 @@ class PRWorker(Worker):
                         verify_result = self._run_tests(repo_dir)
                         result["test_results"][-1]["fix_success"] = verify_result["success"]
                         result["test_results"][-1]["fix_output"] = verify_result.get("output", "")
-                        if verify_result["success"] and not self._push_branch(repo_dir, branch):
-                            self.logger.warning(f"Failed to push branch {branch} after fixing tests")
+                        # Always push after fixing tests, regardless of verification result
+                        if not self._push_after_test_fix(repo_dir, branch):
+                            result["error"] = f"Failed to push branch {branch} after fixing tests"
                     else:
                         result["test_results"][-1]["fix_success"] = False
                         result["test_results"][-1]["fix_error"] = fix_result.get("error", "Unknown fix error")
-                else:
-                    result["test_results"][-1]["fix_success"] = True
 
             result["success"] = True
 
@@ -351,3 +358,41 @@ class PRWorker(Worker):
             "error": result.get("error") if not result["success"] else None,
             "return_code": result["return_code"],
         }
+
+    def _push_after_merge_fix(self, repo_dir: Path, branch: str) -> bool:
+        """Push the branch after merge conflicts are fixed with CLI.
+
+        Args:
+            repo_dir: Path to the repository directory
+            branch: Branch name to push
+
+        Returns:
+            True if push successful, False otherwise
+        """
+        self.logger.info(f"Pushing branch {branch} after fixing merge conflicts")
+
+        success = push_branch(repo_dir=repo_dir, branch=branch, force=True)
+
+        if not success:
+            self.logger.error(f"Failed to push branch {branch} after fixing merge conflicts")
+
+        return success
+
+    def _push_after_test_fix(self, repo_dir: Path, branch: str) -> bool:
+        """Push the branch after tests are fixed with CLI.
+
+        Args:
+            repo_dir: Path to the repository directory
+            branch: Branch name to push
+
+        Returns:
+            True if push successful, False otherwise
+        """
+        self.logger.info(f"Pushing branch {branch} after fixing tests")
+
+        success = push_branch(repo_dir=repo_dir, branch=branch, force=True)
+
+        if not success:
+            self.logger.error(f"Failed to push branch {branch} after fixing tests")
+
+        return success
