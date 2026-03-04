@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from dotenv import dotenv_values
 
-from src.settings.main import settings
+from settings.main import settings
 
 logger = logging.getLogger(__name__)
 
