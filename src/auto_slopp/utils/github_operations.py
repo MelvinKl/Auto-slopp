@@ -53,7 +53,7 @@ def _run_gh_command(
         for k, v in parsed_env.items():
             if v is not None:
                 env[k] = str(v)
-    
+
     # Ensure GH_TOKEN is set if GITHUB_TOKEN is present (gh cli prefers GH_TOKEN)
     if "GH_TOKEN" not in env and "GITHUB_TOKEN" in env:
         env["GH_TOKEN"] = env["GITHUB_TOKEN"]
@@ -287,7 +287,7 @@ def create_pull_request(
             if parts:
                 try:
                     pr_number = int(parts[-1])
-                except (ValueError, IndexError):
+                except ValueError, IndexError:
                     pass
 
         return {"url": pr_url, "number": pr_number}
