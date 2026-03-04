@@ -1,7 +1,7 @@
 """Main settings configuration using Pydantic BaseSettings."""
 
 from pathlib import Path
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -14,6 +14,14 @@ DEFAULT_WORKERS = [
 ]
 
 
+class CLIRating(BaseModel):
+    """Rating configuration for a CLI tool."""
+
+    min_rating: int = Field(default=0, ge=0, le=10)
+    max_rating: int = Field(default=10, ge=0, le=10)
+    recommend_rating: int = Field(default=5, ge=0, le=10)
+
+
 class CLIConfiguration(BaseModel):
     """Single CLI configuration entry for tiered failover."""
 
@@ -23,6 +31,14 @@ class CLIConfiguration(BaseModel):
     cli_args: List[str] = Field(
         default_factory=list,
         description="Arguments to pass to the CLI command",
+    )
+    rating: CLIRating = Field(
+        default_factory=CLIRating,
+        description="Difficulty rating capabilities of this CLI tool",
+    )
+    cooldown_seconds: int = Field(
+        default=300,
+        description="Cooldown time in seconds if the tool times out",
     )
 
 
@@ -130,6 +146,16 @@ class Settings(BaseSettings):
     additional_env_file: Optional[Path] = Field(
         default=None,
         description="Path to an additional .env file to be appended to subprocess calls for github_operations",
+    )
+
+    task_difficulties: Dict[str, int] = Field(
+        default={
+            "github_issue": 5,
+            "pr_review": 5,
+            "git_checkout": 2,
+            "default": 5,
+        },
+        description="Difficulty ratings for various tasks (0-10)",
     )
 
     model_config = {

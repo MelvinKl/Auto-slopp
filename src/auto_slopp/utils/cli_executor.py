@@ -19,6 +19,60 @@ _active_cli_configuration_index = 0
 _PROBE_INSTRUCTIONS = "are you working?"
 _PROBE_TIMEOUT_SECONDS = 60
 
+_cli_states: Dict[int, Dict[str, Any]] = {}
+
+
+def _get_cli_state(index: int) -> Dict[str, Any]:
+    if index not in _cli_states:
+        _cli_states[index] = {"active": True, "cooldown_until": 0.0}
+    return _cli_states[index]
+
+
+def _check_cooldowns(working_dir: Path) -> None:
+    now = time.time()
+    for index, config in enumerate(settings.cli_configurations):
+        state = _get_cli_state(index)
+        if not state["active"] and now >= state["cooldown_until"]:
+            logger.info(f"Checking if CLI tool at index {index} has recovered...")
+            c_dict = {
+                "cli_command": config.cli_command,
+                "cli_args": list(config.cli_args),
+            }
+            if _probe_configuration(c_dict, working_dir):
+                logger.info(f"CLI tool at index {index} successfully recovered.")
+                state["active"] = True
+            else:
+                logger.warning(f"CLI tool at index {index} still timing out. Resetting cooldown.")
+                state["cooldown_until"] = now + config.cooldown_seconds
+
+
+def _choose_best_config_index(difficulty: int, working_dir: Path) -> int:
+    _check_cooldowns(working_dir)
+
+    best_index = -1
+    best_score = float("inf")
+
+    for i, config in enumerate(settings.cli_configurations):
+        state = _get_cli_state(i)
+        if not state["active"]:
+            continue
+
+        rating = config.rating
+        score = abs(rating.recommend_rating - difficulty)
+
+        if difficulty < rating.min_rating:
+            score += (rating.min_rating - difficulty) * 10
+        if difficulty > rating.max_rating:
+            score += (difficulty - rating.max_rating) * 10
+
+        if score < best_score:
+            best_score = score
+            best_index = i
+
+    if best_index == -1:
+        return 0
+    return best_index
+
 
 CODEX_SUBCOMMANDS = {
     "exec",
@@ -215,6 +269,7 @@ def run_cli_executor(
     timeout: int = 7200,
     agent_args: Optional[List[str]] = None,
     capture_output: bool = True,
+    difficulty: int = 5,
 ) -> Dict[str, Any]:
     """Execute the configured CLI command with the specified parameters.
 
@@ -227,6 +282,7 @@ def run_cli_executor(
         timeout: Command execution timeout in seconds (default: 7200)
         agent_args: Additional arguments to pass to the CLI
         capture_output: Whether to capture stdout/stderr (default: True)
+        difficulty: Difficulty rating for this task (0-10)
 
     Returns:
         Dictionary containing execution results with the following keys:
@@ -284,11 +340,17 @@ def run_cli_executor(
     logger.info(f"Timeout: {timeout}s")
     logger.info(f"Agent args: {agent_args}")
 
-    if _active_cli_configuration_index >= len(cli_configurations):
-        _active_cli_configuration_index = 0
-
     final_result: Optional[Dict[str, Any]] = None
-    for config_index in range(_active_cli_configuration_index, len(cli_configurations)):
+    tried_indices = set()
+
+    while True:
+        config_index = _choose_best_config_index(difficulty, working_dir)
+        state = _get_cli_state(config_index)
+
+        if config_index in tried_indices or not state["active"]:
+            break
+
+        tried_indices.add(config_index)
         config = cli_configurations[config_index]
         cli_command = config["cli_command"]
         cmd = _build_command(
@@ -298,7 +360,7 @@ def run_cli_executor(
             additional_instructions=additional_instructions,
         )
 
-        logger.info(f"Using CLI configuration index: {config_index} ({cli_command})")
+        logger.info(f"Using CLI configuration index: {config_index} ({cli_command}) for difficulty {difficulty}")
         result = _execute_command(
             cli_command=cli_command,
             cmd=cmd,
@@ -309,8 +371,10 @@ def run_cli_executor(
         )
         final_result = result
 
-        if result["timeout"] and config_index + 1 < len(cli_configurations):
-            logger.warning(f"Timeout on configuration index {config_index}, trying next configuration")
+        if result.get("timeout", False):
+            logger.warning(f"Timeout on configuration index {config_index}, placing in cooldown")
+            state["active"] = False
+            state["cooldown_until"] = time.time() + settings.cli_configurations[config_index].cooldown_seconds
             continue
 
         _active_cli_configuration_index = config_index
@@ -339,6 +403,7 @@ def execute_with_instructions(
     work_dir: Path,
     agent_args: Optional[List[str]] = None,
     timeout: int = 7200,
+    difficulty: int = 5,
 ) -> Dict[str, Any]:
     """Execute CLI with specific instructions.
 
@@ -347,6 +412,7 @@ def execute_with_instructions(
         work_dir: Working directory for command execution
         agent_args: Additional arguments to pass to the CLI
         timeout: Command execution timeout in seconds
+        difficulty: Difficulty rating for this task (0-10)
 
     Returns:
         Dictionary containing execution results.
@@ -356,6 +422,7 @@ def execute_with_instructions(
         working_directory=work_dir,
         agent_args=agent_args,
         timeout=timeout,
+        difficulty=difficulty,
     )
 
 

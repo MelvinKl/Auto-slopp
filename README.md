@@ -42,19 +42,27 @@ Auto-slopp supports a tiered CLI configuration system. You can define multiple C
 AUTO_SLOPP_CLI_CONFIGURATIONS='[
   {
     "cli_command": "gemini",
-    "cli_args": ["--yolo", "-p"]
+    "cli_args": ["--yolo", "-p"],
+    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 8 },
+    "cooldown_seconds": 300
   },
   {
     "cli_command": "codex",
-    "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"]
+    "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"],
+    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
+    "cooldown_seconds": 300
   },
   {
     "cli_command": "opencode",
-    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"]
+    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"],
+    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
+    "cooldown_seconds": 300
   },
   {
     "cli_command": "opencode",
-    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"]
+    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"],
+    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 2 },
+    "cooldown_seconds": 300
   }
 ]'
 
@@ -208,19 +216,27 @@ AUTO_SLOPP_WORKERS_DISABLED='[]'
 AUTO_SLOPP_CLI_CONFIGURATIONS='[
   {
     "cli_command": "gemini",
-    "cli_args": ["--yolo", "-p"]
+    "cli_args": ["--yolo", "-p"],
+    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 8 },
+    "cooldown_seconds": 300
   },
   {
     "cli_command": "codex",
-    "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"]
+    "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"],
+    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
+    "cooldown_seconds": 300
   },
   {
     "cli_command": "opencode",
-    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"]
+    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"],
+    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
+    "cooldown_seconds": 300
   },
   {
     "cli_command": "opencode",
-    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"]
+    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"],
+    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 2 },
+    "cooldown_seconds": 300
   }
 ]'
 
@@ -508,19 +524,27 @@ export AUTO_SLOPP_TELEGRAM_CHAT_ID=prod_chat_id
 export AUTO_SLOPP_CLI_CONFIGURATIONS='[
   {
     "cli_command": "gemini",
-    "cli_args": ["--yolo", "-p"]
+    "cli_args": ["--yolo", "-p"],
+    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 8 },
+    "cooldown_seconds": 300
   },
   {
     "cli_command": "codex",
-    "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"]
+    "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"],
+    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
+    "cooldown_seconds": 300
   },
   {
     "cli_command": "opencode",
-    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"]
+    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"],
+    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
+    "cooldown_seconds": 300
   },
   {
     "cli_command": "opencode",
-    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"]
+    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"],
+    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 2 },
+    "cooldown_seconds": 300
   }
 ]'
 
@@ -542,19 +566,27 @@ AUTO_SLOPP_DEBUG=false
 export AUTO_SLOPP_CLI_CONFIGURATIONS='[
   {
     "cli_command": "gemini",
-    "cli_args": ["--yolo", "-p"]
+    "cli_args": ["--yolo", "-p"],
+    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 8 },
+    "cooldown_seconds": 300
   },
   {
     "cli_command": "codex",
-    "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"]
+    "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"],
+    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
+    "cooldown_seconds": 300
   },
   {
     "cli_command": "opencode",
-    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"]
+    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"],
+    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
+    "cooldown_seconds": 300
   },
   {
     "cli_command": "opencode",
-    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"]
+    "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"],
+    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 2 },
+    "cooldown_seconds": 300
   }
 ]'
 
