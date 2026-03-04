@@ -48,7 +48,15 @@ def _run_gh_command(
     """
     env = os.environ.copy()
     if settings.additional_env_file and settings.additional_env_file.exists():
-        env.update(dotenv_values(settings.additional_env_file))
+        parsed_env = dotenv_values(settings.additional_env_file)
+        # Filter out None values and ensure they are strings to avoid TypeError in subprocess
+        for k, v in parsed_env.items():
+            if v is not None:
+                env[k] = str(v)
+
+    # Ensure GH_TOKEN is set if GITHUB_TOKEN is present (gh cli prefers GH_TOKEN)
+    if "GH_TOKEN" not in env and "GITHUB_TOKEN" in env:
+        env["GH_TOKEN"] = env["GITHUB_TOKEN"]
 
     try:
         result = subprocess.run(
