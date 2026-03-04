@@ -44,6 +44,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "base_repo_path",
+        "additional_env_file",
         mode="before",
     )
     @classmethod
