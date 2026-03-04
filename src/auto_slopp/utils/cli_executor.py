@@ -56,51 +56,19 @@ def _choose_best_config_index(difficulty: int, working_dir: Path) -> int:
         state = _get_cli_state(i)
         if not state["active"]:
             continue
-
+        if difficulty < rating.min_rating:
+            continue
+        if difficulty > rating.max_rating:
+            continue
+            
         rating = config.rating
         score = abs(rating.recommend_rating - difficulty)
-
-        if difficulty < rating.min_rating:
-            score += (rating.min_rating - difficulty) * 10
-        if difficulty > rating.max_rating:
-            score += (difficulty - rating.max_rating) * 10
 
         if score < best_score:
             best_score = score
             best_index = i
 
-    if best_index == -1:
-        return 0
     return best_index
-
-
-CODEX_SUBCOMMANDS = {
-    "exec",
-    "review",
-    "login",
-    "logout",
-    "mcp",
-    "mcp-server",
-    "app-server",
-    "completion",
-    "sandbox",
-    "debug",
-    "apply",
-    "resume",
-    "fork",
-    "cloud",
-    "features",
-    "help",
-}
-
-
-def _codex_has_subcommand(args: List[str]) -> bool:
-    """Return True when codex arguments already include a subcommand."""
-    for arg in args:
-        if arg.startswith("-"):
-            continue
-        return arg in CODEX_SUBCOMMANDS
-    return False
 
 
 def _get_cli_configurations() -> List[Dict[str, Any]]:
@@ -231,38 +199,6 @@ def _probe_configuration(config: Dict[str, Any], working_dir: Path) -> bool:
     return result["success"]
 
 
-def _rebalance_active_configuration(configs: List[Dict[str, Any]], working_dir: Path) -> None:
-    """Probe all configurations concurrently and switch to the best available."""
-    global _active_cli_configuration_index
-
-    with ThreadPoolExecutor(max_workers=len(configs)) as executor:
-        futures = [executor.submit(_probe_configuration, config, working_dir) for config in configs]
-        probe_results = [future.result() for future in futures]
-
-    for index, healthy in enumerate(probe_results):
-        if healthy:
-            if index != _active_cli_configuration_index:
-                logger.info(
-                    f"Switching active CLI configuration from index {_active_cli_configuration_index} to {index}"
-                )
-            _active_cli_configuration_index = index
-            return
-
-
-def rebalance_configurations(working_dir: Optional[Path] = None) -> None:
-    """Public interface to trigger health-probe and rebalance active configuration.
-
-    This should be called after worker execution to ensure the most preferred
-    healthy configuration is selected for the next task.
-    """
-    cli_configurations = _get_cli_configurations()
-    if _active_cli_configuration_index != 0 and len(cli_configurations) > 1:
-        _rebalance_active_configuration(
-            configs=cli_configurations,
-            working_dir=working_dir or Path.cwd(),
-        )
-
-
 def run_cli_executor(
     additional_instructions: Optional[str] = None,
     working_directory: Optional[Path] = None,
@@ -391,9 +327,6 @@ def run_cli_executor(
             "timeout": False,
             "error": "No CLI configurations available",
         }
-
-    if _active_cli_configuration_index != 0 and len(cli_configurations) > 1:
-        _rebalance_active_configuration(configs=cli_configurations, working_dir=working_dir)
 
     return final_result
 
