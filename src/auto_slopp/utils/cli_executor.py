@@ -56,12 +56,13 @@ def _choose_best_config_index(difficulty: int, working_dir: Path) -> int:
         state = _get_cli_state(i)
         if not state["active"]:
             continue
+
+        rating = config.rating
         if difficulty < rating.min_rating:
             continue
         if difficulty > rating.max_rating:
             continue
-            
-        rating = config.rating
+
         score = abs(rating.recommend_rating - difficulty)
 
         if score < best_score:
