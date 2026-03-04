@@ -95,7 +95,7 @@ class Settings(BaseSettings):
 
     cli_configurations: List[CLIConfiguration] = Field(
         default_factory=lambda: [
-            CLIConfiguration(cli_command="gemini", cli_args=["--yolo", "-p"]),
+            CLIConfiguration(cli_command="gemini", cli_args=["--yolo", "--model", "gemini-3.1-pro-preview", "-p"]),
             CLIConfiguration(cli_command="codex", cli_args=["--dangerously-bypass-approvals-and-sandbox", "exec"]),
             CLIConfiguration(
                 cli_command="opencode",
