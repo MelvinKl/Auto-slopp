@@ -59,7 +59,7 @@ def _run_gh_command(
         env["GH_TOKEN"] = env["GITHUB_TOKEN"]
 
     try:
-        print(env)
+        print(parsed_env)
         result = subprocess.run(
             ["gh", *args],
             cwd=repo_dir,
