@@ -47,7 +47,10 @@ def _run_gh_command(
         GitHubOperationError: If gh command fails and check is True
     """
     env = os.environ.copy()
+    print(settings.additional_env_file)
+    print(settings.additional_env_file.exists())
     if settings.additional_env_file and settings.additional_env_file.exists():
+        
         parsed_env = dotenv_values(settings.additional_env_file)
         print(parsed_env)
         # Filter out None values and ensure they are strings to avoid TypeError in subprocess
