@@ -49,6 +49,7 @@ def _run_gh_command(
     env = os.environ.copy()
     if settings.additional_env_file and settings.additional_env_file.exists():
         parsed_env = dotenv_values(settings.additional_env_file)
+        print(parsed_env)
         # Filter out None values and ensure they are strings to avoid TypeError in subprocess
         for k, v in parsed_env.items():
             if v is not None:
@@ -59,7 +60,7 @@ def _run_gh_command(
         env["GH_TOKEN"] = env["GITHUB_TOKEN"]
 
     try:
-        print(parsed_env)
+        
         result = subprocess.run(
             ["gh", *args],
             cwd=repo_dir,
