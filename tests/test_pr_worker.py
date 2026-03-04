@@ -10,7 +10,7 @@ class TestPRWorker:
     """Tests for PRWorker push behavior."""
 
     def test_pushes_once_when_tests_pass_without_fix(self):
-        """PRWorker should push only once when tests pass immediately."""
+        """Test that PRWorker pushes only once when tests pass immediately."""
         worker = PRWorker()
         repo_dir = Path("/tmp/repo")
 
@@ -27,7 +27,7 @@ class TestPRWorker:
         assert mock_push_branch.call_count == 1
 
     def test_pushes_once_when_tests_pass_after_fix(self):
-        """PRWorker should push only once after tests are fixed and pass."""
+        """Test that PRWorker pushes only once after tests are fixed and pass."""
         worker = PRWorker()
         repo_dir = Path("/tmp/repo")
 

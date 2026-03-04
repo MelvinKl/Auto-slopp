@@ -126,6 +126,11 @@ class Settings(BaseSettings):
         description="Allowed GitHub username for GitHubIssueWorker to process issues",
     )
 
+    additional_env_file: Optional[Path] = Field(
+        default=None,
+        description="Path to an additional .env file to be appended to subprocess calls for github_operations",
+    )
+
     model_config = {
         "env_prefix": "AUTO_SLOPP_",
         "env_file": ".env",

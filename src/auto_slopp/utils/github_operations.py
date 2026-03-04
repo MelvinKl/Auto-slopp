@@ -6,9 +6,14 @@ used across different workers.
 
 import json
 import logging
+import os
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from dotenv import dotenv_values
+
+from src.settings.main import settings
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +46,10 @@ def _run_gh_command(
     Raises:
         GitHubOperationError: If gh command fails and check is True
     """
+    env = os.environ.copy()
+    if settings.additional_env_file and settings.additional_env_file.exists():
+        env.update(dotenv_values(settings.additional_env_file))
+
     try:
         result = subprocess.run(
             ["gh", *args],
@@ -49,6 +58,7 @@ def _run_gh_command(
             text=capture_output,
             check=check,
             timeout=timeout,
+            env=env,
         )
         return result
     except subprocess.CalledProcessError as e:
