@@ -96,26 +96,11 @@ class Executor:
         """
         try:
             print(f"Executing worker: {worker_class.__name__}")
-
-            if self._worker_needs_directory_iteration(worker_class):
-                self._execute_worker_with_directories(worker_class)
-            else:
-                self._execute_worker_single(worker_class)
+            self._execute_worker_with_directories(worker_class)
 
         except Exception as e:
             print(f"Error executing worker {worker_class.__name__}: {e}")
             traceback.print_exc()
-
-    def _worker_needs_directory_iteration(self, worker_class: Type[Worker]) -> bool:
-        """Check if worker needs directory iteration at orchestrator level.
-
-        Args:
-            worker_class: Worker class to check
-
-        Returns:
-            True if worker should be executed for each subdirectory
-        """
-        return True
 
     def _execute_worker_with_directories(self, worker_class: Type[Worker]) -> None:
         """Execute worker for each subdirectory in repo_path.
@@ -152,22 +137,6 @@ class Executor:
             except Exception as e:
                 print(f"Error executing worker {worker_class.__name__} on {subdirectory.name}: {e}")
                 traceback.print_exc()
-
-    def _execute_worker_single(self, worker_class: Type[Worker]) -> None:
-        """Execute worker once on entire repo_path (for workers that don't need iteration).
-
-        Args:
-            worker_class: Worker class to instantiate and execute
-        """
-        worker = self._instantiate_worker(worker_class)
-
-        start_time = time.time()
-        result = worker.run(self.repo_path)
-        execution_time = time.time() - start_time
-
-        print(f"Worker {worker_class.__name__} completed in {execution_time:.2f}s")
-        if result is not None:
-            print(f"Result: {result}")
 
 
 def run_executor(

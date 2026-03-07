@@ -380,22 +380,6 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
 ]'
 
 # Task difficulty ratings (optional)
-export AUTO_SLOPP_TASK_DIFFICULTIES='{
-  "github_issue": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
-  "pr_review": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
-  "git_checkout": { "min_rating": 0, "max_rating": 10, "recommended_rating": 2 },
-  "default": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 }
-}'
-
-# Task difficulty ratings (optional)
-export AUTO_SLOPP_TASK_DIFFICULTIES='{
-  "github_issue": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
-  "pr_review": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
-  "git_checkout": { "min_rating": 0, "max_rating": 10, "recommended_rating": 2 },
-  "default": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 }
-}'
-
-# Task difficulty ratings (optional)
 AUTO_SLOPP_TASK_DIFFICULTIES='{
   "github_issue": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
   "pr_review": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
@@ -720,8 +704,7 @@ export AUTO_SLOPP_SLOP_TIMEOUT=7200
 ```bash
 # .env
 AUTO_SLOPP_BASE_REPO_PATH=/home/user/projects/my-automation
-AUTO_SLOPP_WORKER_SEARCH_PATH=/home/user/custom-workers
-AUTO_SLOPP_WORKERS_ENABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker"]'
+AUTO_SLOPP_WORKERS_DISABLED='[]'
 AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=2.0
 AUTO_SLOPP_DEBUG=false
 
