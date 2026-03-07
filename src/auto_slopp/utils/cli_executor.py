@@ -33,16 +33,17 @@ def _check_cooldowns(working_dir: Path) -> None:
     for index, config in enumerate(settings.cli_configurations):
         state = _get_cli_state(index)
         if not state["active"] and now >= state["cooldown_until"]:
-            logger.info(f"Checking if CLI tool at index {index} has recovered...")
+            logger.info(f"Checking if CLI tool {config.name} has recovered...")
             c_dict = {
                 "cli_command": config.cli_command,
                 "cli_args": list(config.cli_args),
+                "name": config.name,
             }
             if _probe_configuration(c_dict, working_dir):
-                logger.info(f"CLI tool at index {index} successfully recovered.")
+                logger.info(f"CLI tool {config.name} successfully recovered.")
                 state["active"] = True
             else:
-                logger.warning(f"CLI tool at index {index} still timing out. Resetting cooldown.")
+                logger.warning(f"CLI tool {config.name} still timing out. Resetting cooldown.")
                 state["cooldown_until"] = now + config.cooldown_seconds
 
 
@@ -79,6 +80,7 @@ def _get_cli_configurations() -> List[Dict[str, Any]]:
         {
             "cli_command": config.cli_command,
             "cli_args": list(config.cli_args),
+            "name": config.name,
         }
         for config in settings.cli_configurations
     ]
@@ -300,7 +302,7 @@ def run_cli_executor(
             additional_instructions=additional_instructions,
         )
 
-        logger.info(f"Using CLI configuration index: {config_index} ({cli_command}) for task {task_name}")
+        logger.info(f"Using CLI configuration: {config['name']} for task {task_name}")
         result = _execute_command(
             cli_command=cli_command,
             cmd=cmd,
@@ -312,7 +314,7 @@ def run_cli_executor(
         final_result = result
 
         if not result.get("success", False):
-            logger.warning(f"Error on configuration index {config_index}, placing in cooldown")
+            logger.warning(f"Error on configuration {config['name']}, placing in cooldown")
             state["active"] = False
             state["cooldown_until"] = time.time() + settings.cli_configurations[config_index].cooldown_seconds
             continue
