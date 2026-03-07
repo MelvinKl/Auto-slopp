@@ -150,7 +150,7 @@ class Settings(BaseSettings):
                     "--agent",
                     "openagent",
                     "--model",
-                    "zai-coding-plan/glm-5",
+                    "zai-coding-plan/glm-4.7",
                     "run",
                 ],
                 capability=5,
