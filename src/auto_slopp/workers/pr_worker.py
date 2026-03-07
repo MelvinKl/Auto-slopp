@@ -311,7 +311,7 @@ class PRWorker(Worker):
         Returns:
             Dictionary containing CLI execution results
         """
-        additional_instructions = "'make test' is failing fix it and push the changes"
+        additional_instructions = "'make test' is failing, fix it"
 
         result = run_cli_executor(
             additional_instructions=additional_instructions,
@@ -337,7 +337,7 @@ class PRWorker(Worker):
         Returns:
             Dictionary containing CLI execution results
         """
-        additional_instructions = "Fix the merge conflicts and complete the merge, then push the changes"
+        additional_instructions = "Fix the merge conflicts and complete the merge"
 
         result = run_cli_executor(
             additional_instructions=additional_instructions,
