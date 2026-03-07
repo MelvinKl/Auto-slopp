@@ -114,7 +114,7 @@ After=network.target
 Type=simple
 User=your-username
 WorkingDirectory=/path/to/Auto-slopp
-Environment="PATH=/path/to/Auto-slopp/.venv/bin"
+Environment="PATH=/path/to/Auto-slopp/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 EnvironmentFile=/path/to/Auto-slopp/.env
 ExecStart=/path/to/Auto-slopp/.venv/bin/auto-slopp
 Restart=on-failure
@@ -166,6 +166,23 @@ sudo systemctl disable auto-slopp
 - The service runs with the user specified in the service file, so ensure that user has proper permissions
 - The `EnvironmentFile` directive loads environment variables from your `.env` file
 - Adjust `RestartSec` as needed for your use case
+- **Important**: The PATH environment variable must include both the virtual environment bin directory AND system paths (e.g., `/usr/bin`, `/usr/local/bin`) to ensure git and other system utilities are accessible
+
+### Troubleshooting Autostart Issues
+
+**Error: `[Errno 2] No such file or directory: 'git'`**
+
+This error occurs when git is not in the PATH for the systemd service. The service file must include system paths in the PATH environment variable:
+
+```ini
+Environment="PATH=/path/to/Auto-slopp/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+```
+
+**Other common issues:**
+
+- Verify git is installed: `which git` should return a path (e.g., `/usr/bin/git`)
+- Ensure the user has permission to access the repository directories
+- Check service logs: `sudo journalctl -u auto-slopp -f`
 
 ## Quick Start
 
