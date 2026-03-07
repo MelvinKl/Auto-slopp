@@ -146,7 +146,6 @@ pwd
 # EnvironmentFile=/home/username/Auto-slopp/.env
 # ExecStart=/home/username/Auto-slopp/.venv/bin/auto-slopp
 ```
-
 ### Install and Enable the Service
 
 ```bash
