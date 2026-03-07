@@ -97,15 +97,32 @@ class Settings(BaseSettings):
     cli_configurations: List[CLIConfiguration] = Field(
         default_factory=lambda: [
             CLIConfiguration(
-                cli_command="opencode",
-                cli_args=["--agent", "openagent", "--model", "zai-coding-plan/glm-5", "run"],
+                cli_command="gemini",
+                cli_args=["--yolo", "--model", "gemini-3.1-pro-preview", "-p"],
             ),
-            CLIConfiguration(cli_command="gemini", cli_args=["--yolo", "--model", "gemini-3.1-pro-preview", "-p"]),
-            CLIConfiguration(cli_command="codex", cli_args=["--dangerously-bypass-approvals-and-sandbox", "exec"]),
-
+            CLIConfiguration(
+                cli_command="codex",
+                cli_args=["--dangerously-bypass-approvals-and-sandbox", "exec"],
+            ),
             CLIConfiguration(
                 cli_command="opencode",
-                cli_args=["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"],
+                cli_args=[
+                    "--agent",
+                    "openagent",
+                    "--model",
+                    "zai-coding-plan/glm-4.7",
+                    "run",
+                ],
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--agent",
+                    "openagent",
+                    "--model",
+                    "zai-coding-plan/glm-4.7-flash",
+                    "run",
+                ],
             ),
         ],
         description=(
