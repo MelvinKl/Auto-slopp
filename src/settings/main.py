@@ -17,9 +17,15 @@ DEFAULT_WORKERS = [
 class TaskRating(BaseModel):
     """Rating configuration for a task type."""
 
-    min_rating: int = Field(default=0, ge=0, le=10, description="Minimum capability required")
-    max_rating: int = Field(default=10, ge=0, le=10, description="Maximum capability to use")
-    recommended_rating: int = Field(default=5, ge=0, le=10, description="Preferred capability level")
+    min_rating: int = Field(
+        default=0, ge=0, le=10, description="Minimum capability required"
+    )
+    max_rating: int = Field(
+        default=10, ge=0, le=10, description="Maximum capability to use"
+    )
+    recommended_rating: int = Field(
+        default=5, ge=0, le=10, description="Preferred capability level"
+    )
 
 
 class CLIConfiguration(BaseModel):
@@ -79,25 +85,39 @@ class Settings(BaseSettings):
         description="Sleep interval between executor iterations in seconds",
     )
 
-    debug: bool = Field(default=False, description="Enable debug mode with verbose logging")
+    debug: bool = Field(
+        default=False, description="Enable debug mode with verbose logging"
+    )
 
     # Telegram logger settings
-    telegram_enabled: bool = Field(default=False, description="Enable Telegram logging integration")
+    telegram_enabled: bool = Field(
+        default=False, description="Enable Telegram logging integration"
+    )
 
-    telegram_bot_token: Optional[str] = Field(default=None, description="Telegram bot token for API authentication")
+    telegram_bot_token: Optional[str] = Field(
+        default=None, description="Telegram bot token for API authentication"
+    )
 
-    telegram_chat_id: Optional[str] = Field(default=None, description="Telegram chat ID to send messages to")
+    telegram_chat_id: Optional[str] = Field(
+        default=None, description="Telegram chat ID to send messages to"
+    )
 
     telegram_api_url: str = Field(
         default="https://api.telegram.org/bot{token}/sendMessage",
         description="Telegram API URL for sending messages",
     )
 
-    telegram_timeout: float = Field(default=30.0, description="Timeout for Telegram API requests in seconds")
+    telegram_timeout: float = Field(
+        default=30.0, description="Timeout for Telegram API requests in seconds"
+    )
 
-    telegram_retry_attempts: int = Field(default=3, description="Number of retry attempts for failed Telegram requests")
+    telegram_retry_attempts: int = Field(
+        default=3, description="Number of retry attempts for failed Telegram requests"
+    )
 
-    telegram_retry_delay: float = Field(default=1.0, description="Delay between retry attempts in seconds")
+    telegram_retry_delay: float = Field(
+        default=1.0, description="Delay between retry attempts in seconds"
+    )
 
     telegram_parse_mode: str = Field(
         default="HTML",
@@ -130,7 +150,7 @@ class Settings(BaseSettings):
                     "--agent",
                     "openagent",
                     "--model",
-                    "zai-coding-plan/glm-4.7",
+                    "zai-coding-plan/glm-5",
                     "run",
                 ],
                 capability=5,
@@ -148,7 +168,8 @@ class Settings(BaseSettings):
             ),
         ],
         description=(
-            "Tiered CLI configurations ordered by preference. " "Lower index entries are preferred and used first."
+            "Tiered CLI configurations ordered by preference. "
+            "Lower index entries are preferred and used first."
         ),
     )
 
@@ -174,9 +195,13 @@ class Settings(BaseSettings):
 
     task_difficulties: Dict[str, TaskRating] = Field(
         default={
-            "github_issue": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
+            "github_issue": TaskRating(
+                min_rating=0, max_rating=10, recommended_rating=5
+            ),
             "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
-            "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2),
+            "git_checkout": TaskRating(
+                min_rating=0, max_rating=10, recommended_rating=2
+            ),
             "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
         },
         description="Difficulty ratings for various tasks (0-10)",
