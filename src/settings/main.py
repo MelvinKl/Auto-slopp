@@ -117,12 +117,23 @@ class Settings(BaseSettings):
             CLIConfiguration(
                 cli_command="gemini",
                 cli_args=["--yolo", "--model", "gemini-3.1-pro-preview", "-p"],
-                capability=8,
+                capability=7,
             ),
             CLIConfiguration(
                 cli_command="codex",
                 cli_args=["--dangerously-bypass-approvals-and-sandbox", "exec"],
-                capability=5,
+                capability=8,
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--agent",
+                    "openagent",
+                    "--model",
+                    "zai-coding-plan/glm-5",
+                    "run",
+                ],
+                capability=10,
             ),
             CLIConfiguration(
                 cli_command="opencode",
@@ -133,7 +144,7 @@ class Settings(BaseSettings):
                     "zai-coding-plan/glm-4.7",
                     "run",
                 ],
-                capability=5,
+                capability=6,
             ),
             CLIConfiguration(
                 cli_command="opencode",
@@ -144,7 +155,7 @@ class Settings(BaseSettings):
                     "zai-coding-plan/glm-4.7-flash",
                     "run",
                 ],
-                capability=2,
+                capability=1,
             ),
         ],
         description=(
@@ -174,7 +185,7 @@ class Settings(BaseSettings):
 
     task_difficulties: Dict[str, TaskRating] = Field(
         default={
-            "github_issue": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
+            "github_issue": TaskRating(min_rating=7, max_rating=10, recommended_rating=10),
             "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
             "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2),
             "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
