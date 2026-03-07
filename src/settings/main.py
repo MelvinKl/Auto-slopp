@@ -186,8 +186,8 @@ class Settings(BaseSettings):
     task_difficulties: Dict[str, TaskRating] = Field(
         default={
             "github_issue": TaskRating(min_rating=7, max_rating=10, recommended_rating=10),
-            "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
-            "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2),
+            "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5), # fix tests
+            "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2), # merge conflict
             "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
         },
         description="Difficulty ratings for various tasks (0-10)",
