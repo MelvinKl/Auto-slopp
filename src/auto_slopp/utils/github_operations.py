@@ -59,7 +59,6 @@ def _run_gh_command(
         env["GH_TOKEN"] = env["GITHUB_TOKEN"]
 
     try:
-
         result = subprocess.run(
             ["gh", *args],
             cwd=repo_dir,
@@ -301,14 +300,14 @@ def create_pull_request(
         return None
 
 
-def get_open_pr_branches(repo_dir: Path) -> List[str]:
-    """Get list of branches from open PRs in the repository.
+def get_open_prs(repo_dir: Path) -> List[Dict[str, Any]]:
+    """Get list of open PRs in the repository with full information.
 
     Args:
         repo_dir: Path to the git repository
 
     Returns:
-        List of branch names from open PRs.
+        List of dictionaries containing PR information (headRefName, author, etc).
 
     Raises:
         GitHubOperationError: If gh command fails
@@ -319,7 +318,7 @@ def get_open_pr_branches(repo_dir: Path) -> List[str]:
             "pr",
             "list",
             "--state=open",
-            "--json=headRefName",
+            "--json=headRefName,author,number,title",
             check=False,
         )
 
@@ -335,9 +334,7 @@ def get_open_pr_branches(repo_dir: Path) -> List[str]:
             return []
 
         prs = json.loads(result.stdout)
-        branches = [pr["headRefName"] for pr in prs]
-
-        return branches
+        return prs
 
     except GitHubOperationError as e:
         logger.error(f"Error getting PRs from {repo_dir.name}: {str(e)}")
@@ -348,6 +345,23 @@ def get_open_pr_branches(repo_dir: Path) -> List[str]:
     except Exception as e:
         logger.error(f"Unexpected error getting PRs from {repo_dir.name}: {str(e)}")
         return []
+
+
+def get_open_pr_branches(repo_dir: Path) -> List[str]:
+    """Get list of branches from open PRs in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+
+    Returns:
+        List of branch names from open PRs.
+
+    Raises:
+        GitHubOperationError: If gh command fails
+    """
+    prs = get_open_prs(repo_dir)
+    branches = [pr["headRefName"] for pr in prs]
+    return branches
 
 
 def get_pr_for_branch(repo_dir: Path, branch: str) -> Optional[Dict[str, Any]]:

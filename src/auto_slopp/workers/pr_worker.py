@@ -15,7 +15,7 @@ from auto_slopp.utils.git_operations import (
     merge_main_into_branch,
     push_branch,
 )
-from auto_slopp.utils.github_operations import get_open_pr_branches
+from auto_slopp.utils.github_operations import get_open_prs
 from auto_slopp.utils.repository_utils import discover_repositories, validate_repository
 from auto_slopp.worker import Worker
 from settings.main import settings
@@ -194,15 +194,30 @@ class PRWorker(Worker):
         return result
 
     def _get_open_pr_branches(self, repo_dir: Path) -> List[str]:
-        """Get list of branches from open PRs in the repository.
+        """Get list of branches from open PRs in the repository, filtered by allowed creator.
 
         Args:
             repo_dir: Path to the repository directory
 
         Returns:
-            List of branch names from open PRs
+            List of branch names from open PRs created by allowed creator
         """
-        return get_open_pr_branches(repo_dir)
+        prs = get_open_prs(repo_dir)
+        allowed_creator = settings.github_issue_worker_allowed_creator
+
+        filtered_branches = []
+        for pr in prs:
+            author = pr.get("author", {})
+            author_login = author.get("login", "") if author else ""
+
+            if author_login == allowed_creator:
+                filtered_branches.append(pr["headRefName"])
+            else:
+                self.logger.info(
+                    f"Skipping PR #{pr.get('number')} '{pr.get('title')}': " f"not created by '{allowed_creator}'"
+                )
+
+        return filtered_branches
 
     def _checkout_branch(self, repo_dir: Path, branch: str) -> bool:
         """Checkout a specific branch in the repository.
