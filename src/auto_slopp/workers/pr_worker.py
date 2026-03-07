@@ -319,6 +319,7 @@ class PRWorker(Worker):
             timeout=self.timeout,
             agent_args=[],
             capture_output=True,
+            task_name="pr_review",
         )
 
         return {
@@ -345,6 +346,7 @@ class PRWorker(Worker):
             timeout=self.timeout,
             agent_args=[],
             capture_output=True,
+            task_name="git_checkout",
         )
 
         return {

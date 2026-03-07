@@ -1,7 +1,7 @@
 """Main settings configuration using Pydantic BaseSettings."""
 
 from pathlib import Path
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -14,6 +14,14 @@ DEFAULT_WORKERS = [
 ]
 
 
+class TaskRating(BaseModel):
+    """Rating configuration for a task type."""
+
+    min_rating: int = Field(default=0, ge=0, le=10, description="Minimum capability required")
+    max_rating: int = Field(default=10, ge=0, le=10, description="Maximum capability to use")
+    recommended_rating: int = Field(default=5, ge=0, le=10, description="Preferred capability level")
+
+
 class CLIConfiguration(BaseModel):
     """Single CLI configuration entry for tiered failover."""
 
@@ -23,6 +31,16 @@ class CLIConfiguration(BaseModel):
     cli_args: List[str] = Field(
         default_factory=list,
         description="Arguments to pass to the CLI command",
+    )
+    capability: int = Field(
+        default=5,
+        ge=0,
+        le=10,
+        description="Capability rating of this CLI tool (0-10)",
+    )
+    cooldown_seconds: int = Field(
+        default=300,
+        description="Cooldown time in seconds if the tool encounters errors",
     )
 
 
@@ -99,10 +117,23 @@ class Settings(BaseSettings):
             CLIConfiguration(
                 cli_command="gemini",
                 cli_args=["--yolo", "--model", "gemini-3.1-pro-preview", "-p"],
+                capability=7,
             ),
             CLIConfiguration(
                 cli_command="codex",
                 cli_args=["--dangerously-bypass-approvals-and-sandbox", "exec"],
+                capability=8,
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--agent",
+                    "openagent",
+                    "--model",
+                    "zai-coding-plan/glm-5",
+                    "run",
+                ],
+                capability=10,
             ),
             CLIConfiguration(
                 cli_command="opencode",
@@ -113,6 +144,7 @@ class Settings(BaseSettings):
                     "zai-coding-plan/glm-4.7",
                     "run",
                 ],
+                capability=6,
             ),
             CLIConfiguration(
                 cli_command="opencode",
@@ -123,6 +155,7 @@ class Settings(BaseSettings):
                     "zai-coding-plan/glm-4.7-flash",
                     "run",
                 ],
+                capability=1,
             ),
         ],
         description=(
@@ -148,6 +181,16 @@ class Settings(BaseSettings):
     additional_env_file: Optional[Path] = Field(
         default=None,
         description="Path to an additional .env file to be appended to subprocess calls for github_operations",
+    )
+
+    task_difficulties: Dict[str, TaskRating] = Field(
+        default={
+            "github_issue": TaskRating(min_rating=7, max_rating=10, recommended_rating=10),
+            "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5), # fix tests
+            "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2), # merge conflict
+            "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
+        },
+        description="Difficulty ratings for various tasks (0-10)",
     )
 
     model_config = {
