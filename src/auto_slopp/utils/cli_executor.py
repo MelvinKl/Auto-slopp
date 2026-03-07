@@ -287,7 +287,7 @@ def run_cli_executor(
         config_index = _choose_best_config_index(task_rating, working_dir)
         state = _get_cli_state(config_index)
 
-        if config_index in tried_indices or not state["active"]:
+        if config_index in tried_indices or not state["active"] or config_index == -1:
             break
 
         tried_indices.add(config_index)
