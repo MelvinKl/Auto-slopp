@@ -1,5 +1,7 @@
 # Auto-slopp
 
+sloppytheslop
+
 A Python-based automation framework for task execution with pluggable worker system. Auto-slopp provides a flexible foundation for creating automation workflows with support for configuration management, logging (including Telegram integration), and extensible worker implementations.
 
 ## Features
