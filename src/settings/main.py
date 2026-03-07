@@ -42,6 +42,10 @@ class CLIConfiguration(BaseModel):
         default=300,
         description="Cooldown time in seconds if the tool encounters errors",
     )
+    name: str = Field(
+        default="",
+        description="Human-readable name for this CLI configuration",
+    )
 
 
 class Settings(BaseSettings):
@@ -118,11 +122,13 @@ class Settings(BaseSettings):
                 cli_command="gemini",
                 cli_args=["--yolo", "--model", "gemini-3.1-pro-preview", "-p"],
                 capability=7,
+                name="gemini gemini-3.1-pro-preview",
             ),
             CLIConfiguration(
                 cli_command="codex",
                 cli_args=["--dangerously-bypass-approvals-and-sandbox", "exec"],
                 capability=8,
+                name="codex",
             ),
             CLIConfiguration(
                 cli_command="opencode",
@@ -134,6 +140,7 @@ class Settings(BaseSettings):
                     "run",
                 ],
                 capability=10,
+                name="opencode glm-5",
             ),
             CLIConfiguration(
                 cli_command="opencode",
@@ -145,6 +152,7 @@ class Settings(BaseSettings):
                     "run",
                 ],
                 capability=6,
+                name="opencode glm-4.7",
             ),
             CLIConfiguration(
                 cli_command="opencode",
@@ -156,6 +164,7 @@ class Settings(BaseSettings):
                     "run",
                 ],
                 capability=1,
+                name="opencode glm-4.7-flash",
             ),
         ],
         description=(
@@ -186,8 +195,8 @@ class Settings(BaseSettings):
     task_difficulties: Dict[str, TaskRating] = Field(
         default={
             "github_issue": TaskRating(min_rating=7, max_rating=10, recommended_rating=10),
-            "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5), # fix tests
-            "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2), # merge conflict
+            "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),  # fix tests
+            "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2),  # merge conflict
             "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
         },
         description="Difficulty ratings for various tasks (0-10)",
