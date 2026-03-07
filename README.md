@@ -128,6 +128,25 @@ WantedBy=multi-user.target
 - `your-username` with your actual username
 - `/path/to/Auto-slopp` with the actual path to your installation
 
+### Finding Your Paths
+
+To determine the correct values for your system, run these commands:
+
+```bash
+# Get your current username
+whoami
+
+# Get the full path to your Auto-slopp installation
+pwd
+
+# Example: If you're in /home/username/Auto-slopp, your service file should use:
+# User=username
+# WorkingDirectory=/home/username/Auto-slopp
+# Environment="PATH=/home/username/Auto-slopp/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# EnvironmentFile=/home/username/Auto-slopp/.env
+# ExecStart=/home/username/Auto-slopp/.venv/bin/auto-slopp
+```
+
 ### Install and Enable the Service
 
 ```bash
