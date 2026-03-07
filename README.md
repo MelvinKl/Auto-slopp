@@ -97,6 +97,76 @@ uv sync
 source .venv/bin/activate
 ```
 
+## Autostart with Systemd
+
+To run auto-slopp automatically on system startup using systemd, follow these steps:
+
+### Create a Systemd Service File
+
+1. Create a service file at `/etc/systemd/system/auto-slopp.service`:
+
+```ini
+[Unit]
+Description=Auto-slopp Automation Framework
+After=network.target
+
+[Service]
+Type=simple
+User=your-username
+WorkingDirectory=/path/to/Auto-slopp
+Environment="PATH=/path/to/Auto-slopp/.venv/bin"
+EnvironmentFile=/path/to/Auto-slopp/.env
+ExecStart=/path/to/Auto-slopp/.venv/bin/auto-slopp
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Important**: Replace:
+- `your-username` with your actual username
+- `/path/to/Auto-slopp` with the actual path to your installation
+
+### Install and Enable the Service
+
+```bash
+# Reload systemd to recognize the new service
+sudo systemctl daemon-reload
+
+# Enable the service to start on boot
+sudo systemctl enable auto-slopp
+
+# Start the service immediately
+sudo systemctl start auto-slopp
+```
+
+### Service Management
+
+```bash
+# Check service status
+sudo systemctl status auto-slopp
+
+# View logs
+sudo journalctl -u auto-slopp -f
+
+# Stop the service
+sudo systemctl stop auto-slopp
+
+# Restart the service
+sudo systemctl restart auto-slopp
+
+# Disable autostart
+sudo systemctl disable auto-slopp
+```
+
+### Configuration Notes
+
+- Ensure your `.env` file contains all necessary configuration
+- The service runs with the user specified in the service file, so ensure that user has proper permissions
+- The `EnvironmentFile` directive loads environment variables from your `.env` file
+- Adjust `RestartSec` as needed for your use case
+
 ## Quick Start
 
 ### Basic Usage
