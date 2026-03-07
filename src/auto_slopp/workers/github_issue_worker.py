@@ -296,7 +296,13 @@ class GitHubIssueWorker(Worker):
                 result["error"] = f"Failed to create branch {branch_name}"
                 return result
 
-            openagent_result = execute_with_instructions(instructions, repo_dir, self.agent_args, self.timeout)
+            openagent_result = execute_with_instructions(
+                instructions,
+                repo_dir,
+                self.agent_args,
+                self.timeout,
+                task_name="github_issue",
+            )
             result["openagent_executed"] = openagent_result["success"]
             if openagent_result["success"]:
                 result["openagent_executions"] = 1

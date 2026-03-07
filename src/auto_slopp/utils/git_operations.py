@@ -117,6 +117,7 @@ def _handle_git_operation_failure(
             working_directory=repo_dir,
             timeout=timeout,
             capture_output=True,
+            task_name="git_checkout",
         )
 
         if result.get("success"):
@@ -473,7 +474,14 @@ def merge_main_into_branch(
             fetch_result = _run_git_command(repo_dir, "fetch", remote_name, "main", check=False, timeout=timeout)
         else:
             # Try to update local main, but if it fails (e.g. non-fast-forward), fall back to just fetching main
-            fetch_result = _run_git_command(repo_dir, "fetch", remote_name, "main:main", check=False, timeout=timeout)
+            fetch_result = _run_git_command(
+                repo_dir,
+                "fetch",
+                remote_name,
+                "main:main",
+                check=False,
+                timeout=timeout,
+            )
             if fetch_result.returncode != 0:
                 fetch_result = _run_git_command(repo_dir, "fetch", remote_name, "main", check=False, timeout=timeout)
 

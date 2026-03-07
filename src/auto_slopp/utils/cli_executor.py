@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from settings.main import settings
+from settings.main import TaskRating, settings
 
 logger = logging.getLogger(__name__)
 _active_cli_configuration_index = 0
@@ -46,7 +46,7 @@ def _check_cooldowns(working_dir: Path) -> None:
                 state["cooldown_until"] = now + config.cooldown_seconds
 
 
-def _choose_best_config_index(difficulty: int, working_dir: Path) -> int:
+def _choose_best_config_index(task_rating: TaskRating, working_dir: Path) -> int:
     _check_cooldowns(working_dir)
 
     best_index = -1
@@ -57,13 +57,14 @@ def _choose_best_config_index(difficulty: int, working_dir: Path) -> int:
         if not state["active"]:
             continue
 
-        rating = config.rating
-        if difficulty < rating.min_rating:
+        capability = config.capability
+
+        if capability < task_rating.min_rating:
             continue
-        if difficulty > rating.max_rating:
+        if capability > task_rating.max_rating:
             continue
 
-        score = abs(rating.recommend_rating - difficulty)
+        score = abs(capability - task_rating.recommended_rating)
 
         if score < best_score:
             best_score = score
@@ -206,7 +207,7 @@ def run_cli_executor(
     timeout: int = 7200,
     agent_args: Optional[List[str]] = None,
     capture_output: bool = True,
-    difficulty: int = 5,
+    task_name: str = "default",
 ) -> Dict[str, Any]:
     """Execute the configured CLI command with the specified parameters.
 
@@ -219,7 +220,7 @@ def run_cli_executor(
         timeout: Command execution timeout in seconds (default: 7200)
         agent_args: Additional arguments to pass to the CLI
         capture_output: Whether to capture stdout/stderr (default: True)
-        difficulty: Difficulty rating for this task (0-10)
+        task_name: Name of the task type for difficulty matching (default: "default")
 
     Returns:
         Dictionary containing execution results with the following keys:
@@ -277,11 +278,13 @@ def run_cli_executor(
     logger.info(f"Timeout: {timeout}s")
     logger.info(f"Agent args: {agent_args}")
 
+    task_rating = settings.task_difficulties.get(task_name, settings.task_difficulties["default"])
+
     final_result: Optional[Dict[str, Any]] = None
     tried_indices = set()
 
     while True:
-        config_index = _choose_best_config_index(difficulty, working_dir)
+        config_index = _choose_best_config_index(task_rating, working_dir)
         state = _get_cli_state(config_index)
 
         if config_index in tried_indices or not state["active"]:
@@ -297,7 +300,7 @@ def run_cli_executor(
             additional_instructions=additional_instructions,
         )
 
-        logger.info(f"Using CLI configuration index: {config_index} ({cli_command}) for difficulty {difficulty}")
+        logger.info(f"Using CLI configuration index: {config_index} ({cli_command}) for task {task_name}")
         result = _execute_command(
             cli_command=cli_command,
             cmd=cmd,
@@ -308,8 +311,8 @@ def run_cli_executor(
         )
         final_result = result
 
-        if result.get("timeout", False):
-            logger.warning(f"Timeout on configuration index {config_index}, placing in cooldown")
+        if not result.get("success", False):
+            logger.warning(f"Error on configuration index {config_index}, placing in cooldown")
             state["active"] = False
             state["cooldown_until"] = time.time() + settings.cli_configurations[config_index].cooldown_seconds
             continue
@@ -337,7 +340,7 @@ def execute_with_instructions(
     work_dir: Path,
     agent_args: Optional[List[str]] = None,
     timeout: int = 7200,
-    difficulty: int = 5,
+    task_name: str = "default",
 ) -> Dict[str, Any]:
     """Execute CLI with specific instructions.
 
@@ -346,7 +349,7 @@ def execute_with_instructions(
         work_dir: Working directory for command execution
         agent_args: Additional arguments to pass to the CLI
         timeout: Command execution timeout in seconds
-        difficulty: Difficulty rating for this task (0-10)
+        task_name: Name of the task type for difficulty matching
 
     Returns:
         Dictionary containing execution results.
@@ -356,7 +359,7 @@ def execute_with_instructions(
         working_directory=work_dir,
         agent_args=agent_args,
         timeout=timeout,
-        difficulty=difficulty,
+        task_name=task_name,
     )
 
 

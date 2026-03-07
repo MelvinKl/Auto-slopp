@@ -14,12 +14,12 @@ DEFAULT_WORKERS = [
 ]
 
 
-class CLIRating(BaseModel):
-    """Rating configuration for a CLI tool."""
+class TaskRating(BaseModel):
+    """Rating configuration for a task type."""
 
-    min_rating: int = Field(default=0, ge=0, le=10)
-    max_rating: int = Field(default=10, ge=0, le=10)
-    recommend_rating: int = Field(default=5, ge=0, le=10)
+    min_rating: int = Field(default=0, ge=0, le=10, description="Minimum capability required")
+    max_rating: int = Field(default=10, ge=0, le=10, description="Maximum capability to use")
+    recommended_rating: int = Field(default=5, ge=0, le=10, description="Preferred capability level")
 
 
 class CLIConfiguration(BaseModel):
@@ -32,13 +32,15 @@ class CLIConfiguration(BaseModel):
         default_factory=list,
         description="Arguments to pass to the CLI command",
     )
-    rating: CLIRating = Field(
-        default_factory=CLIRating,
-        description="Difficulty rating capabilities of this CLI tool",
+    capability: int = Field(
+        default=5,
+        ge=0,
+        le=10,
+        description="Capability rating of this CLI tool (0-10)",
     )
     cooldown_seconds: int = Field(
         default=300,
-        description="Cooldown time in seconds if the tool times out",
+        description="Cooldown time in seconds if the tool encounters errors",
     )
 
 
@@ -112,15 +114,37 @@ class Settings(BaseSettings):
 
     cli_configurations: List[CLIConfiguration] = Field(
         default_factory=lambda: [
-            CLIConfiguration(cli_command="gemini", cli_args=["--yolo", "--model", "gemini-3.1-pro-preview", "-p"]),
-            CLIConfiguration(cli_command="codex", cli_args=["--dangerously-bypass-approvals-and-sandbox", "exec"]),
             CLIConfiguration(
-                cli_command="opencode",
-                cli_args=["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"],
+                cli_command="gemini",
+                cli_args=["--yolo", "--model", "gemini-3.1-pro-preview", "-p"],
+                capability=8,
+            ),
+            CLIConfiguration(
+                cli_command="codex",
+                cli_args=["--dangerously-bypass-approvals-and-sandbox", "exec"],
+                capability=5,
             ),
             CLIConfiguration(
                 cli_command="opencode",
-                cli_args=["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"],
+                cli_args=[
+                    "--agent",
+                    "openagent",
+                    "--model",
+                    "zai-coding-plan/glm-4.7",
+                    "run",
+                ],
+                capability=5,
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--agent",
+                    "openagent",
+                    "--model",
+                    "zai-coding-plan/glm-4.7-flash",
+                    "run",
+                ],
+                capability=2,
             ),
         ],
         description=(
@@ -148,12 +172,12 @@ class Settings(BaseSettings):
         description="Path to an additional .env file to be appended to subprocess calls for github_operations",
     )
 
-    task_difficulties: Dict[str, int] = Field(
+    task_difficulties: Dict[str, TaskRating] = Field(
         default={
-            "github_issue": 5,
-            "pr_review": 5,
-            "git_checkout": 2,
-            "default": 5,
+            "github_issue": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
+            "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
+            "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2),
+            "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
         },
         description="Difficulty ratings for various tasks (0-10)",
     )
