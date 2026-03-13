@@ -34,6 +34,12 @@ from auto_slopp.utils.github_operations import (
     get_open_issues,
     get_pr_for_branch,
 )
+from auto_slopp.utils.task_executor import (
+    ExecutionStep,
+    StepStatus,
+    TaskProgress,
+    execute_task_with_loop,
+)
 from auto_slopp.worker import Worker
 from settings.main import settings
 
@@ -51,6 +57,8 @@ class GitHubIssueWorker(Worker):
         timeout: int | None = None,
         agent_args: Optional[List[str]] = None,
         dry_run: bool = False,
+        max_iterations: int = 3,
+        verify_tests: bool = True,
     ):
         """Initialize the GitHubIssueWorker.
 
@@ -58,10 +66,14 @@ class GitHubIssueWorker(Worker):
             timeout: Timeout for CLI execution in seconds (default: from settings.slop_timeout)
             agent_args: Additional arguments to pass to the CLI tool
             dry_run: If True, skip actual CLI execution and git operations
+            max_iterations: Maximum retry iterations for task execution
+            verify_tests: Whether to run tests for verification
         """
         self.timeout = timeout if timeout is not None else settings.slop_timeout
         self.agent_args = agent_args or []
         self.dry_run = dry_run
+        self.max_iterations = max_iterations
+        self.verify_tests = verify_tests
         self.logger = logging.getLogger("auto_slopp.workers.GitHubIssueWorker")
 
     def run(self, repo_path: Path) -> Dict[str, Any]:
@@ -279,6 +291,8 @@ class GitHubIssueWorker(Worker):
             "issue_closed": False,
             "issues_closed": 0,
             "error": None,
+            "iterations": 0,
+            "tests_passed": False,
         }
 
         try:
@@ -296,20 +310,36 @@ class GitHubIssueWorker(Worker):
                 result["error"] = f"Failed to create branch {branch_name}"
                 return result
 
-            openagent_result = execute_with_instructions(
-                instructions,
-                repo_dir,
-                self.agent_args,
-                self.timeout,
+            task_id = f"issue-{issue_number}"
+            loop_result = execute_task_with_loop(
+                instructions=instructions,
+                work_dir=repo_dir,
+                execute_func=execute_with_instructions,
+                max_iterations=self.max_iterations,
+                verify_tests=self.verify_tests,
+                task_id=task_id,
+                agent_args=self.agent_args,
+                timeout=self.timeout,
                 task_name="github_issue",
             )
-            result["openagent_executed"] = openagent_result["success"]
-            if openagent_result["success"]:
-                result["openagent_executions"] = 1
 
-            if not openagent_result["success"]:
+            result["openagent_executed"] = loop_result["success"]
+            result["iterations"] = loop_result.get("iterations", 1)
+            result["tests_passed"] = loop_result.get("tests_passed", False)
+            result["progress"] = loop_result.get("progress", {})
+
+            if loop_result["success"]:
+                result["openagent_executions"] = result["iterations"]
+                self.logger.info(
+                    f"Issue #{issue_number} completed successfully after {result['iterations']} iteration(s)"
+                )
+            else:
                 cli_tool = get_active_cli_command()
-                result["error"] = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
+                error_msg = f"{cli_tool} execution failed after {result['iterations']} iteration(s)"
+                if loop_result.get("progress", {}).get("errors"):
+                    error_msg += f": {'; '.join(loop_result['progress']['errors'][-3:])}"
+                result["error"] = error_msg
+                self.logger.error(f"Failed to process issue #{issue_number}: {error_msg}")
                 return result
 
             current_branch = get_current_branch(repo_dir)
