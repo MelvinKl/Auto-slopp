@@ -6,7 +6,154 @@ from unittest.mock import patch
 
 import pytest
 
+from auto_slopp.utils.task_executor import ExecutionStep, IssueTracker, StepStatus
 from auto_slopp.workers.github_issue_worker import GitHubIssueWorker
+
+
+class TestIssueTracker:
+    """Tests for IssueTracker class."""
+
+    def test_issue_tracker_creation(self):
+        """Test creating a new issue tracker."""
+        tracker = IssueTracker(
+            issue_number=123,
+            issue_title="Test Issue",
+            branch_name="ai/issue-123-test-issue",
+            max_iterations=3,
+        )
+
+        assert tracker.issue_number == 123
+        assert tracker.issue_title == "Test Issue"
+        assert tracker.branch_name == "ai/issue-123-test-issue"
+        assert tracker.max_iterations == 3
+        assert tracker.iteration == 0
+        assert len(tracker.errors) == 0
+
+    def test_issue_tracker_mark_step(self):
+        """Test marking steps in issue tracker."""
+        tracker = IssueTracker(
+            issue_number=1,
+            issue_title="Test",
+            branch_name="ai/issue-1-test",
+        )
+
+        tracker.mark_step(ExecutionStep.FETCH, StepStatus.COMPLETED)
+        assert tracker.get_step_status(ExecutionStep.FETCH) == StepStatus.COMPLETED
+        assert tracker.is_step_completed(ExecutionStep.FETCH)
+
+    def test_issue_tracker_add_error(self):
+        """Test adding errors to tracker."""
+        tracker = IssueTracker(
+            issue_number=1,
+            issue_title="Test",
+            branch_name="ai/issue-1-test",
+        )
+
+        tracker.add_error("Test error")
+        assert len(tracker.errors) == 1
+        assert tracker.errors[0] == "Test error"
+
+    def test_issue_tracker_iteration(self):
+        """Test iteration counter."""
+        tracker = IssueTracker(
+            issue_number=1,
+            issue_title="Test",
+            branch_name="ai/issue-1-test",
+            max_iterations=2,
+        )
+
+        assert tracker.can_retry() is True
+        tracker.increment_iteration()
+        assert tracker.iteration == 1
+        assert tracker.can_retry() is True
+        tracker.increment_iteration()
+        assert tracker.iteration == 2
+        assert tracker.can_retry() is False
+
+    def test_issue_tracker_to_markdown(self):
+        """Test converting tracker to markdown."""
+        tracker = IssueTracker(
+            issue_number=42,
+            issue_title="Fix Bug",
+            branch_name="ai/issue-42-fix-bug",
+            max_iterations=3,
+        )
+
+        tracker.mark_step(ExecutionStep.FETCH, StepStatus.COMPLETED)
+        tracker.mark_step(ExecutionStep.VALIDATE, StepStatus.COMPLETED)
+
+        markdown = tracker.to_markdown()
+
+        assert IssueTracker.TRACKER_MARKER in markdown
+        assert "Issue #42" in markdown
+        assert "Fix Bug" in markdown
+        assert "ai/issue-42-fix-bug" in markdown
+        assert "FETCH" in markdown
+        assert "completed" in markdown
+
+    def test_issue_tracker_from_markdown(self):
+        """Test parsing tracker from markdown."""
+        markdown = f"""{IssueTracker.TRACKER_MARKER}
+# Implementation Tracker: Issue #42
+
+**Issue**: ai/issue-42-fix-bug
+**Title**: Fix Bug
+**Created**: 2024-01-01T00:00:00
+**Updated**: 2024-01-01T00:00:00
+**Iteration**: 1/3
+
+## Execution Steps
+
+- ✅ **FETCH**: completed
+- ✅ **VALIDATE**: completed
+- 🔄 **PREPARE**: in_progress
+
+{IssueTracker.TRACKER_MARKER}"""
+
+        tracker = IssueTracker.from_markdown(markdown)
+
+        assert tracker is not None
+        assert tracker.issue_number == 42
+        assert tracker.issue_title == "Fix Bug"
+        assert tracker.branch_name == "ai/issue-42-fix-bug"
+        assert tracker.iteration == 1
+        assert tracker.max_iterations == 3
+        assert tracker.get_step_status(ExecutionStep.FETCH) == StepStatus.COMPLETED
+        assert tracker.get_step_status(ExecutionStep.VALIDATE) == StepStatus.COMPLETED
+        assert tracker.get_step_status(ExecutionStep.PREPARE) == StepStatus.IN_PROGRESS
+
+    def test_issue_tracker_from_markdown_invalid(self):
+        """Test parsing invalid markdown."""
+        markdown = "This is not a valid tracker"
+        tracker = IssueTracker.from_markdown(markdown)
+        assert tracker is None
+
+    def test_issue_tracker_roundtrip(self):
+        """Test markdown to tracker to markdown roundtrip."""
+        original = IssueTracker(
+            issue_number=99,
+            issue_title="Roundtrip Test",
+            branch_name="ai/issue-99-roundtrip-test",
+            max_iterations=5,
+        )
+
+        original.mark_step(ExecutionStep.FETCH, StepStatus.COMPLETED)
+        original.mark_step(ExecutionStep.EXECUTE, StepStatus.FAILED)
+        original.add_error("Test error")
+        original.iteration = 2
+
+        markdown = original.to_markdown()
+        parsed = IssueTracker.from_markdown(markdown)
+
+        assert parsed is not None
+        assert parsed.issue_number == original.issue_number
+        assert parsed.issue_title == original.issue_title
+        assert parsed.branch_name == original.branch_name
+        assert parsed.iteration == original.iteration
+        assert parsed.max_iterations == original.max_iterations
+        assert parsed.get_step_status(ExecutionStep.FETCH) == StepStatus.COMPLETED
+        assert parsed.get_step_status(ExecutionStep.EXECUTE) == StepStatus.FAILED
+        assert len(parsed.errors) == 1
 
 
 class TestGitHubIssueWorker:

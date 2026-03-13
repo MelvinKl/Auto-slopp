@@ -9,7 +9,9 @@ This module provides an improved execution pattern that:
 
 import json
 import logging
+import re
 import subprocess
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -121,6 +123,203 @@ class TaskProgress:
             return None
 
 
+class IssueTracker:
+    """Tracks execution progress and can be stored in GitHub issue comments."""
+
+    TRACKER_MARKER = "<!-- ISSUE_TRACKER -->"
+
+    def __init__(
+        self,
+        issue_number: int,
+        issue_title: str,
+        branch_name: str,
+        max_iterations: int = 3,
+    ):
+        self.issue_number = issue_number
+        self.issue_title = issue_title
+        self.branch_name = branch_name
+        self.max_iterations = max_iterations
+        self.steps: Dict[ExecutionStep, StepStatus] = {step: StepStatus.PENDING for step in ExecutionStep}
+        self.step_timestamps: Dict[ExecutionStep, str] = {}
+        self.iteration = 0
+        self.errors: List[str] = []
+        self.created_at = datetime.now().isoformat()
+        self.updated_at = datetime.now().isoformat()
+
+    def mark_step(self, step: ExecutionStep, status: StepStatus) -> None:
+        """Mark a step with a specific status and update timestamp."""
+        self.steps[step] = status
+        self.step_timestamps[step] = datetime.now().isoformat()
+        self.updated_at = datetime.now().isoformat()
+        logger.info(f"Issue #{self.issue_number}: Step {step.value} marked as {status.value}")
+
+    def get_step_status(self, step: ExecutionStep) -> StepStatus:
+        """Get the status of a specific step."""
+        return self.steps.get(step, StepStatus.PENDING)
+
+    def is_step_completed(self, step: ExecutionStep) -> bool:
+        """Check if a step is completed."""
+        return self.get_step_status(step) == StepStatus.COMPLETED
+
+    def add_error(self, error: str) -> None:
+        """Add an error to the error log."""
+        self.errors.append(error)
+        self.updated_at = datetime.now().isoformat()
+        logger.error(f"Issue #{self.issue_number}: {error}")
+
+    def increment_iteration(self) -> bool:
+        """Increment iteration counter and check if more iterations allowed."""
+        self.iteration += 1
+        self.updated_at = datetime.now().isoformat()
+        return self.iteration < self.max_iterations
+
+    def can_retry(self) -> bool:
+        """Check if retry is possible."""
+        return self.iteration < self.max_iterations
+
+    def to_markdown(self) -> str:
+        """Convert tracker to markdown format for GitHub comment."""
+        lines = [
+            f"{self.TRACKER_MARKER}",
+            f"# Implementation Tracker: Issue #{self.issue_number}",
+            "",
+            f"**Issue**: {self.branch_name}",
+            f"**Title**: {self.issue_title}",
+            f"**Created**: {self.created_at}",
+            f"**Updated**: {self.updated_at}",
+            f"**Iteration**: {self.iteration}/{self.max_iterations}",
+            "",
+            "## Execution Steps",
+            "",
+        ]
+
+        for step in ExecutionStep:
+            status = self.steps.get(step, StepStatus.PENDING)
+            timestamp = self.step_timestamps.get(step, "")
+            status_emoji = {
+                StepStatus.PENDING: "⏳",
+                StepStatus.IN_PROGRESS: "🔄",
+                StepStatus.COMPLETED: "✅",
+                StepStatus.FAILED: "❌",
+                StepStatus.SKIPPED: "⏭️",
+            }.get(status, "❓")
+
+            timestamp_str = f" ({timestamp})" if timestamp else ""
+            lines.append(f"- {status_emoji} **{step.value.upper()}**: {status.value}{timestamp_str}")
+
+        if self.errors:
+            lines.extend(
+                [
+                    "",
+                    "## Errors",
+                    "",
+                ]
+            )
+            for i, error in enumerate(self.errors, 1):
+                lines.append(f"{i}. {error}")
+
+        lines.extend(
+            [
+                "",
+                f"{self.TRACKER_MARKER}",
+            ]
+        )
+
+        return "\n".join(lines)
+
+    @classmethod
+    def from_markdown(cls, markdown: str) -> Optional["IssueTracker"]:
+        """Parse tracker from markdown format."""
+        if cls.TRACKER_MARKER not in markdown:
+            return None
+
+        try:
+            lines = markdown.split("\n")
+            data = {}
+
+            for line in lines:
+                if line.startswith("**Issue**:"):
+                    data["branch_name"] = line.split(":", 1)[1].strip()
+                elif line.startswith("**Title**:"):
+                    data["issue_title"] = line.split(":", 1)[1].strip()
+                elif line.startswith("**Created**:"):
+                    data["created_at"] = line.split(":", 1)[1].strip()
+                elif line.startswith("**Updated**:"):
+                    data["updated_at"] = line.split(":", 1)[1].strip()
+                elif line.startswith("**Iteration**:"):
+                    iteration_str = line.split(":", 1)[1].strip()
+                    parts = iteration_str.split("/")
+                    data["iteration"] = int(parts[0]) if parts else 0
+                    data["max_iterations"] = int(parts[1]) if len(parts) > 1 else 3
+
+            if "branch_name" not in data or "issue_title" not in data:
+                return None
+
+            issue_number_match = re.search(r"issue-(\d+)", data["branch_name"])
+            if not issue_number_match:
+                return None
+
+            issue_number = int(issue_number_match.group(1))
+
+            tracker = cls(
+                issue_number=issue_number,
+                issue_title=data["issue_title"],
+                branch_name=data["branch_name"],
+                max_iterations=data.get("max_iterations", 3),
+            )
+
+            tracker.created_at = data.get("created_at", tracker.created_at)
+            tracker.updated_at = data.get("updated_at", tracker.updated_at)
+            tracker.iteration = data.get("iteration", 0)
+
+            step_pattern = r"- [^\s]+ \*\*([A-Z]+)\*\*: (\w+)"
+            for line in lines:
+                match = re.search(step_pattern, line)
+                if match:
+                    step_name = match.group(1).lower()
+                    status_name = match.group(2).lower()
+                    try:
+                        step = ExecutionStep(step_name)
+                        status = StepStatus(status_name)
+                        tracker.steps[step] = status
+                    except ValueError:
+                        pass
+
+            error_pattern = r"^\d+\. (.+)$"
+            in_errors_section = False
+            for line in lines:
+                if "## Errors" in line:
+                    in_errors_section = True
+                    continue
+                if in_errors_section and line.startswith("##"):
+                    break
+                if in_errors_section:
+                    match = re.match(error_pattern, line)
+                    if match:
+                        tracker.errors.append(match.group(1))
+
+            return tracker
+
+        except Exception as e:
+            logger.warning(f"Failed to parse issue tracker from markdown: {e}")
+            return None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert tracker to dictionary for serialization."""
+        return {
+            "issue_number": self.issue_number,
+            "issue_title": self.issue_title,
+            "branch_name": self.branch_name,
+            "steps": {step.value: status.value for step, status in self.steps.items()},
+            "step_timestamps": self.step_timestamps,
+            "iteration": self.iteration,
+            "max_iterations": self.max_iterations,
+            "errors": self.errors,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+
 def run_verification_tests(work_dir: Path, timeout: int = 300) -> Dict[str, Any]:
     """Run tests to verify task execution was successful.
 
@@ -199,6 +398,63 @@ def build_retry_instructions(
     )
 
     return original_instructions + retry_context
+
+
+def load_tracker_from_comments(
+    comments: List[Dict[str, Any]],
+    issue_number: int,
+    issue_title: str,
+    branch_name: str,
+    max_iterations: int = 3,
+) -> IssueTracker:
+    """Load issue tracker from GitHub comments or create a new one.
+
+    Args:
+        comments: List of comments from GitHub issue
+        issue_number: Issue number
+        issue_title: Issue title
+        branch_name: Branch name for this issue
+        max_iterations: Maximum iterations for new tracker
+
+    Returns:
+        IssueTracker instance (loaded from comment or newly created)
+    """
+    for comment in reversed(comments):
+        body = comment.get("body", "")
+        if IssueTracker.TRACKER_MARKER in body:
+            tracker = IssueTracker.from_markdown(body)
+            if tracker:
+                logger.info(f"Loaded existing tracker for issue #{issue_number}")
+                return tracker
+
+    logger.info(f"Creating new tracker for issue #{issue_number}")
+    return IssueTracker(
+        issue_number=issue_number,
+        issue_title=issue_title,
+        branch_name=branch_name,
+        max_iterations=max_iterations,
+    )
+
+
+def update_tracker_comment(
+    tracker: IssueTracker,
+    comments: List[Dict[str, Any]],
+    comment_func: Any,
+    issue_number: int,
+) -> bool:
+    """Update or create tracker comment on GitHub issue.
+
+    Args:
+        tracker: IssueTracker instance to update
+        comments: List of existing comments
+        comment_func: Function to add comment (e.g., comment_on_issue)
+        issue_number: Issue number to comment on
+
+    Returns:
+        True if successful, False otherwise
+    """
+    tracker_markdown = tracker.to_markdown()
+    return comment_func(issue_number, tracker_markdown)
 
 
 def execute_task_with_loop(

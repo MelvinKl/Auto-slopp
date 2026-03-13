@@ -36,9 +36,12 @@ from auto_slopp.utils.github_operations import (
 )
 from auto_slopp.utils.task_executor import (
     ExecutionStep,
+    IssueTracker,
     StepStatus,
     TaskProgress,
     execute_task_with_loop,
+    load_tracker_from_comments,
+    update_tracker_comment,
 )
 from auto_slopp.worker import Worker
 from settings.main import settings
@@ -295,22 +298,53 @@ class GitHubIssueWorker(Worker):
             "tests_passed": False,
         }
 
+        tracker = None
         try:
             branch_name = f"ai/issue-{issue_number}-{sanitize_branch_name(issue_title[:30].lower())}"
+
+            tracker = load_tracker_from_comments(
+                comments=comments,
+                issue_number=issue_number,
+                issue_title=issue_title,
+                branch_name=branch_name,
+                max_iterations=self.max_iterations,
+            )
+
+            tracker.mark_step(ExecutionStep.FETCH, StepStatus.COMPLETED)
+            tracker.mark_step(ExecutionStep.VALIDATE, StepStatus.COMPLETED)
+
             instructions = self._build_instructions(issue_title, issue_body, comment_texts, branch_name=branch_name)
 
             if self.dry_run:
                 self.logger.info(f"DRY RUN: Would create branch {branch_name} and execute instructions")
                 result["openagent_executed"] = True
                 result["success"] = True
+                tracker.mark_step(ExecutionStep.PREPARE, StepStatus.SKIPPED)
+                tracker.mark_step(ExecutionStep.EXECUTE, StepStatus.SKIPPED)
+                tracker.mark_step(ExecutionStep.VERIFY, StepStatus.SKIPPED)
+                tracker.mark_step(ExecutionStep.FINALIZE, StepStatus.SKIPPED)
                 return result
 
+            tracker.mark_step(ExecutionStep.PREPARE, StepStatus.IN_PROGRESS)
             branch_created = create_and_checkout_branch(repo_dir, branch_name, base_branch="main")
             if not branch_created:
-                result["error"] = f"Failed to create branch {branch_name}"
+                error_msg = f"Failed to create branch {branch_name}"
+                result["error"] = error_msg
+                tracker.add_error(error_msg)
+                tracker.mark_step(ExecutionStep.PREPARE, StepStatus.FAILED)
+                update_tracker_comment(
+                    tracker,
+                    comments,
+                    lambda _, msg: comment_on_issue(repo_dir, issue_number, msg),
+                    issue_number,
+                )
                 return result
 
+            tracker.mark_step(ExecutionStep.PREPARE, StepStatus.COMPLETED)
+
             task_id = f"issue-{issue_number}"
+            tracker.mark_step(ExecutionStep.EXECUTE, StepStatus.IN_PROGRESS)
+
             loop_result = execute_task_with_loop(
                 instructions=instructions,
                 work_dir=repo_dir,
@@ -328,8 +362,11 @@ class GitHubIssueWorker(Worker):
             result["tests_passed"] = loop_result.get("tests_passed", False)
             result["progress"] = loop_result.get("progress", {})
 
+            tracker.iteration = result["iterations"]
+
             if loop_result["success"]:
                 result["openagent_executions"] = result["iterations"]
+                tracker.mark_step(ExecutionStep.EXECUTE, StepStatus.COMPLETED)
                 self.logger.info(
                     f"Issue #{issue_number} completed successfully after {result['iterations']} iteration(s)"
                 )
@@ -339,8 +376,27 @@ class GitHubIssueWorker(Worker):
                 if loop_result.get("progress", {}).get("errors"):
                     error_msg += f": {'; '.join(loop_result['progress']['errors'][-3:])}"
                 result["error"] = error_msg
+                tracker.add_error(error_msg)
+                tracker.mark_step(ExecutionStep.EXECUTE, StepStatus.FAILED)
                 self.logger.error(f"Failed to process issue #{issue_number}: {error_msg}")
+                update_tracker_comment(
+                    tracker,
+                    comments,
+                    lambda _, msg: comment_on_issue(repo_dir, issue_number, msg),
+                    issue_number,
+                )
                 return result
+
+            if self.verify_tests:
+                tracker.mark_step(ExecutionStep.VERIFY, StepStatus.IN_PROGRESS)
+                if result["tests_passed"]:
+                    tracker.mark_step(ExecutionStep.VERIFY, StepStatus.COMPLETED)
+                else:
+                    tracker.mark_step(ExecutionStep.VERIFY, StepStatus.FAILED)
+            else:
+                tracker.mark_step(ExecutionStep.VERIFY, StepStatus.SKIPPED)
+
+            tracker.mark_step(ExecutionStep.FINALIZE, StepStatus.IN_PROGRESS)
 
             current_branch = get_current_branch(repo_dir)
             if current_branch in ("main", "master"):
@@ -360,6 +416,13 @@ class GitHubIssueWorker(Worker):
 
                 result["success"] = True
                 result["no_changes"] = True
+                tracker.mark_step(ExecutionStep.FINALIZE, StepStatus.COMPLETED)
+                update_tracker_comment(
+                    tracker,
+                    comments,
+                    lambda _, msg: comment_on_issue(repo_dir, issue_number, msg),
+                    issue_number,
+                )
                 return result
 
             pr_body = f"Closes #{issue_number}\n\n{issue_body}"
@@ -391,7 +454,16 @@ class GitHubIssueWorker(Worker):
                             f"Using existing PR for branch '{current_branch}': {existing_pr.get('url', 'N/A')}"
                         )
                     else:
-                        result["error"] = "Failed to create pull request"
+                        error_msg = "Failed to create pull request"
+                        result["error"] = error_msg
+                        tracker.add_error(error_msg)
+                        tracker.mark_step(ExecutionStep.FINALIZE, StepStatus.FAILED)
+                        update_tracker_comment(
+                            tracker,
+                            comments,
+                            lambda _, msg: comment_on_issue(repo_dir, issue_number, msg),
+                            issue_number,
+                        )
                         return result
 
             close_success = close_issue(repo_dir, issue_number)
@@ -408,10 +480,27 @@ class GitHubIssueWorker(Worker):
                 self.logger.warning(f"Failed to close issue #{issue_number}")
 
             result["success"] = True
+            tracker.mark_step(ExecutionStep.FINALIZE, StepStatus.COMPLETED)
+
+            update_tracker_comment(
+                tracker,
+                comments,
+                lambda _, msg: comment_on_issue(repo_dir, issue_number, msg),
+                issue_number,
+            )
 
         except Exception as e:
             self.logger.error(f"Error processing issue #{issue_number}: {str(e)}")
             result["error"] = str(e)
+            if tracker:
+                tracker.add_error(str(e))
+                tracker.mark_step(ExecutionStep.FINALIZE, StepStatus.FAILED)
+                update_tracker_comment(
+                    tracker,
+                    comments,
+                    lambda _, msg: comment_on_issue(repo_dir, issue_number, msg),
+                    issue_number,
+                )
 
         return result
 
