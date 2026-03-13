@@ -1,0 +1,67 @@
+name: Cleanup Tracker Artifacts
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  cleanup-tracker:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          
+      - name: Install dependencies
+        run: |
+          pip install PyGithub
+          
+      - name: Remove tracker comments from issues
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python -c "
+          import os
+          import re
+          from github import Github
+          
+          g = Github(os.environ['GITHUB_TOKEN'])
+          repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])
+          pr = repo.get_pull(os.environ['GITHUB_REF'].split('/')[-2])
+          
+          # Extract issue numbers from PR body and commits
+          issue_numbers = set()
+          
+          # Check PR body for 'Closes #X' or 'Fixes #X'
+          if pr.body:
+              matches = re.findall(r'(?:close|fix|resolve)[sd]?\s+#(\d+)', pr.body, re.IGNORECASE)
+              issue_numbers.update(int(m) for m in matches)
+          
+          # Check commit messages for issue references
+          for commit in pr.get_commits():
+              matches = re.findall(r'(?:close|fix|resolve)[sd]?\s+#(\d+)', commit.message, re.IGNORECASE)
+              issue_numbers.update(int(m) for m in matches)
+          
+          # For each issue, remove tracker comments
+          tracker_marker = '<!-- ISSUE_TRACKER -->'
+          
+          for issue_num in issue_numbers:
+              try:
+                  issue = repo.get_issue(issue_num)
+                  comments = issue.get_comments()
+                  
+                  for comment in comments:
+                      if tracker_marker in comment.body:
+                          print(f'Deleting tracker comment {comment.id} from issue #{issue_num}')
+                          comment.delete()
+                          
+              except Exception as e:
+                  print(f'Error processing issue #{issue_num}: {e}')
+                  continue
+          "

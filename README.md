@@ -524,6 +524,8 @@ The worker adds issue tracker comments to GitHub issues, showing:
 - Error messages if any
 - Timestamps for each step
 
+**Automatic Cleanup**: When a pull request is merged, the tracker comments are automatically removed from the related GitHub issues via the `cleanup-tracker.yml` workflow. This keeps issues clean and only shows active tracking information.
+
 ### StaleBranchCleanupWorker
 Cleans up stale git branches.
 ```python
