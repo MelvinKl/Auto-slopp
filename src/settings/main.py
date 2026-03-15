@@ -202,6 +202,17 @@ class Settings(BaseSettings):
         description="Difficulty ratings for various tasks (0-10)",
     )
 
+    ralph_max_loops: int = Field(
+        default=20,
+        ge=1,
+        description="Maximum number of loops for Ralph step execution (default: 20)",
+    )
+
+    ralph_enabled: bool = Field(
+        default=True,
+        description="Enable Ralph loop-based step execution for GitHub issues",
+    )
+
     model_config = {
         "env_prefix": "AUTO_SLOPP_",
         "env_file": ".env",

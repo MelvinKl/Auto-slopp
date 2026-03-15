@@ -581,6 +581,15 @@ class TestGitHubIssueWorker:
             with (
                 patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues,
                 patch("auto_slopp.workers.github_issue_worker.get_issue_comments") as mock_comments,
+                patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
+                patch("auto_slopp.workers.github_issue_worker.create_and_checkout_branch") as mock_create_branch,
+                patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute,
+                patch("auto_slopp.workers.github_issue_worker.get_current_branch") as mock_get_branch,
+                patch("auto_slopp.workers.github_issue_worker.get_pr_for_branch") as mock_get_pr,
+                patch("auto_slopp.workers.github_issue_worker.create_pull_request") as mock_create_pr,
+                patch("auto_slopp.workers.github_issue_worker.close_issue") as mock_close,
+                patch("auto_slopp.workers.github_issue_worker.comment_on_issue") as mock_comment,
+                patch("auto_slopp.workers.github_issue_worker.checkout_branch_resilient") as mock_checkout,
                 patch.object(GitHubIssueWorker, "_build_instructions") as mock_build_instructions,
             ):
                 mock_issues.return_value = [issue]
@@ -589,9 +598,20 @@ class TestGitHubIssueWorker:
                     {"body": "Other user comment", "author": "other-user"},
                     {"body": "Bot comment", "author": "some-bot"},
                 ]
+                mock_settings.github_issue_worker_required_label = "ai"
+                mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
+                mock_settings.ralph_enabled = False
+                mock_create_branch.return_value = True
+                mock_execute.return_value = {"success": True}
+                mock_get_branch.return_value = "ai/issue-1-test-issue"
+                mock_get_pr.return_value = None
+                mock_create_pr.return_value = {"url": "https://github.com/test/repo/pull/1"}
+                mock_close.return_value = True
+                mock_comment.return_value = True
+                mock_checkout.return_value = True
                 mock_build_instructions.return_value = "instructions"
 
-                worker = GitHubIssueWorker(dry_run=True)
+                worker = GitHubIssueWorker(dry_run=False)
                 result = worker.run(repo_path)
 
                 assert result["success"] is True
