@@ -437,3 +437,484 @@ class TestOpenProjectWorker:
             mock_settings.openproject_api_token = ""
 
             assert worker._is_configured() is False
+
+    def test_process_single_task_no_id(self):
+        """Test _process_single_task with task that has no ID."""
+        worker = OpenProjectWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "test_repo"
+            repo_path.mkdir()
+
+            task = {"subject": "No ID Task"}
+
+            result = worker._process_single_task(repo_path, task, 1)
+
+            assert result["success"] is False
+            assert result["error"] == "Task has no ID"
+            assert result["task_id"] is None
+
+    def test_process_single_task_branch_creation_fails(self):
+        """Test _process_single_task when branch creation fails."""
+        worker = OpenProjectWorker(dry_run=False)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "test_repo"
+            repo_path.mkdir()
+
+            task = {
+                "id": 1,
+                "subject": "Test Task",
+                "description": {"raw": "Test description"},
+                "lockVersion": 1,
+            }
+
+            with (
+                patch("auto_slopp.workers.openproject_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.openproject_worker.create_subtask") as mock_subtask,
+            ):
+                mock_branch.return_value = False
+                mock_subtask.return_value = {"id": 100, "subject": "Subtask 1"}
+
+                result = worker._process_single_task(repo_path, task, 1)
+
+                assert result["success"] is False
+                assert "Failed to create branch" in result["error"]
+
+    def test_process_single_task_no_changes_made(self):
+        """Test _process_single_task when no changes are made (stays on main)."""
+        worker = OpenProjectWorker(dry_run=False)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "test_repo"
+            repo_path.mkdir()
+
+            task = {
+                "id": 1,
+                "subject": "Test Task",
+                "description": {"raw": "Test description"},
+                "lockVersion": 1,
+            }
+
+            with (
+                patch("auto_slopp.workers.openproject_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.openproject_worker.get_current_branch") as mock_get_branch,
+                patch("auto_slopp.workers.openproject_worker.add_comment_to_work_package") as mock_comment,
+                patch("auto_slopp.workers.openproject_worker.create_subtask") as mock_subtask,
+                patch("auto_slopp.workers.openproject_worker.settings") as mock_settings,
+                patch("auto_slopp.workers.openproject_worker.execute_with_instructions") as mock_execute,
+            ):
+                mock_branch.return_value = True
+                mock_get_branch.return_value = "main"
+                mock_comment.return_value = True
+                mock_subtask.return_value = {"id": 100, "subject": "Subtask 1"}
+                mock_settings.ralph_enabled = False
+                mock_execute.return_value = {"success": True}
+
+                result = worker._process_single_task(repo_path, task, 1)
+
+                assert result["success"] is True
+                assert result["no_changes"] is True
+                assert result["task_updated"] is True
+                assert result["task_commented"] is True
+                mock_comment.assert_called_once()
+
+    def test_process_single_task_creates_pr_successfully(self):
+        """Test _process_single_task creates PR successfully."""
+        worker = OpenProjectWorker(dry_run=False)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "test_repo"
+            repo_path.mkdir()
+
+            task = {
+                "id": 1,
+                "subject": "Test Task",
+                "description": {"raw": "Test description"},
+                "lockVersion": 1,
+            }
+
+            with (
+                patch("auto_slopp.workers.openproject_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.openproject_worker.get_current_branch") as mock_get_branch,
+                patch("auto_slopp.workers.openproject_worker.get_pr_for_branch") as mock_get_pr,
+                patch("auto_slopp.workers.openproject_worker.create_pull_request") as mock_create_pr,
+                patch("auto_slopp.workers.openproject_worker.set_work_package_status") as mock_status,
+                patch("auto_slopp.workers.openproject_worker.add_comment_to_work_package") as mock_comment,
+                patch("auto_slopp.workers.openproject_worker.create_subtask") as mock_subtask,
+                patch("auto_slopp.workers.openproject_worker.settings") as mock_settings,
+                patch("auto_slopp.workers.openproject_worker.execute_with_instructions") as mock_execute,
+            ):
+                mock_branch.return_value = True
+                mock_get_branch.return_value = "ai/op-1-test-task"
+                mock_get_pr.return_value = None
+                mock_create_pr.return_value = {"url": "https://github.com/test/repo/pull/1"}
+                mock_status.return_value = True
+                mock_comment.return_value = True
+                mock_subtask.return_value = {"id": 100, "subject": "Subtask 1"}
+                mock_settings.ralph_enabled = False
+                mock_settings.openproject_in_progress_status_id = 7
+                mock_execute.return_value = {"success": True}
+
+                result = worker._process_single_task(repo_path, task, 1)
+
+                assert result["success"] is True
+                assert result["pr_created"] is True
+                assert result["pr_url"] == "https://github.com/test/repo/pull/1"
+                assert result["task_status_updated"] is True
+                mock_create_pr.assert_called_once()
+                mock_status.assert_called_once()
+                mock_comment.assert_called_once()
+
+    def test_process_single_task_pr_already_exists(self):
+        """Test _process_single_task when PR already exists."""
+        worker = OpenProjectWorker(dry_run=False)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "test_repo"
+            repo_path.mkdir()
+
+            task = {
+                "id": 1,
+                "subject": "Test Task",
+                "description": {"raw": "Test description"},
+                "lockVersion": 1,
+            }
+
+            with (
+                patch("auto_slopp.workers.openproject_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.openproject_worker.get_current_branch") as mock_get_branch,
+                patch("auto_slopp.workers.openproject_worker.get_pr_for_branch") as mock_get_pr,
+                patch("auto_slopp.workers.openproject_worker.set_work_package_status") as mock_status,
+                patch("auto_slopp.workers.openproject_worker.add_comment_to_work_package") as mock_comment,
+                patch("auto_slopp.workers.openproject_worker.create_subtask") as mock_subtask,
+                patch("auto_slopp.workers.openproject_worker.settings") as mock_settings,
+                patch("auto_slopp.workers.openproject_worker.execute_with_instructions") as mock_execute,
+            ):
+                mock_branch.return_value = True
+                mock_get_branch.return_value = "ai/op-1-test-task"
+                mock_get_pr.return_value = {
+                    "state": "OPEN",
+                    "url": "https://github.com/test/repo/pull/2",
+                }
+                mock_status.return_value = True
+                mock_comment.return_value = True
+                mock_subtask.return_value = {"id": 100, "subject": "Subtask 1"}
+                mock_settings.ralph_enabled = False
+                mock_settings.openproject_in_progress_status_id = 7
+                mock_execute.return_value = {"success": True}
+
+                result = worker._process_single_task(repo_path, task, 1)
+
+                assert result["success"] is True
+                assert result["pr_created"] is True
+                assert result["pr_url"] == "https://github.com/test/repo/pull/2"
+
+    def test_process_single_task_pr_creation_fails(self):
+        """Test _process_single_task when PR creation fails."""
+        worker = OpenProjectWorker(dry_run=False)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "test_repo"
+            repo_path.mkdir()
+
+            task = {
+                "id": 1,
+                "subject": "Test Task",
+                "description": {"raw": "Test description"},
+                "lockVersion": 1,
+            }
+
+            with (
+                patch("auto_slopp.workers.openproject_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.openproject_worker.get_current_branch") as mock_get_branch,
+                patch("auto_slopp.workers.openproject_worker.get_pr_for_branch") as mock_get_pr,
+                patch("auto_slopp.workers.openproject_worker.create_pull_request") as mock_create_pr,
+                patch("auto_slopp.workers.openproject_worker.create_subtask") as mock_subtask,
+                patch("auto_slopp.workers.openproject_worker.settings") as mock_settings,
+                patch("auto_slopp.workers.openproject_worker.execute_with_instructions") as mock_execute,
+            ):
+                mock_branch.return_value = True
+                mock_get_branch.return_value = "ai/op-1-test-task"
+                mock_get_pr.return_value = None
+                mock_create_pr.return_value = None
+                mock_subtask.return_value = {"id": 100, "subject": "Subtask 1"}
+                mock_settings.ralph_enabled = False
+                mock_execute.return_value = {"success": True}
+
+                result = worker._process_single_task(repo_path, task, 1)
+
+                assert result["success"] is False
+                assert result["error"] == "Failed to create pull request"
+
+    def test_create_task_plan(self):
+        """Test _create_task_plan creates a proper plan."""
+        import tempfile
+        from pathlib import Path
+
+        from auto_slopp.utils.ralph import Plan, Step
+
+        worker = OpenProjectWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plan_path = Path(temp_dir) / ".ralph" / "test-plan.md"
+            plan_path.parent.mkdir(parents=True, exist_ok=True)
+
+            task = {
+                "id": 1,
+                "subject": "Test Task",
+                "description": {"raw": "Test description"},
+            }
+
+            subtasks = [
+                {"subject": "Subtask 1", "description": {"raw": "Desc 1"}},
+                {"subject": "Subtask 2", "description": {"raw": "Desc 2"}},
+            ]
+
+            plan = worker._create_task_plan(
+                plan_path=plan_path,
+                task=task,
+                subtasks=subtasks,
+                branch_name="ai/op-1-test",
+            )
+
+            assert plan is not None
+            assert plan.title == "OpenProject Task Plan: Test Task"
+            assert len(plan.steps) == 2
+            assert "ai/op-1-test" in plan.description
+            assert plan_path.exists()
+
+    def test_build_step_instructions(self):
+        """Test _build_step_instructions creates proper instructions."""
+        from auto_slopp.utils.ralph import Plan, Step
+
+        worker = OpenProjectWorker(dry_run=True)
+
+        plan = Plan(
+            title="Test Plan",
+            description="Test description",
+            steps=[
+                Step(number=1, description="First step", is_closed=True),
+                Step(number=2, description="Second step", is_closed=False),
+            ],
+        )
+
+        step = Step(number=2, description="Second step", is_closed=False)
+
+        task = {
+            "subject": "Test Task",
+            "description": {"raw": "Task description"},
+        }
+
+        instructions = worker._build_step_instructions(
+            step=step,
+            plan=plan,
+            task=task,
+            branch_name="ai/op-1-test",
+        )
+
+        assert "Test Task" in instructions
+        assert "Task description" in instructions
+        assert "ai/op-1-test" in instructions
+        assert "Step 2: Second step" in instructions
+        assert "✓" in instructions
+        assert "○" in instructions
+
+    def test_create_results_dict(self):
+        """Test _create_results_dict creates proper dictionary."""
+        worker = OpenProjectWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "test_repo"
+            repo_path.mkdir()
+
+            result = worker._create_results_dict(1000.0, repo_path)
+
+            assert result["worker_name"] == "OpenProjectWorker"
+            assert result["repo_path"] == str(repo_path)
+            assert result["dry_run"] is True
+            assert result["repositories_processed"] == 1
+            assert result["repositories_with_errors"] == 0
+            assert result["tasks_processed"] == 0
+            assert result["success"] is True
+            assert result["task_results"] == []
+
+    def test_checkout_main_branch_failure(self):
+        """Test _checkout_main_branch when checkout fails."""
+        worker = OpenProjectWorker(dry_run=False)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "test_repo"
+            repo_path.mkdir()
+
+            with patch("auto_slopp.workers.openproject_worker.checkout_branch_resilient") as mock_checkout:
+                mock_checkout.return_value = False
+
+                result = worker._checkout_main_branch(repo_path)
+
+                assert result is False
+
+    def test_run_with_checkout_failure(self):
+        """Test run when checkout of main branch fails."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            with (
+                patch("auto_slopp.workers.openproject_worker.settings") as mock_settings,
+                patch("auto_slopp.workers.openproject_worker.checkout_branch_resilient") as mock_checkout,
+            ):
+                mock_settings.openproject_url = "https://test.openproject.com"
+                mock_settings.openproject_api_token = "test_token"
+                mock_checkout.return_value = False
+
+                worker = OpenProjectWorker(dry_run=False)
+                result = worker.run(repo_path)
+
+                assert result["success"] is False
+                assert result["repositories_with_errors"] == 1
+
+    def test_run_with_project_not_found_no_create(self):
+        """Test run when project not found and auto-creation is disabled."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            with (
+                patch("auto_slopp.workers.openproject_worker.settings") as mock_settings,
+                patch("auto_slopp.workers.openproject_worker.get_project_by_identifier") as mock_get_id,
+                patch("auto_slopp.workers.openproject_worker.get_project_by_name") as mock_get_name,
+                patch("auto_slopp.workers.openproject_worker.checkout_branch_resilient") as mock_checkout,
+            ):
+                mock_settings.openproject_url = "https://test.openproject.com"
+                mock_settings.openproject_api_token = "test_token"
+                mock_settings.openproject_project_prefix = ""
+                mock_settings.openproject_create_projects = False
+                mock_get_id.return_value = None
+                mock_get_name.return_value = None
+                mock_checkout.return_value = True
+
+                worker = OpenProjectWorker(dry_run=False)
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                assert result["tasks_processed"] == 0
+
+    def test_get_or_create_project_with_prefix(self):
+        """Test _get_or_create_project uses prefix correctly."""
+        worker = OpenProjectWorker(dry_run=True)
+
+        mock_project = {"id": 1, "name": "test-repo", "identifier": "prefix_test_repo"}
+
+        with (
+            patch("auto_slopp.workers.openproject_worker.settings") as mock_settings,
+            patch("auto_slopp.workers.openproject_worker.get_project_by_identifier") as mock_get_id,
+        ):
+            mock_settings.openproject_project_prefix = "prefix_"
+            mock_settings.openproject_create_projects = True
+            mock_get_id.return_value = mock_project
+
+            result = worker._get_or_create_project("test-repo")
+
+            assert result == mock_project
+            mock_get_id.assert_called_once_with("prefix_test_repo")
+
+    def test_run_with_multiple_tasks_processes_only_first(self):
+        """Test that run processes only the first task when multiple exist."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            mock_project = {"id": 1, "name": "test_repo"}
+            mock_tasks = [
+                {
+                    "id": 1,
+                    "subject": "Task 1",
+                    "description": {"raw": "Desc 1"},
+                    "lockVersion": 1,
+                },
+                {
+                    "id": 2,
+                    "subject": "Task 2",
+                    "description": {"raw": "Desc 2"},
+                    "lockVersion": 1,
+                },
+            ]
+
+            with (
+                patch("auto_slopp.workers.openproject_worker.settings") as mock_settings,
+                patch("auto_slopp.workers.openproject_worker.get_project_by_identifier") as mock_get_project,
+                patch("auto_slopp.workers.openproject_worker.get_open_work_packages") as mock_get_tasks,
+                patch("auto_slopp.workers.openproject_worker.checkout_branch_resilient") as mock_checkout,
+            ):
+                mock_settings.openproject_url = "https://test.openproject.com"
+                mock_settings.openproject_api_token = "test_token"
+                mock_settings.openproject_assigned_user_id = 1
+                mock_settings.openproject_project_prefix = ""
+                mock_settings.openproject_create_projects = True
+                mock_get_project.return_value = mock_project
+                mock_get_tasks.return_value = mock_tasks
+                mock_checkout.return_value = True
+
+                worker = OpenProjectWorker(dry_run=True)
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                assert result["tasks_processed"] == 1
+                assert result["task_results"][0]["task_id"] == 1
+
+    def test_process_single_task_with_exception(self):
+        """Test _process_single_task handles exceptions gracefully."""
+        worker = OpenProjectWorker(dry_run=False)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "test_repo"
+            repo_path.mkdir()
+
+            task = {
+                "id": 1,
+                "subject": "Test Task",
+                "description": {"raw": "Test description"},
+                "lockVersion": 1,
+            }
+
+            with (patch("auto_slopp.workers.openproject_worker.create_and_checkout_branch") as mock_branch,):
+                mock_branch.side_effect = Exception("Unexpected error")
+
+                result = worker._process_single_task(repo_path, task, 1)
+
+                assert result["success"] is False
+                assert "Unexpected error" in result["error"]
+
+    def test_process_single_task_execution_fails(self):
+        """Test _process_single_task when CLI execution fails."""
+        worker = OpenProjectWorker(dry_run=False)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "test_repo"
+            repo_path.mkdir()
+
+            task = {
+                "id": 1,
+                "subject": "Test Task",
+                "description": {"raw": "Test description"},
+                "lockVersion": 1,
+            }
+
+            with (
+                patch("auto_slopp.workers.openproject_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.openproject_worker.create_subtask") as mock_subtask,
+                patch("auto_slopp.workers.openproject_worker.settings") as mock_settings,
+                patch("auto_slopp.workers.openproject_worker.execute_with_instructions") as mock_execute,
+                patch("auto_slopp.workers.openproject_worker.get_active_cli_command") as mock_cli,
+            ):
+                mock_branch.return_value = True
+                mock_subtask.return_value = {"id": 100, "subject": "Subtask 1"}
+                mock_settings.ralph_enabled = False
+                mock_execute.return_value = {"success": False, "error": "CLI failed"}
+                mock_cli.return_value = "test-cli"
+
+                result = worker._process_single_task(repo_path, task, 1)
+
+                assert result["success"] is False
+                assert "CLI failed" in result["error"]
