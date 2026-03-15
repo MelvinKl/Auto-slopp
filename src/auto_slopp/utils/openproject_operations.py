@@ -1,9 +1,10 @@
 """OpenProject operations utilities for workers.
 
 This module provides pure functions for common OpenProject operations
-used across different workers via the OpenProject REST API.
+using the OpenProject REST API v3 (HAL+JSON format) based on docs/openproject.json.
 """
 
+import base64
 import json
 import logging
 from typing import Any, Dict, List, Optional
@@ -21,29 +22,19 @@ class OpenProjectOperationError(Exception):
     pass
 
 
-def _build_filter(field: str, operator: str, values: List[str]) -> str:
-    """Build an OpenProject API filter in the correct format.
-
-    Args:
-        field: The field name to filter on
-        operator: The operator (e.g., "=", "!", "ow", etc.)
-        values: List of values to filter by
-
-    Returns:
-        JSON string filter in OpenProject format.
-    """
-    filter_obj = {field: {"operator": operator, "values": values}}
-    return json.dumps([filter_obj])
-
-
 def _get_client() -> httpx.Client:
     """Get an HTTP client configured for OpenProject API.
+
+    OpenProject uses BasicAuth where:
+    - Username: 'apikey' (literal string)
+    - Password: the API token
 
     Returns:
         Configured httpx.Client instance
     """
+    credentials = base64.b64encode(f"apikey:{settings.openproject_api_token}".encode()).decode()
     headers = {
-        "Authorization": f"Bearer {settings.openproject_api_token}",
+        "Authorization": f"Basic {credentials}",
         "Content-Type": "application/json",
     }
     return httpx.Client(
@@ -84,7 +75,7 @@ def get_project_by_identifier(identifier: str) -> Optional[Dict[str, Any]]:
     """
     try:
         with _get_client() as client:
-            filters = _build_filter("name_and_identifier", "~", [identifier])
+            filters = json.dumps([{"name_and_identifier": {"operator": "~", "values": [identifier]}}])
             response = client.get("/api/v3/projects", params={"filters": filters})
             response.raise_for_status()
             data = response.json()
@@ -112,7 +103,7 @@ def get_project_by_name(name: str) -> Optional[Dict[str, Any]]:
     """
     try:
         with _get_client() as client:
-            filters = _build_filter("name_and_identifier", "~", [name])
+            filters = json.dumps([{"name_and_identifier": {"operator": "~", "values": [name]}}])
             response = client.get("/api/v3/projects", params={"filters": filters})
             response.raise_for_status()
             data = response.json()

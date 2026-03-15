@@ -7,7 +7,6 @@ import pytest
 
 from auto_slopp.utils.openproject_operations import (
     OpenProjectOperationError,
-    _build_filter,
     _get_client,
     add_comment_to_work_package,
     create_project,
@@ -32,53 +31,20 @@ class TestGetClient:
     """Tests for _get_client function."""
 
     def test_get_client_configured_correctly(self):
-        """Test that client is configured with correct headers."""
+        """Test that client is configured with correct BasicAuth headers."""
+        import base64
+
         with patch("auto_slopp.utils.openproject_operations.settings") as mock_settings:
             mock_settings.openproject_url = "https://test.openproject.com/"
             mock_settings.openproject_api_token = "test_token"
 
             client = _get_client()
 
+            expected_credentials = base64.b64encode(b"apikey:test_token").decode()
             assert client is not None
-            assert "Bearer test_token" in client.headers.get("Authorization", "")
+            assert f"Basic {expected_credentials}" in client.headers.get("Authorization", "")
             assert client.headers.get("Content-Type") == "application/json"
             client.close()
-
-
-class TestBuildFilter:
-    """Tests for _build_filter function."""
-
-    def test_build_filter_single_value(self):
-        """Test building a filter with a single value."""
-        result = _build_filter("name", "=", ["test_project"])
-        import json
-
-        parsed = json.loads(result)
-        assert parsed == [{"name": {"operator": "=", "values": ["test_project"]}}]
-
-    def test_build_filter_uses_double_quotes(self):
-        """Test that filter uses double quotes for JSON compatibility."""
-        result = _build_filter("identifier", "~", ["test-project"])
-        assert '"' in result
-        assert "'" not in result
-
-    def test_build_filter_returns_json_string(self):
-        """Test that filter returns a valid JSON string."""
-        import json
-
-        result = _build_filter("status", "=", ["open"])
-        parsed = json.loads(result)
-        assert isinstance(parsed, list)
-        assert len(parsed) == 1
-
-    def test_build_filter_with_tilde_operator(self):
-        """Test building filter with tilde operator for fuzzy matching."""
-        result = _build_filter("name_and_identifier", "~", ["test"])
-        import json
-
-        parsed = json.loads(result)
-        assert parsed[0]["name_and_identifier"]["operator"] == "~"
-        assert parsed[0]["name_and_identifier"]["values"] == ["test"]
 
 
 class TestGetProjects:
