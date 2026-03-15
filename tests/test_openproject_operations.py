@@ -7,6 +7,7 @@ import pytest
 
 from auto_slopp.utils.openproject_operations import (
     OpenProjectOperationError,
+    _build_filter,
     _get_client,
     add_comment_to_work_package,
     create_project,
@@ -42,6 +43,42 @@ class TestGetClient:
             assert "Bearer test_token" in client.headers.get("Authorization", "")
             assert client.headers.get("Content-Type") == "application/json"
             client.close()
+
+
+class TestBuildFilter:
+    """Tests for _build_filter function."""
+
+    def test_build_filter_single_value(self):
+        """Test building a filter with a single value."""
+        result = _build_filter("name", "=", ["test_project"])
+        import json
+
+        parsed = json.loads(result)
+        assert parsed == [{"name": {"operator": "=", "values": ["test_project"]}}]
+
+    def test_build_filter_uses_double_quotes(self):
+        """Test that filter uses double quotes for JSON compatibility."""
+        result = _build_filter("identifier", "~", ["test-project"])
+        assert '"' in result
+        assert "'" not in result
+
+    def test_build_filter_returns_json_string(self):
+        """Test that filter returns a valid JSON string."""
+        import json
+
+        result = _build_filter("status", "=", ["open"])
+        parsed = json.loads(result)
+        assert isinstance(parsed, list)
+        assert len(parsed) == 1
+
+    def test_build_filter_with_tilde_operator(self):
+        """Test building filter with tilde operator for fuzzy matching."""
+        result = _build_filter("name_and_identifier", "~", ["test"])
+        import json
+
+        parsed = json.loads(result)
+        assert parsed[0]["name_and_identifier"]["operator"] == "~"
+        assert parsed[0]["name_and_identifier"]["values"] == ["test"]
 
 
 class TestGetProjects:
@@ -151,6 +188,32 @@ class TestGetProjectByIdentifier:
 
             assert project is None
 
+    def test_get_project_by_identifier_filter_format(self):
+        """Test that get_project_by_identifier uses correct filter format."""
+        import json
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"_embedded": {"elements": []}}
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_client_instance = MagicMock()
+            mock_client_instance.get.return_value = mock_response
+            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
+            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+
+            get_project_by_identifier("test-project")
+
+            call_args = mock_client_instance.get.call_args
+            filters_str = call_args.kwargs.get("params", {}).get("filters", "")
+            filters = json.loads(filters_str)
+
+            assert filters[0]["name_and_identifier"]["operator"] == "~"
+            assert "test-project" in filters[0]["name_and_identifier"]["values"]
+
 
 class TestGetProjectByName:
     """Tests for get_project_by_name function."""
@@ -193,6 +256,32 @@ class TestGetProjectByName:
             project = get_project_by_name("Nonexistent Project")
 
             assert project is None
+
+    def test_get_project_by_name_filter_format(self):
+        """Test that get_project_by_name uses correct filter format."""
+        import json
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"_embedded": {"elements": []}}
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_client_instance = MagicMock()
+            mock_client_instance.get.return_value = mock_response
+            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
+            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+
+            get_project_by_name("Test Project")
+
+            call_args = mock_client_instance.get.call_args
+            filters_str = call_args.kwargs.get("params", {}).get("filters", "")
+            filters = json.loads(filters_str)
+
+            assert filters[0]["name_and_identifier"]["operator"] == "~"
+            assert "Test Project" in filters[0]["name_and_identifier"]["values"]
 
 
 class TestCreateProject:
