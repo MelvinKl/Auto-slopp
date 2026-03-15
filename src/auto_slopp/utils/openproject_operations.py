@@ -184,14 +184,14 @@ def get_work_packages(
             if assigned_to_user_id:
                 filters_list.append(
                     {
-                        "assigned_to": {
+                        "assignee": {
                             "operator": "=",
                             "values": [str(assigned_to_user_id)],
                         }
                     }
                 )
             if status_id:
-                filters_list.append({"status_id": {"operator": "=", "values": [str(status_id)]}})
+                filters_list.append({"status": {"operator": "=", "values": [str(status_id)]}})
 
             filters = json.dumps(filters_list, separators=(",", ":")) if filters_list else "[]"
             params = {"filters": filters}
