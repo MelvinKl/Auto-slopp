@@ -53,13 +53,13 @@ format:
 # Run unit tests
 test-unit:
 	@echo "🧪 Running unit tests..."
-	uv run python -m pytest tests/ -v --tb=short || (echo "❌ Tests failed" && exit 1)
+	uv run python -m pytest tests/ -v --tb=short -m "not integration" || (echo "❌ Tests failed" && exit 1)
 	@echo "✅ All tests passed"
 
 # Run tests with coverage
 coverage:
 	@echo "📊 Running tests with coverage..."
-	uv run python -m pytest tests/ --cov=src --cov-report=term-missing --cov-report=html || (echo "❌ Tests failed" && exit 1)
+	uv run python -m pytest tests/ --cov=src --cov-report=term-missing --cov-report=html -m "not integration" || (echo "❌ Tests failed" && exit 1)
 	@echo "✅ Coverage report generated"
 	@echo "📁 HTML coverage report available at htmlcov/index.html"
 
