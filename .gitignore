@@ -198,3 +198,6 @@ credentials.*
 
 # uv specific
 .uv_cache/
+
+# Ralph plan files
+.ralph/
