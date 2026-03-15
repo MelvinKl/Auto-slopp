@@ -67,7 +67,7 @@ coverage:
 security:
 	@echo "🔒 Running security scans..."
 	@echo "Running safety check..."
-	uv run safety check || (echo "❌ Safety security check failed" && exit 1)
+	uv pip freeze | uv run safety check -r /dev/stdin || (echo "❌ Safety security check failed" && exit 1)
 	@echo "✅ Safety security check passed"
 	@echo "Running bandit security linter..."
 	uv run bandit -r src/ --severity-level=medium || (echo "❌ Bandit security linter failed" && exit 1)

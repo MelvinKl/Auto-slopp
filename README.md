@@ -503,13 +503,28 @@ from auto_slopp.workers import PRWorker
 ```
 
 ### GitHubIssueWorker
-Handles GitHub issue operations.
+Handles GitHub issue operations with automatic execution tracking.
+
+Features:
+- Processes GitHub issues with AI-powered execution
+- Implements loop-based retry with test verification
+- Tracks execution progress via issue tracker comments
+- Automatically creates branches and pull requests
+
 ```python
 from auto_slopp.workers import GitHubIssueWorker
 
 # Disable in AUTO_SLOPP_WORKERS_DISABLED
 # Returns: issue status, updates, management results
 ```
+
+The worker adds issue tracker comments to GitHub issues, showing:
+- Execution step status (FETCH, VALIDATE, PREPARE, EXECUTE, VERIFY, FINALIZE)
+- Iteration count and progress
+- Error messages if any
+- Timestamps for each step
+
+**Automatic Cleanup**: When a pull request is merged, the tracker comments are automatically removed from the related GitHub issues via the `cleanup-tracker.yml` workflow. This keeps issues clean and only shows active tracking information.
 
 ### StaleBranchCleanupWorker
 Cleans up stale git branches.
