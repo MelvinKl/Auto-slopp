@@ -169,3 +169,29 @@ class TestSettings:
         assert len(test_settings.cli_configurations) == 1
         assert test_settings.cli_configurations[0].cli_command == "custom"
         assert test_settings.cli_configurations[0].cli_args == ["--arg"]
+
+    def test_auto_update_reboot_delay_default(self):
+        """Test default auto_update_reboot_delay value."""
+        test_settings = Settings()
+        assert test_settings.auto_update_reboot_delay == 300
+
+    def test_auto_update_reboot_delay_custom(self):
+        """Test that auto_update_reboot_delay can be customized."""
+        env_vars = {
+            "AUTO_SLOPP_AUTO_UPDATE_REBOOT_DELAY": "600",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            test_settings = Settings()
+
+        assert test_settings.auto_update_reboot_delay == 600
+
+    def test_auto_update_reboot_delay_validation(self):
+        """Test that auto_update_reboot_delay must be non-negative."""
+        env_vars = {
+            "AUTO_SLOPP_AUTO_UPDATE_REBOOT_DELAY": "-1",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            with pytest.raises(ValidationError):
+                Settings()

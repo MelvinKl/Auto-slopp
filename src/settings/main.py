@@ -213,6 +213,12 @@ class Settings(BaseSettings):
         description="Enable Ralph loop-based step execution for GitHub issues",
     )
 
+    auto_update_reboot_delay: int = Field(
+        default=300,
+        ge=0,
+        description="Delay in seconds before reboot after auto-update (default: 5 minutes)",
+    )
+
     model_config = {
         "env_prefix": "AUTO_SLOPP_",
         "env_file": ".env",

@@ -1,5 +1,6 @@
 """Endless loop executor for running Worker instances."""
 
+import subprocess
 import time
 import traceback
 from pathlib import Path
@@ -45,6 +46,7 @@ class Executor:
         try:
             while self.running:
                 self._run_iteration()
+                self._check_for_updates()
                 time.sleep(settings.executor_sleep_interval)
         except KeyboardInterrupt:
             print("\nReceived interrupt signal, shutting down...")
@@ -137,6 +139,61 @@ class Executor:
             except Exception as e:
                 print(f"Error executing worker {worker_class.__name__} on {subdirectory.name}: {e}")
                 traceback.print_exc()
+
+    def _check_for_updates(self) -> bool:
+        """Execute git pull in the working directory and detect if updates were downloaded.
+
+        Returns:
+            True if an update was detected, False otherwise.
+        """
+        try:
+            result = subprocess.run(
+                ["git", "pull"],
+                cwd=Path.cwd(),
+                capture_output=True,
+                text=True,
+            )
+
+            if result.returncode != 0:
+                print(f"Git pull failed: {result.stderr}")
+                return False
+
+            output = result.stdout
+            update_detected = "Updating" in output or "Fast-forward" in output and "Already up to date" not in output
+
+            if update_detected:
+                print(f"Update detected: {output.strip()}")
+                self._schedule_reboot(settings.auto_update_reboot_delay)
+                return True
+
+            return False
+
+        except Exception as e:
+            print(f"Error checking for updates: {e}")
+            traceback.print_exc()
+            return False
+
+    def _schedule_reboot(self, delay: int) -> None:
+        """Schedule a reboot after the specified delay.
+
+        Args:
+            delay: Delay in seconds before rebooting.
+        """
+        print(f"Update detected. Rebooting in {delay} seconds...")
+
+        if delay > 0:
+            time.sleep(delay)
+
+        self._execute_reboot()
+
+    def _execute_reboot(self) -> None:
+        """Execute the reboot command."""
+        print("Executing reboot...")
+        try:
+            subprocess.run(["reboot"], check=True)
+        except Exception as e:
+            print(f"Failed to execute reboot: {e}")
+            traceback.print_exc()
 
 
 def run_executor(
