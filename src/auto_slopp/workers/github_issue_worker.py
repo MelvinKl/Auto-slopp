@@ -4,7 +4,7 @@ This worker:
 1. Searches each repository for open issues on GitHub
 2. Uses issue title/body as instructions
 3. Creates a new branch starting with ai/
-4. Executes instructions using the configured CLI tool
+4. Creates a plan file with steps and executes them using the Ralph loop
 5. Creates a PR and closes the issue
 """
 
@@ -33,6 +33,14 @@ from auto_slopp.utils.github_operations import (
     get_issue_comments,
     get_open_issues,
     get_pr_for_branch,
+)
+from auto_slopp.utils.ralph import (
+    Plan,
+    PlanParser,
+    PlanWriter,
+    RalphLoop,
+    Step,
+    create_default_plan_steps,
 )
 from auto_slopp.worker import Worker
 from settings.main import settings
@@ -244,7 +252,7 @@ class GitHubIssueWorker(Worker):
         return filtered
 
     def _process_single_issue(self, repo_dir: Path, issue: Dict[str, Any]) -> Dict[str, Any]:
-        """Process a single issue from the repository.
+        """Process a single issue from the repository using Ralph loop.
 
         Args:
             repo_dir: Path to the repository directory
@@ -279,14 +287,15 @@ class GitHubIssueWorker(Worker):
             "issue_closed": False,
             "issues_closed": 0,
             "error": None,
+            "ralph_loops_executed": 0,
+            "ralph_steps_completed": 0,
         }
 
         try:
             branch_name = f"ai/issue-{issue_number}-{sanitize_branch_name(issue_title[:30].lower())}"
-            instructions = self._build_instructions(issue_title, issue_body, comment_texts, branch_name=branch_name)
 
             if self.dry_run:
-                self.logger.info(f"DRY RUN: Would create branch {branch_name} and execute instructions")
+                self.logger.info(f"DRY RUN: Would create branch {branch_name} and execute with Ralph loop")
                 result["openagent_executed"] = True
                 result["success"] = True
                 return result
@@ -296,21 +305,42 @@ class GitHubIssueWorker(Worker):
                 result["error"] = f"Failed to create branch {branch_name}"
                 return result
 
-            openagent_result = execute_with_instructions(
-                instructions,
-                repo_dir,
-                self.agent_args,
-                self.timeout,
-                task_name="github_issue",
-            )
-            result["openagent_executed"] = openagent_result["success"]
-            if openagent_result["success"]:
-                result["openagent_executions"] = 1
+            if settings.ralph_enabled:
+                ralph_result = self._execute_with_ralph_loop(
+                    repo_dir=repo_dir,
+                    issue_number=issue_number,
+                    issue_title=issue_title,
+                    issue_body=issue_body,
+                    comment_texts=comment_texts,
+                    branch_name=branch_name,
+                )
+                result["ralph_loops_executed"] = ralph_result.get("loops_executed", 0)
+                result["ralph_steps_completed"] = ralph_result.get("steps_completed", 0)
+                result["openagent_executions"] = ralph_result.get("loops_executed", 0)
 
-            if not openagent_result["success"]:
-                cli_tool = get_active_cli_command()
-                result["error"] = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
-                return result
+                if not ralph_result.get("success", False):
+                    result["error"] = f"Ralph loop failed: {ralph_result.get('error', 'Unknown error')}"
+                    return result
+
+                result["openagent_executed"] = True
+            else:
+                instructions = self._build_instructions(issue_title, issue_body, comment_texts, branch_name=branch_name)
+
+                openagent_result = execute_with_instructions(
+                    instructions,
+                    repo_dir,
+                    self.agent_args,
+                    self.timeout,
+                    task_name="github_issue",
+                )
+                result["openagent_executed"] = openagent_result["success"]
+                if openagent_result["success"]:
+                    result["openagent_executions"] = 1
+
+                if not openagent_result["success"]:
+                    cli_tool = get_active_cli_command()
+                    result["error"] = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
+                    return result
 
             current_branch = get_current_branch(repo_dir)
             if current_branch in ("main", "master"):
@@ -384,6 +414,205 @@ class GitHubIssueWorker(Worker):
             result["error"] = str(e)
 
         return result
+
+    def _execute_with_ralph_loop(
+        self,
+        repo_dir: Path,
+        issue_number: int,
+        issue_title: str,
+        issue_body: str,
+        comment_texts: List[str],
+        branch_name: str,
+    ) -> Dict[str, Any]:
+        """Execute issue processing using Ralph loop.
+
+        Args:
+            repo_dir: Path to the repository directory
+            issue_number: Issue number
+            issue_title: Issue title
+            issue_body: Issue body
+            comment_texts: List of comment texts
+            branch_name: Branch name
+
+        Returns:
+            Result dictionary from Ralph loop execution
+        """
+        plan_path = repo_dir / ".ralph" / f"issue-{issue_number}-plan.md"
+
+        plan = self._create_issue_plan(
+            plan_path=plan_path,
+            issue_title=issue_title,
+            issue_body=issue_body,
+            comment_texts=comment_texts,
+            branch_name=branch_name,
+        )
+
+        def step_executor(step: Step, current_plan: Plan) -> Dict[str, Any]:
+            return self._execute_step(
+                step=step,
+                plan=current_plan,
+                repo_dir=repo_dir,
+                issue_title=issue_title,
+                issue_body=issue_body,
+                comment_texts=comment_texts,
+                branch_name=branch_name,
+            )
+
+        ralph_loop = RalphLoop(
+            plan_path=plan_path,
+            max_loops=settings.ralph_max_loops,
+            step_executor=step_executor,
+        )
+        ralph_loop.plan = plan
+
+        return ralph_loop.run()
+
+    def _create_issue_plan(
+        self,
+        plan_path: Path,
+        issue_title: str,
+        issue_body: str,
+        comment_texts: List[str],
+        branch_name: str,
+    ) -> Plan:
+        """Create a plan file for the issue.
+
+        Args:
+            plan_path: Path to save the plan file
+            issue_title: Issue title
+            issue_body: Issue body
+            comment_texts: List of comment texts
+            branch_name: Branch name
+
+        Returns:
+            Created Plan object
+        """
+        description = f"Branch: {branch_name}\n\n{issue_body}"
+        if comment_texts:
+            description += "\n\nComments:\n" + "\n".join(f"- {c}" for c in comment_texts if c)
+
+        steps = create_default_plan_steps()
+
+        plan = Plan(
+            title=f"Issue Plan: {issue_title}",
+            description=description,
+            steps=[Step(number=i + 1, description=desc, is_closed=False) for i, desc in enumerate(steps)],
+        )
+
+        PlanWriter.write_file(plan, plan_path)
+        self.logger.info(f"Created plan file: {plan_path}")
+
+        return plan
+
+    def _execute_step(
+        self,
+        step: Step,
+        plan: Plan,
+        repo_dir: Path,
+        issue_title: str,
+        issue_body: str,
+        comment_texts: List[str],
+        branch_name: str,
+    ) -> Dict[str, Any]:
+        """Execute a single step from the plan.
+
+        Args:
+            step: Step to execute
+            plan: Current plan
+            repo_dir: Repository directory
+            issue_title: Issue title
+            issue_body: Issue body
+            comment_texts: Comment texts
+            branch_name: Branch name
+
+        Returns:
+            Execution result dictionary
+        """
+        step_instructions = self._build_step_instructions(
+            step=step,
+            plan=plan,
+            issue_title=issue_title,
+            issue_body=issue_body,
+            comment_texts=comment_texts,
+            branch_name=branch_name,
+        )
+
+        self.logger.info(f"Executing step {step.number}: {step.description}")
+
+        result = execute_with_instructions(
+            step_instructions,
+            repo_dir,
+            self.agent_args,
+            self.timeout,
+            task_name="github_issue",
+        )
+
+        if result.get("success", False):
+            self.logger.info(f"Step {step.number} completed successfully")
+        else:
+            self.logger.warning(f"Step {step.number} failed: {result.get('error', 'Unknown error')}")
+
+        return result
+
+    def _build_step_instructions(
+        self,
+        step: Step,
+        plan: Plan,
+        issue_title: str,
+        issue_body: str,
+        comment_texts: List[str],
+        branch_name: str,
+    ) -> str:
+        """Build instructions for a single step.
+
+        Args:
+            step: Step to build instructions for
+            plan: Current plan
+            issue_title: Issue title
+            issue_body: Issue body
+            comment_texts: Comment texts
+            branch_name: Branch name
+
+        Returns:
+            Instructions string for the step
+        """
+        body_text = f"\n{issue_body}" if issue_body else ""
+        comments_text = ""
+        if comment_texts:
+            comments_text = "\nComments:\n" + "\n".join(f"- {comment}" for comment in comment_texts if comment)
+
+        progress_info = self._build_progress_info(plan)
+
+        return (
+            f"You are already on branch '{branch_name}'. "
+            f"Work on this branch, implement the changes, commit them, and push.\n"
+            f"Implement the following:\n"
+            f"Title: {issue_title}\n"
+            f"Description:{body_text}\n"
+            f"{comments_text}\n\n"
+            f"Current Progress:\n{progress_info}\n\n"
+            f"Your current task is Step {step.number}: {step.description}\n\n"
+            f"Focus only on completing this step. Once done, mark it as complete in your work. "
+            f"Keep your implementation simple. Only implement what is required. "
+            f"Check if there are components you can reuse. "
+            f"Ensure that 'make test' runs successful. Only push if ALL tests are successful. "
+            f"Check if you need to update the README.md."
+        )
+
+    def _build_progress_info(self, plan: Plan) -> str:
+        """Build progress information string.
+
+        Args:
+            plan: Current plan
+
+        Returns:
+            Progress information string
+        """
+        lines = []
+        for step in plan.steps:
+            status = "✓" if step.is_closed else "○"
+            lines.append(f"{status} Step {step.number}: {step.description}")
+        return "\n".join(lines)
 
     def _build_instructions(
         self,
