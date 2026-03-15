@@ -4,6 +4,7 @@ This module provides pure functions for common OpenProject operations
 used across different workers via the OpenProject REST API.
 """
 
+import json
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -167,7 +168,7 @@ def get_work_packages(
             if status_id:
                 filters_list.append(["status_id", "=", str(status_id)])
 
-            filters = str(filters_list) if filters_list else "[]"
+            filters = json.dumps(filters_list) if filters_list else "[]"
             params = {"filters": filters}
 
             response = client.get(f"/api/v3/projects/{project_id}/work_packages", params=params)

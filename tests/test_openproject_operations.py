@@ -321,6 +321,32 @@ class TestGetWorkPackages:
             call_args = mock_client_instance.get.call_args
             assert "filters" in call_args.kwargs.get("params", {})
 
+    def test_get_work_packages_filter_format_is_json(self):
+        """Test that filters are formatted as proper JSON with double quotes."""
+        import json
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"_embedded": {"elements": []}}
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_client_instance = MagicMock()
+            mock_client_instance.get.return_value = mock_response
+            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
+            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+
+            get_work_packages(project_id=1, assigned_to_user_id=5)
+
+            call_args = mock_client_instance.get.call_args
+            filters_str = call_args.kwargs.get("params", {}).get("filters", "")
+            filters = json.loads(filters_str)
+            assert filters == [["assigned_to_id", "=", "5"]]
+            assert '"' in filters_str
+            assert "'" not in filters_str
+
 
 class TestGetOpenWorkPackages:
     """Tests for get_open_work_packages function."""
