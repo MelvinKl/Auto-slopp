@@ -4,6 +4,7 @@ This module provides pure functions for common OpenProject operations
 using the OpenProject REST API v3 (HAL+JSON format) based on docs/openproject.json.
 """
 
+import base64
 import json
 import logging
 from typing import Any, Dict, List, Optional
@@ -24,11 +25,16 @@ class OpenProjectOperationError(Exception):
 def _get_client() -> httpx.Client:
     """Get an HTTP client configured for OpenProject API.
 
+    OpenProject uses BasicAuth where:
+    - Username: 'apikey' (literal string)
+    - Password: the API token
+
     Returns:
         Configured httpx.Client instance
     """
+    credentials = base64.b64encode(f"apikey:{settings.openproject_api_token}".encode()).decode()
     headers = {
-        "Authorization": f"Bearer {settings.openproject_api_token}",
+        "Authorization": f"Basic {credentials}",
         "Content-Type": "application/json",
     }
     return httpx.Client(

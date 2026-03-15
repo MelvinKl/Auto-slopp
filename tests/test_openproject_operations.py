@@ -31,15 +31,18 @@ class TestGetClient:
     """Tests for _get_client function."""
 
     def test_get_client_configured_correctly(self):
-        """Test that client is configured with correct headers."""
+        """Test that client is configured with correct BasicAuth headers."""
+        import base64
+
         with patch("auto_slopp.utils.openproject_operations.settings") as mock_settings:
             mock_settings.openproject_url = "https://test.openproject.com/"
             mock_settings.openproject_api_token = "test_token"
 
             client = _get_client()
 
+            expected_credentials = base64.b64encode(b"apikey:test_token").decode()
             assert client is not None
-            assert "Bearer test_token" in client.headers.get("Authorization", "")
+            assert f"Basic {expected_credentials}" in client.headers.get("Authorization", "")
             assert client.headers.get("Content-Type") == "application/json"
             client.close()
 
