@@ -123,6 +123,7 @@ def mock_settings():
     settings.telegram_parse_mode = "HTML"
     settings.telegram_disable_web_page_preview = True
     settings.telegram_disable_notification = False
+    settings.auto_update_reboot_delay = 300
     return settings
 
 
