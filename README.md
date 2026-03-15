@@ -399,6 +399,14 @@ AUTO_SLOPP_TELEGRAM_CHAT_ID=your_chat_id
 AUTO_SLOPP_TELEGRAM_TIMEOUT=60.0
 AUTO_SLOPP_TELEGRAM_RETRY_ATTEMPTS=5
 AUTO_SLOPP_TELEGRAM_PARSE_MODE=HTML
+
+# OpenProject integration (optional)
+AUTO_SLOPP_OPENPROJECT_ENABLED=true
+AUTO_SLOPP_OPENPROJECT_URL=https://openproject.example.com
+AUTO_SLOPP_OPENPROJECT_API_TOKEN=your_api_token
+AUTO_SLOPP_OPENPROJECT_ASSIGNED_USER_ID=5
+AUTO_SLOPP_OPENPROJECT_IN_PROGRESS_STATUS_ID=7
+AUTO_SLOPP_OPENPROJECT_CREATE_PROJECTS=true
 ```
 
 ## Creating Worker Implementations
@@ -486,7 +494,7 @@ To disable specific workers, set the `AUTO_SLOPP_WORKERS_DISABLED` variable in y
 AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker"]'
 
 # Disable all workers
-AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker"]'
+AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker", "OpenProjectWorker"]'
 ```
 
 ## Available Workers
@@ -518,6 +526,50 @@ from auto_slopp.workers import StaleBranchCleanupWorker
 
 # Disable in AUTO_SLOPP_WORKERS_DISABLED
 # Returns: cleaned branches, deletion status
+```
+
+### OpenProjectWorker
+Processes tasks from OpenProject integration.
+```python
+from auto_slopp.workers import OpenProjectWorker
+
+# Requires OpenProject configuration (see below)
+# Returns: tasks processed, PRs created, work packages updated
+```
+
+The OpenProjectWorker:
+1. Matches GitHub repositories to OpenProject projects by name
+2. Creates OpenProject projects if they don't exist (configurable)
+3. Searches for open tasks assigned to a configured user
+4. Creates subtasks for the first open task
+5. Creates a branch linked to the task and executes subtasks
+6. Commits changes, pushes branch, and creates a PR
+7. Adds a comment to the OpenProject task and sets status to in progress
+
+#### OpenProject Configuration
+```bash
+# Enable OpenProject integration
+AUTO_SLOPP_OPENPROJECT_ENABLED=true
+
+# OpenProject instance URL and API token
+AUTO_SLOPP_OPENPROJECT_URL=https://openproject.example.com
+AUTO_SLOPP_OPENPROJECT_API_TOKEN=your_api_token
+
+# User ID to filter tasks assigned to (auto-slopper user)
+AUTO_SLOPP_OPENPROJECT_ASSIGNED_USER_ID=5
+
+# Status IDs for task workflow
+AUTO_SLOPP_OPENPROJECT_DEFAULT_STATUS_ID=1
+AUTO_SLOPP_OPENPROJECT_IN_PROGRESS_STATUS_ID=7
+
+# Optional prefix for project identifiers
+AUTO_SLOPP_OPENPROJECT_PROJECT_PREFIX=auto_
+
+# Auto-create projects if they don't exist
+AUTO_SLOPP_OPENPROJECT_CREATE_PROJECTS=true
+
+# Default work package type ID
+AUTO_SLOPP_OPENPROJECT_TASK_TYPE_ID=1
 ```
 
 ## API Reference
@@ -627,6 +679,7 @@ Auto-slopp/
 │   │   ├── workers/             # Worker implementations
 │   │   │   ├── pr_worker.py
 │   │   │   ├── github_issue_worker.py
+│   │   │   ├── openproject_worker.py
 │   │   │   └── stale_branch_cleanup_worker.py
 │   │   └── utils/               # Utility modules
 │   │       ├── git_operations.py
