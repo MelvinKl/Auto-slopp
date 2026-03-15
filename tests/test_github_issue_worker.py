@@ -253,6 +253,21 @@ class TestGitHubIssueWorker:
         assert "Test issue" in instructions
         assert "ai/" in instructions
 
+    def test_build_instructions_includes_plan(self):
+        """Test that instructions include a structured plan."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        instructions = worker._build_instructions("Test issue", "Test body")
+        assert "Plan:" in instructions
+        assert "1." in instructions
+        assert "2." in instructions
+        assert "Understand the requirements" in instructions
+        assert "Explore the codebase" in instructions
+        assert "make lint" in instructions
+        assert "make test" in instructions
+        assert "Commit the changes" in instructions
+        assert "Push the changes" in instructions
+
     def test_create_error_result(self):
         """Test error result creation."""
         worker = GitHubIssueWorker(dry_run=True)
