@@ -4,6 +4,7 @@ This module provides pure functions for common OpenProject operations
 used across different workers via the OpenProject REST API.
 """
 
+import json
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -18,6 +19,21 @@ class OpenProjectOperationError(Exception):
     """Exception raised when OpenProject operations fail."""
 
     pass
+
+
+def _build_filter(field: str, operator: str, values: List[str]) -> str:
+    """Build an OpenProject API filter in the correct format.
+
+    Args:
+        field: The field name to filter on
+        operator: The operator (e.g., "=", "!", "ow", etc.)
+        values: List of values to filter by
+
+    Returns:
+        JSON string filter in OpenProject format.
+    """
+    filter_obj = {field: {"operator": operator, "values": values}}
+    return json.dumps([filter_obj])
 
 
 def _get_client() -> httpx.Client:
@@ -68,11 +84,14 @@ def get_project_by_identifier(identifier: str) -> Optional[Dict[str, Any]]:
     """
     try:
         with _get_client() as client:
-            filters = f'[["identifier","=","{identifier}"]]'
+            filters = _build_filter("name_and_identifier", "~", [identifier])
             response = client.get("/api/v3/projects", params={"filters": filters})
             response.raise_for_status()
             data = response.json()
             elements = data.get("_embedded", {}).get("elements", [])
+            for project in elements:
+                if project.get("identifier") == identifier:
+                    return project
             return elements[0] if elements else None
     except httpx.HTTPError as e:
         logger.error(f"Failed to get project {identifier}: {e}")
@@ -93,11 +112,14 @@ def get_project_by_name(name: str) -> Optional[Dict[str, Any]]:
     """
     try:
         with _get_client() as client:
-            filters = f'[["name","=","{name}"]]'
+            filters = _build_filter("name_and_identifier", "~", [name])
             response = client.get("/api/v3/projects", params={"filters": filters})
             response.raise_for_status()
             data = response.json()
             elements = data.get("_embedded", {}).get("elements", [])
+            for project in elements:
+                if project.get("name") == name:
+                    return project
             return elements[0] if elements else None
     except httpx.HTTPError as e:
         logger.error(f"Failed to get project by name {name}: {e}")
@@ -163,11 +185,18 @@ def get_work_packages(
         with _get_client() as client:
             filters_list = []
             if assigned_to_user_id:
-                filters_list.append(["assigned_to_id", "=", str(assigned_to_user_id)])
+                filters_list.append(
+                    {
+                        "assigned_to": {
+                            "operator": "=",
+                            "values": [str(assigned_to_user_id)],
+                        }
+                    }
+                )
             if status_id:
-                filters_list.append(["status_id", "=", str(status_id)])
+                filters_list.append({"status_id": {"operator": "=", "values": [str(status_id)]}})
 
-            filters = str(filters_list) if filters_list else "[]"
+            filters = json.dumps(filters_list) if filters_list else "[]"
             params = {"filters": filters}
 
             response = client.get(f"/api/v3/projects/{project_id}/work_packages", params=params)
