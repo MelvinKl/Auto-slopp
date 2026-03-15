@@ -398,7 +398,7 @@ class TestGetWorkPackages:
             call_args = mock_client_instance.get.call_args
             filters_str = call_args.kwargs.get("params", {}).get("filters", "")
             filters = json.loads(filters_str)
-            expected_filter = [{"assignee": {"operator": "=", "values": ["5"]}}]
+            expected_filter = [{"assigned_to": {"operator": "=", "values": ["5"]}}]
             assert filters == expected_filter
             assert '"' in filters_str
             assert "'" not in filters_str

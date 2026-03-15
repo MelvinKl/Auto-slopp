@@ -184,7 +184,7 @@ def get_work_packages(
             if assigned_to_user_id:
                 filters_list.append(
                     {
-                        "assignee": {
+                        "assigned_to": {
                             "operator": "=",
                             "values": [str(assigned_to_user_id)],
                         }
