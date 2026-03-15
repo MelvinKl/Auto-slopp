@@ -540,13 +540,29 @@ class GitHubIssueWorker(Worker):
                 "If there is a branch/PR linked in the issue use this branch.\n"
             )
 
+        plan_text = """
+Plan:
+1. Understand the requirements by analyzing the issue title and description
+2. Explore the codebase to understand the current implementation
+3. Identify components that can be reused
+4. Design a solution that is simple and focused
+5. Write or update tests for the changes
+6. Implement the solution
+7. Run 'make lint' to ensure code quality
+8. Run 'make test' to verify all tests pass
+9. Commit the changes with a clear commit message
+10. Push the changes to the remote branch
+"""
+
         return (
             f"{branch_instruction}"
             f"Implement the following:\n"
             f"Title: {issue_title}\n"
             f"Description:{body_text}\n"
             f"{comments_text}\n"
-            f"Keep your implementation simple. Only implement what is required. Check if there are components you can reuse. "
+            f"{plan_text}\n"
+            f"Keep your implementation simple. Only implement what is required. "
+            f"Check if there are components you can reuse. "
             f"Ensure that 'make test' runs successful. Only push if ALL tests are successful. "
             f"Check if you need to update the README.md."
         )
