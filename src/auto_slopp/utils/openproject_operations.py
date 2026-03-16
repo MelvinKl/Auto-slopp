@@ -75,7 +75,10 @@ def get_project_by_identifier(identifier: str) -> Optional[Dict[str, Any]]:
     """
     try:
         with _get_client() as client:
-            filters = json.dumps([{"name_and_identifier": {"operator": "~", "values": [identifier]}}])
+            filters = json.dumps(
+                [{"name_and_identifier": {"operator": "~", "values": [identifier]}}],
+                separators=(",", ":"),
+            )
             response = client.get("/api/v3/projects", params={"filters": filters})
             response.raise_for_status()
             data = response.json()
@@ -103,7 +106,10 @@ def get_project_by_name(name: str) -> Optional[Dict[str, Any]]:
     """
     try:
         with _get_client() as client:
-            filters = json.dumps([{"name_and_identifier": {"operator": "~", "values": [name]}}])
+            filters = json.dumps(
+                [{"name_and_identifier": {"operator": "~", "values": [name]}}],
+                separators=(",", ":"),
+            )
             response = client.get("/api/v3/projects", params={"filters": filters})
             response.raise_for_status()
             data = response.json()
@@ -178,16 +184,16 @@ def get_work_packages(
             if assigned_to_user_id:
                 filters_list.append(
                     {
-                        "assigned_to": {
+                        "assignee": {
                             "operator": "=",
                             "values": [str(assigned_to_user_id)],
                         }
                     }
                 )
             if status_id:
-                filters_list.append({"status_id": {"operator": "=", "values": [str(status_id)]}})
+                filters_list.append({"status": {"operator": "=", "values": [str(status_id)]}})
 
-            filters = json.dumps(filters_list) if filters_list else "[]"
+            filters = json.dumps(filters_list, separators=(",", ":")) if filters_list else "[]"
             params = {"filters": filters}
 
             response = client.get(f"/api/v3/projects/{project_id}/work_packages", params=params)

@@ -180,6 +180,28 @@ class TestGetProjectByIdentifier:
             assert filters[0]["name_and_identifier"]["operator"] == "~"
             assert "test-project" in filters[0]["name_and_identifier"]["values"]
 
+    def test_get_project_by_identifier_uses_compact_json(self):
+        """Test that get_project_by_identifier uses compact JSON format."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"_embedded": {"elements": []}}
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_client_instance = MagicMock()
+            mock_client_instance.get.return_value = mock_response
+            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
+            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+
+            get_project_by_identifier("test-project")
+
+            call_args = mock_client_instance.get.call_args
+            filters_str = call_args.kwargs.get("params", {}).get("filters", "")
+            assert ": " not in filters_str
+            assert ", " not in filters_str
+
 
 class TestGetProjectByName:
     """Tests for get_project_by_name function."""
@@ -248,6 +270,28 @@ class TestGetProjectByName:
 
             assert filters[0]["name_and_identifier"]["operator"] == "~"
             assert "Test Project" in filters[0]["name_and_identifier"]["values"]
+
+    def test_get_project_by_name_uses_compact_json(self):
+        """Test that get_project_by_name uses compact JSON format."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"_embedded": {"elements": []}}
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_client_instance = MagicMock()
+            mock_client_instance.get.return_value = mock_response
+            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
+            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+
+            get_project_by_name("Test Project")
+
+            call_args = mock_client_instance.get.call_args
+            filters_str = call_args.kwargs.get("params", {}).get("filters", "")
+            assert ": " not in filters_str
+            assert ", " not in filters_str
 
 
 class TestCreateProject:
@@ -398,10 +442,59 @@ class TestGetWorkPackages:
             call_args = mock_client_instance.get.call_args
             filters_str = call_args.kwargs.get("params", {}).get("filters", "")
             filters = json.loads(filters_str)
-            expected_filter = [{"assigned_to": {"operator": "=", "values": ["5"]}}]
+            expected_filter = [{"assignee": {"operator": "=", "values": ["5"]}}]
             assert filters == expected_filter
             assert '"' in filters_str
             assert "'" not in filters_str
+
+    def test_get_work_packages_status_filter_uses_correct_name(self):
+        """Test that status filter uses 'status' not 'status_id'."""
+        import json
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"_embedded": {"elements": []}}
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_client_instance = MagicMock()
+            mock_client_instance.get.return_value = mock_response
+            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
+            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+
+            get_work_packages(project_id=1, status_id=7)
+
+            call_args = mock_client_instance.get.call_args
+            filters_str = call_args.kwargs.get("params", {}).get("filters", "")
+            filters = json.loads(filters_str)
+            assert "status" in filters[0]
+            assert "status_id" not in filters[0]
+            assert filters[0]["status"]["operator"] == "="
+            assert filters[0]["status"]["values"] == ["7"]
+
+    def test_get_work_packages_filters_use_compact_json(self):
+        """Test that filters use compact JSON format without spaces."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"_embedded": {"elements": []}}
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_client_instance = MagicMock()
+            mock_client_instance.get.return_value = mock_response
+            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
+            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+
+            get_work_packages(project_id=1, assigned_to_user_id=5, status_id=7)
+
+            call_args = mock_client_instance.get.call_args
+            filters_str = call_args.kwargs.get("params", {}).get("filters", "")
+            assert ": " not in filters_str
+            assert ", " not in filters_str
 
 
 class TestGetOpenWorkPackages:
