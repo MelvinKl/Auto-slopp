@@ -1,16 +1,32 @@
 """OpenProject operations utilities for workers.
 
 This module provides pure functions for common OpenProject operations
-using the OpenProject REST API v3 (HAL+JSON format) based on docs/openproject.json.
+using the OpenProject REST API v3 via the generated OpenAPI client.
 """
 
-import base64
-import json
 import logging
 from typing import Any, Dict, List, Optional
 
-import httpx
-
+from openproject.openapi_client.openproject_client import (
+    ApiClient,
+    Configuration,
+)
+from openproject.openapi_client.openproject_client.api import (
+    ActivitiesApi,
+    ProjectsApi,
+    StatusesApi,
+    TypesApi,
+    UsersApi,
+    WorkPackagesApi,
+)
+from openproject.openapi_client.openproject_client.exceptions import ApiException
+from openproject.openapi_client.openproject_client.models import (
+    ActivityCommentWriteModel,
+    ProjectModel,
+    WorkPackageModel,
+    WorkPackagePatchModel,
+    WorkPackageWriteModel,
+)
 from settings.main import settings
 
 logger = logging.getLogger(__name__)
@@ -22,26 +38,31 @@ class OpenProjectOperationError(Exception):
     pass
 
 
-def _get_client() -> httpx.Client:
-    """Get an HTTP client configured for OpenProject API.
+def _get_configuration() -> Configuration:
+    """Get OpenAPI client configuration.
 
     OpenProject uses BasicAuth where:
     - Username: 'apikey' (literal string)
     - Password: the API token
 
     Returns:
-        Configured httpx.Client instance
+        Configured Configuration instance
     """
-    credentials = base64.b64encode(f"apikey:{settings.openproject_api_token}".encode()).decode()
-    headers = {
-        "Authorization": f"Basic {credentials}",
-        "Content-Type": "application/json",
-    }
-    return httpx.Client(
-        base_url=settings.openproject_url.rstrip("/"),
-        headers=headers,
-        timeout=30.0,
+    configuration = Configuration(
+        host=settings.openproject_url.rstrip("/"),
+        username="apikey",
+        password=settings.openproject_api_token,
     )
+    return configuration
+
+
+def _get_api_client() -> ApiClient:
+    """Get an API client configured for OpenProject.
+
+    Returns:
+        Configured ApiClient instance
+    """
+    return ApiClient(configuration=_get_configuration())
 
 
 def get_projects() -> List[Dict[str, Any]]:
@@ -51,12 +72,14 @@ def get_projects() -> List[Dict[str, Any]]:
         List of dictionaries containing project information.
     """
     try:
-        with _get_client() as client:
-            response = client.get("/api/v3/projects")
-            response.raise_for_status()
-            data = response.json()
-            return data.get("_embedded", {}).get("elements", [])
-    except httpx.HTTPError as e:
+        with _get_api_client() as api_client:
+            api = ProjectsApi(api_client)
+            result = api.list_projects()
+            if result and hasattr(result, "_embedded") and result._embedded:
+                elements = getattr(result._embedded, "elements", [])
+                return [api_client.sanitize_for_serialization(e) for e in elements]
+            return []
+    except ApiException as e:
         logger.error(f"Failed to get projects from OpenProject: {e}")
         return []
     except Exception as e:
@@ -74,20 +97,18 @@ def get_project_by_identifier(identifier: str) -> Optional[Dict[str, Any]]:
         Project dictionary or None if not found.
     """
     try:
-        with _get_client() as client:
-            filters = json.dumps(
-                [{"name_and_identifier": {"operator": "~", "values": [identifier]}}],
-                separators=(",", ":"),
-            )
-            response = client.get("/api/v3/projects", params={"filters": filters})
-            response.raise_for_status()
-            data = response.json()
-            elements = data.get("_embedded", {}).get("elements", [])
-            for project in elements:
-                if project.get("identifier") == identifier:
-                    return project
-            return elements[0] if elements else None
-    except httpx.HTTPError as e:
+        with _get_api_client() as api_client:
+            api = ProjectsApi(api_client)
+            result = api.list_projects(filters=f'[{{"identifier":{{"operator":"=","values":["{identifier}"]}}}}]')
+            if result and hasattr(result, "_embedded") and result._embedded:
+                elements = getattr(result._embedded, "elements", [])
+                for project in elements:
+                    if hasattr(project, "identifier") and project.identifier == identifier:
+                        return api_client.sanitize_for_serialization(project)
+                if elements:
+                    return api_client.sanitize_for_serialization(elements[0])
+            return None
+    except ApiException as e:
         logger.error(f"Failed to get project {identifier}: {e}")
         return None
     except Exception as e:
@@ -105,20 +126,18 @@ def get_project_by_name(name: str) -> Optional[Dict[str, Any]]:
         Project dictionary or None if not found.
     """
     try:
-        with _get_client() as client:
-            filters = json.dumps(
-                [{"name_and_identifier": {"operator": "~", "values": [name]}}],
-                separators=(",", ":"),
-            )
-            response = client.get("/api/v3/projects", params={"filters": filters})
-            response.raise_for_status()
-            data = response.json()
-            elements = data.get("_embedded", {}).get("elements", [])
-            for project in elements:
-                if project.get("name") == name:
-                    return project
-            return elements[0] if elements else None
-    except httpx.HTTPError as e:
+        with _get_api_client() as api_client:
+            api = ProjectsApi(api_client)
+            result = api.list_projects(filters=f'[{{"name_and_identifier":{{"operator":"~","values":["{name}"]}}}}]')
+            if result and hasattr(result, "_embedded") and result._embedded:
+                elements = getattr(result._embedded, "elements", [])
+                for project in elements:
+                    if hasattr(project, "name") and project.name == name:
+                        return api_client.sanitize_for_serialization(project)
+                if elements:
+                    return api_client.sanitize_for_serialization(elements[0])
+            return None
+    except ApiException as e:
         logger.error(f"Failed to get project by name {name}: {e}")
         return None
     except Exception as e:
@@ -142,20 +161,20 @@ def create_project(
         Created project dictionary or None if failed.
     """
     try:
-        with _get_client() as client:
-            payload: Dict[str, Any] = {
+        with _get_api_client() as api_client:
+            api = ProjectsApi(api_client)
+            project_data: Dict[str, Any] = {
                 "name": name,
                 "identifier": identifier,
             }
             if description:
-                payload["description"] = {"raw": description}
+                project_data["description"] = {"raw": description}
 
-            response = client.post("/api/v3/projects", json=payload)
-            response.raise_for_status()
-            project = response.json()
+            project_model = ProjectModel(**project_data)
+            result = api.create_project(project_model=project_model)
             logger.info(f"Created OpenProject project: {name} ({identifier})")
-            return project
-    except httpx.HTTPError as e:
+            return api_client.sanitize_for_serialization(result)
+    except ApiException as e:
         logger.error(f"Failed to create project {name}: {e}")
         return None
     except Exception as e:
@@ -179,28 +198,21 @@ def get_work_packages(
         List of work package dictionaries.
     """
     try:
-        with _get_client() as client:
+        with _get_api_client() as api_client:
+            api = WorkPackagesApi(api_client)
             filters_list = []
             if assigned_to_user_id:
-                filters_list.append(
-                    {
-                        "assignee": {
-                            "operator": "=",
-                            "values": [str(assigned_to_user_id)],
-                        }
-                    }
-                )
+                filters_list.append(f'{{"assignee":{{"operator":"=","values":["{assigned_to_user_id}"]}}}}')
             if status_id:
-                filters_list.append({"status": {"operator": "=", "values": [str(status_id)]}})
+                filters_list.append(f'{{"status":{{"operator":"=","values":["{status_id}"]}}}}')
 
-            filters = json.dumps(filters_list, separators=(",", ":")) if filters_list else "[]"
-            params = {"filters": filters}
-
-            response = client.get(f"/api/v3/projects/{project_id}/work_packages", params=params)
-            response.raise_for_status()
-            data = response.json()
-            return data.get("_embedded", {}).get("elements", [])
-    except httpx.HTTPError as e:
+            filters = f"[{','.join(filters_list)}]" if filters_list else "[]"
+            result = api.list_work_packages(id=project_id, filters=filters)
+            if result and hasattr(result, "_embedded") and result._embedded:
+                elements = getattr(result._embedded, "elements", [])
+                return [api_client.sanitize_for_serialization(e) for e in elements]
+            return []
+    except ApiException as e:
         logger.error(f"Failed to get work packages for project {project_id}: {e}")
         return []
     except Exception as e:
@@ -240,11 +252,11 @@ def get_work_package(work_package_id: int) -> Optional[Dict[str, Any]]:
         Work package dictionary or None if not found.
     """
     try:
-        with _get_client() as client:
-            response = client.get(f"/api/v3/work_packages/{work_package_id}")
-            response.raise_for_status()
-            return response.json()
-    except httpx.HTTPError as e:
+        with _get_api_client() as api_client:
+            api = WorkPackagesApi(api_client)
+            result = api.view_work_package(id=work_package_id)
+            return api_client.sanitize_for_serialization(result)
+    except ApiException as e:
         logger.error(f"Failed to get work package {work_package_id}: {e}")
         return None
     except Exception as e:
@@ -274,8 +286,9 @@ def create_work_package(
         Created work package dictionary or None if failed.
     """
     try:
-        with _get_client() as client:
-            payload: Dict[str, Any] = {
+        with _get_api_client() as api_client:
+            api = WorkPackagesApi(api_client)
+            wp_data: Dict[str, Any] = {
                 "subject": subject,
                 "_links": {
                     "project": {"href": f"/api/v3/projects/{project_id}"},
@@ -283,26 +296,22 @@ def create_work_package(
             }
 
             if description:
-                payload["description"] = {"raw": description}
+                wp_data["description"] = {"raw": description}
 
             if type_id:
-                payload["_links"]["type"] = {"href": f"/api/v3/types/{type_id}"}
+                wp_data["_links"]["type"] = {"href": f"/api/v3/types/{type_id}"}
 
             if parent_id:
-                payload["_links"]["parent"] = {"href": f"/api/v3/work_packages/{parent_id}"}
+                wp_data["_links"]["parent"] = {"href": f"/api/v3/work_packages/{parent_id}"}
 
             if assignee_id:
-                payload["_links"]["assignee"] = {"href": f"/api/v3/users/{assignee_id}"}
+                wp_data["_links"]["assignee"] = {"href": f"/api/v3/users/{assignee_id}"}
 
-            response = client.post(
-                f"/api/v3/projects/{project_id}/work_packages",
-                json=payload,
-            )
-            response.raise_for_status()
-            wp = response.json()
+            wp_model = WorkPackageWriteModel(**wp_data)
+            result = api.create_work_package(id=project_id, work_package_write_model=wp_model)
             logger.info(f"Created work package: {subject}")
-            return wp
-    except httpx.HTTPError as e:
+            return api_client.sanitize_for_serialization(result)
+    except ApiException as e:
         logger.error(f"Failed to create work package {subject}: {e}")
         return None
     except Exception as e:
@@ -357,32 +366,31 @@ def update_work_package(
         Updated work package dictionary or None if failed.
     """
     try:
-        with _get_client() as client:
-            payload: Dict[str, Any] = {"lockVersion": lock_version}
+        with _get_api_client() as api_client:
+            api = WorkPackagesApi(api_client)
+            patch_data: Dict[str, Any] = {"lockVersion": lock_version}
 
+            links: Dict[str, Any] = {}
             if status_id is not None:
-                payload["_links"] = payload.get("_links", {})
-                payload["_links"]["status"] = {"href": f"/api/v3/statuses/{status_id}"}
+                links["status"] = {"href": f"/api/v3/statuses/{status_id}"}
 
             if assignee_id is not None:
-                payload["_links"] = payload.get("_links", {})
-                payload["_links"]["assignee"] = {"href": f"/api/v3/users/{assignee_id}"}
+                links["assignee"] = {"href": f"/api/v3/users/{assignee_id}"}
+
+            if links:
+                patch_data["_links"] = links
 
             if description is not None:
-                payload["description"] = {"raw": description}
+                patch_data["description"] = {"raw": description}
 
             if subject is not None:
-                payload["subject"] = subject
+                patch_data["subject"] = subject
 
-            response = client.patch(
-                f"/api/v3/work_packages/{work_package_id}",
-                json=payload,
-            )
-            response.raise_for_status()
-            wp = response.json()
+            patch_model = WorkPackagePatchModel(**patch_data)
+            result = api.update_work_package(id=work_package_id, work_package_patch_model=patch_model)
             logger.info(f"Updated work package {work_package_id}")
-            return wp
-    except httpx.HTTPError as e:
+            return api_client.sanitize_for_serialization(result)
+    except ApiException as e:
         logger.error(f"Failed to update work package {work_package_id}: {e}")
         return None
     except Exception as e:
@@ -426,16 +434,13 @@ def add_comment_to_work_package(
         True if successful, False otherwise.
     """
     try:
-        with _get_client() as client:
-            payload = {"comment": {"raw": comment}}
-            response = client.post(
-                f"/api/v3/work_packages/{work_package_id}/activities",
-                json=payload,
-            )
-            response.raise_for_status()
+        with _get_api_client() as api_client:
+            api = WorkPackagesApi(api_client)
+            comment_model = ActivityCommentWriteModel(comment={"raw": comment})
+            api.create_work_package_activity(id=work_package_id, activity_comment_write_model=comment_model)
             logger.info(f"Added comment to work package {work_package_id}")
             return True
-    except httpx.HTTPError as e:
+    except ApiException as e:
         logger.error(f"Failed to add comment to work package {work_package_id}: {e}")
         return False
     except Exception as e:
@@ -453,12 +458,14 @@ def get_available_statuses(project_id: int) -> List[Dict[str, Any]]:
         List of status dictionaries.
     """
     try:
-        with _get_client() as client:
-            response = client.get(f"/api/v3/projects/{project_id}/available_statuses")
-            response.raise_for_status()
-            data = response.json()
-            return data.get("_embedded", {}).get("elements", [])
-    except httpx.HTTPError as e:
+        with _get_api_client() as api_client:
+            api = StatusesApi(api_client)
+            result = api.list_available_statuses_for_project(id=project_id)
+            if result and hasattr(result, "_embedded") and result._embedded:
+                elements = getattr(result._embedded, "elements", [])
+                return [api_client.sanitize_for_serialization(e) for e in elements]
+            return []
+    except ApiException as e:
         logger.error(f"Failed to get statuses for project {project_id}: {e}")
         return []
     except Exception as e:
@@ -476,11 +483,11 @@ def get_user(user_id: int) -> Optional[Dict[str, Any]]:
         User dictionary or None if not found.
     """
     try:
-        with _get_client() as client:
-            response = client.get(f"/api/v3/users/{user_id}")
-            response.raise_for_status()
-            return response.json()
-    except httpx.HTTPError as e:
+        with _get_api_client() as api_client:
+            api = UsersApi(api_client)
+            result = api.view_user(id=user_id)
+            return api_client.sanitize_for_serialization(result)
+    except ApiException as e:
         logger.error(f"Failed to get user {user_id}: {e}")
         return None
     except Exception as e:
@@ -495,11 +502,11 @@ def get_current_user() -> Optional[Dict[str, Any]]:
         User dictionary or None if not found.
     """
     try:
-        with _get_client() as client:
-            response = client.get("/api/v3/users/me")
-            response.raise_for_status()
-            return response.json()
-    except httpx.HTTPError as e:
+        with _get_api_client() as api_client:
+            api = UsersApi(api_client)
+            result = api.view_current_user()
+            return api_client.sanitize_for_serialization(result)
+    except ApiException as e:
         logger.error(f"Failed to get current user: {e}")
         return None
     except Exception as e:
@@ -517,12 +524,14 @@ def get_work_package_types(project_id: int) -> List[Dict[str, Any]]:
         List of type dictionaries.
     """
     try:
-        with _get_client() as client:
-            response = client.get(f"/api/v3/projects/{project_id}/types")
-            response.raise_for_status()
-            data = response.json()
-            return data.get("_embedded", {}).get("elements", [])
-    except httpx.HTTPError as e:
+        with _get_api_client() as api_client:
+            api = TypesApi(api_client)
+            result = api.list_types_for_project(id=project_id)
+            if result and hasattr(result, "_embedded") and result._embedded:
+                elements = getattr(result._embedded, "elements", [])
+                return [api_client.sanitize_for_serialization(e) for e in elements]
+            return []
+    except ApiException as e:
         logger.error(f"Failed to get work package types for project {project_id}: {e}")
         return []
     except Exception as e:
