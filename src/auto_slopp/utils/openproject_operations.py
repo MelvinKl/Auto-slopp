@@ -166,7 +166,7 @@ def create_project(
                 "identifier": identifier,
             }
             if description:
-                project_data["description"] = {"format": "markdown", "raw": description}
+                project_data["description"] = {"raw": description}
 
             project_model = ProjectModel(**project_data)
             result = api.create_project(project_model=project_model)
