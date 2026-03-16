@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import ValidationError
 
 from auto_slopp.utils.openproject_operations import (
     OpenProjectOperationError,
@@ -25,6 +26,7 @@ from auto_slopp.utils.openproject_operations import (
     set_work_package_status,
     update_work_package,
 )
+from openproject.openapi_client.openproject_client.models import ProjectModel
 
 
 class MockElement:
@@ -379,6 +381,33 @@ class TestCreateProject:
                 project = create_project(name="New Project", identifier="new_project")
 
                 assert project is not None
+
+    def test_create_project_description_includes_format(self):
+        """Test that description includes format field for ProjectModel validation."""
+        project_data = {
+            "name": "Test Project",
+            "identifier": "test_project",
+            "description": {"format": "markdown", "raw": "Test description"},
+        }
+
+        project_model = ProjectModel(**project_data)
+        assert project_model.description is not None
+        assert project_model.description.format == "markdown"
+        assert project_model.description.raw == "Test description"
+
+    def test_create_project_description_missing_format_fails(self):
+        """Test that description without format field fails validation."""
+        project_data = {
+            "name": "Test Project",
+            "identifier": "test_project",
+            "description": {"raw": "Test description"},
+        }
+
+        with pytest.raises(ValidationError) as exc_info:
+            ProjectModel(**project_data)
+
+        assert "format" in str(exc_info.value)
+        assert "Field required" in str(exc_info.value)
 
 
 class TestGetWorkPackages:
