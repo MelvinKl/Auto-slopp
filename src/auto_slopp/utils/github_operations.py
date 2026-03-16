@@ -107,6 +107,8 @@ def get_open_issues(repo_dir: Path) -> List[Dict[str, Any]]:
                     f"Cannot access repository {repo_dir.name}: likely permission denied or repository not found. "
                     f"Verify the GitHub token has access to this repository."
                 )
+            elif "has disabled issues" in issue_error or "issues are disabled" in issue_error:
+                logger.info(f"Skipping issue sync for {repo_dir.name}: GitHub issues are disabled for this repository")
             else:
                 logger.error(f"Failed to list issues in {repo_dir.name}: {issue_error}")
             return []

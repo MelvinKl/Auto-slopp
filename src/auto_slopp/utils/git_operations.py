@@ -84,6 +84,14 @@ def _configure_safe_directory(repo_dir: Path, timeout: int = 60) -> bool:
     return False
 
 
+def _get_git_command_env() -> Dict[str, str]:
+    """Build environment variables for non-interactive git commands."""
+    env = os.environ.copy()
+    env.setdefault("GIT_TERMINAL_PROMPT", "0")
+    env.setdefault("GIT_SSH_COMMAND", "ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new")
+    return env
+
+
 def _run_git_command(
     repo_dir: Path,
     *args: str,
@@ -114,6 +122,7 @@ def _run_git_command(
             text=capture_output,
             check=False,
             timeout=timeout,
+            env=_get_git_command_env(),
         )
 
         error_output = _get_command_error_output(result)
@@ -129,6 +138,7 @@ def _run_git_command(
                     text=capture_output,
                     check=False,
                     timeout=timeout,
+                    env=_get_git_command_env(),
                 )
                 error_output = _get_command_error_output(result)
 

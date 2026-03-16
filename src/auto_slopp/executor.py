@@ -159,9 +159,13 @@ class Executor:
             True if an update was detected, False otherwise.
         """
         try:
+            update_repo_dir = Path.cwd()
+            if not update_repo_dir.joinpath(".git").exists():
+                return False
+
             result = subprocess.run(
                 ["git", "pull"],
-                cwd=Path.cwd(),
+                cwd=update_repo_dir,
                 capture_output=True,
                 text=True,
             )

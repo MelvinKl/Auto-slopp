@@ -99,6 +99,28 @@ class TestAutoUpdate:
             assert update_detected is False, "Failed git pull should not detect update"
 
     @patch("auto_slopp.executor.subprocess.run")
+    def test_skips_update_check_when_cwd_is_not_git_repo(self, mock_subprocess_run, temp_dir, mock_settings):
+        """Test that auto-update is skipped when the current directory is not a git checkout."""
+        mock_settings.workers_disabled = [
+            "GitHubIssueWorker",
+            "PRWorker",
+            "StaleBranchCleanupWorker",
+        ]
+        non_git_dir = temp_dir / "container-app"
+        non_git_dir.mkdir()
+
+        with (
+            patch("auto_slopp.executor.settings", mock_settings),
+            patch("auto_slopp.executor.Path.cwd", return_value=non_git_dir),
+        ):
+            executor = Executor(repo_path=temp_dir)
+
+            update_detected = executor._check_for_updates()
+
+            assert update_detected is False
+            mock_subprocess_run.assert_not_called()
+
+    @patch("auto_slopp.executor.subprocess.run")
     def test_configurable_reboot_delay(self, mock_subprocess_run, temp_repo_dir):
         """Test that reboot delay is configurable."""
         custom_delay = 600

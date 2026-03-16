@@ -8,6 +8,7 @@ import pytest
 
 from auto_slopp.utils.git_operations import (
     GitOperationError,
+    _run_git_command,
     checkout_branch_resilient,
     get_current_branch,
     get_local_branches,
@@ -100,6 +101,19 @@ class TestCheckoutBranchResilient:
 
         assert result is True
         assert mock_subprocess_run.call_count == 3
+
+    @patch("auto_slopp.utils.git_operations.subprocess.run")
+    def test_run_git_command_uses_non_interactive_git_env(self, mock_subprocess_run):
+        """Test git commands use non-interactive SSH settings."""
+        repo_dir = Path("/tmp/test_repo")
+        mock_subprocess_run.return_value = Mock(returncode=0, stdout="", stderr="")
+
+        _run_git_command(repo_dir, "fetch", "origin", check=False)
+
+        env = mock_subprocess_run.call_args.kwargs["env"]
+        assert env["GIT_TERMINAL_PROMPT"] == "0"
+        assert "BatchMode=yes" in env["GIT_SSH_COMMAND"]
+        assert "StrictHostKeyChecking=accept-new" in env["GIT_SSH_COMMAND"]
 
     @patch("auto_slopp.utils.git_operations.subprocess.run")
     def test_checkout_success_after_reset(self, mock_subprocess_run):
