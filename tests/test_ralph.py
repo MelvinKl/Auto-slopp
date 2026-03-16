@@ -286,7 +286,9 @@ class TestRalphLoop:
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = Path(tmpdir) / "plan.md"
 
-            ralph = RalphLoop(plan_path=plan_path, max_loops=5, step_executor=success_executor)
+            ralph = RalphLoop(
+                plan_path=plan_path, max_loops=5, step_executor=success_executor
+            )
             ralph.create_plan(
                 title="Test",
                 description="Test",
@@ -309,7 +311,9 @@ class TestRalphLoop:
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = Path(tmpdir) / "plan.md"
 
-            ralph = RalphLoop(plan_path=plan_path, max_loops=3, step_executor=failing_executor)
+            ralph = RalphLoop(
+                plan_path=plan_path, max_loops=3, step_executor=failing_executor
+            )
             ralph.create_plan(
                 title="Test",
                 description="Test",
@@ -335,7 +339,9 @@ class TestRalphLoop:
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = Path(tmpdir) / "plan.md"
 
-            ralph = RalphLoop(plan_path=plan_path, max_loops=2, step_executor=counting_executor)
+            ralph = RalphLoop(
+                plan_path=plan_path, max_loops=2, step_executor=counting_executor
+            )
             ralph.create_plan(
                 title="Test",
                 description="Test",
@@ -380,7 +386,9 @@ class TestRalphLoop:
                 call_count += 1
                 return {"success": True}
 
-            ralph2 = RalphLoop(plan_path=plan_path, max_loops=5, step_executor=counting_executor)
+            ralph2 = RalphLoop(
+                plan_path=plan_path, max_loops=5, step_executor=counting_executor
+            )
             result = ralph2.run()
 
             assert result["success"] is True
@@ -395,10 +403,15 @@ class TestCreateDefaultPlanSteps:
         """Test that default steps are created."""
         steps = create_default_plan_steps()
 
-        assert len(steps) == 9
-        assert "Design a solution" in steps[0]
-        assert "Identify components" in steps[1]
-        assert "make lint" in steps[4]
-        assert "make test" in steps[5]
-        assert "Commit the changes" in steps[7]
-        assert "Push the changes" in steps[8]
+        assert len(steps) == 11
+        assert "Understand the requirements" in steps[0]
+        assert "Explore the codebase" in steps[1]
+        assert "Design a solution" in steps[2]
+        assert "Identify components" in steps[3]
+        assert "Implement the solution" in steps[4]
+        assert "Write or update tests" in steps[5]
+        assert "make lint" in steps[6]
+        assert "make test" in steps[7]
+        assert "Check if the README.md needs" in steps[8]
+        assert "Commit the changes" in steps[9]
+        assert "Push the changes" in steps[10]
