@@ -15,6 +15,15 @@ from settings.main import settings
 
 logger = logging.getLogger(__name__)
 
+_PRIMARY_WORK_PACKAGE_FILTER_NAMES = {
+    "assignee": "assignee",
+    "status": "status",
+}
+_LEGACY_WORK_PACKAGE_FILTER_NAMES = {
+    "assignee": "assigned_to",
+    "status": "status_id",
+}
+
 
 class OpenProjectOperationError(Exception):
     """Exception raised when OpenProject operations fail."""
@@ -180,32 +189,81 @@ def get_work_packages(
     """
     try:
         with _get_client() as client:
-            filters_list = []
-            if assigned_to_user_id:
-                filters_list.append(
-                    {
-                        "assignee": {
-                            "operator": "=",
-                            "values": [str(assigned_to_user_id)],
-                        }
-                    }
+            params = {
+                "filters": _build_work_package_filters(
+                    assigned_to_user_id=assigned_to_user_id,
+                    status_id=status_id,
+                    filter_names=_PRIMARY_WORK_PACKAGE_FILTER_NAMES,
                 )
-            if status_id:
-                filters_list.append({"status": {"operator": "=", "values": [str(status_id)]}})
-
-            filters = json.dumps(filters_list, separators=(",", ":")) if filters_list else "[]"
-            params = {"filters": filters}
-
+            }
             response = client.get(f"/api/v3/projects/{project_id}/work_packages", params=params)
             response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        if e.response is not None and e.response.status_code == 400:
+            try:
+                with _get_client() as client:
+                    fallback_params = {
+                        "filters": _build_work_package_filters(
+                            assigned_to_user_id=assigned_to_user_id,
+                            status_id=status_id,
+                            filter_names=_LEGACY_WORK_PACKAGE_FILTER_NAMES,
+                        )
+                    }
+                    logger.warning(
+                        "Retrying work package request for project %s with legacy filter names",
+                        project_id,
+                    )
+                    response = client.get(
+                        f"/api/v3/projects/{project_id}/work_packages",
+                        params=fallback_params,
+                    )
+                    response.raise_for_status()
+            except httpx.HTTPError as retry_error:
+                logger.error(f"Failed to get work packages for project {project_id}: {retry_error}")
+                return []
+
             data = response.json()
             return data.get("_embedded", {}).get("elements", [])
+        logger.error(f"Failed to get work packages for project {project_id}: {e}")
+        return []
     except httpx.HTTPError as e:
         logger.error(f"Failed to get work packages for project {project_id}: {e}")
         return []
     except Exception as e:
         logger.error(f"Unexpected error getting work packages: {e}")
         return []
+
+    data = response.json()
+    return data.get("_embedded", {}).get("elements", [])
+
+
+def _build_work_package_filters(
+    assigned_to_user_id: Optional[int],
+    status_id: Optional[int],
+    filter_names: Dict[str, str],
+) -> str:
+    """Build JSON query filters for work package list requests."""
+    filters_list = []
+    if assigned_to_user_id is not None:
+        filters_list.append(
+            {
+                filter_names["assignee"]: {
+                    "operator": "=",
+                    "values": [str(assigned_to_user_id)],
+                }
+            }
+        )
+    if status_id is not None:
+        filters_list.append(
+            {
+                filter_names["status"]: {
+                    "operator": "=",
+                    "values": [str(status_id)],
+                }
+            }
+        )
+
+    return json.dumps(filters_list, separators=(",", ":")) if filters_list else "[]"
 
 
 def get_open_work_packages(

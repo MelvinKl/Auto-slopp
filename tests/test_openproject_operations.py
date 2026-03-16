@@ -1,9 +1,10 @@
 """Tests for OpenProject operations utilities."""
 
+import base64
+import json
 from unittest.mock import MagicMock, patch
 
 import httpx
-import pytest
 
 from auto_slopp.utils.openproject_operations import (
     OpenProjectOperationError,
@@ -32,8 +33,6 @@ class TestGetClient:
 
     def test_get_client_configured_correctly(self):
         """Test that client is configured with correct BasicAuth headers."""
-        import base64
-
         with patch("auto_slopp.utils.openproject_operations.settings") as mock_settings:
             mock_settings.openproject_url = "https://test.openproject.com/"
             mock_settings.openproject_api_token = "test_token"
@@ -156,8 +155,6 @@ class TestGetProjectByIdentifier:
 
     def test_get_project_by_identifier_filter_format(self):
         """Test that get_project_by_identifier uses correct filter format."""
-        import json
-
         mock_response = MagicMock()
         mock_response.json.return_value = {"_embedded": {"elements": []}}
         mock_response.raise_for_status = MagicMock()
@@ -247,8 +244,6 @@ class TestGetProjectByName:
 
     def test_get_project_by_name_filter_format(self):
         """Test that get_project_by_name uses correct filter format."""
-        import json
-
         mock_response = MagicMock()
         mock_response.json.return_value = {"_embedded": {"elements": []}}
         mock_response.raise_for_status = MagicMock()
@@ -422,8 +417,6 @@ class TestGetWorkPackages:
 
     def test_get_work_packages_filter_format_is_json(self):
         """Test that filters are formatted as proper JSON with double quotes."""
-        import json
-
         mock_response = MagicMock()
         mock_response.json.return_value = {"_embedded": {"elements": []}}
         mock_response.raise_for_status = MagicMock()
@@ -447,10 +440,8 @@ class TestGetWorkPackages:
             assert '"' in filters_str
             assert "'" not in filters_str
 
-    def test_get_work_packages_status_filter_uses_correct_name(self):
-        """Test that status filter uses 'status' not 'status_id'."""
-        import json
-
+    def test_get_work_packages_status_filter_uses_primary_name(self):
+        """Test that the primary status filter uses 'status' not 'status_id'."""
         mock_response = MagicMock()
         mock_response.json.return_value = {"_embedded": {"elements": []}}
         mock_response.raise_for_status = MagicMock()
@@ -473,6 +464,51 @@ class TestGetWorkPackages:
             assert "status_id" not in filters[0]
             assert filters[0]["status"]["operator"] == "="
             assert filters[0]["status"]["values"] == ["7"]
+
+    def test_get_work_packages_retries_with_legacy_filters_after_400(self):
+        """Test that a 400 response retries with legacy filter names."""
+        request = httpx.Request("GET", "https://openproject.example/api/v3/projects/1/work_packages")
+        bad_response = MagicMock()
+        bad_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Bad request",
+            request=request,
+            response=httpx.Response(400, request=request),
+        )
+
+        good_response = MagicMock()
+        good_response.json.return_value = {"_embedded": {"elements": [{"id": 1, "subject": "Recovered Task"}]}}
+        good_response.raise_for_status = MagicMock()
+
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_client_instance = MagicMock()
+            mock_client_instance.get.side_effect = [bad_response, good_response]
+            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
+            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+
+            work_packages = get_work_packages(
+                project_id=1,
+                assigned_to_user_id=5,
+                status_id=7,
+            )
+
+            assert len(work_packages) == 1
+            assert work_packages[0]["subject"] == "Recovered Task"
+            assert mock_client_instance.get.call_count == 2
+
+            first_filters = json.loads(mock_client_instance.get.call_args_list[0].kwargs["params"]["filters"])
+            second_filters = json.loads(mock_client_instance.get.call_args_list[1].kwargs["params"]["filters"])
+
+            assert first_filters == [
+                {"assignee": {"operator": "=", "values": ["5"]}},
+                {"status": {"operator": "=", "values": ["7"]}},
+            ]
+            assert second_filters == [
+                {"assigned_to": {"operator": "=", "values": ["5"]}},
+                {"status_id": {"operator": "=", "values": ["7"]}},
+            ]
 
     def test_get_work_packages_filters_use_compact_json(self):
         """Test that filters use compact JSON format without spaces."""

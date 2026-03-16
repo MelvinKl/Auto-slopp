@@ -27,10 +27,7 @@ from auto_slopp.utils.git_operations import (
     get_current_branch,
     sanitize_branch_name,
 )
-from auto_slopp.utils.github_operations import (
-    create_pull_request,
-    get_pr_for_branch,
-)
+from auto_slopp.utils.github_operations import create_pull_request, get_pr_for_branch
 from auto_slopp.utils.openproject_operations import (
     add_comment_to_work_package,
     create_project,
@@ -40,13 +37,7 @@ from auto_slopp.utils.openproject_operations import (
     get_project_by_name,
     set_work_package_status,
 )
-from auto_slopp.utils.ralph import (
-    Plan,
-    PlanParser,
-    PlanWriter,
-    RalphLoop,
-    Step,
-)
+from auto_slopp.utils.ralph import Plan, PlanParser, PlanWriter, RalphLoop, Step
 from auto_slopp.worker import Worker
 from settings.main import settings
 

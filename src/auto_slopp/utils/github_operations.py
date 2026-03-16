@@ -287,7 +287,9 @@ def create_pull_request(
             if parts:
                 try:
                     pr_number = int(parts[-1])
-                except ValueError, IndexError:
+                except ValueError:
+                    pass
+                except IndexError:
                     pass
 
         return {"url": pr_url, "number": pr_number}

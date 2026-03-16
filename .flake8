@@ -1,0 +1,56 @@
+[flake8]
+exclude =
+    src/assistant/models,
+    .eggs,
+    .git,
+    .hg,
+    .mypy_cache,
+    .tox,
+    .venv,
+    .devcontainer,
+    venv,
+    _build,
+    buck-out,
+    build,
+    dist,
+    **/__init__.py
+statistics = true
+show-source = false
+max-complexity = 8
+max-line-length = 120
+extend-ignore =
+    E203,
+    W503,
+    Q000,
+    WOT001,
+    SIM105,
+    SIM117,
+    S101,
+    S105,
+    S106,
+    S108,
+    S110,
+    S403,
+    S404,
+    S405,
+    S603,
+    S605,
+    S607,
+    S608,
+    S609,
+    C901,
+    E501,
+    F401,
+    F811,
+    F841,
+    B007,
+    D104,
+    D406,
+    D407,
+    D202,
+    D401,
+    I100,
+    I201
+ban-relative-imports = true
+per-file-ignores =
+    ./tests/*: S101,I252
