@@ -382,14 +382,15 @@ def create_default_plan_steps() -> List[str]:
         List of default step descriptions
     """
     return [
-        "Understand the requirements by analyzing the issue title and description",
-        "Explore the codebase to understand the current implementation",
-        "Identify components that can be reused",
-        "Design a solution that is simple and focused",
-        "Write or update tests for the changes",
+        #"Understand the requirements by analyzing the issue title and description",
+        #"Explore the codebase to understand the current implementation",
+        "Design a solution that is simple and focused. Update the issue file in .ralph with your design",
+        "Identify components from this repo that are already implemented and that can be reused in the solution in .ralph for this issue and update your plan in the .ralph directory accordingly",                
         "Implement the solution",
+        "Write or update tests for the changes",
         "Run 'make lint' to ensure code quality",
         "Run 'make test' to verify all tests pass",
+        "Check if the README.md needs to be updated. Ensure the README.md contains an up-todate tree-view of the repository (max-depth=3) with a one-line description for each directory",
         "Commit the changes with a clear commit message",
         "Push the changes to the remote branch",
     ]
