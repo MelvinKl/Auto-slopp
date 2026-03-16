@@ -1,4 +1,4 @@
-.PHONY: help test lint format clean install dev-install coverage security
+.PHONY: help test lint format clean install dev-install coverage security apiclient
 
 # Default target
 help:
@@ -10,7 +10,11 @@ help:
 	@echo "  format       - Format code with black and isort"
 	@echo "  coverage     - Run tests with coverage report"
 	@echo "  security     - Run security vulnerability scans"
+	@echo "  apiclient    - Creates the API-client for openproject"
 	@echo "  clean        - Clean up temporary files and caches"
+
+apiclient:
+	docker run --user $(id -u):$(id -g) --rm -v $PWD:/local openapitools/openapi-generator-cli generate -i /local/docs/openproject.json -g python -o /local/src --additional-properties=generateSourceCodeOnly=True,packageName=auto_slopp.openproject.openapi_client
 
 # Install dependencies
 install:
