@@ -245,6 +245,176 @@ Environment="PATH=/path/to/Auto-slopp/.venv/bin:/usr/local/sbin:/usr/local/bin:/
 - Ensure the user has permission to access the repository directories
 - Check service logs: `sudo journalctl -u auto-slopp -f`
 
+## Docker
+
+Auto-slopp can be run as a Docker container for easy deployment and isolation.
+
+### Building the Docker Image
+
+Build the Docker image from the project root:
+
+```bash
+docker build -t auto-slopp:latest .
+```
+
+### Running the Container
+
+#### Basic Usage
+
+Run auto-slopp with default configuration:
+
+```bash
+docker run -d \
+  --name auto-slopp \
+  -v /path/to/managed/repos:/repos \
+  auto-slopp:latest
+```
+
+#### With Environment Variables
+
+Configure auto-slopp using environment variables:
+
+```bash
+docker run -d \
+  --name auto-slopp \
+  -v /path/to/managed/repos:/repos \
+  -e AUTO_SLOPP_DEBUG=false \
+  -e AUTO_SLOPP_TELEGRAM_ENABLED=true \
+  -e AUTO_SLOPP_TELEGRAM_BOT_TOKEN=your_bot_token \
+  -e AUTO_SLOPP_TELEGRAM_CHAT_ID=your_chat_id \
+  -e AUTO_SLOPP_WORKERS_DISABLED='[]' \
+  auto-slopp:latest
+```
+
+#### With CLI Configuration
+
+Configure tiered CLI tools:
+
+```bash
+docker run -d \
+  --name auto-slopp \
+  -v /path/to/managed/repos:/repos \
+  -e AUTO_SLOPP_CLI_CONFIGURATIONS='[
+    {
+      "cli_command": "gemini",
+      "cli_args": ["--yolo", "-p"],
+      "capability": 8,
+      "cooldown_seconds": 300
+    }
+  ]' \
+  auto-slopp:latest
+```
+
+#### Using an Environment File
+
+For complex configurations, use an environment file:
+
+```bash
+# Create .env file with your configuration
+cat > .env <<EOF
+AUTO_SLOPP_DEBUG=false
+AUTO_SLOPP_TELEGRAM_ENABLED=true
+AUTO_SLOPP_TELEGRAM_BOT_TOKEN=your_bot_token
+AUTO_SLOPP_TELEGRAM_CHAT_ID=your_chat_id
+AUTO_SLOPP_WORKERS_DISABLED=[]
+AUTO_SLOPP_SLOP_TIMEOUT=7200
+EOF
+
+# Run with environment file
+docker run -d \
+  --name auto-slopp \
+  -v /path/to/managed/repos:/repos \
+  --env-file .env \
+  auto-slopp:latest
+```
+
+### Docker Compose
+
+For easier management, use Docker Compose. Create a `docker-compose.yml` file:
+
+```yaml
+version: '3.8'
+
+services:
+  auto-slopp:
+    image: auto-slopp:latest
+    container_name: auto-slopp
+    restart: unless-stopped
+    volumes:
+      - /path/to/managed/repos:/repos
+    environment:
+      - AUTO_SLOPP_DEBUG=false
+      - AUTO_SLOPP_TELEGRAM_ENABLED=true
+      - AUTO_SLOPP_TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - AUTO_SLOPP_TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - AUTO_SLOPP_WORKERS_DISABLED=[]
+      - AUTO_SLOPP_SLOP_TIMEOUT=7200
+    env_file:
+      - .env
+```
+
+Run with Docker Compose:
+
+```bash
+# Start the service
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the service
+docker-compose down
+```
+
+### Volume Mounting
+
+The container requires access to your managed repositories:
+
+- **`/repos`**: Directory containing git repositories to be managed by auto-slopp
+  - Mount your repository directory: `-v /path/to/managed/repos:/repos`
+  - Each subdirectory should be a git repository
+
+### Container Management
+
+```bash
+# View container logs
+docker logs -f auto-slopp
+
+# Stop container
+docker stop auto-slopp
+
+# Start container
+docker start auto-slopp
+
+# Remove container
+docker rm auto-slopp
+
+# Execute shell inside container
+docker exec -it auto-slopp /bin/bash
+```
+
+### Important Notes
+
+- **Git Access**: The container includes git for repository operations
+- **Network Access**: Ensure the container can access GitHub, Telegram API, and other required services
+- **Volume Persistence**: Repository changes are persisted on the host through volume mounting
+- **Environment Variables**: All `AUTO_SLOPP_*` environment variables are supported
+
+### Troubleshooting Docker Issues
+
+**Container exits immediately:**
+- Check logs: `docker logs auto-slopp`
+- Verify environment variables are set correctly
+- Ensure volume mount path exists and has correct permissions
+
+**Permission denied errors:**
+- Ensure the mounted directory has proper permissions
+- On Linux, you may need to adjust ownership: `chown -R 1000:1000 /path/to/repos`
+
+**Network connectivity issues:**
+- Verify the container can reach external services
+- Check firewall rules if applicable
+
 ## Quick Start
 
 ### Basic Usage
