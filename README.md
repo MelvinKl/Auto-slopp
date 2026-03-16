@@ -971,39 +971,15 @@ flake8 src/ tests/
 
 ```
 Auto-slopp/
-├── src/
-│   ├── auto_slopp/
-│   │   ├── __init__.py
-│   │   ├── main.py              # Main entry point
-│   │   ├── worker.py            # Base Worker class
-│   │   ├── executor.py          # Worker execution
-│   │   ├── telegram_handler.py  # Telegram logging integration
-│   │   ├── base/                # Base classes
-│   │   │   └── __init__.py
-│   │   ├── workers/             # Worker implementations
-│   │   │   ├── pr_worker.py
-│   │   │   ├── github_issue_worker.py
-│   │   │   ├── openproject_worker.py
-│   │   │   └── stale_branch_cleanup_worker.py
-│   │   └── utils/               # Utility modules
-│   │       ├── git_operations.py
-│   │       ├── github_operations.py
-│   │       ├── file_operations.py
-│   │       ├── branch_analysis.py
-│   │       ├── repository_utils.py
-│   │       └── cli_executor.py
-│   └── settings/
-│       ├── __init__.py
-│       └── main.py              # Configuration management
-├── tests/
-│   ├── conftest.py              # Test fixtures
-│   ├── test_worker.py
-│   ├── test_settings.py
-│   ├── test_main.py
-│   ├── test_telegram_handler.py
-│   └── test_*_worker.py        # Worker tests
-├── pyproject.toml               # Project configuration
-└── README.md
+├── docs/                         # Documentation files (guides, API references)
+├── src/                          # Source code
+│   ├── auto_slopp/               # Main package with core modules and workers
+│   │   ├── utils/                # Utility modules (git, github, openproject operations)
+│   │   └── workers/              # Worker implementations (PR, GitHub issue, OpenProject)
+│   ├── openproject/              # OpenProject API client
+│   │   └── openapi_client/       # Generated OpenAPI client for OpenProject REST API
+│   └── settings/                 # Configuration management with Pydantic settings
+└── tests/                        # Test suite with pytest tests
 ```
 
 ## Configuration Examples

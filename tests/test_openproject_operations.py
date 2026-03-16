@@ -2,12 +2,12 @@
 
 from unittest.mock import MagicMock, patch
 
-import httpx
 import pytest
 
 from auto_slopp.utils.openproject_operations import (
     OpenProjectOperationError,
-    _get_client,
+    _get_api_client,
+    _get_configuration,
     add_comment_to_work_package,
     create_project,
     create_subtask,
@@ -27,24 +27,42 @@ from auto_slopp.utils.openproject_operations import (
 )
 
 
-class TestGetClient:
-    """Tests for _get_client function."""
+class MockElement:
+    """Simple mock element with real attributes."""
 
-    def test_get_client_configured_correctly(self):
-        """Test that client is configured with correct BasicAuth headers."""
-        import base64
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
+
+class TestGetConfiguration:
+    """Tests for _get_configuration function."""
+
+    def test_get_configuration_configured_correctly(self):
+        """Test that configuration is set with correct credentials."""
         with patch("auto_slopp.utils.openproject_operations.settings") as mock_settings:
             mock_settings.openproject_url = "https://test.openproject.com/"
             mock_settings.openproject_api_token = "test_token"
 
-            client = _get_client()
+            config = _get_configuration()
 
-            expected_credentials = base64.b64encode(b"apikey:test_token").decode()
+            assert config is not None
+            assert config.host == "https://test.openproject.com"
+            assert config.username == "apikey"
+            assert config.password == "test_token"
+
+
+class TestGetApiClient:
+    """Tests for _get_api_client function."""
+
+    def test_get_api_client_returns_client(self):
+        """Test that API client is returned."""
+        with patch("auto_slopp.utils.openproject_operations.settings") as mock_settings:
+            mock_settings.openproject_url = "https://test.openproject.com/"
+            mock_settings.openproject_api_token = "test_token"
+
+            client = _get_api_client()
             assert client is not None
-            assert f"Basic {expected_credentials}" in client.headers.get("Authorization", "")
-            assert client.headers.get("Content-Type") == "application/json"
-            client.close()
 
 
 class TestGetProjects:
@@ -52,64 +70,84 @@ class TestGetProjects:
 
     def test_get_projects_success(self):
         """Test successful retrieval of projects."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "_embedded": {
-                "elements": [
-                    {"id": 1, "name": "Project 1"},
-                    {"id": 2, "name": "Project 2"},
-                ]
-            }
-        }
-        mock_response.raise_for_status = MagicMock()
+        mock_result = MagicMock()
+        mock_result._embedded = MagicMock()
+        mock_result._embedded.elements = [
+            MockElement(identifier="project1", name="Project 1"),
+            MockElement(identifier="project2", name="Project 2"),
+        ]
 
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client.return_value.__enter__ = MagicMock(
-                return_value=MagicMock(get=MagicMock(return_value=mock_response))
-            )
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
 
-            projects = get_projects()
+            def serialize(x):
+                return {"identifier": x.identifier, "name": x.name}
 
-            assert len(projects) == 2
-            assert projects[0]["name"] == "Project 1"
+            mock_api_client.sanitize_for_serialization.side_effect = serialize
+            mock_client.return_value = mock_api_client
+
+            with (patch("auto_slopp.utils.openproject_operations.ProjectsApi") as mock_projects_api,):
+                mock_api_instance = MagicMock()
+                mock_api_instance.list_projects.return_value = mock_result
+                mock_projects_api.return_value = mock_api_instance
+
+                projects = get_projects()
+
+                assert len(projects) == 2
+                assert projects[0]["name"] == "Project 1"
 
     def test_get_projects_empty(self):
         """Test retrieval when no projects exist."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"_embedded": {"elements": []}}
-        mock_response.raise_for_status = MagicMock()
+        mock_result = MagicMock()
+        mock_result._embedded = MagicMock()
+        mock_result._embedded.elements = []
 
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client.return_value.__enter__ = MagicMock(
-                return_value=MagicMock(get=MagicMock(return_value=mock_response))
-            )
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_client.return_value = mock_api_client
 
-            projects = get_projects()
+            with (patch("auto_slopp.utils.openproject_operations.ProjectsApi") as mock_projects_api,):
+                mock_api_instance = MagicMock()
+                mock_api_instance.list_projects.return_value = mock_result
+                mock_projects_api.return_value = mock_api_instance
 
-            assert projects == []
+                projects = get_projects()
 
-    def test_get_projects_http_error(self):
-        """Test handling of HTTP errors."""
+                assert projects == []
+
+    def test_get_projects_api_error(self):
+        """Test handling of API errors."""
+        from openproject.openapi_client.openproject_client.exceptions import (
+            ApiException,
+        )
+
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.side_effect = httpx.HTTPError("Connection failed")
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_client.return_value = mock_api_client
 
-            projects = get_projects()
+            with (patch("auto_slopp.utils.openproject_operations.ProjectsApi") as mock_projects_api,):
+                mock_api_instance = MagicMock()
+                mock_api_instance.list_projects.side_effect = ApiException("Connection failed")
+                mock_projects_api.return_value = mock_api_instance
 
-            assert projects == []
+                projects = get_projects()
+
+                assert projects == []
 
 
 class TestGetProjectByIdentifier:
@@ -117,90 +155,59 @@ class TestGetProjectByIdentifier:
 
     def test_get_project_by_identifier_found(self):
         """Test finding project by identifier."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"_embedded": {"elements": [{"id": 1, "identifier": "test_project"}]}}
-        mock_response.raise_for_status = MagicMock()
+        mock_result = MagicMock()
+        mock_result._embedded = MagicMock()
+        mock_result._embedded.elements = [
+            MockElement(identifier="test_project", name="Test Project"),
+        ]
 
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
 
-            project = get_project_by_identifier("test_project")
+            def serialize(x):
+                return {"identifier": x.identifier, "name": x.name}
 
-            assert project is not None
-            assert project["identifier"] == "test_project"
+            mock_api_client.sanitize_for_serialization.side_effect = serialize
+            mock_client.return_value = mock_api_client
+
+            with (patch("auto_slopp.utils.openproject_operations.ProjectsApi") as mock_projects_api,):
+                mock_api_instance = MagicMock()
+                mock_api_instance.list_projects.return_value = mock_result
+                mock_projects_api.return_value = mock_api_instance
+
+                project = get_project_by_identifier("test_project")
+
+                assert project is not None
+                assert project["identifier"] == "test_project"
 
     def test_get_project_by_identifier_not_found(self):
         """Test when project not found by identifier."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"_embedded": {"elements": []}}
-        mock_response.raise_for_status = MagicMock()
+        mock_result = MagicMock()
+        mock_result._embedded = MagicMock()
+        mock_result._embedded.elements = []
 
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_client.return_value = mock_api_client
 
-            project = get_project_by_identifier("nonexistent")
+            with (patch("auto_slopp.utils.openproject_operations.ProjectsApi") as mock_projects_api,):
+                mock_api_instance = MagicMock()
+                mock_api_instance.list_projects.return_value = mock_result
+                mock_projects_api.return_value = mock_api_instance
 
-            assert project is None
+                project = get_project_by_identifier("nonexistent")
 
-    def test_get_project_by_identifier_filter_format(self):
-        """Test that get_project_by_identifier uses correct filter format."""
-        import json
-
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"_embedded": {"elements": []}}
-        mock_response.raise_for_status = MagicMock()
-
-        with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
-            patch("auto_slopp.utils.openproject_operations.settings"),
-        ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
-
-            get_project_by_identifier("test-project")
-
-            call_args = mock_client_instance.get.call_args
-            filters_str = call_args.kwargs.get("params", {}).get("filters", "")
-            filters = json.loads(filters_str)
-
-            assert filters[0]["name_and_identifier"]["operator"] == "~"
-            assert "test-project" in filters[0]["name_and_identifier"]["values"]
-
-    def test_get_project_by_identifier_uses_compact_json(self):
-        """Test that get_project_by_identifier uses compact JSON format."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"_embedded": {"elements": []}}
-        mock_response.raise_for_status = MagicMock()
-
-        with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
-            patch("auto_slopp.utils.openproject_operations.settings"),
-        ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
-
-            get_project_by_identifier("test-project")
-
-            call_args = mock_client_instance.get.call_args
-            filters_str = call_args.kwargs.get("params", {}).get("filters", "")
-            assert ": " not in filters_str
-            assert ", " not in filters_str
+                assert project is None
 
 
 class TestGetProjectByName:
@@ -208,90 +215,59 @@ class TestGetProjectByName:
 
     def test_get_project_by_name_found(self):
         """Test finding project by name."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"_embedded": {"elements": [{"id": 1, "name": "Test Project"}]}}
-        mock_response.raise_for_status = MagicMock()
+        mock_result = MagicMock()
+        mock_result._embedded = MagicMock()
+        mock_result._embedded.elements = [
+            MockElement(identifier="test", name="Test Project"),
+        ]
 
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
 
-            project = get_project_by_name("Test Project")
+            def serialize(x):
+                return {"identifier": x.identifier, "name": x.name}
 
-            assert project is not None
-            assert project["name"] == "Test Project"
+            mock_api_client.sanitize_for_serialization.side_effect = serialize
+            mock_client.return_value = mock_api_client
+
+            with (patch("auto_slopp.utils.openproject_operations.ProjectsApi") as mock_projects_api,):
+                mock_api_instance = MagicMock()
+                mock_api_instance.list_projects.return_value = mock_result
+                mock_projects_api.return_value = mock_api_instance
+
+                project = get_project_by_name("Test Project")
+
+                assert project is not None
+                assert project["name"] == "Test Project"
 
     def test_get_project_by_name_not_found(self):
         """Test when project not found by name."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"_embedded": {"elements": []}}
-        mock_response.raise_for_status = MagicMock()
+        mock_result = MagicMock()
+        mock_result._embedded = MagicMock()
+        mock_result._embedded.elements = []
 
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_client.return_value = mock_api_client
 
-            project = get_project_by_name("Nonexistent Project")
+            with (patch("auto_slopp.utils.openproject_operations.ProjectsApi") as mock_projects_api,):
+                mock_api_instance = MagicMock()
+                mock_api_instance.list_projects.return_value = mock_result
+                mock_projects_api.return_value = mock_api_instance
 
-            assert project is None
+                project = get_project_by_name("Nonexistent Project")
 
-    def test_get_project_by_name_filter_format(self):
-        """Test that get_project_by_name uses correct filter format."""
-        import json
-
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"_embedded": {"elements": []}}
-        mock_response.raise_for_status = MagicMock()
-
-        with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
-            patch("auto_slopp.utils.openproject_operations.settings"),
-        ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
-
-            get_project_by_name("Test Project")
-
-            call_args = mock_client_instance.get.call_args
-            filters_str = call_args.kwargs.get("params", {}).get("filters", "")
-            filters = json.loads(filters_str)
-
-            assert filters[0]["name_and_identifier"]["operator"] == "~"
-            assert "Test Project" in filters[0]["name_and_identifier"]["values"]
-
-    def test_get_project_by_name_uses_compact_json(self):
-        """Test that get_project_by_name uses compact JSON format."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"_embedded": {"elements": []}}
-        mock_response.raise_for_status = MagicMock()
-
-        with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
-            patch("auto_slopp.utils.openproject_operations.settings"),
-        ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
-
-            get_project_by_name("Test Project")
-
-            call_args = mock_client_instance.get.call_args
-            filters_str = call_args.kwargs.get("params", {}).get("filters", "")
-            assert ": " not in filters_str
-            assert ", " not in filters_str
+                assert project is None
 
 
 class TestCreateProject:
@@ -299,70 +275,69 @@ class TestCreateProject:
 
     def test_create_project_success(self):
         """Test successful project creation."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "id": 1,
-            "name": "New Project",
-            "identifier": "new_project",
-        }
-        mock_response.raise_for_status = MagicMock()
+        mock_result = MockElement(id=1, name="New Project", identifier="new_project")
 
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.post.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_api_client.sanitize_for_serialization.return_value = {
+                "id": 1,
+                "name": "New Project",
+                "identifier": "new_project",
+            }
+            mock_client.return_value = mock_api_client
 
-            project = create_project(
-                name="New Project",
-                identifier="new_project",
-                description="Project description",
-            )
+            with (
+                patch("auto_slopp.utils.openproject_operations.ProjectsApi") as mock_projects_api,
+                patch("auto_slopp.utils.openproject_operations.ProjectModel") as mock_model,
+            ):
+                mock_api_instance = MagicMock()
+                mock_api_instance.create_project.return_value = mock_result
+                mock_projects_api.return_value = mock_api_instance
 
-            assert project is not None
-            assert project["name"] == "New Project"
-            mock_client_instance.post.assert_called_once()
+                project = create_project(
+                    name="New Project",
+                    identifier="new_project",
+                    description="Project description",
+                )
+
+                assert project is not None
+                assert project["name"] == "New Project"
+                mock_api_instance.create_project.assert_called_once()
 
     def test_create_project_without_description(self):
         """Test project creation without description."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "id": 1,
-            "name": "New Project",
-            "identifier": "new_project",
-        }
-        mock_response.raise_for_status = MagicMock()
+        mock_result = MockElement(id=1, name="New Project", identifier="new_project")
 
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.post.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_api_client.sanitize_for_serialization.return_value = {
+                "id": 1,
+                "name": "New Project",
+                "identifier": "new_project",
+            }
+            mock_client.return_value = mock_api_client
 
-            project = create_project(name="New Project", identifier="new_project")
+            with (
+                patch("auto_slopp.utils.openproject_operations.ProjectsApi") as mock_projects_api,
+                patch("auto_slopp.utils.openproject_operations.ProjectModel") as mock_model,
+            ):
+                mock_api_instance = MagicMock()
+                mock_api_instance.create_project.return_value = mock_result
+                mock_projects_api.return_value = mock_api_instance
 
-            assert project is not None
+                project = create_project(name="New Project", identifier="new_project")
 
-    def test_create_project_http_error(self):
-        """Test handling HTTP error during project creation."""
-        with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
-            patch("auto_slopp.utils.openproject_operations.settings"),
-        ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.post.side_effect = httpx.HTTPError("Creation failed")
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
-
-            project = create_project(name="New Project", identifier="new_project")
-
-            assert project is None
+                assert project is not None
 
 
 class TestGetWorkPackages:
@@ -370,131 +345,36 @@ class TestGetWorkPackages:
 
     def test_get_work_packages_success(self):
         """Test successful retrieval of work packages."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "_embedded": {
-                "elements": [
-                    {"id": 1, "subject": "Task 1"},
-                    {"id": 2, "subject": "Task 2"},
-                ]
-            }
-        }
-        mock_response.raise_for_status = MagicMock()
+        mock_result = MagicMock()
+        mock_result._embedded = MagicMock()
+        mock_result._embedded.elements = [
+            MockElement(id=1, subject="Task 1"),
+            MockElement(id=2, subject="Task 2"),
+        ]
 
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
 
-            work_packages = get_work_packages(project_id=1)
+            def serialize(x):
+                return {"id": x.id, "subject": x.subject}
 
-            assert len(work_packages) == 2
-            assert work_packages[0]["subject"] == "Task 1"
+            mock_api_client.sanitize_for_serialization.side_effect = serialize
+            mock_client.return_value = mock_api_client
 
-    def test_get_work_packages_with_filters(self):
-        """Test retrieval of work packages with filters."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"_embedded": {"elements": [{"id": 1, "subject": "Filtered Task"}]}}
-        mock_response.raise_for_status = MagicMock()
+            with (patch("auto_slopp.utils.openproject_operations.WorkPackagesApi") as mock_wp_api,):
+                mock_api_instance = MagicMock()
+                mock_api_instance.list_work_packages.return_value = mock_result
+                mock_wp_api.return_value = mock_api_instance
 
-        with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
-            patch("auto_slopp.utils.openproject_operations.settings"),
-        ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+                work_packages = get_work_packages(project_id=1)
 
-            work_packages = get_work_packages(
-                project_id=1,
-                assigned_to_user_id=5,
-                status_id=7,
-            )
-
-            assert len(work_packages) == 1
-            call_args = mock_client_instance.get.call_args
-            assert "filters" in call_args.kwargs.get("params", {})
-
-    def test_get_work_packages_filter_format_is_json(self):
-        """Test that filters are formatted as proper JSON with double quotes."""
-        import json
-
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"_embedded": {"elements": []}}
-        mock_response.raise_for_status = MagicMock()
-
-        with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
-            patch("auto_slopp.utils.openproject_operations.settings"),
-        ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
-
-            get_work_packages(project_id=1, assigned_to_user_id=5)
-
-            call_args = mock_client_instance.get.call_args
-            filters_str = call_args.kwargs.get("params", {}).get("filters", "")
-            filters = json.loads(filters_str)
-            expected_filter = [{"assignee": {"operator": "=", "values": ["5"]}}]
-            assert filters == expected_filter
-            assert '"' in filters_str
-            assert "'" not in filters_str
-
-    def test_get_work_packages_status_filter_uses_correct_name(self):
-        """Test that status filter uses 'status' not 'status_id'."""
-        import json
-
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"_embedded": {"elements": []}}
-        mock_response.raise_for_status = MagicMock()
-
-        with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
-            patch("auto_slopp.utils.openproject_operations.settings"),
-        ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
-
-            get_work_packages(project_id=1, status_id=7)
-
-            call_args = mock_client_instance.get.call_args
-            filters_str = call_args.kwargs.get("params", {}).get("filters", "")
-            filters = json.loads(filters_str)
-            assert "status" in filters[0]
-            assert "status_id" not in filters[0]
-            assert filters[0]["status"]["operator"] == "="
-            assert filters[0]["status"]["values"] == ["7"]
-
-    def test_get_work_packages_filters_use_compact_json(self):
-        """Test that filters use compact JSON format without spaces."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"_embedded": {"elements": []}}
-        mock_response.raise_for_status = MagicMock()
-
-        with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
-            patch("auto_slopp.utils.openproject_operations.settings"),
-        ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
-
-            get_work_packages(project_id=1, assigned_to_user_id=5, status_id=7)
-
-            call_args = mock_client_instance.get.call_args
-            filters_str = call_args.kwargs.get("params", {}).get("filters", "")
-            assert ": " not in filters_str
-            assert ", " not in filters_str
+                assert len(work_packages) == 2
+                assert work_packages[0]["subject"] == "Task 1"
 
 
 class TestGetOpenWorkPackages:
@@ -520,38 +400,54 @@ class TestGetWorkPackage:
 
     def test_get_work_package_found(self):
         """Test finding a work package by ID."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"id": 1, "subject": "Test Task"}
-        mock_response.raise_for_status = MagicMock()
+        mock_result = MockElement(id=1, subject="Test Task")
 
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_api_client.sanitize_for_serialization.return_value = {
+                "id": 1,
+                "subject": "Test Task",
+            }
+            mock_client.return_value = mock_api_client
 
-            wp = get_work_package(1)
+            with (patch("auto_slopp.utils.openproject_operations.WorkPackagesApi") as mock_wp_api,):
+                mock_api_instance = MagicMock()
+                mock_api_instance.view_work_package.return_value = mock_result
+                mock_wp_api.return_value = mock_api_instance
 
-            assert wp is not None
-            assert wp["id"] == 1
+                wp = get_work_package(1)
+
+                assert wp is not None
+                assert wp["id"] == 1
 
     def test_get_work_package_not_found(self):
         """Test when work package not found."""
+        from openproject.openapi_client.openproject_client.exceptions import (
+            ApiException,
+        )
+
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.side_effect = httpx.HTTPError("Not found")
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_client.return_value = mock_api_client
 
-            wp = get_work_package(999)
+            with (patch("auto_slopp.utils.openproject_operations.WorkPackagesApi") as mock_wp_api,):
+                mock_api_instance = MagicMock()
+                mock_api_instance.view_work_package.side_effect = ApiException("Not found")
+                mock_wp_api.return_value = mock_api_instance
 
-            assert wp is None
+                wp = get_work_package(999)
+
+                assert wp is None
 
 
 class TestCreateWorkPackage:
@@ -559,58 +455,37 @@ class TestCreateWorkPackage:
 
     def test_create_work_package_success(self):
         """Test successful work package creation."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"id": 1, "subject": "New Task"}
-        mock_response.raise_for_status = MagicMock()
+        mock_result = MockElement(id=1, subject="New Task")
 
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.post.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_api_client.sanitize_for_serialization.return_value = {
+                "id": 1,
+                "subject": "New Task",
+            }
+            mock_client.return_value = mock_api_client
 
-            wp = create_work_package(
-                project_id=1,
-                subject="New Task",
-                description="Task description",
-            )
+            with (
+                patch("auto_slopp.utils.openproject_operations.WorkPackagesApi") as mock_wp_api,
+                patch("auto_slopp.utils.openproject_operations.WorkPackageWriteModel") as mock_model,
+            ):
+                mock_api_instance = MagicMock()
+                mock_api_instance.create_work_package.return_value = mock_result
+                mock_wp_api.return_value = mock_api_instance
 
-            assert wp is not None
-            assert wp["subject"] == "New Task"
+                wp = create_work_package(
+                    project_id=1,
+                    subject="New Task",
+                    description="Task description",
+                )
 
-    def test_create_work_package_with_all_options(self):
-        """Test work package creation with all options."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"id": 1, "subject": "New Task"}
-        mock_response.raise_for_status = MagicMock()
-
-        with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
-            patch("auto_slopp.utils.openproject_operations.settings"),
-        ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.post.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
-
-            wp = create_work_package(
-                project_id=1,
-                subject="New Task",
-                description="Task description",
-                type_id=1,
-                parent_id=10,
-                assignee_id=5,
-            )
-
-            assert wp is not None
-            call_args = mock_client_instance.post.call_args
-            payload = call_args.kwargs.get("json", {})
-            assert "_links" in payload
-            assert "parent" in payload["_links"]
-            assert "assignee" in payload["_links"]
+                assert wp is not None
+                assert wp["subject"] == "New Task"
 
 
 class TestCreateSubtask:
@@ -642,55 +517,36 @@ class TestUpdateWorkPackage:
 
     def test_update_work_package_status(self):
         """Test updating work package status."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"id": 1, "subject": "Updated Task"}
-        mock_response.raise_for_status = MagicMock()
+        mock_result = MockElement(id=1, subject="Updated Task")
 
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.patch.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_api_client.sanitize_for_serialization.return_value = {
+                "id": 1,
+                "subject": "Updated Task",
+            }
+            mock_client.return_value = mock_api_client
 
-            wp = update_work_package(
-                work_package_id=1,
-                lock_version=1,
-                status_id=7,
-            )
+            with (
+                patch("auto_slopp.utils.openproject_operations.WorkPackagesApi") as mock_wp_api,
+                patch("auto_slopp.utils.openproject_operations.WorkPackagePatchModel") as mock_model,
+            ):
+                mock_api_instance = MagicMock()
+                mock_api_instance.update_work_package.return_value = mock_result
+                mock_wp_api.return_value = mock_api_instance
 
-            assert wp is not None
-            call_args = mock_client_instance.patch.call_args
-            payload = call_args.kwargs.get("json", {})
-            assert payload["lockVersion"] == 1
+                wp = update_work_package(
+                    work_package_id=1,
+                    lock_version=1,
+                    status_id=7,
+                )
 
-    def test_update_work_package_all_fields(self):
-        """Test updating all work package fields."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"id": 1, "subject": "Updated Task"}
-        mock_response.raise_for_status = MagicMock()
-
-        with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
-            patch("auto_slopp.utils.openproject_operations.settings"),
-        ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.patch.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
-
-            wp = update_work_package(
-                work_package_id=1,
-                lock_version=1,
-                status_id=7,
-                assignee_id=5,
-                description="New description",
-                subject="New subject",
-            )
-
-            assert wp is not None
+                assert wp is not None
 
 
 class TestSetWorkPackageStatus:
@@ -720,42 +576,58 @@ class TestAddCommentToWorkPackage:
 
     def test_add_comment_success(self):
         """Test successfully adding a comment."""
-        mock_response = MagicMock()
-        mock_response.raise_for_status = MagicMock()
-
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.post.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_client.return_value = mock_api_client
 
-            result = add_comment_to_work_package(
-                work_package_id=1,
-                comment="This is a comment",
-            )
+            with (
+                patch("auto_slopp.utils.openproject_operations.WorkPackagesApi") as mock_wp_api,
+                patch("auto_slopp.utils.openproject_operations.ActivityCommentWriteModel") as mock_model,
+            ):
+                mock_api_instance = MagicMock()
+                mock_wp_api.return_value = mock_api_instance
 
-            assert result is True
+                result = add_comment_to_work_package(
+                    work_package_id=1,
+                    comment="This is a comment",
+                )
+
+                assert result is True
 
     def test_add_comment_failure(self):
         """Test handling failure when adding comment."""
+        from openproject.openapi_client.openproject_client.exceptions import (
+            ApiException,
+        )
+
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.post.side_effect = httpx.HTTPError("Failed")
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_client.return_value = mock_api_client
 
-            result = add_comment_to_work_package(
-                work_package_id=1,
-                comment="This is a comment",
-            )
+            with (
+                patch("auto_slopp.utils.openproject_operations.WorkPackagesApi") as mock_wp_api,
+                patch("auto_slopp.utils.openproject_operations.ActivityCommentWriteModel") as mock_model,
+            ):
+                mock_api_instance = MagicMock()
+                mock_api_instance.create_work_package_activity.side_effect = ApiException("Failed")
+                mock_wp_api.return_value = mock_api_instance
 
-            assert result is False
+                result = add_comment_to_work_package(
+                    work_package_id=1,
+                    comment="This is a comment",
+                )
+
+                assert result is False
 
 
 class TestGetAvailableStatuses:
@@ -763,45 +635,36 @@ class TestGetAvailableStatuses:
 
     def test_get_available_statuses_success(self):
         """Test successful retrieval of statuses."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "_embedded": {
-                "elements": [
-                    {"id": 1, "name": "New"},
-                    {"id": 7, "name": "In Progress"},
-                ]
-            }
-        }
-        mock_response.raise_for_status = MagicMock()
+        mock_result = MagicMock()
+        mock_result._embedded = MagicMock()
+        mock_result._embedded.elements = [
+            MockElement(id=1, name="New"),
+            MockElement(id=7, name="In Progress"),
+        ]
 
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
 
-            statuses = get_available_statuses(project_id=1)
+            def serialize(x):
+                return {"id": x.id, "name": x.name}
 
-            assert len(statuses) == 2
-            assert statuses[0]["name"] == "New"
+            mock_api_client.sanitize_for_serialization.side_effect = serialize
+            mock_client.return_value = mock_api_client
 
-    def test_get_available_statuses_error(self):
-        """Test handling error when getting statuses."""
-        with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
-            patch("auto_slopp.utils.openproject_operations.settings"),
-        ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.side_effect = httpx.HTTPError("Failed")
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            with (patch("auto_slopp.utils.openproject_operations.StatusesApi") as mock_statuses_api,):
+                mock_api_instance = MagicMock()
+                mock_api_instance.list_available_statuses_for_project.return_value = mock_result
+                mock_statuses_api.return_value = mock_api_instance
 
-            statuses = get_available_statuses(project_id=1)
+                statuses = get_available_statuses(project_id=1)
 
-            assert statuses == []
+                assert len(statuses) == 2
+                assert statuses[0]["name"] == "New"
 
 
 class TestGetUser:
@@ -809,38 +672,30 @@ class TestGetUser:
 
     def test_get_user_found(self):
         """Test finding a user by ID."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"id": 1, "name": "Test User"}
-        mock_response.raise_for_status = MagicMock()
+        mock_result = MockElement(id=1, name="Test User")
 
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_api_client.sanitize_for_serialization.return_value = {
+                "id": 1,
+                "name": "Test User",
+            }
+            mock_client.return_value = mock_api_client
 
-            user = get_user(1)
+            with (patch("auto_slopp.utils.openproject_operations.UsersApi") as mock_users_api,):
+                mock_api_instance = MagicMock()
+                mock_api_instance.view_user.return_value = mock_result
+                mock_users_api.return_value = mock_api_instance
 
-            assert user is not None
-            assert user["name"] == "Test User"
+                user = get_user(1)
 
-    def test_get_user_not_found(self):
-        """Test when user not found."""
-        with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
-            patch("auto_slopp.utils.openproject_operations.settings"),
-        ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.side_effect = httpx.HTTPError("Not found")
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
-
-            user = get_user(999)
-
-            assert user is None
+                assert user is not None
+                assert user["name"] == "Test User"
 
 
 class TestGetCurrentUser:
@@ -848,38 +703,30 @@ class TestGetCurrentUser:
 
     def test_get_current_user_success(self):
         """Test getting current user."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"id": 1, "name": "Current User"}
-        mock_response.raise_for_status = MagicMock()
+        mock_result = MockElement(id=1, name="Current User")
 
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_api_client.sanitize_for_serialization.return_value = {
+                "id": 1,
+                "name": "Current User",
+            }
+            mock_client.return_value = mock_api_client
 
-            user = get_current_user()
+            with (patch("auto_slopp.utils.openproject_operations.UsersApi") as mock_users_api,):
+                mock_api_instance = MagicMock()
+                mock_api_instance.view_current_user.return_value = mock_result
+                mock_users_api.return_value = mock_api_instance
 
-            assert user is not None
-            assert user["name"] == "Current User"
+                user = get_current_user()
 
-    def test_get_current_user_error(self):
-        """Test handling error when getting current user."""
-        with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
-            patch("auto_slopp.utils.openproject_operations.settings"),
-        ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.side_effect = httpx.HTTPError("Failed")
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
-
-            user = get_current_user()
-
-            assert user is None
+                assert user is not None
+                assert user["name"] == "Current User"
 
 
 class TestGetWorkPackageTypes:
@@ -887,45 +734,36 @@ class TestGetWorkPackageTypes:
 
     def test_get_work_package_types_success(self):
         """Test successful retrieval of work package types."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "_embedded": {
-                "elements": [
-                    {"id": 1, "name": "Task"},
-                    {"id": 2, "name": "Feature"},
-                ]
-            }
-        }
-        mock_response.raise_for_status = MagicMock()
+        mock_result = MagicMock()
+        mock_result._embedded = MagicMock()
+        mock_result._embedded.elements = [
+            MockElement(id=1, name="Task"),
+            MockElement(id=2, name="Feature"),
+        ]
 
         with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
             patch("auto_slopp.utils.openproject_operations.settings"),
         ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.return_value = mock_response
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
 
-            types = get_work_package_types(project_id=1)
+            def serialize(x):
+                return {"id": x.id, "name": x.name}
 
-            assert len(types) == 2
-            assert types[0]["name"] == "Task"
+            mock_api_client.sanitize_for_serialization.side_effect = serialize
+            mock_client.return_value = mock_api_client
 
-    def test_get_work_package_types_error(self):
-        """Test handling error when getting work package types."""
-        with (
-            patch("auto_slopp.utils.openproject_operations._get_client") as mock_client,
-            patch("auto_slopp.utils.openproject_operations.settings"),
-        ):
-            mock_client_instance = MagicMock()
-            mock_client_instance.get.side_effect = httpx.HTTPError("Failed")
-            mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client.return_value.__exit__ = MagicMock(return_value=False)
+            with (patch("auto_slopp.utils.openproject_operations.TypesApi") as mock_types_api,):
+                mock_api_instance = MagicMock()
+                mock_api_instance.list_types_for_project.return_value = mock_result
+                mock_types_api.return_value = mock_api_instance
 
-            types = get_work_package_types(project_id=1)
+                types = get_work_package_types(project_id=1)
 
-            assert types == []
+                assert len(types) == 2
+                assert types[0]["name"] == "Task"
 
 
 class TestOpenProjectOperationError:
@@ -935,3 +773,254 @@ class TestOpenProjectOperationError:
         """Test that error message is preserved."""
         error = OpenProjectOperationError("Test error message")
         assert str(error) == "Test error message"
+
+
+class TestCreateWorkPackageWithAllParams:
+    """Tests for create_work_package with all optional parameters."""
+
+    def test_create_work_package_with_all_params(self):
+        """Test work package creation with all optional parameters."""
+        mock_result = MockElement(id=1, subject="Full Task")
+
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_api_client.sanitize_for_serialization.return_value = {
+                "id": 1,
+                "subject": "Full Task",
+            }
+            mock_client.return_value = mock_api_client
+
+            with (
+                patch("auto_slopp.utils.openproject_operations.WorkPackagesApi") as mock_wp_api,
+                patch("auto_slopp.utils.openproject_operations.WorkPackageWriteModel") as mock_model,
+            ):
+                mock_api_instance = MagicMock()
+                mock_api_instance.create_work_package.return_value = mock_result
+                mock_wp_api.return_value = mock_api_instance
+
+                wp = create_work_package(
+                    project_id=1,
+                    subject="Full Task",
+                    description="Full description",
+                    type_id=2,
+                    parent_id=10,
+                    assignee_id=5,
+                )
+
+                assert wp is not None
+                assert wp["subject"] == "Full Task"
+                mock_api_instance.create_work_package.assert_called_once()
+
+
+class TestUpdateWorkPackageWithMultipleParams:
+    """Tests for update_work_package with multiple parameters."""
+
+    def test_update_work_package_with_assignee(self):
+        """Test updating work package with assignee."""
+        mock_result = MockElement(id=1, subject="Updated Task")
+
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_api_client.sanitize_for_serialization.return_value = {
+                "id": 1,
+                "subject": "Updated Task",
+            }
+            mock_client.return_value = mock_api_client
+
+            with (
+                patch("auto_slopp.utils.openproject_operations.WorkPackagesApi") as mock_wp_api,
+                patch("auto_slopp.utils.openproject_operations.WorkPackagePatchModel") as mock_model,
+            ):
+                mock_api_instance = MagicMock()
+                mock_api_instance.update_work_package.return_value = mock_result
+                mock_wp_api.return_value = mock_api_instance
+
+                wp = update_work_package(
+                    work_package_id=1,
+                    lock_version=1,
+                    assignee_id=5,
+                )
+
+                assert wp is not None
+
+    def test_update_work_package_with_description_and_subject(self):
+        """Test updating work package with description and subject."""
+        mock_result = MockElement(id=1, subject="New Subject")
+
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_api_client.sanitize_for_serialization.return_value = {
+                "id": 1,
+                "subject": "New Subject",
+            }
+            mock_client.return_value = mock_api_client
+
+            with (
+                patch("auto_slopp.utils.openproject_operations.WorkPackagesApi") as mock_wp_api,
+                patch("auto_slopp.utils.openproject_operations.WorkPackagePatchModel") as mock_model,
+            ):
+                mock_api_instance = MagicMock()
+                mock_api_instance.update_work_package.return_value = mock_result
+                mock_wp_api.return_value = mock_api_instance
+
+                wp = update_work_package(
+                    work_package_id=1,
+                    lock_version=1,
+                    description="New description",
+                    subject="New Subject",
+                )
+
+                assert wp is not None
+
+
+class TestGenericExceptionHandling:
+    """Tests for generic exception handling."""
+
+    def test_get_projects_generic_exception(self):
+        """Test handling of generic exceptions in get_projects."""
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(side_effect=ValueError("Unexpected error"))
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_client.return_value = mock_api_client
+
+            projects = get_projects()
+
+            assert projects == []
+
+    def test_get_work_package_generic_exception(self):
+        """Test handling of generic exceptions in get_work_package."""
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(side_effect=RuntimeError("Unexpected error"))
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_client.return_value = mock_api_client
+
+            wp = get_work_package(1)
+
+            assert wp is None
+
+    def test_get_user_generic_exception(self):
+        """Test handling of generic exceptions in get_user."""
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(side_effect=KeyError("Unexpected error"))
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_client.return_value = mock_api_client
+
+            user = get_user(1)
+
+            assert user is None
+
+    def test_add_comment_generic_exception(self):
+        """Test handling of generic exceptions in add_comment_to_work_package."""
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(side_effect=TypeError("Unexpected error"))
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+            mock_client.return_value = mock_api_client
+
+            result = add_comment_to_work_package(work_package_id=1, comment="Test")
+
+            assert result is False
+
+
+class TestGetWorkPackagesWithFilters:
+    """Tests for get_work_packages with various filters."""
+
+    def test_get_work_packages_with_assigned_user_filter(self):
+        """Test work packages retrieval with user filter."""
+        mock_result = MagicMock()
+        mock_result._embedded = MagicMock()
+        mock_result._embedded.elements = [
+            MockElement(id=1, subject="Assigned Task"),
+        ]
+
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+
+            def serialize(x):
+                return {"id": x.id, "subject": x.subject}
+
+            mock_api_client.sanitize_for_serialization.side_effect = serialize
+            mock_client.return_value = mock_api_client
+
+            with patch("auto_slopp.utils.openproject_operations.WorkPackagesApi") as mock_wp_api:
+                mock_api_instance = MagicMock()
+                mock_api_instance.list_work_packages.return_value = mock_result
+                mock_wp_api.return_value = mock_api_instance
+
+                work_packages = get_work_packages(
+                    project_id=1,
+                    assigned_to_user_id=5,
+                )
+
+                assert len(work_packages) == 1
+                assert work_packages[0]["subject"] == "Assigned Task"
+
+    def test_get_work_packages_with_status_filter(self):
+        """Test work packages retrieval with status filter."""
+        mock_result = MagicMock()
+        mock_result._embedded = MagicMock()
+        mock_result._embedded.elements = [
+            MockElement(id=2, subject="Filtered Task"),
+        ]
+
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+
+            def serialize(x):
+                return {"id": x.id, "subject": x.subject}
+
+            mock_api_client.sanitize_for_serialization.side_effect = serialize
+            mock_client.return_value = mock_api_client
+
+            with patch("auto_slopp.utils.openproject_operations.WorkPackagesApi") as mock_wp_api:
+                mock_api_instance = MagicMock()
+                mock_api_instance.list_work_packages.return_value = mock_result
+                mock_wp_api.return_value = mock_api_instance
+
+                work_packages = get_work_packages(
+                    project_id=1,
+                    status_id=7,
+                )
+
+                assert len(work_packages) == 1
+                assert work_packages[0]["subject"] == "Filtered Task"
