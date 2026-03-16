@@ -495,7 +495,8 @@ class GitHubIssueWorker(Worker):
 
         plan = Plan(
             title=f"Issue Plan: {issue_title}",
-            description=description+"\nEnsure that you save the result of each step in a file in .ralph directory. Check there for relevant files before each step and load them.\n",
+            description=description
+            + "\nEnsure that you save the result of each step in a file in .ralph directory. Check there for relevant files before each step and load them.\n",
             steps=[Step(number=i + 1, description=desc, is_closed=False) for i, desc in enumerate(steps)],
         )
 
