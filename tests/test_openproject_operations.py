@@ -184,6 +184,42 @@ class TestGetProjectByIdentifier:
 
                 assert project is not None
                 assert project["identifier"] == "test_project"
+                mock_api_instance.list_projects.assert_called_once_with()
+
+    def test_get_project_by_identifier_found_among_multiple(self):
+        """Test finding project by identifier among multiple projects."""
+        mock_result = MagicMock()
+        mock_result._embedded = MagicMock()
+        mock_result._embedded.elements = [
+            MockElement(identifier="other_project", name="Other Project"),
+            MockElement(identifier="test_project", name="Test Project"),
+            MockElement(identifier="another_project", name="Another Project"),
+        ]
+
+        with (
+            patch("auto_slopp.utils.openproject_operations._get_api_client") as mock_client,
+            patch("auto_slopp.utils.openproject_operations.settings"),
+        ):
+            mock_api_client = MagicMock()
+            mock_api_client.__enter__ = MagicMock(return_value=mock_api_client)
+            mock_api_client.__exit__ = MagicMock(return_value=False)
+
+            def serialize(x):
+                return {"identifier": x.identifier, "name": x.name}
+
+            mock_api_client.sanitize_for_serialization.side_effect = serialize
+            mock_client.return_value = mock_api_client
+
+            with (patch("auto_slopp.utils.openproject_operations.ProjectsApi") as mock_projects_api,):
+                mock_api_instance = MagicMock()
+                mock_api_instance.list_projects.return_value = mock_result
+                mock_projects_api.return_value = mock_api_instance
+
+                project = get_project_by_identifier("test_project")
+
+                assert project is not None
+                assert project["identifier"] == "test_project"
+                assert project["name"] == "Test Project"
 
     def test_get_project_by_identifier_not_found(self):
         """Test when project not found by identifier."""
@@ -208,6 +244,7 @@ class TestGetProjectByIdentifier:
                 project = get_project_by_identifier("nonexistent")
 
                 assert project is None
+                mock_api_instance.list_projects.assert_called_once_with()
 
 
 class TestGetProjectByName:
@@ -244,6 +281,8 @@ class TestGetProjectByName:
 
                 assert project is not None
                 assert project["name"] == "Test Project"
+                expected_filter = '[{"name":{"operator":"~","values":["Test Project"]}}]'
+                mock_api_instance.list_projects.assert_called_once_with(filters=expected_filter)
 
     def test_get_project_by_name_not_found(self):
         """Test when project not found by name."""
@@ -268,6 +307,8 @@ class TestGetProjectByName:
                 project = get_project_by_name("Nonexistent Project")
 
                 assert project is None
+                expected_filter = '[{"name":{"operator":"~","values":["Nonexistent Project"]}}]'
+                mock_api_instance.list_projects.assert_called_once_with(filters=expected_filter)
 
 
 class TestCreateProject:
