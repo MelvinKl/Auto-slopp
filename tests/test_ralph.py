@@ -395,10 +395,15 @@ class TestCreateDefaultPlanSteps:
         """Test that default steps are created."""
         steps = create_default_plan_steps()
 
-        assert len(steps) == 10
+        assert len(steps) == 11
         assert "Understand the requirements" in steps[0]
         assert "Explore the codebase" in steps[1]
+        assert "Design a solution" in steps[2]
+        assert "Identify components" in steps[3]
+        assert "Implement the solution" in steps[4]
+        assert "Write or update tests" in steps[5]
         assert "make lint" in steps[6]
         assert "make test" in steps[7]
-        assert "Commit the changes" in steps[8]
-        assert "Push the changes" in steps[9]
+        assert "Check if the README.md needs" in steps[8]
+        assert "Commit the changes" in steps[9]
+        assert "Push the changes" in steps[10]
