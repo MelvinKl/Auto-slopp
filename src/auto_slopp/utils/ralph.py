@@ -381,7 +381,7 @@ def create_default_plan_steps() -> List[str]:
     Returns:
         List of default step descriptions
     """
-    return [        
+    return [
         "Implement the solution for the problem. Ensure to re-use existing code if possible",
         "Write or update tests for the changes",
         "Run 'make lint' to ensure code quality",
