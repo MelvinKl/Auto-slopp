@@ -99,14 +99,12 @@ def get_project_by_identifier(identifier: str) -> Optional[Dict[str, Any]]:
     try:
         with _get_api_client() as api_client:
             api = ProjectsApi(api_client)
-            result = api.list_projects(filters=f'[{{"identifier":{{"operator":"=","values":["{identifier}"]}}}}]')
+            result = api.list_projects()
             if result and hasattr(result, "_embedded") and result._embedded:
                 elements = getattr(result._embedded, "elements", [])
                 for project in elements:
                     if hasattr(project, "identifier") and project.identifier == identifier:
                         return api_client.sanitize_for_serialization(project)
-                if elements:
-                    return api_client.sanitize_for_serialization(elements[0])
             return None
     except ApiException as e:
         logger.error(f"Failed to get project {identifier}: {e}")
@@ -128,7 +126,7 @@ def get_project_by_name(name: str) -> Optional[Dict[str, Any]]:
     try:
         with _get_api_client() as api_client:
             api = ProjectsApi(api_client)
-            result = api.list_projects(filters=f'[{{"name_and_identifier":{{"operator":"~","values":["{name}"]}}}}]')
+            result = api.list_projects(filters=f'[{{"name":{{"operator":"~","values":["{name}"]}}}}]')
             if result and hasattr(result, "_embedded") and result._embedded:
                 elements = getattr(result._embedded, "elements", [])
                 for project in elements:
