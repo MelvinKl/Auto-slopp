@@ -432,6 +432,28 @@ class TestOpenProjectWorker:
             assert mock_get_id.call_count == 2
             mock_create.assert_called_once()
 
+    def test_get_or_create_project_create_fails_not_found(self):
+        """Test handling when create_project fails and project still doesn't exist."""
+        worker = OpenProjectWorker(dry_run=True)
+
+        with (
+            patch("auto_slopp.workers.openproject_worker.settings") as mock_settings,
+            patch("auto_slopp.workers.openproject_worker.get_project_by_identifier") as mock_get_id,
+            patch("auto_slopp.workers.openproject_worker.get_project_by_name") as mock_get_name,
+            patch("auto_slopp.workers.openproject_worker.create_project") as mock_create,
+        ):
+            mock_settings.openproject_project_prefix = ""
+            mock_settings.openproject_create_projects = True
+            mock_get_id.return_value = None
+            mock_get_name.return_value = None
+            mock_create.return_value = None
+
+            result = worker._get_or_create_project("test-repo")
+
+            assert result is None
+            assert mock_get_id.call_count == 2
+            mock_create.assert_called_once()
+
     def test_is_configured_true(self):
         """Test is_configured returns True when properly configured."""
         worker = OpenProjectWorker(dry_run=True)
