@@ -99,7 +99,9 @@ def get_project_by_identifier(identifier: str) -> Optional[Dict[str, Any]]:
     try:
         with _get_api_client() as api_client:
             api = ProjectsApi(api_client)
-            result = api.list_projects(filters=f'[{{"identifier":{{"operator":"=","values":["{identifier}"]}}}}]')
+            result = api.list_projects(
+                filters=f'[{{"name_and_identifier":{{"operator":"=","values":["{identifier}"]}}}}]'
+            )
             if result and hasattr(result, "_embedded") and result._embedded:
                 elements = getattr(result._embedded, "elements", [])
                 for project in elements:
@@ -168,7 +170,7 @@ def create_project(
                 "identifier": identifier,
             }
             if description:
-                project_data["description"] = {"raw": description}
+                project_data["description"] = {"format": "markdown", "raw": description}
 
             project_model = ProjectModel(**project_data)
             result = api.create_project(project_model=project_model)
