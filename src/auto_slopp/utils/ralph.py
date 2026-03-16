@@ -393,8 +393,8 @@ def create_default_plan_steps() -> List[str]:
         List of default step descriptions
     """
     return [
-        # "Understand the requirements by analyzing the issue title and description",
-        # "Explore the codebase to understand the current implementation",
+        "Understand the requirements by analyzing the issue title and description",
+        "Explore the codebase to understand the current implementation",
         "Design a solution that is simple and focused. Update the issue file in .ralph with your design",
         "Identify components from this repo that are already implemented and that can be reused in the solution in .ralph for this issue and update your plan in the .ralph directory accordingly",
         "Implement the solution",
