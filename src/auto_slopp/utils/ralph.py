@@ -381,7 +381,11 @@ def create_default_plan_steps() -> List[str]:
     Returns:
         List of default step descriptions
     """
-    return [        
+    return [
+        "Understand the requirements and analyze the problem",
+        "Explore the codebase to understand the existing structure and relevant components",
+        "Design a solution that fits the codebase architecture",
+        "Identify components and modules that need to be modified or created",
         "Implement the solution for the problem. Ensure to re-use existing code if possible",
         "Write or update tests for the changes",
         "Run 'make lint' to ensure code quality",
