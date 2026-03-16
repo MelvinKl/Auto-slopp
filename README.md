@@ -840,7 +840,7 @@ Auto-slopp/
 ├── docs/                         # Documentation files (guides, API references)
 ├── src/                          # Source code
 │   ├── auto_slopp/               # Main package with core modules and workers
-│   │   ├── utils/                # Utility modules (git, github, openproject operations)
+│   │   ├── utils/                # Utility modules (git, github, openproject, CLI execution)
 │   │   └── workers/              # Worker implementations (PR, GitHub issue, OpenProject)
 │   ├── openproject/              # OpenProject API client
 │   │   └── openapi_client/       # Generated OpenAPI client for OpenProject REST API
