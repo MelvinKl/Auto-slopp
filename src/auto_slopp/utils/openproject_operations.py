@@ -198,14 +198,14 @@ def get_work_packages(
     try:
         with _get_api_client() as api_client:
             api = WorkPackagesApi(api_client)
-            filters_list = []
+            filters_list = [f'{{"project":{{"operator":"=","values":["{project_id}"]}}}}']
             if assigned_to_user_id:
-                filters_list.append(f'{{"assignee":{{"operator":"=","values":["{assigned_to_user_id}"]}}}}')
+                filters_list.append(f'{{"assigned_to":{{"operator":"=","values":["{assigned_to_user_id}"]}}}}')
             if status_id:
                 filters_list.append(f'{{"status":{{"operator":"=","values":["{status_id}"]}}}}')
 
-            filters = f"[{','.join(filters_list)}]" if filters_list else "[]"
-            result = api.list_work_packages(id=project_id, filters=filters)
+            filters = f"[{','.join(filters_list)}]"
+            result = api.list_work_packages(filters=filters)
             if result and hasattr(result, "_embedded") and result._embedded:
                 elements = getattr(result._embedded, "elements", [])
                 return [api_client.sanitize_for_serialization(e) for e in elements]
@@ -306,7 +306,7 @@ def create_work_package(
                 wp_data["_links"]["assignee"] = {"href": f"/api/v3/users/{assignee_id}"}
 
             wp_model = WorkPackageWriteModel(**wp_data)
-            result = api.create_work_package(id=project_id, work_package_write_model=wp_model)
+            result = api.create_project_work_package(id=project_id, work_package_model=wp_model)
             logger.info(f"Created work package: {subject}")
             return api_client.sanitize_for_serialization(result)
     except ApiException as e:

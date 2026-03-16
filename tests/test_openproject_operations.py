@@ -545,7 +545,7 @@ class TestCreateWorkPackage:
                 patch("auto_slopp.utils.openproject_operations.WorkPackageWriteModel") as mock_model,
             ):
                 mock_api_instance = MagicMock()
-                mock_api_instance.create_work_package.return_value = mock_result
+                mock_api_instance.create_project_work_package.return_value = mock_result
                 mock_wp_api.return_value = mock_api_instance
 
                 wp = create_work_package(
@@ -870,7 +870,7 @@ class TestCreateWorkPackageWithAllParams:
                 patch("auto_slopp.utils.openproject_operations.WorkPackageWriteModel") as mock_model,
             ):
                 mock_api_instance = MagicMock()
-                mock_api_instance.create_work_package.return_value = mock_result
+                mock_api_instance.create_project_work_package.return_value = mock_result
                 mock_wp_api.return_value = mock_api_instance
 
                 wp = create_work_package(
@@ -884,7 +884,7 @@ class TestCreateWorkPackageWithAllParams:
 
                 assert wp is not None
                 assert wp["subject"] == "Full Task"
-                mock_api_instance.create_work_package.assert_called_once()
+                mock_api_instance.create_project_work_package.assert_called_once()
 
 
 class TestUpdateWorkPackageWithMultipleParams:
