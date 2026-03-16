@@ -1,0 +1,9 @@
+apiVersion: v2
+name: auto-slopp
+description: A Helm chart for Auto-slopp automation framework
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+maintainers:
+  - name: Auto-slopp Team
+    email: team@example.com

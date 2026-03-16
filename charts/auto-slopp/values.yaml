@@ -1,0 +1,61 @@
+replicaCount: 1
+
+image:
+  repository: auto-slopp
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources: {}
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: ""
+  accessMode: ReadWriteOnce
+
+additionalPrograms: []
+
+env:
+  AUTO_SLOPP_DEBUG: "false"
+  AUTO_SLOPP_TELEGRAM_ENABLED: "false"
+  AUTO_SLOPP_TELEGRAM_BOT_TOKEN: ""
+  AUTO_SLOPP_TELEGRAM_CHAT_ID: ""
+  AUTO_SLOPP_WORKERS_DISABLED: "[]"
+  AUTO_SLOPP_SLOP_TIMEOUT: "7200"
+
+envFrom: []
+
+secrets: {}
+
+configMaps: {}
