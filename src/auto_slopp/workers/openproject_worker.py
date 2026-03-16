@@ -189,7 +189,12 @@ class OpenProjectWorker(Worker):
                 identifier=identifier,
                 description=f"Auto-created project for repository {repo_name}",
             )
-            return project
+            if project:
+                return project
+            project = get_project_by_identifier(identifier)
+            if project:
+                self.logger.info(f"Project {repo_name} already exists, using existing project")
+                return project
 
         self.logger.info(f"Project not found for {repo_name} and auto-creation is disabled")
         return None
