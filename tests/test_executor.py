@@ -1,6 +1,9 @@
 """Tests for Executor class and worker registration."""
 
-from auto_slopp.executor import ALL_WORKERS
+from pathlib import Path
+from unittest.mock import patch
+
+from auto_slopp.executor import ALL_WORKERS, Executor
 from auto_slopp.workers import (
     GitHubIssueWorker,
     OpenProjectWorker,
@@ -56,3 +59,38 @@ class TestWorkerRegistration:
                 PRWorker,
                 StaleBranchCleanupWorker,
             ], f"{worker_class.__name__} not found in workers module exports"
+
+
+class TestExecutorWorkerFiltering:
+    """Tests for worker enablement in the executor."""
+
+    def test_openproject_worker_disabled_when_feature_flag_is_false(self):
+        """Test that OpenProjectWorker is skipped when OpenProject is disabled."""
+        executor = Executor(repo_path=Path("/tmp/repos"))
+
+        with patch("auto_slopp.executor.settings") as mock_settings:
+            mock_settings.workers_disabled = []
+            mock_settings.openproject_enabled = False
+
+            assert executor._is_worker_enabled(OpenProjectWorker) is False
+            assert executor._is_worker_enabled(GitHubIssueWorker) is True
+
+    def test_openproject_worker_enabled_when_feature_flag_is_true(self):
+        """Test that OpenProjectWorker runs when enabled and not explicitly disabled."""
+        executor = Executor(repo_path=Path("/tmp/repos"))
+
+        with patch("auto_slopp.executor.settings") as mock_settings:
+            mock_settings.workers_disabled = []
+            mock_settings.openproject_enabled = True
+
+            assert executor._is_worker_enabled(OpenProjectWorker) is True
+
+    def test_worker_disabled_by_name_takes_precedence(self):
+        """Test that workers_disabled still disables workers by class name."""
+        executor = Executor(repo_path=Path("/tmp/repos"))
+
+        with patch("auto_slopp.executor.settings") as mock_settings:
+            mock_settings.workers_disabled = ["PRWorker"]
+            mock_settings.openproject_enabled = True
+
+            assert executor._is_worker_enabled(PRWorker) is False
