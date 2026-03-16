@@ -844,8 +844,6 @@ Auto-slopp/
 │   │   ├── worker.py            # Base Worker class
 │   │   ├── executor.py          # Worker execution
 │   │   ├── telegram_handler.py  # Telegram logging integration
-│   │   ├── base/                # Base classes
-│   │   │   └── __init__.py
 │   │   ├── workers/             # Worker implementations
 │   │   │   ├── pr_worker.py
 │   │   │   ├── github_issue_worker.py
@@ -857,7 +855,9 @@ Auto-slopp/
 │   │       ├── file_operations.py
 │   │       ├── branch_analysis.py
 │   │       ├── repository_utils.py
-│   │       └── cli_executor.py
+│   │       ├── cli_executor.py
+│   │       ├── openproject_operations.py
+│   │       └── ralph.py
 │   └── settings/
 │       ├── __init__.py
 │       └── main.py              # Configuration management
@@ -867,8 +867,29 @@ Auto-slopp/
 │   ├── test_settings.py
 │   ├── test_main.py
 │   ├── test_telegram_handler.py
-│   └── test_*_worker.py        # Worker tests
+│   ├── test_executor.py
+│   ├── test_cli_executor.py
+│   ├── test_git_operations.py
+│   ├── test_file_operations.py
+│   ├── test_pr_worker.py
+│   ├── test_github_issue_worker.py
+│   ├── test_openproject_worker.py
+│   ├── test_openproject_operations.py
+│   ├── test_stale_branch_cleanup_worker.py
+│   ├── test_ralph.py
+│   ├── test_auto_update.py
+│   └── test_docker.py
+├── docs/                        # Documentation
+│   ├── api-reference.md
+│   ├── architecture.md
+│   ├── contributing.md
+│   ├── development-guide.md
+│   ├── telegram-logging.md
+│   ├── testing.md
+│   └── openproject_worker_design.md
 ├── pyproject.toml               # Project configuration
+├── Makefile                     # Build and test automation
+├── Dockerfile                   # Docker container definition
 └── README.md
 ```
 
