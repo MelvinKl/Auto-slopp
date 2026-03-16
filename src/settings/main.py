@@ -172,6 +172,11 @@ class Settings(BaseSettings):
         ),
     )
 
+    slopmachine: str = Field(
+        default="codex",
+        description="Legacy CLI preset selector retained for backward-compatible env parsing.",
+    )
+
     slop_timeout: int = Field(
         default=7200,
         description="Timeout for slopmachine execution in seconds (default: 2 hours)",

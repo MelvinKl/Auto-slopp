@@ -123,6 +123,68 @@ class TestCheckoutBranchResilient:
         assert mock_subprocess_run.call_count == 6
 
     @patch("auto_slopp.utils.git_operations.subprocess.run")
+    def test_checkout_retries_after_safe_directory_fix(self, mock_subprocess_run):
+        """Test checkout retry after git safe.directory is configured."""
+        repo_dir = Path("/tmp/test_repo")
+        branch = "feature/test"
+        dubious_error = (
+            "fatal: detected dubious ownership in repository at '/tmp/test_repo'\n"
+            "To add an exception for this directory, call:\n\n"
+            "\tgit config --global --add safe.directory /tmp/test_repo"
+        )
+
+        mock_subprocess_run.side_effect = [
+            Mock(returncode=1, stderr=dubious_error),  # git fetch
+            Mock(returncode=0, stderr=""),  # git config --global --add safe.directory
+            Mock(returncode=0, stderr=""),  # git fetch retry
+            Mock(returncode=0, stderr=""),  # git checkout
+            Mock(returncode=0, stderr=""),  # git pull
+        ]
+
+        result = checkout_branch_resilient(repo_dir, branch)
+
+        assert result is True
+        assert mock_subprocess_run.call_count == 5
+        safe_directory_call = mock_subprocess_run.call_args_list[1]
+        assert safe_directory_call.args[0] == [
+            "git",
+            "config",
+            "--global",
+            "--add",
+            "safe.directory",
+            str(repo_dir.resolve()),
+        ]
+
+    @patch("auto_slopp.utils.git_operations.subprocess.run")
+    @patch("auto_slopp.utils.git_operations.run_cli_executor")
+    def test_checkout_dubious_ownership_does_not_reset(self, mock_run_cli_executor, mock_subprocess_run):
+        """Test dubious ownership failures do not trigger git reset --hard."""
+        repo_dir = Path("/tmp/test_repo")
+        branch = "feature/test"
+        dubious_error = (
+            "fatal: detected dubious ownership in repository at '/tmp/test_repo'\n"
+            "To add an exception for this directory, call:\n\n"
+            "\tgit config --global --add safe.directory /tmp/test_repo"
+        )
+
+        mock_run_cli_executor.return_value = {
+            "success": False,
+            "error": "CLI executor failed",
+        }
+        mock_subprocess_run.side_effect = [
+            Mock(returncode=0, stderr=""),  # git fetch
+            Mock(returncode=1, stderr=dubious_error),  # git checkout
+            Mock(returncode=1, stderr="permission denied"),  # git config --global --add safe.directory
+        ]
+
+        result = checkout_branch_resilient(repo_dir, branch)
+
+        assert result is False
+        assert mock_subprocess_run.call_count == 3
+        issued_commands = [call.args[0] for call in mock_subprocess_run.call_args_list]
+        assert ["git", "reset", "--hard"] not in issued_commands
+
+    @patch("auto_slopp.utils.git_operations.subprocess.run")
     @patch("auto_slopp.utils.git_operations.run_cli_executor")
     def test_checkout_failure_after_reset(self, mock_run_cli_executor, mock_subprocess_run):
         """Test checkout failure even after reset."""
