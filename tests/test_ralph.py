@@ -286,9 +286,7 @@ class TestRalphLoop:
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = Path(tmpdir) / "plan.md"
 
-            ralph = RalphLoop(
-                plan_path=plan_path, max_loops=5, step_executor=success_executor
-            )
+            ralph = RalphLoop(plan_path=plan_path, max_loops=5, step_executor=success_executor)
             ralph.create_plan(
                 title="Test",
                 description="Test",
@@ -311,9 +309,7 @@ class TestRalphLoop:
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = Path(tmpdir) / "plan.md"
 
-            ralph = RalphLoop(
-                plan_path=plan_path, max_loops=3, step_executor=failing_executor
-            )
+            ralph = RalphLoop(plan_path=plan_path, max_loops=3, step_executor=failing_executor)
             ralph.create_plan(
                 title="Test",
                 description="Test",
@@ -339,9 +335,7 @@ class TestRalphLoop:
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = Path(tmpdir) / "plan.md"
 
-            ralph = RalphLoop(
-                plan_path=plan_path, max_loops=2, step_executor=counting_executor
-            )
+            ralph = RalphLoop(plan_path=plan_path, max_loops=2, step_executor=counting_executor)
             ralph.create_plan(
                 title="Test",
                 description="Test",
@@ -386,9 +380,7 @@ class TestRalphLoop:
                 call_count += 1
                 return {"success": True}
 
-            ralph2 = RalphLoop(
-                plan_path=plan_path, max_loops=5, step_executor=counting_executor
-            )
+            ralph2 = RalphLoop(plan_path=plan_path, max_loops=5, step_executor=counting_executor)
             result = ralph2.run()
 
             assert result["success"] is True
