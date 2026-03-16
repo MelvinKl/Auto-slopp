@@ -16,6 +16,7 @@ from auto_slopp.utils.cli_executor import get_active_cli_command, run_cli_execut
 from settings.main import settings
 
 logger = logging.getLogger(__name__)
+_DUBIOUS_OWNERSHIP_MARKER = "detected dubious ownership in repository"
 
 
 def sanitize_branch_name(name: str, max_length: int = 50) -> str:
@@ -46,6 +47,51 @@ class GitOperationError(Exception):
     pass
 
 
+def _get_command_error_output(result: subprocess.CompletedProcess) -> str:
+    """Return the most useful stderr/stdout text from a git command result."""
+    return (result.stderr.strip() or result.stdout.strip()) if result.stderr or result.stdout else ""
+
+
+def _is_dubious_ownership_error(error_output: str) -> bool:
+    """Return True when git refused to operate because the repo is not marked safe."""
+    return _DUBIOUS_OWNERSHIP_MARKER in error_output.lower()
+
+
+def _configure_safe_directory(repo_dir: Path, timeout: int = 60) -> bool:
+    """Add the repository to git's global safe.directory list."""
+    safe_repo_dir = str(repo_dir.resolve())
+    logger.info(f"Adding {safe_repo_dir} to git safe.directory")
+
+    try:
+        result = subprocess.run(
+            ["git", "config", "--global", "--add", "safe.directory", safe_repo_dir],
+            cwd=Path.home(),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+        )
+    except (subprocess.TimeoutExpired, TimeoutError) as e:
+        logger.error(f"Timed out while adding {safe_repo_dir} to git safe.directory: {e}")
+        return False
+
+    if result.returncode == 0:
+        logger.info(f"Added {safe_repo_dir} to git safe.directory")
+        return True
+
+    error_output = _get_command_error_output(result) or "unknown error"
+    logger.error(f"Failed to add {safe_repo_dir} to git safe.directory: {error_output}")
+    return False
+
+
+def _get_git_command_env() -> Dict[str, str]:
+    """Build environment variables for non-interactive git commands."""
+    env = os.environ.copy()
+    env.setdefault("GIT_TERMINAL_PROMPT", "0")
+    env.setdefault("GIT_SSH_COMMAND", "ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new")
+    return env
+
+
 def _run_git_command(
     repo_dir: Path,
     *args: str,
@@ -74,14 +120,33 @@ def _run_git_command(
             cwd=repo_dir,
             capture_output=capture_output,
             text=capture_output,
-            check=check,
+            check=False,
             timeout=timeout,
+            env=_get_git_command_env(),
         )
+
+        error_output = _get_command_error_output(result)
+        if result.returncode != 0 and _is_dubious_ownership_error(error_output):
+            logger.warning(
+                f"Git blocked '{repo_dir}' due to dubious ownership; configuring safe.directory and retrying"
+            )
+            if _configure_safe_directory(repo_dir, timeout=timeout):
+                result = subprocess.run(
+                    ["git", *args],
+                    cwd=repo_dir,
+                    capture_output=capture_output,
+                    text=capture_output,
+                    check=False,
+                    timeout=timeout,
+                    env=_get_git_command_env(),
+                )
+                error_output = _get_command_error_output(result)
+
+        if check and result.returncode != 0:
+            logger.error(f"Git command 'git {' '.join(args)}' failed in {repo_dir}: {error_output}")
+            raise GitOperationError(f"Git command failed: {error_output}")
+
         return result
-    except subprocess.CalledProcessError as e:
-        error_output = (e.stderr.strip() or e.stdout.strip()) if e.stderr or e.stdout else str(e)
-        logger.error(f"Git command 'git {' '.join(args)}' failed in {repo_dir}: {error_output}")
-        raise GitOperationError(f"Git command failed: {error_output}")
     except (subprocess.TimeoutExpired, TimeoutError) as e:
         logger.error(f"Git command 'git {' '.join(args)}' timed out in {repo_dir}")
         raise GitOperationError(f"Git command timed out: {e}")
@@ -323,6 +388,13 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
 
         checkout_error = checkout_result.stderr.strip() or checkout_result.stdout.strip()
         logger.warning(f"Initial checkout failed for '{branch}' in {repo_dir.name}: {checkout_error}")
+
+        if _is_dubious_ownership_error(checkout_error):
+            error_msg = f"Failed to checkout '{branch}' because git rejected repository ownership: {checkout_error}"
+            logger.error(f"Unable to checkout '{branch}' in {repo_dir.name}: {checkout_error}")
+            _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
+            return False
+
         logger.info(f"Attempting git reset --hard and retry for '{branch}' in {repo_dir.name}")
 
         reset_result = _run_git_command(repo_dir, "reset", "--hard", check=False, timeout=timeout)

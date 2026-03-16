@@ -66,7 +66,7 @@ class Executor:
     def _run_iteration(self) -> None:
         """Run a single iteration of worker execution."""
         try:
-            enabled_workers = [w for w in ALL_WORKERS if w.__name__ not in settings.workers_disabled]
+            enabled_workers = [worker for worker in ALL_WORKERS if self._is_worker_enabled(worker)]
 
             if not enabled_workers:
                 print("No workers enabled")
@@ -80,6 +80,16 @@ class Executor:
         except Exception as e:
             print(f"Error in iteration: {e}")
             traceback.print_exc()
+
+    def _is_worker_enabled(self, worker_class: Type[Worker]) -> bool:
+        """Return whether the worker should run for the current settings."""
+        if worker_class.__name__ in settings.workers_disabled:
+            return False
+
+        if worker_class is OpenProjectWorker and not settings.openproject_enabled:
+            return False
+
+        return True
 
     def _instantiate_worker(self, worker_class: Type[Worker]) -> Worker:
         """Instantiate a worker with appropriate arguments.
@@ -149,9 +159,13 @@ class Executor:
             True if an update was detected, False otherwise.
         """
         try:
+            update_repo_dir = Path.cwd()
+            if not update_repo_dir.joinpath(".git").exists():
+                return False
+
             result = subprocess.run(
                 ["git", "pull"],
-                cwd=Path.cwd(),
+                cwd=update_repo_dir,
                 capture_output=True,
                 text=True,
             )

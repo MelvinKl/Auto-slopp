@@ -282,7 +282,7 @@ docker run -d \
   -e AUTO_SLOPP_TELEGRAM_ENABLED=true \
   -e AUTO_SLOPP_TELEGRAM_BOT_TOKEN=your_bot_token \
   -e AUTO_SLOPP_TELEGRAM_CHAT_ID=your_chat_id \
-  -e AUTO_SLOPP_WORKERS_DISABLED='[]' \
+  -e AUTO_SLOPP_WORKERS_DISABLED=[] \
   auto-slopp:latest
 ```
 
@@ -518,8 +518,8 @@ AUTO_SLOPP_DEBUG=false
 # Worker configuration (all workers enabled by default)
 # JSON list of disabled workers. Available: GitHubIssueWorker, PRWorker, StaleBranchCleanupWorker
 # Leave empty to enable all workers, or specify workers to disable:
-AUTO_SLOPP_WORKERS_DISABLED='[]'
-# Example: AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker"]'
+AUTO_SLOPP_WORKERS_DISABLED=[]
+# Example: AUTO_SLOPP_WORKERS_DISABLED=["GitHubIssueWorker"]
 
 # CLI configuration (optional)
 export AUTO_SLOPP_CLI_CONFIGURATIONS='[
@@ -661,10 +661,10 @@ To disable specific workers, set the `AUTO_SLOPP_WORKERS_DISABLED` variable in y
 
 ```bash
 # Disable specific workers
-AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker"]'
+AUTO_SLOPP_WORKERS_DISABLED=["GitHubIssueWorker", "PRWorker"]
 
 # Disable all workers
-AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker", "OpenProjectWorker"]'
+AUTO_SLOPP_WORKERS_DISABLED=["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker", "OpenProjectWorker"]
 ```
 
 ## Available Workers
@@ -858,7 +858,7 @@ export AUTO_SLOPP_DEBUG=true
 export AUTO_SLOPP_BASE_REPO_PATH=./dev-repo
 
 # Worker configuration - disable specific workers (JSON list format)
-export AUTO_SLOPP_WORKERS_DISABLED='[]'
+export AUTO_SLOPP_WORKERS_DISABLED=[]
 
 # Production environment
 export AUTO_SLOPP_DEBUG=false
@@ -903,7 +903,7 @@ export AUTO_SLOPP_SLOP_TIMEOUT=7200
 ```bash
 # .env
 AUTO_SLOPP_BASE_REPO_PATH=/home/user/projects/my-automation
-AUTO_SLOPP_WORKERS_DISABLED='[]'
+AUTO_SLOPP_WORKERS_DISABLED=[]
 AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL=2.0
 AUTO_SLOPP_DEBUG=false
 

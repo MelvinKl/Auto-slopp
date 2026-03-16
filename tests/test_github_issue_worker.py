@@ -56,8 +56,13 @@ class TestGitHubIssueWorker:
                 "labels": [{"name": "ai"}],
             }
 
-            with patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues:
+            with (
+                patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues,
+                patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
+            ):
                 mock_issues.return_value = [mock_issue]
+                mock_settings.github_issue_worker_required_label = "ai"
+                mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
 
                 worker = GitHubIssueWorker(dry_run=True)
                 result = worker.run(repo_path)
@@ -160,6 +165,7 @@ class TestGitHubIssueWorker:
                 patch("auto_slopp.workers.github_issue_worker.close_issue") as mock_close,
                 patch("auto_slopp.workers.github_issue_worker.delete_branch") as mock_delete,
                 patch("auto_slopp.workers.github_issue_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
             ):
                 mock_issues.return_value = [mock_issue]
                 mock_create_branch.return_value = True
@@ -169,6 +175,9 @@ class TestGitHubIssueWorker:
                 mock_close.return_value = True
                 mock_delete.return_value = True
                 mock_checkout.return_value = True
+                mock_settings.github_issue_worker_required_label = "ai"
+                mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
+                mock_settings.ralph_enabled = False
 
                 worker = GitHubIssueWorker(dry_run=False)
                 result = worker.run(repo_path)
@@ -296,8 +305,13 @@ class TestGitHubIssueWorker:
                 },
             ]
 
-            with patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues:
+            with (
+                patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues,
+                patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
+            ):
                 mock_issues.return_value = issues
+                mock_settings.github_issue_worker_required_label = "ai"
+                mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
 
                 worker = GitHubIssueWorker(dry_run=True)
                 result = worker.run(repo_path)
@@ -361,8 +375,13 @@ class TestGitHubIssueWorker:
                     "labels": [{"name": "ai"}],
                 }
 
-                with patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues:
+                with (
+                    patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues,
+                    patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
+                ):
                     mock_issues.return_value = [issue]
+                    mock_settings.github_issue_worker_required_label = "ai"
+                    mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
 
                     result = worker.run(repo_path)
 

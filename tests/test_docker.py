@@ -72,6 +72,14 @@ class TestDockerfileContent:
         """Test that Dockerfile installs git."""
         assert "git" in dockerfile_content, "Dockerfile should install git"
 
+    def test_dockerfile_installs_github_cli(self, dockerfile_content):
+        """Test that Dockerfile installs GitHub CLI."""
+        assert "gh" in dockerfile_content, "Dockerfile should install gh for GitHub operations"
+
+    def test_dockerfile_installs_ssh_client(self, dockerfile_content):
+        """Test that Dockerfile installs an SSH client."""
+        assert "openssh-client" in dockerfile_content, "Dockerfile should install openssh-client for git over SSH"
+
     def test_dockerfile_installs_uv(self, dockerfile_content):
         """Test that Dockerfile installs uv package manager."""
         assert "uv" in dockerfile_content, "Dockerfile should install uv package manager"
