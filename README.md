@@ -415,6 +415,140 @@ docker exec -it auto-slopp /bin/bash
 - Verify the container can reach external services
 - Check firewall rules if applicable
 
+## Helm Chart
+
+Auto-slopp can be deployed to Kubernetes using the provided Helm chart.
+
+### Installing the Chart
+
+```bash
+# Install from local chart
+helm install auto-slopp ./charts/auto-slopp
+
+# Install with custom values
+helm install auto-slopp ./charts/auto-slopp -f my-values.yaml
+
+# Install with specific namespace
+helm install auto-slopp ./charts/auto-slopp -n auto-slopp --create-namespace
+```
+
+### Configuration
+
+The Helm chart supports extensive configuration through `values.yaml`. Key configurations include:
+
+#### Basic Configuration
+
+```yaml
+# Number of replicas
+replicaCount: 1
+
+# Image configuration
+image:
+  repository: auto-slopp
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+# Persistence for /repos volume
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: ""
+  accessMode: ReadWriteOnce
+```
+
+#### Environment Variables
+
+```yaml
+env:
+  AUTO_SLOPP_DEBUG: "false"
+  AUTO_SLOPP_TELEGRAM_ENABLED: "false"
+  AUTO_SLOPP_TELEGRAM_BOT_TOKEN: ""
+  AUTO_SLOPP_TELEGRAM_CHAT_ID: ""
+  AUTO_SLOPP_WORKERS_DISABLED: "[]"
+  AUTO_SLOPP_SLOP_TIMEOUT: "7200"
+```
+
+#### Installing Additional Programs
+
+The Helm chart supports installing additional programs during container startup using an init container. This is useful for adding development tools like Android build tools:
+
+```yaml
+# Install additional packages
+additionalPrograms:
+  - android-sdk
+  - android-sdk-build-tools
+  - openjdk-11-jdk
+```
+
+The init container will run `apt-get install` with the specified packages before the main application starts.
+
+#### Secrets
+
+For sensitive configuration like API tokens, use the secrets configuration:
+
+```yaml
+secrets:
+  TELEGRAM_BOT_TOKEN: "your-secret-token"
+  API_KEY: "your-api-key"
+```
+
+Secrets are automatically base64 encoded and mounted as environment variables.
+
+#### Custom Environment Sources
+
+You can also load environment variables from external sources:
+
+```yaml
+envFrom:
+  - secretRef:
+      name: my-existing-secret
+  - configMapRef:
+      name: my-config-map
+```
+
+### Example: Deploy with Android Build Tools
+
+```bash
+# Create values file for Android development
+cat > android-values.yaml <<EOF
+additionalPrograms:
+  - android-sdk
+  - android-sdk-build-tools
+  - openjdk-11-jdk
+
+env:
+  AUTO_SLOPP_DEBUG: "false"
+  AUTO_SLOPP_BASE_REPO_PATH: "/repos"
+
+persistence:
+  enabled: true
+  size: 20Gi
+EOF
+
+# Install with Android build tools
+helm install auto-slopp ./charts/auto-slopp -f android-values.yaml
+```
+
+### Upgrading
+
+```bash
+# Upgrade with new values
+helm upgrade auto-slopp ./charts/auto-slopp -f my-values.yaml
+
+# Upgrade to new version
+helm upgrade auto-slopp ./charts/auto-slopp
+```
+
+### Uninstalling
+
+```bash
+helm uninstall auto-slopp
+```
+
+### Chart Reference
+
+For a complete list of configurable parameters, see the [values.yaml](charts/auto-slopp/values.yaml) file.
+
 ## Quick Start
 
 ### Basic Usage
