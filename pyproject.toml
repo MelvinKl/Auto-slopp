@@ -71,7 +71,7 @@ exclude = '''
 '''
 
 [tool.flake8]
-exclude= ["src/assistant/models", "src/openproject/openapi_client", ".eggs", ".git", ".hg", ".mypy_cache", ".tox", ".venv", ".devcontainer", "venv", "_build", "buck-out", "build", "dist", "**/__init__.py"]
+exclude= ["src/assistant/models", ".eggs", ".git", ".hg", ".mypy_cache", ".tox", ".venv", ".devcontainer", "venv", "_build", "buck-out", "build", "dist", "**/__init__.py"]
 statistics = true
 show-source = false
 max-complexity = 8
