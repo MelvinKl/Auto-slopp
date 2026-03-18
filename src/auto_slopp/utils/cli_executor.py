@@ -289,6 +289,11 @@ def run_cli_executor(
         config_index = _choose_best_config_index(task_rating, working_dir)
 
         if config_index == -1:
+            available_capabilities = [cfg.capability for cfg in settings.cli_configurations]
+            logger.error(
+                f"No CLI configuration meets min_rating={task_rating.min_rating} for task '{task_name}'. "
+                f"Available configurations have capabilities: {available_capabilities}"
+            )
             break
 
         state = _get_cli_state(config_index)
