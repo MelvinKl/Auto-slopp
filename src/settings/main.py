@@ -154,6 +154,26 @@ class Settings(BaseSettings):
                 cli_command="opencode",
                 cli_args=[
                     "--model",
+                    "opencode/big-pickle",
+                    "run",
+                ],
+                capability=7,
+                name="opencode nemotron-3-super-free",
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "opencode/nemotron-3-super-free",
+                    "run",
+                ],
+                capability=2,
+                name="opencode nemotron-3-super-free",
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
                     "zai-coding-plan/glm-4.7-flash",
                     "run",
                 ],
