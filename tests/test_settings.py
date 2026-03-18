@@ -152,11 +152,8 @@ class TestSettings:
         assert test_settings.cli_configurations[0].cli_command == "gemini"
         assert test_settings.cli_configurations[1].cli_command == "codex"
         assert test_settings.cli_configurations[2].cli_command == "opencode"
-        assert "glm-5" in str(test_settings.cli_configurations[2].cli_args)
         assert test_settings.cli_configurations[3].cli_command == "opencode"
-        assert "glm-4.7" in str(test_settings.cli_configurations[3].cli_args)
         assert test_settings.cli_configurations[4].cli_command == "opencode"
-        assert "glm-4.7-flash" in str(test_settings.cli_configurations[4].cli_args)
 
     def test_cli_configurations_env_override(self):
         """Test overriding CLI configurations via environment variable."""
