@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
+from auto_slopp.utils.ralph import Step
 from auto_slopp.workers.github_issue_worker import GitHubIssueWorker
 
 
@@ -621,3 +622,214 @@ class TestGitHubIssueWorker:
                 assert call_args.args[0] == "Test issue"
                 assert call_args.args[1] == "Issue body"
                 assert call_args.args[2] == ["Author comment"]
+
+    def test_get_issue_task_path_uses_github_prefix(self):
+        """Test that issue task files use .ralph/github-<issue>.md naming."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            task_path = worker._get_issue_task_path(repo_path, 281)
+
+            assert task_path == repo_path / ".ralph" / "github-281.md"
+
+    def test_create_issue_task_file_creates_expected_content(self):
+        """Test creating the initial GitHub task markdown file."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            task_path = repo_path / ".ralph" / "github-281.md"
+
+            worker._create_issue_task_file(
+                task_path=task_path,
+                issue_number=281,
+                issue_title="Rework worker",
+                issue_body="Implement the new Ralph flow.",
+                comment_texts=["Please include tests"],
+                branch_name="ai/issue-281-rework-worker",
+            )
+
+            content = task_path.read_text()
+            assert "Issue Number: 281" in content
+            assert "Branch: ai/issue-281-rework-worker" in content
+            assert "Implement the new Ralph flow." in content
+            assert "Comments:\n- Please include tests" in content
+            assert "- [ ] 4. Run `make test` and confirm it succeeds." in content
+
+    def test_ensure_last_step_is_make_test_appends_step(self):
+        """Test that make test step is appended when not already last."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            task_path = Path(temp_dir) / "task.md"
+            task_path.write_text("""# Task
+
+## Steps
+
+- [ ] 1. Implement changes
+- [ ] 2. Update tests
+""")
+
+            worker._ensure_last_step_is_make_test(task_path)
+            updated = task_path.read_text()
+
+            assert "- [ ] 3. Run `make test` and confirm it succeeds." in updated
+
+    def test_ensure_last_step_is_make_test_does_not_duplicate(self):
+        """Test that make test step is not duplicated when already last."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            task_path = Path(temp_dir) / "task.md"
+            task_path.write_text("""# Task
+
+## Steps
+
+- [ ] 1. Implement changes
+- [ ] 2. Run `make test` and confirm it succeeds.
+""")
+
+            worker._ensure_last_step_is_make_test(task_path)
+            updated = task_path.read_text()
+
+            assert updated.count("Run `make test` and confirm it succeeds.") == 1
+
+    def test_execute_step_acceptance_check_fails_when_status_fail(self):
+        """Test acceptance check returns failure when agent reports fail."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            task_path = repo_path / "task.md"
+            task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
+            step = Step(number=1, description="Implement changes")
+
+            with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
+                mock_execute.return_value = {"success": True, "stdout": "ACCEPTANCE_STATUS: fail"}
+
+                result = worker._execute_step_acceptance_check(
+                    repo_dir=repo_path,
+                    task_path=task_path,
+                    step=step,
+                    issue_title="Issue",
+                    issue_body="Body",
+                    branch_name="ai/issue-1",
+                )
+
+            assert result["success"] is False
+            assert "not fulfilled" in result["error"].lower()
+
+    def test_execute_step_acceptance_check_passes_when_status_pass(self):
+        """Test acceptance check returns success when agent reports pass."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            task_path = repo_path / "task.md"
+            task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
+            step = Step(number=1, description="Implement changes")
+
+            with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
+                mock_execute.return_value = {"success": True, "stdout": "ACCEPTANCE_STATUS: pass"}
+
+                result = worker._execute_step_acceptance_check(
+                    repo_dir=repo_path,
+                    task_path=task_path,
+                    step=step,
+                    issue_title="Issue",
+                    issue_body="Body",
+                    branch_name="ai/issue-1",
+                )
+
+            assert result["success"] is True
+
+    def test_run_refined_task_loop_respects_max_iterations_setting(self):
+        """Test refined task loop stops after configured maximum iterations."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            task_path = repo_path / "task.md"
+            task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
+
+            with (
+                patch("auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations", 2),
+                patch.object(worker, "_execute_step", return_value={"success": False, "error": "retry needed"}),
+            ):
+                result = worker._run_refined_task_loop(
+                    repo_dir=repo_path,
+                    task_path=task_path,
+                    issue_title="Issue",
+                    issue_body="Body",
+                    comment_texts=[],
+                    branch_name="ai/issue-1",
+                )
+
+            assert result["success"] is False
+            assert result["max_loops_reached"] is True
+            assert result["loops_executed"] == 2
+            assert "maximum iterations (2)" in result["error"].lower()
+
+    def test_run_refined_task_loop_commits_on_successful_step(self):
+        """Test successful step completion triggers per-step commit."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            task_path = repo_path / "task.md"
+            task_path.write_text("""# Task
+
+## Steps
+
+- [ ] 1. Implement changes
+""")
+
+            with (
+                patch("auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations", 3),
+                patch.object(worker, "_execute_step", return_value={"success": True}),
+                patch.object(worker, "_execute_step_acceptance_check", return_value={"success": True}),
+                patch.object(worker, "_update_remaining_steps", return_value={"success": True}),
+                patch("auto_slopp.workers.github_issue_worker.has_changes", return_value=True),
+                patch("auto_slopp.workers.github_issue_worker.commit_and_push_changes") as mock_commit,
+            ):
+                mock_commit.return_value = (True, "ok")
+
+                result = worker._run_refined_task_loop(
+                    repo_dir=repo_path,
+                    task_path=task_path,
+                    issue_title="Issue",
+                    issue_body="Body",
+                    comment_texts=[],
+                    branch_name="ai/issue-1",
+                )
+
+            assert result["success"] is True
+            assert result["loops_executed"] == 1
+            assert result["steps_completed"] == 1
+            mock_commit.assert_called_once()
+            assert mock_commit.call_args.kwargs["push_if_remote"] is False
+            assert "Complete issue step 1" in mock_commit.call_args.kwargs["commit_message"]
+
+    def test_generate_pr_body_from_task_file_prefixes_closes_issue(self):
+        """Test generated PR body includes closing reference."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            task_path = repo_path / ".ralph" / "github-281.md"
+            task_path.parent.mkdir(parents=True, exist_ok=True)
+            task_path.write_text("# Task\n\n## Steps\n\n- [x] 1. Implement changes\n")
+
+            with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
+                mock_execute.return_value = {"success": True, "stdout": "## Summary\n- Implemented changes"}
+
+                body = worker._generate_pr_body_from_task_file(
+                    repo_dir=repo_path,
+                    issue_number=281,
+                    issue_title="Issue title",
+                    issue_body="Issue body",
+                )
+
+            assert body.startswith("Closes #281")
+            assert "Implemented changes" in body

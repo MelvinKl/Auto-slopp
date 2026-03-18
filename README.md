@@ -485,9 +485,28 @@ The `make test` target includes comprehensive validation:
 
 All checks must pass for the command to succeed, ensuring code quality and reliability before deployment.
 
-### Directory Structure
+### Repository Tree View (max depth: 3)
 
-Auto-slopp operates with a specific directory structure:
+```text
+Auto-slopp/                               # Repository root for the auto-slopp automation framework
+├── .beads/                               # Local bd (beads) issue-tracking state
+├── .github/                              # GitHub repository configuration
+│   └── workflows/                        # CI workflow definitions
+├── .ralph/                               # Ralph task-planning and execution notes
+├── docs/                                 # Project documentation files
+├── src/                                  # Python source tree
+│   ├── auto_slopp/                       # Main auto-slopp package
+│   │   ├── utils/                        # Shared utility helpers
+│   │   └── workers/                      # Worker implementations
+│   ├── openproject/                      # OpenProject integration package
+│   │   └── openapi_client/               # Generated OpenProject OpenAPI client
+│   └── settings/                         # Configuration/settings package
+└── tests/                                # Automated test suite
+```
+
+### Managed Repositories Directory Structure
+
+Auto-slopp operates on managed repositories using a specific directory structure:
 
 ```
 AUTO_SLOPP_BASE_REPO_PATH/          # Directory containing git repositories
