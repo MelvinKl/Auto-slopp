@@ -144,12 +144,11 @@ pytest tests/test_integration.py::TestCIEnvironmentSetup -v
 ### Integration Test Scenarios
 
 1. **Full Workflow Integration**: End-to-end workflow testing
-2. **Beads Integration**: Task management system integration
-3. **OpenAgent Integration**: External tool integration
-4. **CI Environment Variables**: Environment-specific behavior
-5. **Error Recovery**: Failure handling and recovery
-6. **Resource Cleanup**: Proper resource management
-7. **Large Dataset Handling**: Performance with real-world data sizes
+2. **OpenAgent Integration**: External tool integration
+3. **CI Environment Variables**: Environment-specific behavior
+4. **Error Recovery**: Failure handling and recovery
+5. **Resource Cleanup**: Proper resource management
+6. **Large Dataset Handling**: Performance with real-world data sizes
 
 ## Coverage Reports
 
