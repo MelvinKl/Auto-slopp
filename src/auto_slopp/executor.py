@@ -9,7 +9,6 @@ from typing import Any, Optional, Type
 from auto_slopp.worker import Worker
 from auto_slopp.workers import (
     GitHubIssueWorker,
-    OpenProjectWorker,
     PRWorker,
     StaleBranchCleanupWorker,
 )
@@ -17,7 +16,6 @@ from settings.main import settings
 
 ALL_WORKERS: list[Type[Worker]] = [
     GitHubIssueWorker,
-    OpenProjectWorker,
     PRWorker,
     StaleBranchCleanupWorker,
 ]
