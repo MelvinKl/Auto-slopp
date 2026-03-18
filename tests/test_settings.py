@@ -195,3 +195,18 @@ class TestSettings:
         with patch.dict(os.environ, env_vars, clear=True):
             with pytest.raises(ValidationError):
                 Settings()
+
+    def test_github_issue_step_max_iterations_default(self):
+        """Test default github_issue_step_max_iterations value."""
+        test_settings = Settings()
+        assert test_settings.github_issue_step_max_iterations == 25
+
+    def test_github_issue_step_max_iterations_validation(self):
+        """Test github_issue_step_max_iterations must be at least 1."""
+        env_vars = {
+            "AUTO_SLOPP_GITHUB_ISSUE_STEP_MAX_ITERATIONS": "0",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            with pytest.raises(ValidationError):
+                Settings()

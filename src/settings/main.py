@@ -208,6 +208,12 @@ class Settings(BaseSettings):
         description="Maximum number of loops for Ralph step execution (default: 20)",
     )
 
+    github_issue_step_max_iterations: int = Field(
+        default=25,
+        ge=1,
+        description="Maximum step-iteration attempts for GitHub issue Ralph execution (default: 25)",
+    )
+
     ralph_enabled: bool = Field(
         default=True,
         description="Enable Ralph loop-based step execution for GitHub issues",
