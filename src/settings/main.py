@@ -39,7 +39,7 @@ class CLIConfiguration(BaseModel):
         description="Capability rating of this CLI tool (0-10)",
     )
     cooldown_seconds: int = Field(
-        default=300,
+        default=3600,
         description="Cooldown time in seconds if the tool encounters errors",
     )
     name: str = Field(
