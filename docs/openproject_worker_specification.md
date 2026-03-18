@@ -47,9 +47,11 @@ The worker must be initialized with the same parameters as GithubIssueWorker:
 
 #### 3.3 Task Retrieval and Filtering
 - `_get_open_tasks_for_user(project_id: int) -> List[Dict[str, Any]]`: Get open tasks assigned to configured user
-  - Filter by assignee ID from settings
-  - Filter by ready state (configurable status ID)
+  - Filter by assignee ID from settings (`settings.openproject_assigned_user_id`)
+  - Filter by ready state (configurable status ID - `settings.openproject_ready_status_id`)
   - Sort by priority or creation date
+  - Uses `get_open_work_packages(project_id, assigned_to_user_id)` from OpenProject API client
+  - Additional filtering for ready status can be done client-side or by extending the API call
 
 #### 3.4 Task Processing
 - `_process_single_task(repo_dir: Path, task: Dict[str, Any], project_id: int) -> Dict[str, Any]`: Process a single task from OpenProject
@@ -66,7 +68,7 @@ The worker must be initialized with the same parameters as GithubIssueWorker:
 - `_create_subtasks_for_task(task: Dict[str, Any], repo_dir: Path, project_id: int) -> List[Dict[str, Any]]`: Create subtasks for a parent task
   - Analyze task and generate specific subtask descriptions using CLI
   - Fall back to default subtasks if analysis fails
-  - Create subtasks in OpenProject via API
+  - Create subtasks in OpenProject via API using `create_subtask(parent_work_package_id, project_id, subject, description)`
   - Return list of created subtask dictionaries
 
 #### 3.6 Subtask Analysis
@@ -122,6 +124,7 @@ Using OpenProject native features:
 - Only work on tasks where all dependencies are completed
 - Optionally create/update dependencies between subtasks using OpenProject API
 - Leverage OpenProject's built-in dependency tracking rather than reimplementing
+- Dependencies can be checked by retrieving the work package and examining its relationships
 
 ### 7. Configuration
 
