@@ -287,13 +287,27 @@ def run_cli_executor(
 
     while True:
         config_index = _choose_best_config_index(task_rating, working_dir)
-        state = _get_cli_state(config_index)
 
-        if config_index in tried_indices or not state["active"] or config_index == -1:
+        if config_index == -1:
             break
 
-        tried_indices.add(config_index)
+        state = _get_cli_state(config_index)
+
+        if config_index in tried_indices or not state["active"]:
+            break
+
         config = cli_configurations[config_index]
+        selected_capability = settings.cli_configurations[config_index].capability
+        if selected_capability < task_rating.min_rating:
+            logger.error(
+                f"Selected CLI configuration {config['name']} has capability={selected_capability}, "
+                f"which is below min_rating={task_rating.min_rating} for task '{task_name}'. "
+                f"This should not happen - selecting next configuration."
+            )
+            tried_indices.add(config_index)
+            continue
+
+        tried_indices.add(config_index)
         cli_command = config["cli_command"]
         cmd = _build_command(
             cli_command=cli_command,
@@ -323,6 +337,12 @@ def run_cli_executor(
         break
 
     if final_result is None:
+        available_capabilities = [cfg.capability for cfg in settings.cli_configurations]
+        error_msg = (
+            f"No CLI configuration meets min_rating={task_rating.min_rating} for task '{task_name}'. "
+            f"Available configurations have capabilities: {available_capabilities}"
+        )
+        logger.error(error_msg)
         final_result = {
             "success": False,
             "execution_time": time.time() - start_time,
@@ -331,7 +351,7 @@ def run_cli_executor(
             "command": "",
             "return_code": -1,
             "timeout": False,
-            "error": "No CLI configurations available",
+            "error": error_msg,
         }
 
     return final_result
