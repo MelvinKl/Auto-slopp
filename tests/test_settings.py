@@ -16,10 +16,12 @@ class TestSettings:
 
     def test_default_settings_values(self):
         """Test that default settings values are correctly set when no env vars are set."""
-        env_vars_to_keep = {k: v for k, v in os.environ.items() if not k.startswith("AUTO_SLOPP_")}
+        env_vars_to_keep = {
+            k: v for k, v in os.environ.items() if not k.startswith("AUTO_SLOPP_")
+        }
         with patch.dict(os.environ, env_vars_to_keep, clear=True):
             with patch("dotenv.load_dotenv", return_value=None):
-                test_settings = Settings(_env_file=None)
+                test_settings = Settings()
 
         assert test_settings.base_repo_path == Path.cwd()
         assert test_settings.executor_sleep_interval == 60.0
@@ -27,7 +29,10 @@ class TestSettings:
         assert test_settings.telegram_enabled is False
         assert test_settings.telegram_bot_token is None
         assert test_settings.telegram_chat_id is None
-        assert test_settings.telegram_api_url == "https://api.telegram.org/bot{token}/sendMessage"
+        assert (
+            test_settings.telegram_api_url
+            == "https://api.telegram.org/bot{token}/sendMessage"
+        )
         assert test_settings.telegram_timeout == 30.0
         assert test_settings.telegram_retry_attempts == 3
         assert test_settings.telegram_retry_delay == 1.0
@@ -37,7 +42,9 @@ class TestSettings:
 
     def test_telegram_api_url_template(self):
         """Test that telegram_api_url contains token placeholder."""
-        env_vars_to_clear = {k: v for k, v in os.environ.items() if k.startswith("AUTO_SLOPP_")}
+        env_vars_to_clear = {
+            k: v for k, v in os.environ.items() if k.startswith("AUTO_SLOPP_")
+        }
         with patch.dict(os.environ, env_vars_to_clear, clear=True):
             with patch("dotenv.load_dotenv", return_value=None):
                 test_settings = Settings()
@@ -66,10 +73,12 @@ class TestSettings:
 
     def test_optional_telegram_fields(self):
         """Test optional telegram fields use configured values."""
-        env_vars_to_keep = {k: v for k, v in os.environ.items() if not k.startswith("AUTO_SLOPP_")}
+        env_vars_to_keep = {
+            k: v for k, v in os.environ.items() if not k.startswith("AUTO_SLOPP_")
+        }
         with patch.dict(os.environ, env_vars_to_keep, clear=True):
             with patch("dotenv.load_dotenv", return_value=None):
-                test_settings = Settings(_env_file=None)
+                test_settings = Settings()
 
         assert test_settings.telegram_enabled is False
         assert test_settings.telegram_bot_token is None
@@ -148,11 +157,13 @@ class TestSettings:
     def test_cli_configurations_default(self):
         """Test default tiered CLI configurations."""
         test_settings = Settings()
-        assert len(test_settings.cli_configurations) == 3
+        assert len(test_settings.cli_configurations) == 5
         assert test_settings.cli_configurations[0].cli_command == "gemini"
         assert test_settings.cli_configurations[1].cli_command == "codex"
         assert test_settings.cli_configurations[2].cli_command == "opencode"
-        assert "glm-4.7-flash" in str(test_settings.cli_configurations[2].cli_args)
+        assert test_settings.cli_configurations[3].cli_command == "opencode"
+        assert test_settings.cli_configurations[4].cli_command == "opencode"
+        assert "glm-4.7-flash" in str(test_settings.cli_configurations[4].cli_args)
 
     def test_cli_configurations_env_override(self):
         """Test overriding CLI configurations via environment variable."""
