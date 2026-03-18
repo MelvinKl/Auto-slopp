@@ -472,9 +472,11 @@ class TestOpenProjectWorker:
             with (
                 patch("auto_slopp.workers.openproject_worker.create_and_checkout_branch") as mock_branch,
                 patch("auto_slopp.workers.openproject_worker.create_subtask") as mock_subtask,
+                patch("auto_slopp.workers.openproject_worker.execute_with_instructions") as mock_execute,
             ):
                 mock_branch.return_value = False
                 mock_subtask.return_value = {"id": 100, "subject": "Subtask 1"}
+                mock_execute.return_value = {"success": True, "stdout": ""}
 
                 result = worker._process_single_task(repo_path, task, 1)
 
@@ -878,8 +880,12 @@ class TestOpenProjectWorker:
                 "lockVersion": 1,
             }
 
-            with (patch("auto_slopp.workers.openproject_worker.create_and_checkout_branch") as mock_branch,):
+            with (
+                patch("auto_slopp.workers.openproject_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.openproject_worker.execute_with_instructions") as mock_execute,
+            ):
                 mock_branch.side_effect = Exception("Unexpected error")
+                mock_execute.return_value = {"success": True, "stdout": ""}
 
                 result = worker._process_single_task(repo_path, task, 1)
 

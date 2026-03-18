@@ -486,7 +486,6 @@ All checks must pass for the command to succeed, ensuring code quality and relia
 
 ```text
 Auto-slopp/                               # Repository root for the auto-slopp automation framework
-├── .beads/                               # Local bd (beads) issue-tracking state
 ├── .github/                              # GitHub repository configuration
 │   └── workflows/                        # CI workflow definitions
 ├── .ralph/                               # Ralph task-planning and execution notes
