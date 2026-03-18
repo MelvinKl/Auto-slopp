@@ -39,7 +39,7 @@ class CLIConfiguration(BaseModel):
         description="Capability rating of this CLI tool (0-10)",
     )
     cooldown_seconds: int = Field(
-        default=300,
+        default=3600,
         description="Cooldown time in seconds if the tool encounters errors",
     )
     name: str = Field(
@@ -130,35 +130,29 @@ class Settings(BaseSettings):
                 capability=8,
                 name="codex",
             ),
+            #CLIConfiguration(
+            #    cli_command="opencode",
+            #    cli_args=[            
+            #        "--model",
+            #        "zai-coding-plan/glm-5",
+            #        "run",
+            #    ],
+            #    capability=10,
+            #    name="opencode glm-5",
+            #),
+            #CLIConfiguration(
+            #    cli_command="opencode",
+            #    cli_args=[                    
+            #        "--model",
+            #        "zai-coding-plan/glm-4.7",
+            #        "run",
+            #    ],
+            #    capability=6,
+            #    name="opencode glm-4.7",
+            #),
             CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[
-                    "--agent",
-                    "openagent",
-                    "--model",
-                    "zai-coding-plan/glm-5",
-                    "run",
-                ],
-                capability=10,
-                name="opencode glm-5",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--agent",
-                    "openagent",
-                    "--model",
-                    "zai-coding-plan/glm-4.7",
-                    "run",
-                ],
-                capability=6,
-                name="opencode glm-4.7",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--agent",
-                    "openagent",
                     "--model",
                     "zai-coding-plan/glm-4.7-flash",
                     "run",
