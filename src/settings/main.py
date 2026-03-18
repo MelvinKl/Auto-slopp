@@ -199,55 +199,6 @@ class Settings(BaseSettings):
         description="Delay in seconds before reboot after auto-update (default: 5 minutes)",
     )
 
-    openproject_url: str = Field(
-        default="",
-        description="Base URL for OpenProject instance (e.g., https://openproject.example.com)",
-    )
-
-    openproject_api_token: str = Field(
-        default="",
-        description="API token for OpenProject authentication",
-    )
-
-    openproject_assigned_user_id: int = Field(
-        default=0,
-        ge=0,
-        description="User ID to filter tasks assigned to (auto-slopper user)",
-    )
-
-    openproject_default_status_id: int = Field(
-        default=1,
-        ge=1,
-        description="Default status ID for new tasks",
-    )
-
-    openproject_in_progress_status_id: int = Field(
-        default=2,
-        ge=1,
-        description="Status ID to set when task is in progress",
-    )
-
-    openproject_project_prefix: str = Field(
-        default="",
-        description="Optional prefix for project identifiers when creating new projects",
-    )
-
-    openproject_enabled: bool = Field(
-        default=False,
-        description="Enable OpenProject worker integration",
-    )
-
-    openproject_create_projects: bool = Field(
-        default=True,
-        description="Automatically create OpenProject projects if they don't exist",
-    )
-
-    openproject_task_type_id: int = Field(
-        default=1,
-        ge=1,
-        description="Default work package type ID for new tasks",
-    )
-
     model_config = {
         "env_prefix": "AUTO_SLOPP_",
         "env_file": ".env",
