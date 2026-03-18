@@ -24,11 +24,8 @@ Auto-slopp supports configurable CLI tools for automation. By default, it uses [
 
 ```json
 {
-  "plugin": [
-    "opencode-beads",
-  ],
   "permission": "allow",
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://opencode.ai/config.json"
 }
 ```
 
@@ -856,6 +853,8 @@ flake8 src/ tests/
 
 ```
 Auto-slopp/
+├── .github/                      # GitHub configuration and automation files
+│   └── workflows/                # CI workflow definitions
 ├── docs/                         # Documentation files (guides, API references)
 ├── src/                          # Source code
 │   ├── auto_slopp/               # Main package with core modules and workers

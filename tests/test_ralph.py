@@ -396,6 +396,7 @@ class TestCreateDefaultPlanSteps:
         steps = create_default_plan_steps()
 
         assert len(steps) == 11
+        assert all("beads" not in step.lower() for step in steps)
         assert "Understand the requirements" in steps[0]
         assert "Explore the codebase" in steps[1]
         assert "Design a solution" in steps[2]
