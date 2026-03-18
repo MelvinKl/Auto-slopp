@@ -147,7 +147,7 @@ class Settings(BaseSettings):
                     "opencode/nemotron-3-super-free",
                     "run",
                 ],
-                capability=2,
+                capability=9,
                 name="opencode nemotron-3-super-free",
             ),
             CLIConfiguration(
