@@ -93,8 +93,7 @@ class TestGitHubIssueWorker:
         """Test instruction building with branch name provided."""
         worker = GitHubIssueWorker(dry_run=True)
 
-        instructions = worker._build_instructions(
-            "Fix bug", "This is a bug", branch_name="ai/issue-1-fix-bug")
+        instructions = worker._build_instructions("Fix bug", "This is a bug", branch_name="ai/issue-1-fix-bug")
         assert "Fix bug" in instructions
         assert "This is a bug" in instructions
         assert "already on branch 'ai/issue-1-fix-bug'" in instructions
@@ -373,8 +372,7 @@ class TestGitHubIssueWorker:
 
                     from auto_slopp.utils.git_operations import sanitize_branch_name
 
-                    sanitized_title = sanitize_branch_name(
-                        test_case["title"][:30].lower())
+                    sanitized_title = sanitize_branch_name(test_case["title"][:30].lower())
 
                     assert result["issue_results"][0]["issue_title"] == test_case["title"]
 
@@ -414,8 +412,7 @@ class TestGitHubIssueWorker:
                 "labels": [{"name": "bug"}],
             }
 
-            assert worker._should_process_issue(
-                issue_from_allowed_creator) is False
+            assert worker._should_process_issue(issue_from_allowed_creator) is False
 
     def test_should_process_issue_without_label_and_not_allowed_creator(self):
         """Test that issues without required label and not from allowed creator are skipped."""
@@ -609,8 +606,7 @@ class TestGitHubIssueWorker:
                 mock_execute.return_value = {"success": True}
                 mock_get_branch.return_value = "ai/issue-1-test-issue"
                 mock_get_pr.return_value = None
-                mock_create_pr.return_value = {
-                    "url": "https://github.com/test/repo/pull/1"}
+                mock_create_pr.return_value = {"url": "https://github.com/test/repo/pull/1"}
                 mock_close.return_value = True
                 mock_comment.return_value = True
                 mock_checkout.return_value = True
@@ -697,8 +693,7 @@ class TestGitHubIssueWorker:
             worker._ensure_last_step_is_make_test(task_path)
             updated = task_path.read_text()
 
-            assert updated.count(
-                "Run `make test` and confirm it succeeds.") == 1
+            assert updated.count("Run `make test` and confirm it succeeds.") == 1
 
     def test_execute_step_acceptance_check_fails_when_status_fail(self):
         """Test acceptance check returns failure when agent reports fail."""
@@ -707,13 +702,11 @@ class TestGitHubIssueWorker:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_path = Path(temp_dir)
             task_path = repo_path / "task.md"
-            task_path.write_text(
-                "# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
+            task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
             step = Step(number=1, description="Implement changes")
 
             with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
-                mock_execute.return_value = {
-                    "success": True, "stdout": "ACCEPTANCE_STATUS: fail"}
+                mock_execute.return_value = {"success": True, "stdout": "ACCEPTANCE_STATUS: fail"}
 
                 result = worker._execute_step_acceptance_check(
                     repo_dir=repo_path,
@@ -734,13 +727,11 @@ class TestGitHubIssueWorker:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_path = Path(temp_dir)
             task_path = repo_path / "task.md"
-            task_path.write_text(
-                "# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
+            task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
             step = Step(number=1, description="Implement changes")
 
             with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
-                mock_execute.return_value = {
-                    "success": True, "stdout": "ACCEPTANCE_STATUS: pass"}
+                mock_execute.return_value = {"success": True, "stdout": "ACCEPTANCE_STATUS: pass"}
 
                 result = worker._execute_step_acceptance_check(
                     repo_dir=repo_path,
@@ -760,19 +751,11 @@ class TestGitHubIssueWorker:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_path = Path(temp_dir)
             task_path = repo_path / "task.md"
-            task_path.write_text(
-                "# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
+            task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
 
             with (
-                patch(
-                    "auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations",
-                    2),
-                patch.object(
-                    worker,
-                    "_execute_step",
-                    return_value={
-                        "success": False,
-                        "error": "retry needed"}),
+                patch("auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations", 2),
+                patch.object(worker, "_execute_step", return_value={"success": False, "error": "retry needed"}),
             ):
                 result = worker._run_refined_task_loop(
                     repo_dir=repo_path,
@@ -803,27 +786,11 @@ class TestGitHubIssueWorker:
 """)
 
             with (
-                patch(
-                    "auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations",
-                    3),
-                patch.object(
-                    worker,
-                    "_execute_step",
-                    return_value={
-                        "success": True}),
-                patch.object(
-                    worker,
-                    "_execute_step_acceptance_check",
-                    return_value={
-                        "success": True}),
-                patch.object(
-                    worker,
-                    "_update_remaining_steps",
-                    return_value={
-                        "success": True}),
-                patch(
-                    "auto_slopp.workers.github_issue_worker.has_changes",
-                    return_value=True),
+                patch("auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations", 3),
+                patch.object(worker, "_execute_step", return_value={"success": True}),
+                patch.object(worker, "_execute_step_acceptance_check", return_value={"success": True}),
+                patch.object(worker, "_update_remaining_steps", return_value={"success": True}),
+                patch("auto_slopp.workers.github_issue_worker.has_changes", return_value=True),
                 patch("auto_slopp.workers.github_issue_worker.commit_and_push_changes") as mock_commit,
             ):
                 mock_commit.return_value = (True, "ok")
@@ -852,12 +819,10 @@ class TestGitHubIssueWorker:
             repo_path = Path(temp_dir)
             task_path = repo_path / ".ralph" / "github-281.md"
             task_path.parent.mkdir(parents=True, exist_ok=True)
-            task_path.write_text(
-                "# Task\n\n## Steps\n\n- [x] 1. Implement changes\n")
+            task_path.write_text("# Task\n\n## Steps\n\n- [x] 1. Implement changes\n")
 
             with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
-                mock_execute.return_value = {
-                    "success": True, "stdout": "## Summary\n- Implemented changes"}
+                mock_execute.return_value = {"success": True, "stdout": "## Summary\n- Implemented changes"}
 
                 body = worker._generate_pr_body_from_task_file(
                     repo_dir=repo_path,

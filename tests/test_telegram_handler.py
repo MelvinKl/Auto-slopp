@@ -120,6 +120,9 @@ class TestTelegramHandler:
                 # Give some time for the async task to complete
                 await asyncio.sleep(0.1)
 
+            # Run the test
+            asyncio.run(test_with_running_loop())
+
             # Assert - Message should be sent
             mock_client.post.assert_called_once()
             call_args = mock_client.post.call_args
@@ -127,9 +130,6 @@ class TestTelegramHandler:
             payload = call_args.kwargs["json"]
             assert payload["chat_id"] == "test_chat"
             assert "Test message" in payload["text"]
-
-            # Run the test
-            asyncio.run(test_with_running_loop())
 
     @patch("httpx.AsyncClient")
     def test_emit_with_no_running_loop(self, mock_client_class):

@@ -90,8 +90,7 @@ class TestStaleBranchCleanupWorker:
 
         remote_branches = {"main", "remote-branch"}
 
-        stale = worker._identify_stale_branches(
-            local_branches, remote_branches)
+        stale = worker._identify_stale_branches(local_branches, remote_branches)
 
         assert len(stale) == 1
         assert stale[0]["name"] == "old-branch"
@@ -110,12 +109,12 @@ class TestStaleBranchCleanupWorker:
 
             assert result is True
 
-     def test_delete_branch_current(self):
-         """Test deletion of current branch is prevented."""
-         worker = StaleBranchCleanupWorker()
+    def test_delete_branch_current(self):
+        """Test deletion of current branch is prevented."""
+        worker = StaleBranchCleanupWorker()
 
-         with tempfile.TemporaryDirectory():
-             with patch("subprocess.run") as mock_run:
+        with tempfile.TemporaryDirectory():
+            with patch("subprocess.run") as mock_run:
                 mock_run.return_value = Mock(stdout="test-branch", returncode=0)
 
                 original_method = worker._delete_branch
