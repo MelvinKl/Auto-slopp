@@ -14,9 +14,7 @@ class TestAutoUpdate:
     """Test cases for auto-update functionality."""
 
     @patch("auto_slopp.executor.subprocess.run")
-    def test_git_pull_called_after_worker_loop(
-        self, mock_subprocess_run, temp_repo_dir, mock_settings
-    ):
+    def test_git_pull_called_after_worker_loop(self, mock_subprocess_run, temp_repo_dir, mock_settings):
         """Test that git pull is called after every worker loop iteration."""
         mock_settings.executor_sleep_interval = 0.1
         mock_settings.workers_disabled = [
@@ -25,9 +23,7 @@ class TestAutoUpdate:
             "StaleBranchCleanupWorker",
         ]
 
-        mock_subprocess_run.return_value = Mock(
-            returncode=0, stdout="Already up to date.", stderr=""
-        )
+        mock_subprocess_run.return_value = Mock(returncode=0, stdout="Already up to date.", stderr="")
 
         with patch("auto_slopp.executor.settings", mock_settings):
             executor = Executor(repo_path=temp_repo_dir)
@@ -45,9 +41,7 @@ class TestAutoUpdate:
 
     @patch("auto_slopp.executor.subprocess.run")
     @patch("auto_slopp.executor.time.sleep")
-    def test_reboot_scheduled_after_update(
-        self, mock_sleep, mock_subprocess_run, temp_repo_dir, mock_settings
-    ):
+    def test_reboot_scheduled_after_update(self, mock_sleep, mock_subprocess_run, temp_repo_dir, mock_settings):
         """Test that reboot is scheduled after detecting an update."""
         mock_settings.auto_update_reboot_delay = 300
         mock_settings.workers_disabled = [
@@ -57,9 +51,7 @@ class TestAutoUpdate:
         ]
 
         mock_subprocess_run.side_effect = [
-            Mock(
-                returncode=0, stdout="Updating abc123..def456\nFast-forward", stderr=""
-            ),
+            Mock(returncode=0, stdout="Updating abc123..def456\nFast-forward", stderr=""),
         ]
 
         with patch("auto_slopp.executor.settings", mock_settings):
@@ -70,9 +62,7 @@ class TestAutoUpdate:
             assert update_detected is True, "Update should be detected"
 
     @patch("auto_slopp.executor.subprocess.run")
-    def test_no_reboot_when_no_update(
-        self, mock_subprocess_run, temp_repo_dir, mock_settings
-    ):
+    def test_no_reboot_when_no_update(self, mock_subprocess_run, temp_repo_dir, mock_settings):
         """Test that no reboot is scheduled when there's no update."""
         mock_settings.auto_update_reboot_delay = 300
         mock_settings.workers_disabled = [
@@ -81,9 +71,7 @@ class TestAutoUpdate:
             "StaleBranchCleanupWorker",
         ]
 
-        mock_subprocess_run.return_value = Mock(
-            returncode=0, stdout="Already up to date.", stderr=""
-        )
+        mock_subprocess_run.return_value = Mock(returncode=0, stdout="Already up to date.", stderr="")
 
         with patch("auto_slopp.executor.settings", mock_settings):
             executor = Executor(repo_path=temp_repo_dir)
@@ -93,9 +81,7 @@ class TestAutoUpdate:
             assert update_detected is False, "No update should be detected"
 
     @patch("auto_slopp.executor.subprocess.run")
-    def test_git_pull_failure_handled_gracefully(
-        self, mock_subprocess_run, temp_repo_dir, mock_settings
-    ):
+    def test_git_pull_failure_handled_gracefully(self, mock_subprocess_run, temp_repo_dir, mock_settings):
         """Test that git pull failures are handled gracefully."""
         mock_settings.workers_disabled = [
             "GitHubIssueWorker",
@@ -103,9 +89,7 @@ class TestAutoUpdate:
             "StaleBranchCleanupWorker",
         ]
 
-        mock_subprocess_run.return_value = Mock(
-            returncode=1, stdout="", stderr="fatal: not a git repository"
-        )
+        mock_subprocess_run.return_value = Mock(returncode=1, stdout="", stderr="fatal: not a git repository")
 
         with patch("auto_slopp.executor.settings", mock_settings):
             executor = Executor(repo_path=temp_repo_dir)
@@ -127,9 +111,7 @@ class TestAutoUpdate:
             "StaleBranchCleanupWorker",
         ]
 
-        mock_subprocess_run.return_value = Mock(
-            returncode=0, stdout="Already up to date.", stderr=""
-        )
+        mock_subprocess_run.return_value = Mock(returncode=0, stdout="Already up to date.", stderr="")
 
         with patch("auto_slopp.executor.settings", mock_settings):
             Executor(repo_path=temp_repo_dir)
@@ -139,9 +121,7 @@ class TestAutoUpdate:
 
     @patch("auto_slopp.executor.subprocess.run")
     @patch("auto_slopp.executor.time.sleep")
-    def test_reboot_delay_timer(
-        self, mock_sleep, mock_subprocess_run, temp_repo_dir, mock_settings
-    ):
+    def test_reboot_delay_timer(self, mock_sleep, mock_subprocess_run, temp_repo_dir, mock_settings):
         """Test that reboot delay timer is correctly applied."""
         mock_settings.auto_update_reboot_delay = 300
         mock_settings.workers_disabled = [
@@ -161,14 +141,10 @@ class TestAutoUpdate:
                 update_detected = executor._check_for_updates()
 
                 if update_detected:
-                    mock_schedule_reboot.assert_called_once_with(
-                        mock_settings.auto_update_reboot_delay
-                    )
+                    mock_schedule_reboot.assert_called_once_with(mock_settings.auto_update_reboot_delay)
 
     @patch("auto_slopp.executor.subprocess.run")
-    def test_git_pull_in_working_directory(
-        self, mock_subprocess_run, temp_repo_dir, mock_settings
-    ):
+    def test_git_pull_in_working_directory(self, mock_subprocess_run, temp_repo_dir, mock_settings):
         """Test that git pull is executed in the working directory of the program."""
         mock_settings.workers_disabled = [
             "GitHubIssueWorker",
@@ -176,9 +152,7 @@ class TestAutoUpdate:
             "StaleBranchCleanupWorker",
         ]
 
-        mock_subprocess_run.return_value = Mock(
-            returncode=0, stdout="Already up to date.", stderr=""
-        )
+        mock_subprocess_run.return_value = Mock(returncode=0, stdout="Already up to date.", stderr="")
 
         with patch("auto_slopp.executor.settings", mock_settings):
             executor = Executor(repo_path=temp_repo_dir)
@@ -188,15 +162,11 @@ class TestAutoUpdate:
             for call_obj in mock_subprocess_run.call_args_list:
                 if "pull" in str(call_obj):
                     cwd_arg = call_obj[1].get("cwd")
-                    assert cwd_arg is not None, (
-                        "git pull should specify working directory"
-                    )
+                    assert cwd_arg is not None, "git pull should specify working directory"
                     break
 
     @patch("auto_slopp.executor.subprocess.run")
-    def test_multiple_iterations_trigger_multiple_pulls(
-        self, mock_subprocess_run, temp_repo_dir, mock_settings
-    ):
+    def test_multiple_iterations_trigger_multiple_pulls(self, mock_subprocess_run, temp_repo_dir, mock_settings):
         """Test that each worker loop iteration triggers a git pull."""
         mock_settings.executor_sleep_interval = 0.1
         mock_settings.workers_disabled = [
@@ -205,9 +175,7 @@ class TestAutoUpdate:
             "StaleBranchCleanupWorker",
         ]
 
-        mock_subprocess_run.return_value = Mock(
-            returncode=0, stdout="Already up to date.", stderr=""
-        )
+        mock_subprocess_run.return_value = Mock(returncode=0, stdout="Already up to date.", stderr="")
 
         with patch("auto_slopp.executor.settings", mock_settings):
             executor = Executor(repo_path=temp_repo_dir)
@@ -216,21 +184,13 @@ class TestAutoUpdate:
                 executor._run_iteration()
                 executor._check_for_updates()
 
-            git_pull_calls = [
-                call
-                for call in mock_subprocess_run.call_args_list
-                if "pull" in str(call)
-            ]
+            git_pull_calls = [call for call in mock_subprocess_run.call_args_list if "pull" in str(call)]
 
-            assert len(git_pull_calls) >= 3, (
-                "git pull should be called in each iteration"
-            )
+            assert len(git_pull_calls) >= 3, "git pull should be called in each iteration"
 
     @patch("auto_slopp.executor.subprocess.run")
     @patch("auto_slopp.executor.time.sleep")
-    def test_update_detection_with_various_outputs(
-        self, mock_sleep, mock_subprocess_run, temp_repo_dir, mock_settings
-    ):
+    def test_update_detection_with_various_outputs(self, mock_sleep, mock_subprocess_run, temp_repo_dir, mock_settings):
         """Test update detection with various git pull outputs."""
         mock_settings.auto_update_reboot_delay = 300
         mock_settings.workers_disabled = [
@@ -251,21 +211,15 @@ class TestAutoUpdate:
             executor = Executor(repo_path=temp_repo_dir)
 
             for output, expected_update in test_cases:
-                mock_subprocess_run.return_value = Mock(
-                    returncode=0, stdout=output, stderr=""
-                )
+                mock_subprocess_run.return_value = Mock(returncode=0, stdout=output, stderr="")
 
                 update_detected = executor._check_for_updates()
 
-                assert update_detected == expected_update, (
-                    f"Failed for output: {output}"
-                )
+                assert update_detected == expected_update, f"Failed for output: {output}"
 
     @patch("auto_slopp.executor.subprocess.run")
     @patch("auto_slopp.executor.time.sleep")
-    def test_reboot_command_execution(
-        self, mock_sleep, mock_subprocess_run, temp_repo_dir, mock_settings
-    ):
+    def test_reboot_command_execution(self, mock_sleep, mock_subprocess_run, temp_repo_dir, mock_settings):
         """Test that reboot command is executed after delay."""
         mock_settings.auto_update_reboot_delay = 0
         mock_settings.workers_disabled = [

@@ -18,7 +18,8 @@ class TestTelegramHandler:
         """Test initialization fails without bot token and chat ID."""
         # Arrange - Mock settings with missing credentials
         with patch.dict(
-            "auto_slopp.telegram_handler.settings.__dict__", {"telegram_bot_token": None, "telegram_chat_id": None}
+            "auto_slopp.telegram_handler.settings.__dict__",
+            {"telegram_bot_token": None, "telegram_chat_id": None},
         ):
             # Act & Assert - Should raise ValueError
             with pytest.raises(ValueError, match="Both bot_token and chat_id must be provided"):
@@ -29,7 +30,10 @@ class TestTelegramHandler:
         # Arrange - Mock settings with different credentials
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_bot_token": "settings_token", "telegram_chat_id": "settings_chat"},
+            {
+                "telegram_bot_token": "settings_token",
+                "telegram_chat_id": "settings_chat",
+            },
         ):
             # Act - Create handler with direct credentials
             handler = TelegramHandler(bot_token="direct_token", chat_id="direct_chat")
@@ -109,20 +113,20 @@ class TestTelegramHandler:
                 exc_info=None,
             )
 
-             # Act - Test with running loop
-             async def test_with_running_loop():
-                 asyncio.get_running_loop()
-                 handler.emit(record)
-                 # Give some time for the async task to complete
-                 await asyncio.sleep(0.1)
+            # Act - Test with running loop
+            async def test_with_running_loop():
+                asyncio.get_running_loop()
+                handler.emit(record)
+                # Give some time for the async task to complete
+                await asyncio.sleep(0.1)
 
-                # Assert - Message should be sent
-                mock_client.post.assert_called_once()
-                call_args = mock_client.post.call_args
-                assert "json" in call_args.kwargs
-                payload = call_args.kwargs["json"]
-                assert payload["chat_id"] == "test_chat"
-                assert "Test message" in payload["text"]
+            # Assert - Message should be sent
+            mock_client.post.assert_called_once()
+            call_args = mock_client.post.call_args
+            assert "json" in call_args.kwargs
+            payload = call_args.kwargs["json"]
+            assert payload["chat_id"] == "test_chat"
+            assert "Test message" in payload["text"]
 
             # Run the test
             asyncio.run(test_with_running_loop())
@@ -290,7 +294,10 @@ class TestTelegramHandler:
             # Test cases with various special characters
             test_cases = [
                 ("Test & <test> & more", "Test &amp; &lt;test&gt; &amp; more"),
-                ("<script>alert('xss')</script>", "&lt;script&gt;alert('xss')&lt;/script&gt;"),
+                (
+                    "<script>alert('xss')</script>",
+                    "&lt;script&gt;alert('xss')&lt;/script&gt;",
+                ),
                 ("Normal text", "Normal text"),
                 ("", ""),
                 ("&<>", "&amp;&lt;&gt;"),
@@ -315,7 +322,11 @@ class TestTelegramHandler:
             "auto_slopp.telegram_handler.settings.__dict__",
             {"telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
         ):
-            handler = TelegramHandler(parse_mode="HTML", disable_web_page_preview=True, disable_notification=False)
+            handler = TelegramHandler(
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+                disable_notification=False,
+            )
 
             # Create a test log record
             record = logging.LogRecord(
@@ -410,7 +421,11 @@ class TestTelegramHandler:
         # Arrange
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_enabled": True, "telegram_bot_token": None, "telegram_chat_id": "test_chat"},
+            {
+                "telegram_enabled": True,
+                "telegram_bot_token": None,
+                "telegram_chat_id": "test_chat",
+            },
         ):
             # Act
             handler = setup_telegram_logging()
@@ -423,7 +438,11 @@ class TestTelegramHandler:
         # Arrange
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_enabled": True, "telegram_bot_token": "test_token", "telegram_chat_id": None},
+            {
+                "telegram_enabled": True,
+                "telegram_bot_token": "test_token",
+                "telegram_chat_id": None,
+            },
         ):
             # Act
             handler = setup_telegram_logging()
@@ -476,7 +495,11 @@ class TestTelegramIntegration:
 
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_enabled": True, "telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
+            {
+                "telegram_enabled": True,
+                "telegram_bot_token": "test_token",
+                "telegram_chat_id": "test_chat",
+            },
         ):
             # Set up logger with Telegram handler
             logger = logging.getLogger("test_integration")
@@ -520,7 +543,11 @@ class TestTelegramPerformance:
 
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_enabled": True, "telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
+            {
+                "telegram_enabled": True,
+                "telegram_bot_token": "test_token",
+                "telegram_chat_id": "test_chat",
+            },
         ):
             handler = TelegramHandler()
             handler.setFormatter(logging.Formatter("%(message)s"))
@@ -566,7 +593,11 @@ class TestTelegramPerformance:
 
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_enabled": True, "telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
+            {
+                "telegram_enabled": True,
+                "telegram_bot_token": "test_token",
+                "telegram_chat_id": "test_chat",
+            },
         ):
             handler = TelegramHandler()
             handler.setFormatter(logging.Formatter("%(message)s"))
@@ -612,7 +643,11 @@ class TestTelegramPerformance:
 
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_enabled": True, "telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
+            {
+                "telegram_enabled": True,
+                "telegram_bot_token": "test_token",
+                "telegram_chat_id": "test_chat",
+            },
         ):
             handler = TelegramHandler()
             handler.setFormatter(logging.Formatter("%(message)s"))
@@ -653,7 +688,11 @@ class TestTelegramErrorScenarios:
 
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_enabled": True, "telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
+            {
+                "telegram_enabled": True,
+                "telegram_bot_token": "test_token",
+                "telegram_chat_id": "test_chat",
+            },
         ):
             handler = TelegramHandler(retry_attempts=2, retry_delay=0.01)
             handler.setFormatter(logging.Formatter("%(message)s"))
@@ -694,7 +733,11 @@ class TestTelegramErrorScenarios:
 
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_enabled": True, "telegram_bot_token": "invalid_token", "telegram_chat_id": "test_chat"},
+            {
+                "telegram_enabled": True,
+                "telegram_bot_token": "invalid_token",
+                "telegram_chat_id": "test_chat",
+            },
         ):
             handler = TelegramHandler(retry_attempts=1)  # Only try once
             handler.setFormatter(logging.Formatter("%(message)s"))
@@ -735,7 +778,11 @@ class TestTelegramErrorScenarios:
 
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_enabled": True, "telegram_bot_token": "test_token", "telegram_chat_id": "invalid_chat"},
+            {
+                "telegram_enabled": True,
+                "telegram_bot_token": "test_token",
+                "telegram_chat_id": "invalid_chat",
+            },
         ):
             handler = TelegramHandler(retry_attempts=1)  # Only try once
             handler.setFormatter(logging.Formatter("%(message)s"))
@@ -772,7 +819,11 @@ class TestTelegramErrorScenarios:
 
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_enabled": True, "telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
+            {
+                "telegram_enabled": True,
+                "telegram_bot_token": "test_token",
+                "telegram_chat_id": "test_chat",
+            },
         ):
             handler = TelegramHandler(retry_attempts=3, retry_delay=0.01)
             handler.setFormatter(logging.Formatter("%(message)s"))
@@ -873,7 +924,11 @@ class TestTelegramConfigurationValidation:
         """Test configuration with boundary values."""
         boundary_configs = [
             {"timeout": 0.1, "retry_attempts": 0, "retry_delay": 0.0},  # Minimum values
-            {"timeout": 300.0, "retry_attempts": 10, "retry_delay": 60.0},  # Maximum values
+            {
+                "timeout": 300.0,
+                "retry_attempts": 10,
+                "retry_delay": 60.0,
+            },  # Maximum values
         ]
 
         for config in boundary_configs:
@@ -934,7 +989,11 @@ class TestTelegramConfigurationValidation:
 
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_enabled": True, "telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
+            {
+                "telegram_enabled": True,
+                "telegram_bot_token": "test_token",
+                "telegram_chat_id": "test_chat",
+            },
         ):
             handler = setup_telegram_logging(format_string=custom_format)
 
@@ -955,7 +1014,11 @@ class TestTelegramConfigurationValidation:
 
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_enabled": True, "telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
+            {
+                "telegram_enabled": True,
+                "telegram_bot_token": "test_token",
+                "telegram_chat_id": "test_chat",
+            },
         ):
             # Set up handler with WARNING level
             handler = TelegramHandler()
@@ -1008,7 +1071,11 @@ class TestTelegramEndToEnd:
 
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_enabled": True, "telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
+            {
+                "telegram_enabled": True,
+                "telegram_bot_token": "test_token",
+                "telegram_chat_id": "test_chat",
+            },
         ):
             # Act - Set up logger
             logger = logging.getLogger("test_e2e")
@@ -1061,7 +1128,11 @@ class TestTelegramEndToEnd:
 
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_enabled": True, "telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
+            {
+                "telegram_enabled": True,
+                "telegram_bot_token": "test_token",
+                "telegram_chat_id": "test_chat",
+            },
         ):
             # Set up multiple loggers with the same Telegram handler
             telegram_handler = setup_telegram_logging()
@@ -1102,7 +1173,11 @@ class TestTelegramEndToEnd:
 
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_enabled": True, "telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
+            {
+                "telegram_enabled": True,
+                "telegram_bot_token": "test_token",
+                "telegram_chat_id": "test_chat",
+            },
         ):
             logger = logging.getLogger("test_dynamic")
             logger.setLevel(logging.INFO)
@@ -1156,7 +1231,11 @@ class TestTelegramEndToEnd:
 
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_enabled": True, "telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
+            {
+                "telegram_enabled": True,
+                "telegram_bot_token": "test_token",
+                "telegram_chat_id": "test_chat",
+            },
         ):
             handler = TelegramHandler(retry_attempts=2, retry_delay=0.01)
             handler.setFormatter(logging.Formatter("%(message)s"))
@@ -1164,7 +1243,13 @@ class TestTelegramEndToEnd:
             # Create log records
             records = [
                 logging.LogRecord(
-                    name="test", level=logging.INFO, pathname="", lineno=0, msg=f"Message {i}", args=(), exc_info=None
+                    name="test",
+                    level=logging.INFO,
+                    pathname="",
+                    lineno=0,
+                    msg=f"Message {i}",
+                    args=(),
+                    exc_info=None,
                 )
                 for i in range(5)
             ]
@@ -1195,7 +1280,11 @@ class TestTelegramEndToEnd:
 
         with patch.dict(
             "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_enabled": True, "telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
+            {
+                "telegram_enabled": True,
+                "telegram_bot_token": "test_token",
+                "telegram_chat_id": "test_chat",
+            },
         ):
             handler = TelegramHandler()
             handler.setFormatter(logging.Formatter("%(message)s"))

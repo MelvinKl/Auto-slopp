@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<duplicate-code-report>
+    <summary>
+        <total-lines-analyzed>5237</total-lines-analyzed>
+        <duplicate-lines-found>25</duplicate-lines-found>
+        <percentage-duplicated>0.48</percentage-duplicated>
+    </summary>
+    <duplicates>
+        <duplicate-block>
+            <lines-count>9</lines-count>
+            <files>
+                <file>
+                    <path>src/auto_slopp/utils/branch_analysis.py</path>
+                    <start-line>28</start-line>
+                    <end-line>37</end-line>
+                </file>
+                <file>
+                    <path>src/auto_slopp/workers/stale_branch_cleanup_worker.py</path>
+                    <start-line>181</start-line>
+                    <end-line>190</end-line>
+                </file>
+            </files>
+            <code-snippet><![CDATA[
+           """
+           return {
+               "repository": repo_dir.name,
+               "path": str(repo_dir),
+               "success": False,
+               "branches_deleted": 0,
+               "branches_failed_to_delete": 0,
+               "deleted_branches": [],
+               "failed_deletions": [],
+]]></code-snippet>
+        </duplicate-block>
+        <duplicate-block>
+            <lines-count>6</lines-count>
+            <files>
+                <file>
+                    <path>src/auto_slopp/utils/git_operations.py</path>
+                    <start-line>60</start-line>
+                    <end-line>68</end-line>
+                </file>
+                <file>
+                    <path>src/auto_slopp/utils/github_operations.py</path>
+                    <start-line>38</start-line>
+                    <end-line>46</end-line>
+                </file>
+            </files>
+            <code-snippet><![CDATA[
+           check: Whether to raise exception on non-zero return code
+           timeout: Timeout for the command in seconds
+           capture_output: Whether to capture output
+
+       Returns:
+           CompletedProcess instance
+
+       Raises:
+]]></code-snippet>
+        </duplicate-block>
+        <duplicate-block>
+            <lines-count>5</lines-count>
+            <files>
+                <file>
+                    <path>src/auto_slopp/utils/git_operations.py</path>
+                    <start-line>73</start-line>
+                    <end-line>78</end-line>
+                </file>
+                <file>
+                    <path>src/auto_slopp/utils/github_operations.py</path>
+                    <start-line>63</start-line>
+                    <end-line>68</end-line>
+                </file>
+            </files>
+            <code-snippet><![CDATA[
+               cwd=repo_dir,
+               capture_output=capture_output,
+               text=capture_output,
+               check=check,
+               timeout=timeout,
+]]></code-snippet>
+        </duplicate-block>
+        <duplicate-block>
+            <lines-count>5</lines-count>
+            <files>
+                <file>
+                    <path>src/auto_slopp/utils/branch_analysis.py</path>
+                    <start-line>32</start-line>
+                    <end-line>37</end-line>
+                </file>
+                <file>
+                    <path>src/auto_slopp/workers/stale_branch_cleanup_worker.py</path>
+                    <start-line>205</start-line>
+                    <end-line>210</end-line>
+                </file>
+            </files>
+            <code-snippet><![CDATA[
+               "success": False,
+               "branches_deleted": 0,
+               "branches_failed_to_delete": 0,
+               "deleted_branches": [],
+               "failed_deletions": [],
+]]></code-snippet>
+        </duplicate-block>
+    </duplicates>
+</duplicate-code-report>

@@ -1,0 +1,199 @@
+************* Module src.settings.main
+src/settings/main.py:22: [C0301(line-too-long), ] Line too long (101/100)
+src/settings/main.py:91: [C0301(line-too-long), ] Line too long (116/100)
+src/settings/main.py:93: [C0301(line-too-long), ] Line too long (109/100)
+src/settings/main.py:100: [C0301(line-too-long), ] Line too long (109/100)
+src/settings/main.py:102: [C0301(line-too-long), ] Line too long (120/100)
+src/settings/main.py:104: [C0301(line-too-long), ] Line too long (107/100)
+src/settings/main.py:185: [C0301(line-too-long), ] Line too long (115/100)
+src/settings/main.py:206: [C0301(line-too-long), ] Line too long (111/100)
+src/settings/main.py:213: [C0301(line-too-long), ] Line too long (108/100)
+src/settings/main.py:228: [C0301(line-too-long), ] Line too long (101/100)
+src/settings/main.py:58: [W0108(unnecessary-lambda), Settings.<lambda>] Lambda may not be necessary
+src/settings/main.py:75: [R1705(no-else-return), Settings.expand_user_paths] Unnecessary "elif" after "return", remove the leading "el" from "elif"
+src/settings/main.py:4: [W0611(unused-import), ] Unused Literal imported from typing
+src/settings/main.py:7: [W0611(unused-import), ] Unused model_validator imported from pydantic
+************* Module src.auto_slopp.telegram_handler
+src/auto_slopp/telegram_handler.py:54: [C0301(line-too-long), ] Line too long (101/100)
+src/auto_slopp/telegram_handler.py:13: [R0902(too-many-instance-attributes), TelegramHandler] Too many instance attributes (10/7)
+src/auto_slopp/telegram_handler.py:20: [R0913(too-many-arguments), TelegramHandler.__init__] Too many arguments (9/5)
+src/auto_slopp/telegram_handler.py:20: [R0917(too-many-positional-arguments), TelegramHandler.__init__] Too many positional arguments (9/5)
+src/auto_slopp/telegram_handler.py:87: [W0718(broad-exception-caught), TelegramHandler.emit] Catching too general exception Exception
+src/auto_slopp/telegram_handler.py:95: [W0718(broad-exception-caught), TelegramHandler._handle_task_result] Catching too general exception Exception
+src/auto_slopp/telegram_handler.py:141: [W0718(broad-exception-caught), TelegramHandler._send_message_async] Catching too general exception Exception
+src/auto_slopp/telegram_handler.py:136: [W0718(broad-exception-caught), TelegramHandler._send_message_async] Catching too general exception Exception
+src/auto_slopp/telegram_handler.py:129: [R1724(no-else-continue), TelegramHandler._send_message_async] Unnecessary "elif" after "continue", remove the leading "el" from "elif"
+src/auto_slopp/telegram_handler.py:143: [W1203(logging-fstring-interpolation), TelegramHandler._send_message_async] Use lazy % formatting in logging functions
+src/auto_slopp/telegram_handler.py:5: [W0611(unused-import), ] Unused import time
+************* Module src.auto_slopp.main
+src/auto_slopp/main.py:76: [W1203(logging-fstring-interpolation), main] Use lazy % formatting in logging functions
+src/auto_slopp/main.py:77: [W1203(logging-fstring-interpolation), main] Use lazy % formatting in logging functions
+src/auto_slopp/main.py:78: [W1203(logging-fstring-interpolation), main] Use lazy % formatting in logging functions
+src/auto_slopp/main.py:88: [W0718(broad-exception-caught), main] Catching too general exception Exception
+src/auto_slopp/main.py:89: [W1203(logging-fstring-interpolation), main] Use lazy % formatting in logging functions
+************* Module src.auto_slopp.executor
+src/auto_slopp/executor.py:67: [C0301(line-too-long), ] Line too long (101/100)
+src/auto_slopp/executor.py:73: [C0301(line-too-long), ] Line too long (101/100)
+src/auto_slopp/executor.py:135: [C0301(line-too-long), ] Line too long (114/100)
+src/auto_slopp/executor.py:162: [C0301(line-too-long), ] Line too long (117/100)
+src/auto_slopp/executor.py:53: [W0718(broad-exception-caught), Executor.start] Catching too general exception Exception
+src/auto_slopp/executor.py:78: [W0718(broad-exception-caught), Executor._run_iteration] Catching too general exception Exception
+src/auto_slopp/executor.py:103: [W0718(broad-exception-caught), Executor._execute_worker] Catching too general exception Exception
+src/auto_slopp/executor.py:139: [W0718(broad-exception-caught), Executor._execute_worker_with_directories] Catching too general exception Exception
+src/auto_slopp/executor.py:171: [W0718(broad-exception-caught), Executor._check_for_updates] Catching too general exception Exception
+src/auto_slopp/executor.py:150: [W1510(subprocess-run-check), Executor._check_for_updates] 'subprocess.run' used without explicitly defining the value for 'check'.
+src/auto_slopp/executor.py:194: [W0718(broad-exception-caught), Executor._execute_reboot] Catching too general exception Exception
+src/auto_slopp/executor.py:7: [W0611(unused-import), ] Unused Any imported from typing
+************* Module src.auto_slopp.worker
+src/auto_slopp/worker.py:26: [W0107(unnecessary-pass), Worker.run] Unnecessary pass statement
+src/auto_slopp/worker.py:8: [R0903(too-few-public-methods), Worker] Too few public methods (1/2)
+************* Module src.auto_slopp.workers.pr_worker
+src/auto_slopp/workers/pr_worker.py:31: [C0301(line-too-long), ] Line too long (116/100)
+src/auto_slopp/workers/pr_worker.py:75: [C0301(line-too-long), ] Line too long (105/100)
+src/auto_slopp/workers/pr_worker.py:80: [C0301(line-too-long), ] Line too long (102/100)
+src/auto_slopp/workers/pr_worker.py:93: [C0301(line-too-long), ] Line too long (110/100)
+src/auto_slopp/workers/pr_worker.py:96: [C0301(line-too-long), ] Line too long (106/100)
+src/auto_slopp/workers/pr_worker.py:145: [C0301(line-too-long), ] Line too long (110/100)
+src/auto_slopp/workers/pr_worker.py:149: [C0301(line-too-long), ] Line too long (109/100)
+src/auto_slopp/workers/pr_worker.py:152: [C0301(line-too-long), ] Line too long (118/100)
+src/auto_slopp/workers/pr_worker.py:169: [C0301(line-too-long), ] Line too long (110/100)
+src/auto_slopp/workers/pr_worker.py:180: [C0301(line-too-long), ] Line too long (110/100)
+src/auto_slopp/workers/pr_worker.py:217: [C0301(line-too-long), ] Line too long (114/100)
+src/auto_slopp/workers/pr_worker.py:232: [C0301(line-too-long), ] Line too long (107/100)
+src/auto_slopp/workers/pr_worker.py:45: [W1203(logging-fstring-interpolation), PRWorker.run] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:71: [W1203(logging-fstring-interpolation), PRWorker.run] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:74: [W1203(logging-fstring-interpolation), PRWorker.run] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:99: [W1203(logging-fstring-interpolation), PRWorker.run] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:190: [W0718(broad-exception-caught), PRWorker._process_repository] Catching too general exception Exception
+src/auto_slopp/workers/pr_worker.py:131: [W1203(logging-fstring-interpolation), PRWorker._process_repository] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:137: [W1203(logging-fstring-interpolation), PRWorker._process_repository] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:145: [W1203(logging-fstring-interpolation), PRWorker._process_repository] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:169: [W1203(logging-fstring-interpolation), PRWorker._process_repository] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:191: [W1203(logging-fstring-interpolation), PRWorker._process_repository] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:107: [R0912(too-many-branches), PRWorker._process_repository] Too many branches (13/12)
+src/auto_slopp/workers/pr_worker.py:216: [W1203(logging-fstring-interpolation), PRWorker._get_open_pr_branches] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:235: [W1203(logging-fstring-interpolation), PRWorker._checkout_branch] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:237: [W1203(logging-fstring-interpolation), PRWorker._checkout_branch] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:251: [W1203(logging-fstring-interpolation), PRWorker._update_branch_with_main] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:256: [W1203(logging-fstring-interpolation), PRWorker._update_branch_with_main] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:259: [W1203(logging-fstring-interpolation), PRWorker._update_branch_with_main] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:272: [W1203(logging-fstring-interpolation), PRWorker._push_branch] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:277: [W1203(logging-fstring-interpolation), PRWorker._push_branch] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:280: [W1203(logging-fstring-interpolation), PRWorker._push_branch] Use lazy % formatting in logging functions
+src/auto_slopp/workers/pr_worker.py:313: [W0718(broad-exception-caught), PRWorker._run_tests] Catching too general exception Exception
+src/auto_slopp/workers/pr_worker.py:293: [W1510(subprocess-run-check), PRWorker._run_tests] 'subprocess.run' used without explicitly defining the value for 'check'.
+src/auto_slopp/workers/pr_worker.py:24: [R0903(too-few-public-methods), PRWorker] Too few public methods (1/2)
+src/auto_slopp/workers/pr_worker.py:19: [W0611(unused-import), ] Unused discover_repositories imported from auto_slopp.utils.repository_utils
+************* Module src.auto_slopp.workers.stale_branch_cleanup_worker
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:69: [C0301(line-too-long), ] Line too long (102/100)
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:141: [C0301(line-too-long), ] Line too long (108/100)
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:148: [C0301(line-too-long), ] Line too long (119/100)
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:166: [C0301(line-too-long), ] Line too long (118/100)
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:171: [C0301(line-too-long), ] Line too long (119/100)
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:173: [C0301(line-too-long), ] Line too long (105/100)
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:214: [C0301(line-too-long), ] Line too long (103/100)
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:50: [W1203(logging-fstring-interpolation), StaleBranchCleanupWorker.run] Use lazy % formatting in logging functions
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:131: [W1203(logging-fstring-interpolation), StaleBranchCleanupWorker._process_single_repository] Use lazy % formatting in logging functions
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:134: [C0415(import-outside-toplevel), StaleBranchCleanupWorker._process_single_repository] Import outside toplevel (auto_slopp.utils.repository_utils.validate_repository)
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:140: [W1203(logging-fstring-interpolation), StaleBranchCleanupWorker._process_single_repository] Use lazy % formatting in logging functions
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:161: [W1203(logging-fstring-interpolation), StaleBranchCleanupWorker._process_repository] Use lazy % formatting in logging functions
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:165: [W1203(logging-fstring-interpolation), StaleBranchCleanupWorker._process_repository] Use lazy % formatting in logging functions
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:258: [C0415(import-outside-toplevel), StaleBranchCleanupWorker._identify_stale_branches] Import outside toplevel (auto_slopp.utils.branch_analysis.identify_stale_branches)
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:277: [W0718(broad-exception-caught), StaleBranchCleanupWorker._delete_branch] Catching too general exception Exception
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:286: [W1203(logging-fstring-interpolation), StaleBranchCleanupWorker._log_completion_summary] Use lazy % formatting in logging functions
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:22: [R0903(too-few-public-methods), StaleBranchCleanupWorker] Too few public methods (1/2)
+src/auto_slopp/workers/stale_branch_cleanup_worker.py:18: [W0611(unused-import), ] Unused discover_repositories imported from auto_slopp.utils.repository_utils
+************* Module src.auto_slopp.workers.github_issue_worker
+src/auto_slopp/workers/github_issue_worker.py:124: [C0301(line-too-long), ] Line too long (115/100)
+src/auto_slopp/workers/github_issue_worker.py:204: [C0301(line-too-long), ] Line too long (105/100)
+src/auto_slopp/workers/github_issue_worker.py:274: [C0301(line-too-long), ] Line too long (112/100)
+src/auto_slopp/workers/github_issue_worker.py:294: [C0301(line-too-long), ] Line too long (101/100)
+src/auto_slopp/workers/github_issue_worker.py:297: [C0301(line-too-long), ] Line too long (107/100)
+src/auto_slopp/workers/github_issue_worker.py:321: [C0301(line-too-long), ] Line too long (104/100)
+src/auto_slopp/workers/github_issue_worker.py:326: [C0301(line-too-long), ] Line too long (120/100)
+src/auto_slopp/workers/github_issue_worker.py:341: [C0301(line-too-long), ] Line too long (118/100)
+src/auto_slopp/workers/github_issue_worker.py:346: [C0301(line-too-long), ] Line too long (106/100)
+src/auto_slopp/workers/github_issue_worker.py:349: [C0301(line-too-long), ] Line too long (117/100)
+src/auto_slopp/workers/github_issue_worker.py:365: [C0301(line-too-long), ] Line too long (109/100)
+src/auto_slopp/workers/github_issue_worker.py:383: [C0301(line-too-long), ] Line too long (117/100)
+src/auto_slopp/workers/github_issue_worker.py:396: [C0301(line-too-long), ] Line too long (108/100)
+src/auto_slopp/workers/github_issue_worker.py:403: [C0301(line-too-long), ] Line too long (111/100)
+src/auto_slopp/workers/github_issue_worker.py:496: [C0301(line-too-long), ] Line too long (118/100)
+src/auto_slopp/workers/github_issue_worker.py:654: [C0301(line-too-long), ] Line too long (105/100)
+src/auto_slopp/workers/github_issue_worker.py:662: [C0301(line-too-long), ] Line too long (102/100)
+src/auto_slopp/workers/github_issue_worker.py:704: [C0301(line-too-long), ] Line too long (104/100)
+src/auto_slopp/workers/github_issue_worker.py:711: [C0301(line-too-long), ] Line too long (101/100)
+src/auto_slopp/workers/github_issue_worker.py:760: [C0301(line-too-long), ] Line too long (101/100)
+src/auto_slopp/workers/github_issue_worker.py:861: [C0301(line-too-long), ] Line too long (111/100)
+src/auto_slopp/workers/github_issue_worker.py:907: [C0301(line-too-long), ] Line too long (111/100)
+src/auto_slopp/workers/github_issue_worker.py:915: [C0301(line-too-long), ] Line too long (102/100)
+src/auto_slopp/workers/github_issue_worker.py:945: [C0301(line-too-long), ] Line too long (101/100)
+src/auto_slopp/workers/github_issue_worker.py:960: [C0301(line-too-long), ] Line too long (101/100)
+src/auto_slopp/workers/github_issue_worker.py:964: [C0301(line-too-long), ] Line too long (104/100)
+src/auto_slopp/workers/github_issue_worker.py:1045: [C0301(line-too-long), ] Line too long (106/100)
+src/auto_slopp/workers/github_issue_worker.py:1153: [C0301(line-too-long), ] Line too long (105/100)
+src/auto_slopp/workers/github_issue_worker.py:1: [C0302(too-many-lines), ] Too many lines in module (1190/1000)
+src/auto_slopp/workers/github_issue_worker.py:84: [W1203(logging-fstring-interpolation), GitHubIssueWorker.run] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:105: [W1203(logging-fstring-interpolation), GitHubIssueWorker.run] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:123: [W1203(logging-fstring-interpolation), GitHubIssueWorker.run] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:167: [W1203(logging-fstring-interpolation), GitHubIssueWorker._checkout_main_branch] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:204: [W1203(logging-fstring-interpolation), GitHubIssueWorker._filter_renovate_issues] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:225: [E1101(no-member), GitHubIssueWorker._should_process_issue] Instance of 'FieldInfo' has no 'lower' member
+src/auto_slopp/workers/github_issue_worker.py:246: [W1203(logging-fstring-interpolation), GitHubIssueWorker._filter_by_label_and_creator] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:253: [R0914(too-many-locals), GitHubIssueWorker._process_single_issue] Too many local variables (28/15)
+src/auto_slopp/workers/github_issue_worker.py:263: [W1203(logging-fstring-interpolation), GitHubIssueWorker._process_single_issue] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:269: [W1203(logging-fstring-interpolation), GitHubIssueWorker._process_single_issue] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:424: [W0718(broad-exception-caught), GitHubIssueWorker._process_single_issue] Catching too general exception Exception
+src/auto_slopp/workers/github_issue_worker.py:297: [W1203(logging-fstring-interpolation), GitHubIssueWorker._process_single_issue] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:346: [W1203(logging-fstring-interpolation), GitHubIssueWorker._process_single_issue] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:383: [W1203(logging-fstring-interpolation), GitHubIssueWorker._process_single_issue] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:396: [W1203(logging-fstring-interpolation), GitHubIssueWorker._process_single_issue] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:402: [W1203(logging-fstring-interpolation), GitHubIssueWorker._process_single_issue] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:418: [W1203(logging-fstring-interpolation), GitHubIssueWorker._process_single_issue] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:420: [W1203(logging-fstring-interpolation), GitHubIssueWorker._process_single_issue] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:425: [W1203(logging-fstring-interpolation), GitHubIssueWorker._process_single_issue] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:253: [R0911(too-many-return-statements), GitHubIssueWorker._process_single_issue] Too many return statements (8/6)
+src/auto_slopp/workers/github_issue_worker.py:253: [R0912(too-many-branches), GitHubIssueWorker._process_single_issue] Too many branches (21/12)
+src/auto_slopp/workers/github_issue_worker.py:253: [R0915(too-many-statements), GitHubIssueWorker._process_single_issue] Too many statements (89/50)
+src/auto_slopp/workers/github_issue_worker.py:430: [R0913(too-many-arguments), GitHubIssueWorker._execute_with_ralph_loop] Too many arguments (7/5)
+src/auto_slopp/workers/github_issue_worker.py:430: [R0917(too-many-positional-arguments), GitHubIssueWorker._execute_with_ralph_loop] Too many positional arguments (7/5)
+src/auto_slopp/workers/github_issue_worker.py:484: [R0913(too-many-arguments), GitHubIssueWorker._create_issue_task_file] Too many arguments (7/5)
+src/auto_slopp/workers/github_issue_worker.py:484: [R0917(too-many-positional-arguments), GitHubIssueWorker._create_issue_task_file] Too many positional arguments (7/5)
+src/auto_slopp/workers/github_issue_worker.py:522: [W1203(logging-fstring-interpolation), GitHubIssueWorker._create_issue_task_file] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:524: [R0913(too-many-arguments), GitHubIssueWorker._refine_issue_task_file] Too many arguments (7/5)
+src/auto_slopp/workers/github_issue_worker.py:524: [R0917(too-many-positional-arguments), GitHubIssueWorker._refine_issue_task_file] Too many positional arguments (7/5)
+src/auto_slopp/workers/github_issue_worker.py:557: [W0718(broad-exception-caught), GitHubIssueWorker._refine_issue_task_file] Catching too general exception Exception
+src/auto_slopp/workers/github_issue_worker.py:575: [W0718(broad-exception-caught), GitHubIssueWorker._ensure_last_step_is_make_test] Catching too general exception Exception
+src/auto_slopp/workers/github_issue_worker.py:594: [R0913(too-many-arguments), GitHubIssueWorker._run_refined_task_loop] Too many arguments (7/5)
+src/auto_slopp/workers/github_issue_worker.py:594: [R0917(too-many-positional-arguments), GitHubIssueWorker._run_refined_task_loop] Too many positional arguments (7/5)
+src/auto_slopp/workers/github_issue_worker.py:594: [R0914(too-many-locals), GitHubIssueWorker._run_refined_task_loop] Too many local variables (20/15)
+src/auto_slopp/workers/github_issue_worker.py:615: [W0718(broad-exception-caught), GitHubIssueWorker._run_refined_task_loop] Catching too general exception Exception
+src/auto_slopp/workers/github_issue_worker.py:675: [W1203(logging-fstring-interpolation), GitHubIssueWorker._run_refined_task_loop] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:683: [W0718(broad-exception-caught), GitHubIssueWorker._run_refined_task_loop] Catching too general exception Exception
+src/auto_slopp/workers/github_issue_worker.py:684: [W1203(logging-fstring-interpolation), GitHubIssueWorker._run_refined_task_loop] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:705: [W0718(broad-exception-caught), GitHubIssueWorker._run_refined_task_loop] Catching too general exception Exception
+src/auto_slopp/workers/github_issue_worker.py:714: [R0913(too-many-arguments), GitHubIssueWorker._execute_step] Too many arguments (8/5)
+src/auto_slopp/workers/github_issue_worker.py:714: [R0917(too-many-positional-arguments), GitHubIssueWorker._execute_step] Too many positional arguments (8/5)
+src/auto_slopp/workers/github_issue_worker.py:747: [W1203(logging-fstring-interpolation), GitHubIssueWorker._execute_step] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:758: [W1203(logging-fstring-interpolation), GitHubIssueWorker._execute_step] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:760: [W1203(logging-fstring-interpolation), GitHubIssueWorker._execute_step] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:764: [R0913(too-many-arguments), GitHubIssueWorker._execute_step_acceptance_check] Too many arguments (7/5)
+src/auto_slopp/workers/github_issue_worker.py:764: [R0917(too-many-positional-arguments), GitHubIssueWorker._execute_step_acceptance_check] Too many positional arguments (7/5)
+src/auto_slopp/workers/github_issue_worker.py:804: [R0913(too-many-arguments), GitHubIssueWorker._update_remaining_steps] Too many arguments (7/5)
+src/auto_slopp/workers/github_issue_worker.py:804: [R0917(too-many-positional-arguments), GitHubIssueWorker._update_remaining_steps] Too many positional arguments (7/5)
+src/auto_slopp/workers/github_issue_worker.py:836: [R0913(too-many-arguments), GitHubIssueWorker._build_step_instructions] Too many arguments (7/5)
+src/auto_slopp/workers/github_issue_worker.py:836: [R0917(too-many-positional-arguments), GitHubIssueWorker._build_step_instructions] Too many positional arguments (7/5)
+src/auto_slopp/workers/github_issue_worker.py:896: [R0913(too-many-arguments), GitHubIssueWorker._build_refinement_instructions] Too many arguments (6/5)
+src/auto_slopp/workers/github_issue_worker.py:896: [R0917(too-many-positional-arguments), GitHubIssueWorker._build_refinement_instructions] Too many positional arguments (6/5)
+src/auto_slopp/workers/github_issue_worker.py:925: [R0913(too-many-arguments), GitHubIssueWorker._build_acceptance_check_instructions] Too many arguments (6/5)
+src/auto_slopp/workers/github_issue_worker.py:925: [R0917(too-many-positional-arguments), GitHubIssueWorker._build_acceptance_check_instructions] Too many positional arguments (6/5)
+src/auto_slopp/workers/github_issue_worker.py:948: [R0913(too-many-arguments), GitHubIssueWorker._build_remaining_steps_update_instructions] Too many arguments (6/5)
+src/auto_slopp/workers/github_issue_worker.py:948: [R0917(too-many-positional-arguments), GitHubIssueWorker._build_remaining_steps_update_instructions] Too many positional arguments (6/5)
+src/auto_slopp/workers/github_issue_worker.py:998: [W0718(broad-exception-caught), GitHubIssueWorker._find_step_description] Catching too general exception Exception
+src/auto_slopp/workers/github_issue_worker.py:1009: [W0718(broad-exception-caught), GitHubIssueWorker._step_is_closed] Catching too general exception Exception
+src/auto_slopp/workers/github_issue_worker.py:1183: [W1203(logging-fstring-interpolation), GitHubIssueWorker._log_completion_summary] Use lazy % formatting in logging functions
+src/auto_slopp/workers/github_issue_worker.py:48: [R0903(too-few-public-methods), GitHubIssueWorker] Too few public methods (1/2)
+
+------------------------------------------------------------------
+Your code has been rated at 7.94/10 (previous run: 7.94/10, +0.00)
+

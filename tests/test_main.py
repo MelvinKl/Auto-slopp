@@ -142,18 +142,18 @@ class TestMainApplication:
             with patch("auto_slopp.main.parse_arguments") as mock_parse:
                 mock_args = MagicMock()
                 mock_args.repo_path = None
-                 mock_args.debug = False
-                 mock_parse.return_value = mock_args
-                 
-                 with patch("auto_slopp.main.setup_logging"):
-                     with patch("auto_slopp.main.sys.exit"):
-                         from auto_slopp.main import main
-                         
-                         main()
-                         
-                         # Verify exit was called with code 0
-                         # Note: We can't directly assert on the mock since we didn't capture it
-                         # but we know the function called sys.exit
+                mock_args.debug = False
+                mock_parse.return_value = mock_args
+
+                with patch("auto_slopp.main.setup_logging"):
+                    with patch("auto_slopp.main.sys.exit"):
+                        from auto_slopp.main import main
+
+                        main()
+
+                        # Verify exit was called with code 0
+                        # Note: We can't directly assert on the mock since we didn't capture it
+                        # but we know the function called sys.exit
 
     @patch("auto_slopp.main.run_executor")
     def test_main_function_with_exception(self, mock_run_executor, mock_settings):

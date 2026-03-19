@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "/root/git/managed/Auto-slopp/.venv/bin/symilar", line 10, in <module>
+    sys.exit(run_symilar())
+             ~~~~~~~~~~~^^
+  File "/root/git/managed/Auto-slopp/.venv/lib/python3.14/site-packages/pylint/__init__.py", line 66, in run_symilar
+    SymilarRun(argv or sys.argv[1:])
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/git/managed/Auto-slopp/.venv/lib/python3.14/site-packages/pylint/checkers/symilar.py", line 924, in Run
+    with open(filename, encoding="utf-8") as stream:
+         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+IsADirectoryError: [Errno 21] Is a directory: 'src'

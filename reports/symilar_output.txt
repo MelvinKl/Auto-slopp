@@ -1,0 +1,45 @@
+
+9 similar lines in 2 files
+==src/auto_slopp/utils/branch_analysis.py:[28:37]
+==src/auto_slopp/workers/stale_branch_cleanup_worker.py:[181:190]
+           """
+           return {
+               "repository": repo_dir.name,
+               "path": str(repo_dir),
+               "success": False,
+               "branches_deleted": 0,
+               "branches_failed_to_delete": 0,
+               "deleted_branches": [],
+               "failed_deletions": [],
+
+6 similar lines in 2 files
+==src/auto_slopp/utils/git_operations.py:[60:68]
+==src/auto_slopp/utils/github_operations.py:[38:46]
+           check: Whether to raise exception on non-zero return code
+           timeout: Timeout for the command in seconds
+           capture_output: Whether to capture output
+
+       Returns:
+           CompletedProcess instance
+
+       Raises:
+
+5 similar lines in 2 files
+==src/auto_slopp/utils/git_operations.py:[73:78]
+==src/auto_slopp/utils/github_operations.py:[63:68]
+               cwd=repo_dir,
+               capture_output=capture_output,
+               text=capture_output,
+               check=check,
+               timeout=timeout,
+
+5 similar lines in 2 files
+==src/auto_slopp/utils/branch_analysis.py:[32:37]
+==src/auto_slopp/workers/stale_branch_cleanup_worker.py:[205:210]
+               "success": False,
+               "branches_deleted": 0,
+               "branches_failed_to_delete": 0,
+               "deleted_branches": [],
+               "failed_deletions": [],
+TOTAL lines=5237 duplicates=25 percent=0.48
+

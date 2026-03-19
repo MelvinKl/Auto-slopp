@@ -51,9 +51,7 @@ class TelegramHandler(logging.Handler):
         self.disable_notification = disable_notification
 
         if not self.bot_token or not self.chat_id:
-            raise ValueError(
-                "Both bot_token and chat_id must be provided or configured in settings"
-            )
+            raise ValueError("Both bot_token and chat_id must be provided or configured in settings")
 
         self.api_url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
         self.client = httpx.AsyncClient(timeout=timeout)
@@ -119,28 +117,26 @@ class TelegramHandler(logging.Handler):
                 "disable_notification": self.disable_notification,
             }
 
-             # Remove None values from payload
-             payload = {k: v for k, v in payload.items() if v is not None}
-             
-             for attempt in range(self.retry_attempts):
-                 try:
-                     response = await self.client.post(self.api_url, json=payload)
-                     response.raise_for_status()
-                     break
-                 except httpx.HTTPStatusError as e:
-                     if e.response.status_code == 429:  # Rate limited
-                         retry_after = int(
-                             e.response.headers.get("retry-after", self.retry_delay)
-                         )
-                         await asyncio.sleep(retry_after)
-                         continue
-                     elif attempt == self.retry_attempts - 1:
-                         raise
-                     await asyncio.sleep(self.retry_delay)
-                 except Exception:
-                     if attempt == self.retry_attempts - 1:
-                         raise
-                     await asyncio.sleep(self.retry_delay)
+            # Remove None values from payload
+            payload = {k: v for k, v in payload.items() if v is not None}
+
+            for attempt in range(self.retry_attempts):
+                try:
+                    response = await self.client.post(self.api_url, json=payload)
+                    response.raise_for_status()
+                    break
+                except httpx.HTTPStatusError as e:
+                    if e.response.status_code == 429:  # Rate limited
+                        retry_after = int(e.response.headers.get("retry-after", self.retry_delay))
+                        await asyncio.sleep(retry_after)
+                        continue
+                    elif attempt == self.retry_attempts - 1:
+                        raise
+                    await asyncio.sleep(self.retry_delay)
+                except Exception:
+                    if attempt == self.retry_attempts - 1:
+                        raise
+                    await asyncio.sleep(self.retry_delay)
 
         except Exception as e:
             # Log the error but don't raise it
@@ -193,9 +189,7 @@ def setup_telegram_logging(
         return None
 
     if not settings.telegram_bot_token or not settings.telegram_chat_id:
-        logging.warning(
-            "Telegram logging is enabled but bot_token or chat_id is not configured"
-        )
+        logging.warning("Telegram logging is enabled but bot_token or chat_id is not configured")
         return None
 
     # Create handler with default settings from configuration
@@ -212,9 +206,7 @@ def setup_telegram_logging(
     handler.setLevel(level)
 
     if format_string is None:
-        format_string = (
-            "<b>{levelname}</b> ({name})\nMessage: {message}\nTime: {asctime}"
-        )
+        format_string = "<b>{levelname}</b> ({name})\nMessage: {message}\nTime: {asctime}"
 
     formatter = logging.Formatter(format_string, style="{")
     handler.setFormatter(formatter)
