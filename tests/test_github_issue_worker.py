@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from auto_slopp.utils.ralph import Step
+from auto_slopp.utils.ralph import PlanParser, Step
 from auto_slopp.workers.github_issue_worker import GitHubIssueWorker
 
 
@@ -516,7 +516,8 @@ class TestGitHubIssueWorker:
 
                 result = worker._should_process_issue(issue)
                 assert result == test_case["expected"], f"Failed for label '{
-                    test_case['label']}'"
+                    test_case['label']
+                }'"
 
     def test_run_filters_issues_by_label_and_creator(self):
         """Test that run method filters issues by label and creator."""
@@ -700,7 +701,10 @@ class TestGitHubIssueWorker:
             step = Step(number=1, description="Implement changes")
 
             with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
-                mock_execute.return_value = {"success": True, "stdout": "ACCEPTANCE_STATUS: fail"}
+                mock_execute.return_value = {
+                    "success": True,
+                    "stdout": "ACCEPTANCE_STATUS: fail",
+                }
 
                 result = worker._execute_step_acceptance_check(
                     repo_dir=repo_path,
@@ -725,7 +729,10 @@ class TestGitHubIssueWorker:
             step = Step(number=1, description="Implement changes")
 
             with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
-                mock_execute.return_value = {"success": True, "stdout": "ACCEPTANCE_STATUS: pass"}
+                mock_execute.return_value = {
+                    "success": True,
+                    "stdout": "ACCEPTANCE_STATUS: pass",
+                }
 
                 result = worker._execute_step_acceptance_check(
                     repo_dir=repo_path,
@@ -748,8 +755,15 @@ class TestGitHubIssueWorker:
             task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
 
             with (
-                patch("auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations", 2),
-                patch.object(worker, "_execute_step", return_value={"success": False, "error": "retry needed"}),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations",
+                    2,
+                ),
+                patch.object(
+                    worker,
+                    "_execute_step",
+                    return_value={"success": False, "error": "retry needed"},
+                ),
             ):
                 result = worker._run_refined_task_loop(
                     repo_dir=repo_path,
@@ -780,11 +794,21 @@ class TestGitHubIssueWorker:
 """)
 
             with (
-                patch("auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations", 3),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations",
+                    3,
+                ),
                 patch.object(worker, "_execute_step", return_value={"success": True}),
-                patch.object(worker, "_execute_step_acceptance_check", return_value={"success": True}),
+                patch.object(
+                    worker,
+                    "_execute_step_acceptance_check",
+                    return_value={"success": True},
+                ),
                 patch.object(worker, "_update_remaining_steps", return_value={"success": True}),
-                patch("auto_slopp.workers.github_issue_worker.has_changes", return_value=True),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.has_changes",
+                    return_value=True,
+                ),
                 patch("auto_slopp.workers.github_issue_worker.commit_and_push_changes") as mock_commit,
             ):
                 mock_commit.return_value = (True, "ok")
@@ -816,7 +840,10 @@ class TestGitHubIssueWorker:
             task_path.write_text("# Task\n\n## Steps\n\n- [x] 1. Implement changes\n")
 
             with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
-                mock_execute.return_value = {"success": True, "stdout": "## Summary\n- Implemented changes"}
+                mock_execute.return_value = {
+                    "success": True,
+                    "stdout": "## Summary\n- Implemented changes",
+                }
 
                 body = worker._generate_pr_body_from_task_file(
                     repo_dir=repo_path,
@@ -827,3 +854,545 @@ class TestGitHubIssueWorker:
 
             assert body.startswith("Closes #281")
             assert "Implemented changes" in body
+
+    # =========================================================================
+    # Error/Exception Path Tests
+    # =========================================================================
+
+    def test_checkout_main_branch_failure(self):
+        """Test that _checkout_main_branch failure is handled correctly."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            mock_issue = {
+                "number": 1,
+                "title": "Test Issue",
+                "body": "This is a test issue",
+                "url": "https://github.com/test/repo/issues/1",
+                "author": {"login": "MelvinKl"},
+                "labels": [{"name": "ai"}],
+            }
+
+            with (
+                patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues,
+                patch.object(GitHubIssueWorker, "_checkout_main_branch", return_value=False),
+            ):
+                mock_issues.return_value = [mock_issue]
+
+                worker = GitHubIssueWorker(dry_run=False)
+                result = worker.run(repo_path)
+
+                assert result["success"] is False
+                assert result["repositories_with_errors"] == 1
+                assert result["issues_processed"] == 0
+
+    def test_process_issue_branch_creation_failure(self):
+        """Test that branch creation failure is handled correctly."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            mock_issue = {
+                "number": 1,
+                "title": "Test Issue",
+                "body": "This is a test issue",
+                "url": "https://github.com/test/repo/issues/1",
+                "author": {"login": "MelvinKl"},
+                "labels": [{"name": "ai"}],
+            }
+
+            with (
+                patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues,
+                patch("auto_slopp.workers.github_issue_worker.create_and_checkout_branch") as mock_create_branch,
+                patch("auto_slopp.workers.github_issue_worker.checkout_branch_resilient") as mock_checkout,
+            ):
+                mock_issues.return_value = [mock_issue]
+                mock_checkout.return_value = True
+                mock_create_branch.return_value = False
+
+                worker = GitHubIssueWorker(dry_run=False)
+                result = worker.run(repo_path)
+
+                assert result["issues_processed"] == 0
+                assert result["issue_results"][0]["success"] is False
+                assert "Failed to create branch" in result["issue_results"][0]["error"]
+
+    def test_process_issue_push_failure_ralph(self):
+        """Test that push failure with ralph enabled is handled correctly."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            mock_issue = {
+                "number": 1,
+                "title": "Test Issue",
+                "body": "This is a test issue",
+                "url": "https://github.com/test/repo/issues/1",
+                "author": {"login": "MelvinKl"},
+                "labels": [{"name": "ai"}],
+            }
+
+            with (
+                patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues,
+                patch("auto_slopp.workers.github_issue_worker.create_and_checkout_branch") as mock_create_branch,
+                patch("auto_slopp.workers.github_issue_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.github_issue_worker.get_current_branch") as mock_get_branch,
+                patch("auto_slopp.workers.github_issue_worker.push_to_remote") as mock_push,
+                patch.object(GitHubIssueWorker, "_execute_with_ralph_loop") as mock_ralph_loop,
+                patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
+            ):
+                mock_issues.return_value = [mock_issue]
+                mock_create_branch.return_value = True
+                mock_checkout.return_value = True
+                mock_get_branch.return_value = "ai/issue-1-test-issue"
+                mock_push.return_value = (False, "Push failed")
+                # Ralph loop completes successfully but returns no steps
+                mock_ralph_loop.return_value = {
+                    "success": True,
+                    "loops_executed": 1,
+                    "steps_completed": 1,
+                }
+                mock_settings.ralph_enabled = True
+                mock_settings.github_issue_worker_required_label = "ai"
+                mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
+
+                worker = GitHubIssueWorker(dry_run=False)
+                result = worker.run(repo_path)
+
+                assert result["issue_results"][0]["success"] is False
+                assert "Failed to push branch" in result["issue_results"][0]["error"]
+
+    def test_process_issue_pr_creation_failure(self):
+        """Test that PR creation failure with failed fallback is handled correctly."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            mock_issue = {
+                "number": 1,
+                "title": "Test Issue",
+                "body": "This is a test issue",
+                "url": "https://github.com/test/repo/issues/1",
+                "author": {"login": "MelvinKl"},
+                "labels": [{"name": "ai"}],
+            }
+
+            with (
+                patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues,
+                patch("auto_slopp.workers.github_issue_worker.create_and_checkout_branch") as mock_create_branch,
+                patch("auto_slopp.workers.github_issue_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.github_issue_worker.get_current_branch") as mock_get_branch,
+                patch("auto_slopp.workers.github_issue_worker.push_to_remote") as mock_push,
+                patch("auto_slopp.workers.github_issue_worker.create_pull_request") as mock_create_pr,
+                patch("auto_slopp.workers.github_issue_worker.get_pr_for_branch") as mock_get_pr,
+                patch.object(GitHubIssueWorker, "_execute_with_ralph_loop") as mock_ralph_loop,
+                patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
+            ):
+                mock_issues.return_value = [mock_issue]
+                mock_create_branch.return_value = True
+                mock_checkout.return_value = True
+                mock_get_branch.return_value = "ai/issue-1-test-issue"
+                mock_push.return_value = (True, "Success")
+                mock_create_pr.return_value = None  # PR creation fails
+                mock_get_pr.return_value = None  # No existing PR either
+                mock_ralph_loop.return_value = {
+                    "success": True,
+                    "loops_executed": 1,
+                    "steps_completed": 1,
+                }
+                mock_settings.ralph_enabled = True
+                mock_settings.github_issue_worker_required_label = "ai"
+                mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
+
+                worker = GitHubIssueWorker(dry_run=False)
+                result = worker.run(repo_path)
+
+                assert result["issue_results"][0]["success"] is False
+                assert "Failed to create pull request" in result["issue_results"][0]["error"]
+
+    def test_process_issue_with_exception(self):
+        """Test that exceptions during issue processing are caught and handled."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            mock_issue = {
+                "number": 1,
+                "title": "Test Issue",
+                "body": "This is a test issue",
+                "url": "https://github.com/test/repo/issues/1",
+                "author": {"login": "MelvinKl"},
+                "labels": [{"name": "ai"}],
+            }
+
+            with (
+                patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues,
+                patch("auto_slopp.workers.github_issue_worker.create_and_checkout_branch") as mock_create_branch,
+                patch("auto_slopp.workers.github_issue_worker.checkout_branch_resilient") as mock_checkout,
+            ):
+                mock_issues.return_value = [mock_issue]
+                mock_checkout.return_value = True
+                mock_create_branch.side_effect = RuntimeError("Branch creation failed")
+
+                worker = GitHubIssueWorker(dry_run=False)
+                result = worker.run(repo_path)
+
+                assert result["issues_processed"] == 0
+                assert result["issue_results"][0]["success"] is False
+                assert "Branch creation failed" in result["issue_results"][0]["error"]
+
+    def test_ensure_last_step_make_test_file_exception(self):
+        """Test that _ensure_last_step_is_make_test handles file parse exceptions."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            task_path = Path(temp_dir) / "task.md"
+            # Create a file that cannot be parsed
+            task_path.write_text("This is not valid markdown for a plan")
+
+            with patch("auto_slopp.workers.github_issue_worker.PlanParser.parse_file") as mock_parse:
+                mock_parse.side_effect = ValueError("Parse error")
+                # Should not raise, just return
+                worker._ensure_last_step_is_make_test(task_path)
+
+                # Verify parse was attempted
+                mock_parse.assert_called_once()
+
+    def test_run_task_file_parse_exception(self):
+        """Test that task file parse exceptions in the loop are handled."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            task_path = repo_path / "task.md"
+            task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
+
+            with (
+                patch("auto_slopp.workers.github_issue_worker.PlanParser.parse_file") as mock_parse,
+                patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
+            ):
+                mock_settings.github_issue_step_max_iterations = 3
+                # First call raises exception
+                mock_parse.side_effect = ValueError("Parse error")
+
+                result = worker._run_refined_task_loop(
+                    repo_dir=repo_path,
+                    task_path=task_path,
+                    issue_title="Issue",
+                    issue_body="Body",
+                    comment_texts=[],
+                    branch_name="ai/issue-1",
+                )
+
+                assert result["success"] is False
+                assert "Failed to parse task file" in result["error"]
+                assert result["loops_executed"] == 1
+
+    def test_run_acceptance_check_failure(self):
+        """Test that acceptance check failure is handled and step remains open."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            task_path = repo_path / "task.md"
+            task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
+
+            with (
+                patch("auto_slopp.workers.github_issue_worker.PlanParser.parse_file") as mock_parse,
+                patch.object(worker, "_execute_step") as mock_step,
+                patch.object(worker, "_execute_step_acceptance_check") as mock_acceptance,
+                patch.object(worker, "_update_remaining_steps") as mock_update,
+                patch("auto_slopp.workers.github_issue_worker.has_changes") as mock_changes,
+                patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
+            ):
+                mock_settings.github_issue_step_max_iterations = 3
+
+                # Create a plan with one open step
+                plan = PlanParser.parse_file(task_path)
+                mock_parse.return_value = plan
+                mock_step.return_value = {"success": True}
+                # Acceptance check fails
+                mock_acceptance.return_value = {
+                    "success": False,
+                    "error": "Acceptance not met",
+                }
+                mock_update.return_value = {"success": True}
+                mock_changes.return_value = False
+
+                result = worker._run_refined_task_loop(
+                    repo_dir=repo_path,
+                    task_path=task_path,
+                    issue_title="Issue",
+                    issue_body="Body",
+                    comment_texts=[],
+                    branch_name="ai/issue-1",
+                )
+
+                # After max iterations with acceptance failures, should fail with max_loops_reached
+                assert result["success"] is False
+                assert result["max_loops_reached"] is True
+                # The last_error should contain the acceptance check failure
+                assert result["loops_executed"] == 3
+
+    def test_run_step_still_open_after_acceptance(self):
+        """Test that step remaining open after acceptance check is handled."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            task_path = repo_path / "task.md"
+            task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
+
+            with (
+                patch("auto_slopp.workers.github_issue_worker.PlanParser.parse_file") as mock_parse,
+                patch.object(worker, "_execute_step") as mock_step,
+                patch.object(worker, "_execute_step_acceptance_check") as mock_acceptance,
+                patch.object(worker, "_step_is_closed") as mock_is_closed,
+                patch.object(worker, "_mark_step_completed_in_file") as mock_mark,
+                patch.object(worker, "_update_remaining_steps") as mock_update,
+                patch("auto_slopp.workers.github_issue_worker.has_changes") as mock_changes,
+                patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
+            ):
+                mock_settings.github_issue_step_max_iterations = 3
+
+                # Create a plan with one open step
+                plan = PlanParser.parse_file(task_path)
+                mock_parse.return_value = plan
+                mock_step.return_value = {"success": True}
+                mock_acceptance.return_value = {"success": True}
+                mock_update.return_value = {"success": True}
+                mock_changes.return_value = False
+
+                # First call: step is not closed (acceptance couldn't mark it)
+                # Second call: still not closed (should not happen in practice but covers the path)
+                # Each iteration calls _step_is_closed twice, so for 3 iterations we need 6 values
+                mock_is_closed.side_effect = [False, False, False, False, False, False]
+                mock_mark.return_value = None
+
+                result = worker._run_refined_task_loop(
+                    repo_dir=repo_path,
+                    task_path=task_path,
+                    issue_title="Issue",
+                    issue_body="Body",
+                    comment_texts=[],
+                    branch_name="ai/issue-1",
+                )
+
+                assert result["success"] is False
+                assert "still open after acceptance check" in result.get("last_error", "")
+
+    def test_run_update_remaining_steps_failure(self):
+        """Test that _update_remaining_steps failure is handled with warning."""
+        from unittest.mock import MagicMock
+
+        from auto_slopp.utils.ralph import Step
+
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            task_path = repo_path / "task.md"
+            task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
+
+            with (
+                patch("auto_slopp.workers.github_issue_worker.PlanParser.parse_file") as mock_parse,
+                patch.object(worker, "_execute_step") as mock_step,
+                patch.object(worker, "_execute_step_acceptance_check") as mock_acceptance,
+                patch.object(worker, "_step_is_closed") as mock_is_closed,
+                patch.object(worker, "_mark_step_completed_in_file") as mock_mark,
+                patch.object(worker, "_update_remaining_steps") as mock_update,
+                patch("auto_slopp.workers.github_issue_worker.has_changes") as mock_changes,
+                patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
+            ):
+                mock_settings.github_issue_step_max_iterations = 3
+
+                # Create mock plan with open step
+                mock_plan = MagicMock()
+                mock_step_obj = MagicMock(spec=Step)
+                mock_step_obj.number = 1
+                mock_step_obj.description = "Test step"
+                mock_step_obj.is_closed = False
+
+                # Return step on first call, None on subsequent calls
+                call_count = [0]
+
+                def get_next_open():
+                    call_count[0] += 1
+                    if call_count[0] == 1:
+                        return mock_step_obj
+                    return None
+
+                mock_plan.get_next_open_step = get_next_open
+                mock_plan.steps = [mock_step_obj]
+                mock_parse.return_value = mock_plan
+
+                mock_step.return_value = {"success": True}
+                mock_acceptance.return_value = {"success": True}
+                mock_is_closed.return_value = True
+                mock_mark.return_value = None
+                mock_update.return_value = {"success": False, "error": "Update failed"}
+                mock_changes.return_value = False
+
+                result = worker._run_refined_task_loop(
+                    repo_dir=repo_path,
+                    task_path=task_path,
+                    issue_title="Issue",
+                    issue_body="Body",
+                    comment_texts=[],
+                    branch_name="ai/issue-1",
+                )
+
+                # The update failure should only log a warning, not fail the result
+                # The loop completes after first iteration because get_next_open_step returns None
+                assert result["success"] is True
+                assert result["loops_executed"] == 1
+
+    def test_run_commit_failure(self):
+        """Test that commit failure is handled correctly."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            task_path = repo_path / "task.md"
+            task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
+
+            with (
+                patch("auto_slopp.workers.github_issue_worker.PlanParser.parse_file") as mock_parse,
+                patch.object(worker, "_execute_step") as mock_step,
+                patch.object(worker, "_execute_step_acceptance_check") as mock_acceptance,
+                patch.object(worker, "_step_is_closed") as mock_is_closed,
+                patch.object(worker, "_mark_step_completed_in_file") as mock_mark,
+                patch.object(worker, "_update_remaining_steps") as mock_update,
+                patch("auto_slopp.workers.github_issue_worker.has_changes") as mock_changes,
+                patch("auto_slopp.workers.github_issue_worker.commit_and_push_changes") as mock_commit,
+                patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
+            ):
+                mock_settings.github_issue_step_max_iterations = 3
+
+                # Create a plan with one open step
+                plan = PlanParser.parse_file(task_path)
+                mock_parse.return_value = plan
+                mock_step.return_value = {"success": True}
+                mock_acceptance.return_value = {"success": True}
+                mock_is_closed.return_value = True
+                mock_mark.return_value = None
+                mock_update.return_value = {"success": True}
+                mock_changes.return_value = True
+                mock_commit.return_value = (False, "Commit failed")
+
+                result = worker._run_refined_task_loop(
+                    repo_dir=repo_path,
+                    task_path=task_path,
+                    issue_title="Issue",
+                    issue_body="Body",
+                    comment_texts=[],
+                    branch_name="ai/issue-1",
+                )
+
+                assert result["success"] is False
+                assert "Failed to commit changes" in result["error"]
+                assert result["steps_completed"] == 0
+
+    def test_find_step_description_fallback(self):
+        """Test _find_step_description fallback when file cannot be parsed."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            task_path = Path(temp_dir) / "task.md"
+            task_path.write_text("Not a valid plan file")
+
+            with patch("auto_slopp.workers.github_issue_worker.PlanParser.parse_file") as mock_parse:
+                mock_parse.side_effect = ValueError("Parse error")
+
+                result = worker._find_step_description(task_path, 1)
+
+                assert result == "Unknown step"
+
+    def test_checkout_main_branch_pull_failure(self):
+        """Test that pull failure in _checkout_main_branch returns False."""
+        worker = GitHubIssueWorker(dry_run=False)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            with patch("auto_slopp.workers.github_issue_worker.checkout_branch_resilient") as mock_checkout:
+                mock_checkout.return_value = False
+
+                result = worker._checkout_main_branch(repo_dir=repo_path)
+
+                assert result is False
+
+    def test_process_issue_pr_fallback_to_existing(self):
+        """Test that PR creation falls back to existing PR when available."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            mock_issue = {
+                "number": 1,
+                "title": "Test Issue",
+                "body": "This is a test issue",
+                "url": "https://github.com/test/repo/issues/1",
+                "author": {"login": "MelvinKl"},
+                "labels": [{"name": "ai"}],
+            }
+
+            with (
+                patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues,
+                patch("auto_slopp.workers.github_issue_worker.create_and_checkout_branch") as mock_create_branch,
+                patch("auto_slopp.workers.github_issue_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.github_issue_worker.get_current_branch") as mock_get_branch,
+                patch("auto_slopp.workers.github_issue_worker.push_to_remote") as mock_push,
+                patch("auto_slopp.workers.github_issue_worker.create_pull_request") as mock_create_pr,
+                patch("auto_slopp.workers.github_issue_worker.get_pr_for_branch") as mock_get_pr,
+                patch("auto_slopp.workers.github_issue_worker.close_issue") as mock_close,
+                patch("auto_slopp.workers.github_issue_worker.comment_on_issue") as mock_comment,
+                patch.object(GitHubIssueWorker, "_execute_with_ralph_loop") as mock_ralph_loop,
+                patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
+            ):
+                mock_issues.return_value = [mock_issue]
+                mock_create_branch.return_value = True
+                mock_checkout.return_value = True
+                mock_get_branch.return_value = "ai/issue-1-test-issue"
+                mock_push.return_value = (True, "Success")
+                mock_create_pr.return_value = None  # PR creation fails
+                # But existing PR is found
+                mock_get_pr.return_value = {
+                    "url": "https://github.com/test/repo/pull/1",
+                    "state": "OPEN",
+                }
+                mock_close.return_value = True
+                mock_comment.return_value = True
+                mock_ralph_loop.return_value = {
+                    "success": True,
+                    "loops_executed": 1,
+                    "steps_completed": 1,
+                }
+                mock_settings.ralph_enabled = True
+                mock_settings.github_issue_worker_required_label = "ai"
+                mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
+
+                worker = GitHubIssueWorker(dry_run=False)
+                result = worker.run(repo_path)
+
+                # Should succeed by falling back to existing PR
+                assert result["issue_results"][0]["success"] is True
+                assert result["issue_results"][0]["pr_created"] is True
+                assert "https://github.com/test/repo/pull/1" in result["issue_results"][0]["pr_url"]
+
+    def test_step_is_closed_with_parse_exception(self):
+        """Test that _step_is_closed returns False on parse exception."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            task_path = Path(temp_dir) / "task.md"
+            task_path.write_text("Not valid markdown")
+
+            with patch("auto_slopp.workers.github_issue_worker.PlanParser.parse_file") as mock_parse:
+                mock_parse.side_effect = ValueError("Parse error")
+
+                result = worker._step_is_closed(task_path, 1)
+
+                assert result is False

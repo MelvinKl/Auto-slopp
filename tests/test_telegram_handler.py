@@ -405,6 +405,26 @@ class TestTelegramHandler:
             # Assert - Client should be closed
             mock_client.aclose.assert_called_once()
 
+    @patch("httpx.AsyncClient")
+    def test_close_handler_with_running_loop(self, mock_client_class):
+        """Test closing the HTTP client when there's a running event loop."""
+        mock_client = AsyncMock()
+        mock_client_class.return_value = mock_client
+
+        with patch.dict(
+            "auto_slopp.telegram_handler.settings.__dict__",
+            {"telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
+        ):
+            handler = TelegramHandler()
+
+            async def test():
+                handler.close()
+                await asyncio.sleep(0.01)
+
+            asyncio.run(test())
+
+            mock_client.aclose.assert_called_once()
+
     def test_setup_telegram_logging_disabled(self):
         """Test setup returns None when Telegram logging is disabled."""
         # Arrange

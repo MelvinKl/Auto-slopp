@@ -356,22 +356,23 @@ class TestExecutor:
         """Test start method handles KeyboardInterrupt."""
         executor = Executor(Path("/tmp/repo"))
 
-        iteration_count = 0
+        call_count = 0
 
-        def run_iteration_once():
-            nonlocal iteration_count
-            iteration_count += 1
-            executor.running = False
+        def first_success_then_interrupt():
+            nonlocal call_count
+            call_count += 1
+            if call_count > 1:
+                raise KeyboardInterrupt()
 
         with patch("auto_slopp.executor.settings", mock_settings):
-            with patch.object(executor, "_run_iteration", side_effect=run_iteration_once):
+            with patch.object(executor, "_run_iteration", side_effect=first_success_then_interrupt):
                 with patch.object(executor, "_check_for_updates", return_value=False):
-                    with patch("builtins.print"):
+                    with patch("builtins.print") as mock_print:
                         with patch("time.sleep"):
                             executor.start()
 
                             assert executor.running is False
-                            assert iteration_count == 1
+                            mock_print.assert_any_call("\nReceived interrupt signal, shutting down...")
 
     def test_start_method_exception(self, mock_settings):
         """Test start method handles exceptions."""

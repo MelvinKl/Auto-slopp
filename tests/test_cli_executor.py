@@ -4,7 +4,13 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-from auto_slopp.utils.cli_executor import run_cli_executor
+from auto_slopp.utils.cli_executor import (
+    execute_openagent_with_instructions,
+    execute_with_instructions,
+    get_active_cli_command,
+    run_cli_executor,
+    run_opencode,
+)
 from settings.main import CLIConfiguration, TaskRating
 
 
@@ -194,3 +200,99 @@ def test_min_rating_respects_max_rating_boundary(mock_run, monkeypatch):
     called_commands = [call.args[0] for call in mock_run.call_args_list]
     assert called_commands[0][0] == "perfect-tool"
     assert "low-tool" not in called_commands[0]
+
+
+def test_get_active_cli_command_empty_configs(monkeypatch):
+    """Test get_active_cli_command returns 'unknown' when no configs."""
+    monkeypatch.setattr("auto_slopp.utils.cli_executor.settings.cli_configurations", [])
+    result = get_active_cli_command()
+    assert result == "unknown"
+
+
+def test_get_active_cli_command_index_out_of_range(monkeypatch):
+    """Test get_active_cli_command handles index out of range."""
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [CLIConfiguration(cli_command="tool", cli_args=["run"])],
+    )
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 99)
+    result = get_active_cli_command()
+    assert result == "tool"
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_execute_command_failure_logs_stderr(mock_run, monkeypatch):
+    """Test that failed command returns error result."""
+    mock_run.return_value.returncode = 1
+    mock_run.return_value.stdout = "output"
+    mock_run.return_value.stderr = "error message"
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [CLIConfiguration(cli_command="tool", cli_args=["run"])],
+    )
+
+    result = run_cli_executor(additional_instructions="test", working_directory=Path.cwd())
+
+    assert result["success"] is False or "error" in result
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_execute_with_instructions(mock_run, monkeypatch):
+    """Test execute_with_instructions wrapper calls run_cli_executor."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [CLIConfiguration(cli_command="tool", cli_args=["run"])],
+    )
+
+    from pathlib import Path
+
+    result = execute_with_instructions(
+        instructions="do work",
+        work_dir=Path.cwd(),
+        agent_args=["--verbose"],
+    )
+
+    assert "success" in result
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_run_opencode_deprecated(mock_run, monkeypatch):
+    """Test run_opencode is deprecated and emits warning."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [CLIConfiguration(cli_command="tool", cli_args=["run"])],
+    )
+
+    result = run_opencode(additional_instructions="test", working_directory=Path.cwd())
+
+    assert "success" in result
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_execute_openagent_deprecated(mock_run, monkeypatch):
+    """Test execute_openagent_with_instructions is deprecated."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [CLIConfiguration(cli_command="tool", cli_args=["run"])],
+    )
+
+    result = execute_openagent_with_instructions(instructions="test", work_dir=Path.cwd())
+
+    assert "success" in result

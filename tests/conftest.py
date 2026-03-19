@@ -127,6 +127,20 @@ def mock_settings():
     return settings
 
 
+@pytest.fixture(autouse=True)
+def _reset_cli_executor_state():
+    """Reset CLI executor state between tests to prevent cross-test contamination."""
+    import auto_slopp.utils.cli_executor as cli_executor_module
+
+    original_states = cli_executor_module._cli_states.copy()
+    original_index = cli_executor_module._active_cli_configuration_index
+
+    yield
+
+    cli_executor_module._cli_states = original_states
+    cli_executor_module._active_cli_configuration_index = original_index
+
+
 @pytest.fixture
 def sample_log_record():
     """Create a sample log record for testing.

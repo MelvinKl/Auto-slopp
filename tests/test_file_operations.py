@@ -96,7 +96,9 @@ class TestFileOperations:
             file2.write_text("Content 2")
             renamed2 = rename_processed_file(file2)
 
+            assert renamed1 is not None
             assert renamed1.name == "0001_first.used"
+            assert renamed2 is not None
             assert renamed2.name == "0002_second.used"
 
     def test_find_text_files(self):
@@ -251,6 +253,15 @@ class TestFileOperations:
             counter = get_next_counter(test_path, counter_start=5)
             assert counter == 11
 
+    def test_get_next_counter_exception(self):
+        """Test get_next_counter handles exceptions gracefully."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            test_path = Path(temp_dir)
+
+            with patch.object(Path, "iterdir", side_effect=OSError("Access denied")):
+                counter = get_next_counter(test_path)
+                assert counter == 1
+
     def test_rename_processed_file_with_custom_counter(self):
         """Test file renaming with custom counter."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -262,3 +273,14 @@ class TestFileOperations:
 
             assert renamed_file is not None
             assert renamed_file.name.startswith("0100_")
+
+    def test_rename_processed_file_exception(self):
+        """Test rename_processed_file handles exceptions gracefully."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            test_path = Path(temp_dir)
+            original_file = test_path / "test.txt"
+            original_file.write_text("Content")
+
+            with patch.object(Path, "rename", side_effect=OSError("Rename failed")):
+                result = rename_processed_file(original_file)
+                assert result is None

@@ -217,3 +217,109 @@ class TestStaleBranchCleanupWorker:
         stale = worker._identify_stale_branches(local_branches, remote_branches)
 
         assert len(stale) == 0
+
+
+class TestStaleBranchCleanupWorkerInvalidRepo:
+    """Tests for invalid repository handling."""
+
+    def test_process_single_repository_invalid_repo(self):
+        """Test _process_single_repository with invalid repo (not a git directory)."""
+        worker = StaleBranchCleanupWorker()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_dir = Path(temp_dir)
+
+            result = worker._process_single_repository(repo_dir)
+
+            assert result["success"] is False
+            assert "Not a git repository" in result["error"]
+
+    def test_process_repository_invalid_repo(self):
+        """Test _process_repository with invalid repo info."""
+        worker = StaleBranchCleanupWorker()
+        repo_info = {
+            "path": "/tmp/invalid_repo",
+            "name": "invalid_repo",
+            "valid": False,
+            "errors": ["Missing git directory"],
+        }
+
+        result = worker._process_repository(repo_info)
+
+        assert result["success"] is False
+        assert "Missing git directory" in result["error"]
+
+    def test_create_invalid_repo_result_from_path(self):
+        """Test _create_invalid_repo_result_from_path."""
+        worker = StaleBranchCleanupWorker()
+        repo_dir = Path("/tmp/bad_repo")
+        errors = ["Not a git repository", "Missing .git directory"]
+
+        result = worker._create_invalid_repo_result_from_path(repo_dir, errors)
+
+        assert result["success"] is False
+        assert "Not a git repository; Missing .git directory" in result["error"]
+
+    def test_create_invalid_repo_result(self):
+        """Test _create_invalid_repo_result."""
+        worker = StaleBranchCleanupWorker()
+        repo_info = {
+            "path": "/tmp/bad_repo",
+            "name": "bad_repo",
+            "errors": ["Permission denied"],
+        }
+
+        result = worker._create_invalid_repo_result(repo_info)
+
+        assert result["success"] is False
+        assert result["error"] == "Permission denied"
+        assert result["repository"] == "bad_repo"
+
+    def test_update_results_statistics_with_failure(self):
+        """Test _update_results_statistics with failed repo."""
+        worker = StaleBranchCleanupWorker()
+        results = {
+            "repositories_processed": 0,
+            "total_branches_deleted": 0,
+            "total_branches_failed": 0,
+            "repositories_with_errors": 0,
+            "success": True,
+        }
+        repo_result = {"success": False, "error": "Test error"}
+
+        worker._update_results_statistics(results, repo_result)
+
+        assert results["repositories_processed"] == 1
+        assert results["repositories_with_errors"] == 1
+        assert results["success"] is False
+
+    def test_delete_branch_dry_run_returns_true(self):
+        """Test _delete_branch with dry_run=True returns True without calling git."""
+        worker = StaleBranchCleanupWorker(dry_run=True)
+        with tempfile.TemporaryDirectory():
+            result = worker._delete_branch("any-branch")
+            assert result is True
+
+    def test_delete_branch_exception_handling(self):
+        """Test _delete_branch handles exceptions."""
+        worker = StaleBranchCleanupWorker()
+
+        with tempfile.TemporaryDirectory():
+            with patch(
+                "auto_slopp.workers.stale_branch_cleanup_worker.delete_branch",
+                side_effect=Exception("Delete failed"),
+            ):
+                result = worker._delete_branch("test-branch")
+                assert result is False
+
+    def test_log_completion_summary(self):
+        """Test _log_completion_summary logs correctly."""
+        worker = StaleBranchCleanupWorker()
+        results = {
+            "repositories_processed": 2,
+            "repositories_with_errors": 1,
+            "total_branches_deleted": 3,
+            "total_branches_failed": 1,
+        }
+
+        worker._log_completion_summary(results)

@@ -1,7 +1,10 @@
 """Tests for GitHub operations utilities."""
 
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from auto_slopp.utils.github_operations import (
     GitHubOperationError,
@@ -68,6 +71,26 @@ class TestGitHubOperationsCloseIssue:
         ):
             result = close_issue(repo_dir, 123)
             assert result is False
+
+    def test_close_issue_called_process_error(self):
+        """Test close_issue handles subprocess.CalledProcessError."""
+        repo_dir = Path("/tmp/repo")
+
+        mock_error = subprocess.CalledProcessError(
+            returncode=1,
+            cmd=["gh", "issue", "close", "123"],
+            stderr="Command failed",
+        )
+
+        with patch(
+            "auto_slopp.utils.github_operations._run_gh_command",
+            side_effect=mock_error,
+        ):
+            with patch("auto_slopp.utils.github_operations.logger") as mock_logger:
+                result = close_issue(repo_dir, 123)
+
+                assert result is False
+                mock_logger.error.assert_called_once()
 
 
 class TestGitHubOperationsCommentOnIssue:
@@ -284,6 +307,26 @@ class TestGitHubOperationsGetPRForBranch:
         ):
             result = get_pr_for_branch(repo_dir, "feature-branch")
             assert result is None
+
+    def test_get_pr_for_branch_generic_error(self):
+        """Test get_pr_for_branch logs error for generic failures."""
+        repo_dir = MagicMock(spec=Path)
+        repo_dir.name = "test-repo"
+
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stderr = "Generic error message"
+        mock_result.stdout = ""
+
+        with patch(
+            "auto_slopp.utils.github_operations._run_gh_command",
+            return_value=mock_result,
+        ):
+            with patch("auto_slopp.utils.github_operations.logger") as mock_logger:
+                result = get_pr_for_branch(repo_dir, "feature-branch")
+
+                assert result is None
+                mock_logger.error.assert_called_once()
 
 
 class TestGitHubOperationsCreatePullRequest:
@@ -609,3 +652,99 @@ class TestGitHubOperationsGetOpenPRBranches:
         ):
             result = get_open_pr_branches(repo_dir)
             assert result == []
+
+
+class TestRunGhCommandEnvHandling:
+    """Tests for _run_gh_command environment variable handling."""
+
+    def test_run_gh_command_with_env_file_and_none_values(self):
+        """Test _run_gh_command filters None values from dotenv."""
+        repo_dir = Path("/tmp/repo")
+
+        with patch("subprocess.run") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = "ok"
+            mock_result.stderr = ""
+            mock_run.return_value = mock_result
+
+            with patch("auto_slopp.utils.github_operations.settings") as mock_settings:
+                mock_env_file = MagicMock()
+                mock_env_file.exists.return_value = True
+                mock_settings.additional_env_file = mock_env_file
+
+                with patch("auto_slopp.utils.github_operations.dotenv_values") as mock_dotenv:
+                    mock_dotenv.return_value = {
+                        "KEY1": "value1",
+                        "KEY2": None,
+                        "KEY3": "value3",
+                    }
+
+                    from auto_slopp.utils.github_operations import _run_gh_command
+
+                    _run_gh_command(repo_dir, "issue", "list")
+
+                    call_kwargs = mock_run.call_args.kwargs
+                    env = call_kwargs["env"]
+                    assert env["KEY1"] == "value1"
+
+    def test_run_gh_command_gh_token_fallback(self):
+        """Test GH_TOKEN fallback when GITHUB_TOKEN is set."""
+        repo_dir = Path("/tmp/repo")
+
+        with patch("subprocess.run") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = "ok"
+            mock_result.stderr = ""
+            mock_run.return_value = mock_result
+
+            with patch.dict("os.environ", {"GITHUB_TOKEN": "token123"}, clear=False):
+                with patch("auto_slopp.utils.github_operations.settings") as mock_settings:
+                    mock_settings.additional_env_file = None
+
+                    from auto_slopp.utils.github_operations import _run_gh_command
+
+                    _run_gh_command(repo_dir, "issue", "list")
+
+                    call_kwargs = mock_run.call_args.kwargs
+                    env = call_kwargs["env"]
+                    assert env["GH_TOKEN"] == "token123"
+
+    def test_run_gh_command_timeout_error(self):
+        """Test _run_gh_command handles TimeoutExpired."""
+        repo_dir = Path("/tmp/repo")
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.TimeoutExpired(cmd=["gh"], timeout=30)
+
+            with patch("auto_slopp.utils.github_operations.settings") as mock_settings:
+                mock_settings.additional_env_file = None
+
+                from auto_slopp.utils.github_operations import (
+                    GitHubOperationError,
+                    _run_gh_command,
+                )
+
+                with pytest.raises(GitHubOperationError) as exc_info:
+                    _run_gh_command(repo_dir, "issue", "list")
+                assert "timed out" in str(exc_info.value)
+
+    def test_run_gh_command_timeout_error_generic(self):
+        """Test _run_gh_command handles generic TimeoutError."""
+        repo_dir = Path("/tmp/repo")
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = TimeoutError("Timeout")
+
+            with patch("auto_slopp.utils.github_operations.settings") as mock_settings:
+                mock_settings.additional_env_file = None
+
+                from auto_slopp.utils.github_operations import (
+                    GitHubOperationError,
+                    _run_gh_command,
+                )
+
+                with pytest.raises(GitHubOperationError) as exc_info:
+                    _run_gh_command(repo_dir, "issue", "list")
+                assert "timed out" in str(exc_info.value)

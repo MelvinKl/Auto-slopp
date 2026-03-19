@@ -185,6 +185,51 @@ class TestPlan:
         assert "- [x] 1. Step 1" in md
         assert "- [ ] 2. Step 2" in md
 
+    def test_to_markdown_with_header_content(self):
+        """Test to_markdown includes header_content when set."""
+        steps = [Step(number=1, description="Step 1")]
+        plan = Plan(
+            title="Test Plan",
+            description="Desc",
+            steps=steps,
+            header_content="<!-- header content -->",
+        )
+
+        md = plan.to_markdown()
+
+        assert "<!-- header content -->" in md
+        assert "# Test Plan" in md
+
+    def test_to_markdown_with_footer_content(self):
+        """Test to_markdown includes footer_content when set."""
+        steps = [Step(number=1, description="Step 1")]
+        plan = Plan(
+            title="Test Plan",
+            description="Desc",
+            steps=steps,
+            footer_content="<!-- footer content -->",
+        )
+
+        md = plan.to_markdown()
+
+        assert "<!-- footer content -->" in md
+
+    def test_to_markdown_with_header_and_footer(self):
+        """Test to_markdown includes both header and footer content."""
+        steps = [Step(number=1, description="Step 1")]
+        plan = Plan(
+            title="Test Plan",
+            description="Desc",
+            steps=steps,
+            header_content="<!-- header -->",
+            footer_content="<!-- footer -->",
+        )
+
+        md = plan.to_markdown()
+
+        assert "<!-- header -->" in md
+        assert "<!-- footer -->" in md
+
 
 class TestPlanParser:
     """Tests for PlanParser class."""
@@ -224,6 +269,39 @@ A test plan
         """Test parsing non-existent file."""
         with pytest.raises(FileNotFoundError):
             PlanParser.parse_file(Path("/nonexistent/plan.md"))
+
+    def test_parse_content_with_header(self):
+        """Test parsing plan content with header before title."""
+        content = """# Custom Title
+
+Description
+
+## Steps
+
+- [ ] 1. Step 1
+"""
+        plan = PlanParser.parse_content(content)
+
+        assert plan.title == "Custom Title"
+        assert plan.description == "Description"
+        assert len(plan.steps) == 1
+
+    def test_parse_content_with_footer(self):
+        """Test parsing plan content with footer after steps."""
+        content = """# Test Plan
+
+Description
+
+## Steps
+
+- [ ] 1. Step 1
+
+Footer content here
+"""
+        plan = PlanParser.parse_content(content)
+
+        assert plan.title == "Test Plan"
+        assert plan.footer_content == "Footer content here"
 
 
 class TestPlanWriter:
@@ -386,6 +464,36 @@ class TestRalphLoop:
             assert result["success"] is True
             assert call_count == 2
             assert result["steps_completed"] == 3
+
+    def test_execute_step_without_executor(self):
+        """Test execute_step when no executor is provided."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan_path = Path(tmpdir) / "plan.md"
+
+            ralph = RalphLoop(plan_path=plan_path, max_loops=5)
+            ralph.create_plan(title="Test", description="Test", step_descriptions=["Step 1"])
+
+            from auto_slopp.utils.ralph import Step
+
+            result = ralph.execute_step(Step(number=1, description="Test step"))
+
+            assert result["success"] is True
+            assert "no executor" in result["message"]
+
+    def test_run_all_steps_already_closed(self):
+        """Test run when all steps are already closed."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan_path = Path(tmpdir) / "plan.md"
+
+            ralph = RalphLoop(plan_path=plan_path, max_loops=5)
+            plan = ralph.create_plan(title="Test", description="Test", step_descriptions=["Step 1"])
+            plan.mark_step_closed(1)
+
+            result = ralph.run()
+
+            assert result["success"] is True
+            assert result["loops_executed"] == 0
+            assert result["steps_completed"] == 1
 
 
 class TestCreateDefaultPlanSteps:

@@ -469,6 +469,19 @@ class TestPRWorker:
         assert result["repositories_invalid"] == 1
         assert result["repositories_with_errors"] == 1
 
+    def test_run_with_nonexistent_repo_path(self):
+        """Test run with non-existent repository path."""
+        worker = PRWorker()
+        repo_dir = MagicMock(spec=Path)
+        repo_dir.exists.return_value = False
+        repo_dir.__str__ = lambda self: "/nonexistent/repo"
+
+        result = worker.run(repo_dir)
+
+        assert result["success"] is False
+        assert "does not exist" in result["error"]
+        assert result["repositories_processed"] == 0
+
     def test_process_repository_exception(self):
         """Test processing repository handles unexpected exceptions."""
         worker = PRWorker()
