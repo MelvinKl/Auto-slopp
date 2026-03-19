@@ -179,16 +179,11 @@ class StaleBranchCleanupWorker(Worker):
         Returns:
             Error result for invalid repository
         """
-        return {
-            "repository": repo_dir.name,
-            "path": str(repo_dir),
-            "success": False,
-            "branches_deleted": 0,
-            "branches_failed_to_delete": 0,
-            "deleted_branches": [],
-            "failed_deletions": [],
-            "error": "; ".join(errors),
-        }
+        from auto_slopp.utils.branch_analysis import create_branch_cleanup_result
+
+        result = create_branch_cleanup_result(repo_dir)
+        result["error"] = "; ".join(errors)
+        return result
 
     def _create_invalid_repo_result(self, repo_info: Dict[str, Any]) -> Dict[str, Any]:
         """Create result for an invalid repository.
@@ -199,16 +194,12 @@ class StaleBranchCleanupWorker(Worker):
         Returns:
             Error result for invalid repository
         """
-        return {
-            "repository": repo_info["name"],
-            "path": repo_info["path"],
-            "success": False,
-            "branches_deleted": 0,
-            "branches_failed_to_delete": 0,
-            "deleted_branches": [],
-            "failed_deletions": [],
-            "error": "; ".join(repo_info.get("errors", ["Repository is invalid"])),
-        }
+        from auto_slopp.utils.branch_analysis import create_branch_cleanup_result
+
+        result = create_branch_cleanup_result(Path(repo_info["path"]))
+        result["repository"] = repo_info["name"]
+        result["error"] = "; ".join(repo_info.get("errors", ["Repository is invalid"]))
+        return result
 
     def _update_results_statistics(self, results: Dict[str, Any], repo_result: Dict[str, Any]) -> None:
         """Update results statistics with repository processing result.
