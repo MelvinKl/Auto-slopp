@@ -2,7 +2,7 @@
 
 import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from auto_slopp.utils.cli_executor import run_cli_executor
 from settings.main import CLIConfiguration, TaskRating

@@ -4,8 +4,6 @@
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from auto_slopp.utils.file_operations import (
     create_file_counter_name,
     get_next_counter,

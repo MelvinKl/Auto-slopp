@@ -8,7 +8,6 @@ import httpx
 import pytest
 
 from auto_slopp.telegram_handler import TelegramHandler, setup_telegram_logging
-from settings.main import settings
 
 
 class TestTelegramHandler:

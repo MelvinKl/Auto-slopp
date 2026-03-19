@@ -15,7 +15,6 @@ from auto_slopp.utils.git_operations import (
     get_local_branches,
     get_remote_branches,
 )
-from auto_slopp.utils.repository_utils import discover_repositories
 from auto_slopp.worker import Worker
 
 

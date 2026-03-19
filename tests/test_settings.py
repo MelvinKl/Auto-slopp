@@ -1,7 +1,6 @@
 """Tests for Pydantic settings validation."""
 
 import os
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -107,7 +106,6 @@ class TestSettings:
 
     def test_global_settings_instance(self):
         """Test that global settings instance is available."""
-        from settings.main import settings
 
         assert isinstance(settings, Settings)
         assert hasattr(settings, "base_repo_path")

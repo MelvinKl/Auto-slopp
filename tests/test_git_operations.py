@@ -1,17 +1,10 @@
 """Tests for git operations utilities."""
 
-import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import pytest
-
 from auto_slopp.utils.git_operations import (
-    GitOperationError,
     checkout_branch_resilient,
-    get_current_branch,
-    get_local_branches,
-    get_remote_branches,
     merge_main_into_branch,
 )
 

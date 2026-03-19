@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from auto_slopp.utils.cli_executor import get_active_cli_command, run_cli_executor
-from settings.main import settings
 
 logger = logging.getLogger(__name__)
 

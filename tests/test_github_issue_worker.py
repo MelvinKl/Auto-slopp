@@ -4,8 +4,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from auto_slopp.utils.ralph import Step
 from auto_slopp.workers.github_issue_worker import GitHubIssueWorker
 
@@ -369,10 +367,6 @@ class TestGitHubIssueWorker:
 
                     assert result["success"] is True
                     assert result["issues_processed"] == 1
-
-                    from auto_slopp.utils.git_operations import sanitize_branch_name
-
-                    sanitized_title = sanitize_branch_name(test_case["title"][:30].lower())
 
                     assert result["issue_results"][0]["issue_title"] == test_case["title"]
 

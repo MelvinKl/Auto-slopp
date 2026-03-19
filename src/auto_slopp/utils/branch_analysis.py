@@ -10,7 +10,6 @@ from typing import Any, Dict, List, Set
 
 from auto_slopp.utils.git_operations import (
     delete_branch,
-    get_current_branch,
     get_local_branches,
     get_remote_branches,
 )

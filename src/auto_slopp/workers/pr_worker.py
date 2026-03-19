@@ -16,7 +16,7 @@ from auto_slopp.utils.git_operations import (
     push_branch,
 )
 from auto_slopp.utils.github_operations import get_open_prs
-from auto_slopp.utils.repository_utils import discover_repositories, validate_repository
+from auto_slopp.utils.repository_utils import validate_repository
 from auto_slopp.worker import Worker
 from settings.main import settings
 
