@@ -495,6 +495,20 @@ class TestRalphLoop:
             assert result["loops_executed"] == 0
             assert result["steps_completed"] == 1
 
+    def test_run_plan_none_after_load(self):
+        """Test run when plan is None after load_plan (line 325-330)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan_path = Path(tmpdir) / "plan.md"
+
+            ralph = RalphLoop(plan_path=plan_path, max_loops=5)
+            ralph.plan = None
+            ralph.load_plan = lambda: None
+
+            result = ralph.run()
+
+            assert result["success"] is False
+            assert "Failed to load plan" in result["error"]
+
 
 class TestCreateDefaultPlanSteps:
     """Tests for create_default_plan_steps function."""

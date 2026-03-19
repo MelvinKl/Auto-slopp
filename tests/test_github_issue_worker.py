@@ -1396,3 +1396,138 @@ class TestGitHubIssueWorker:
                 result = worker._step_is_closed(task_path, 1)
 
                 assert result is False
+
+    def test_refine_issue_task_file_execute_fails(self):
+        """Test _refine_issue_task_file handles execution failure (line 550)."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            task_path = Path(temp_dir) / "task.md"
+            task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement\n")
+
+            with (
+                patch.object(worker, "_create_issue_task_file"),
+                patch.object(
+                    worker,
+                    "_build_refinement_instructions",
+                    return_value="refine instructions",
+                ),
+                patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.github_issue_worker.PlanParser.parse_file"),
+            ):
+                mock_exec.return_value = {
+                    "success": False,
+                    "error": "Execution failed",
+                }
+
+                result = worker._refine_issue_task_file(
+                    repo_dir=Path(temp_dir),
+                    task_path=task_path,
+                    issue_title="Issue",
+                    issue_body="Body",
+                    comment_texts=[],
+                    branch_name="ai/issue-1",
+                )
+
+                assert result["success"] is False
+                assert "Execution failed" in result["error"]
+
+    def test_refine_issue_task_file_parse_exception(self):
+        """Test _refine_issue_task_file handles parse exception (lines 557-558)."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            task_path = Path(temp_dir) / "task.md"
+            task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement\n")
+
+            with (
+                patch.object(worker, "_create_issue_task_file"),
+                patch.object(
+                    worker,
+                    "_build_refinement_instructions",
+                    return_value="refine instructions",
+                ),
+                patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.github_issue_worker.PlanParser.parse_file") as mock_parse,
+            ):
+                mock_exec.return_value = {"success": True}
+                mock_parse.side_effect = ValueError("Parse error")
+
+                result = worker._refine_issue_task_file(
+                    repo_dir=Path(temp_dir),
+                    task_path=task_path,
+                    issue_title="Issue",
+                    issue_body="Body",
+                    comment_texts=[],
+                    branch_name="ai/issue-1",
+                )
+
+                assert result["success"] is False
+                assert "Parse error" in result["error"]
+
+    def test_refine_issue_task_file_no_steps(self):
+        """Test _refine_issue_task_file handles empty steps (line 564)."""
+        from auto_slopp.utils.ralph import Plan
+
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            task_path = Path(temp_dir) / "task.md"
+            task_path.write_text("# Task\n\n## Steps\n\n")
+
+            with (
+                patch.object(worker, "_create_issue_task_file"),
+                patch.object(
+                    worker,
+                    "_build_refinement_instructions",
+                    return_value="refine instructions",
+                ),
+                patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.github_issue_worker.PlanParser.parse_file") as mock_parse,
+            ):
+                mock_exec.return_value = {"success": True}
+                mock_parse.return_value = Plan(title="Task", description="", steps=[])
+
+                result = worker._refine_issue_task_file(
+                    repo_dir=Path(temp_dir),
+                    task_path=task_path,
+                    issue_title="Issue",
+                    issue_body="Body",
+                    comment_texts=[],
+                    branch_name="ai/issue-1",
+                )
+
+                assert result["success"] is False
+                assert "executable steps" in result["error"]
+
+    def test_extract_step_block_pattern_not_found(self):
+        """Test _extract_step_block when step pattern is not found (line 985)."""
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            task_path = Path(temp_dir) / "task.md"
+            task_path.write_text("# Task\n\n## Steps\n\n- [x] 1. Already done\n")
+
+            with patch("auto_slopp.workers.github_issue_worker.PlanParser.parse_file"):
+                result = worker._extract_step_block(task_path, 2)
+
+                assert "Unknown step" in result
+                assert "2" in result
+
+    def test_find_step_description_fallback_returns_unknown(self):
+        """Test _find_step_description when step not found (lines 1000-1003)."""
+        from auto_slopp.utils.ralph import Plan
+
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            task_path = Path(temp_dir) / "task.md"
+            task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement\n")
+
+            with patch("auto_slopp.workers.github_issue_worker.PlanParser.parse_file") as mock_parse:
+                plan = Plan(title="Task", description="", steps=[])
+                mock_parse.return_value = plan
+
+                result = worker._find_step_description(task_path, 2)
+
+                assert result == "Unknown step"

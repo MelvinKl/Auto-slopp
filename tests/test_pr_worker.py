@@ -498,3 +498,131 @@ class TestPRWorker:
 
         assert result["success"] is False
         assert "Unexpected error" in result["error"]
+
+    def test_process_repository_merge_fix_succeeds_but_update_fails(self):
+        """Test merge fix succeeds but subsequent update still fails (lines 149-150)."""
+        worker = PRWorker()
+        repo_dir = Path("/tmp/repo")
+
+        with (
+            patch.object(worker, "_get_open_pr_branches", return_value=["feature"]),
+            patch.object(worker, "_checkout_branch", return_value=True),
+            patch.object(worker, "_update_branch_with_main", side_effect=[False, False]),
+            patch.object(
+                worker,
+                "_fix_merge_with_cli",
+                return_value={"success": True},
+            ),
+        ):
+            result = worker._process_repository(repo_dir)
+
+        assert "Failed to update branch" in result["error"]
+
+    def test_process_repository_tests_fail_and_fix_fails(self):
+        """Test tests fail, fix attempt fails (lines 178-180)."""
+        worker = PRWorker()
+        repo_dir = Path("/tmp/repo")
+
+        with (
+            patch.object(worker, "_get_open_pr_branches", return_value=["feature"]),
+            patch.object(worker, "_checkout_branch", return_value=True),
+            patch.object(worker, "_update_branch_with_main", return_value=True),
+            patch.object(
+                worker,
+                "_run_tests",
+                side_effect=[
+                    {"success": False, "output": "", "error": "Test error"},
+                ],
+            ),
+            patch.object(
+                worker,
+                "_fix_tests_with_cli",
+                return_value={"success": False, "error": "Cannot fix tests"},
+            ),
+            patch.object(worker, "_push_branch", return_value=True),
+        ):
+            result = worker._process_repository(repo_dir)
+
+        assert len(result["test_results"]) == 1
+        assert result["test_results"][-1]["fix_success"] is False
+        assert "Cannot fix tests" in result["test_results"][-1]["fix_error"]
+
+    def test_run_with_valid_repo_and_push_failure(self):
+        """Test run() with valid repo where push fails (tests lines 91-93)."""
+        worker = PRWorker()
+        repo_dir = MagicMock(spec=Path)
+        repo_dir.exists.return_value = True
+        repo_dir.name = "test_repo"
+
+        with (
+            patch(
+                "auto_slopp.workers.pr_worker.validate_repository",
+                return_value={"valid": True, "errors": []},
+            ),
+            patch.object(worker, "_get_open_pr_branches", return_value=["feature"]),
+            patch.object(worker, "_checkout_branch", return_value=True),
+            patch.object(worker, "_update_branch_with_main", return_value=True),
+            patch.object(
+                worker,
+                "_run_tests",
+                return_value={"success": True, "output": "", "error": None},
+            ),
+            patch.object(worker, "_push_branch", return_value=False),
+        ):
+            result = worker.run(repo_dir)
+
+        assert result["repositories_tested"] == 1
+        assert result["repositories_with_errors"] == 1
+        assert any("Failed to push" in e for e in result["errors"])
+
+    def test_run_with_process_failure(self):
+        """Test run() when _process_repository returns success=False (lines 95-97)."""
+        worker = PRWorker()
+        repo_dir = MagicMock(spec=Path)
+        repo_dir.exists.return_value = True
+        repo_dir.name = "test_repo"
+
+        with (
+            patch(
+                "auto_slopp.workers.pr_worker.validate_repository",
+                return_value={"valid": True, "errors": []},
+            ),
+            patch.object(
+                worker,
+                "_process_repository",
+                return_value={"success": False, "error": "Process failed"},
+            ),
+        ):
+            result = worker.run(repo_dir)
+
+        assert result["success"] is False
+        assert result["repositories_with_errors"] == 1
+        assert any("Process failed" in e for e in result["errors"])
+
+    def test_run_with_tests_fixed(self):
+        """Test run() with tests_fixed=True (line 90)."""
+        worker = PRWorker()
+        repo_dir = MagicMock(spec=Path)
+        repo_dir.exists.return_value = True
+        repo_dir.name = "test_repo"
+
+        with (
+            patch(
+                "auto_slopp.workers.pr_worker.validate_repository",
+                return_value={"valid": True, "errors": []},
+            ),
+            patch.object(
+                worker,
+                "_process_repository",
+                return_value={
+                    "success": True,
+                    "tests_fixed": True,
+                    "error": None,
+                    "test_results": [],
+                },
+            ),
+        ):
+            result = worker.run(repo_dir)
+
+        assert result["repositories_tested"] == 1
+        assert result["repositories_fixed"] == 1

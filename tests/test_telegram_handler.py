@@ -1332,3 +1332,46 @@ class TestTelegramEndToEnd:
 
             # Assert - All messages should be sent
             assert mock_client.post.call_count == 15  # 3 tasks * 5 messages each
+
+    @patch("httpx.AsyncClient")
+    def test_handle_task_result_with_exception(self, mock_client_class):
+        """Test _handle_task_result silently handles task exceptions."""
+        mock_client = AsyncMock()
+        mock_client_class.return_value = mock_client
+        mock_client.post.side_effect = RuntimeError("Async error")
+
+        with patch.dict(
+            "auto_slopp.telegram_handler.settings.__dict__",
+            {"telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
+        ):
+            handler = TelegramHandler()
+            handler.setFormatter(logging.Formatter("%(message)s"))
+
+            record = logging.LogRecord(
+                name="test_logger",
+                level=logging.INFO,
+                pathname="",
+                lineno=0,
+                msg="Test message",
+                args=(),
+                exc_info=None,
+            )
+
+            async def test_with_running_loop():
+                asyncio.get_running_loop()
+                handler.emit(record)
+                await asyncio.sleep(0.1)
+
+            asyncio.run(test_with_running_loop())
+
+    def test_handle_task_result_success(self):
+        """Test _handle_task_result when task completes successfully (line 97)."""
+        from auto_slopp.telegram_handler import TelegramHandler
+
+        handler = TelegramHandler.__new__(TelegramHandler)
+
+        mock_task = MagicMock()
+        mock_task.result.return_value = None
+
+        handler._handle_task_result(mock_task)
+        mock_task.result.assert_called_once()

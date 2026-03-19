@@ -296,3 +296,159 @@ def test_execute_openagent_deprecated(mock_run, monkeypatch):
     result = execute_openagent_with_instructions(instructions="test", work_dir=Path.cwd())
 
     assert "success" in result
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_check_cooldowns_cli_recovers(mock_run, monkeypatch):
+    """Test _check_cooldowns recovers inactive CLI after cooldown expires."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="tool", cli_args=["run"], cooldown_seconds=5),
+        ],
+    )
+    import time
+
+    from auto_slopp.utils.cli_executor import _check_cooldowns, _get_cli_state
+
+    state = _get_cli_state(0)
+    state["active"] = False
+    state["cooldown_until"] = time.time() - 10
+
+    _check_cooldowns(Path.cwd())
+
+    assert state["active"] is True
+
+
+def test_check_cooldowns_cli_still_inactive(monkeypatch):
+    """Test _check_cooldowns keeps CLI inactive when probe fails."""
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="tool", cli_args=["run"], cooldown_seconds=5),
+        ],
+    )
+    import time
+
+    from auto_slopp.utils.cli_executor import _check_cooldowns, _get_cli_state
+
+    state = _get_cli_state(0)
+    state["active"] = False
+    state["cooldown_until"] = time.time() - 10
+
+    with patch("auto_slopp.utils.cli_executor._probe_configuration", return_value=False):
+        _check_cooldowns(Path.cwd())
+
+    assert state["active"] is False
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_probe_configuration_success(mock_run, monkeypatch):
+    """Test _probe_configuration returns True on successful probe."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [CLIConfiguration(cli_command="tool", cli_args=["run"])],
+    )
+
+    from auto_slopp.utils.cli_executor import _probe_configuration
+
+    result = _probe_configuration({"cli_command": "tool", "cli_args": ["run"], "name": "test"}, Path.cwd())
+
+    assert result is True
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_probe_configuration_failure(mock_run, monkeypatch):
+    """Test _probe_configuration returns False on probe failure."""
+    mock_run.return_value.returncode = 1
+    mock_run.return_value.stdout = ""
+    mock_run.return_value.stderr = "error"
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [CLIConfiguration(cli_command="tool", cli_args=["run"])],
+    )
+
+    from auto_slopp.utils.cli_executor import _probe_configuration
+
+    result = _probe_configuration({"cli_command": "tool", "cli_args": ["run"], "name": "test"}, Path.cwd())
+
+    assert result is False
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_run_cli_executor_all_configs_inactive(mock_run, monkeypatch):
+    """Test run_cli_executor breaks when all configs are inactive (lines 300-301)."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="tool1", cli_args=["run"], capability=5),
+            CLIConfiguration(cli_command="tool2", cli_args=["run"], capability=5),
+        ],
+    )
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.task_difficulties",
+        {"default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5)},
+    )
+    import time
+
+    from auto_slopp.utils.cli_executor import _get_cli_state
+
+    _get_cli_state(0)["active"] = False
+    _get_cli_state(0)["cooldown_until"] = time.time() - 10
+    _get_cli_state(1)["active"] = False
+    _get_cli_state(1)["cooldown_until"] = time.time() - 10
+
+    with patch("auto_slopp.utils.cli_executor._probe_configuration", return_value=False):
+        result = run_cli_executor(additional_instructions="test", working_directory=Path.cwd())
+
+    assert result["success"] is False
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_run_cli_executor_capability_below_min(mock_run, monkeypatch):
+    """Test config with capability below min_rating is skipped (lines 305-312)."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="weak", cli_args=["run"], capability=5),
+        ],
+    )
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.task_difficulties",
+        {
+            "task": TaskRating(min_rating=8, max_rating=10, recommended_rating=9),
+            "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
+        },
+    )
+
+    result = run_cli_executor(
+        additional_instructions="test",
+        working_directory=Path.cwd(),
+        task_name="task",
+    )
+
+    assert result["success"] is False
+    assert "min_rating" in result["error"]

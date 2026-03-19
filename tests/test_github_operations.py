@@ -748,3 +748,26 @@ class TestRunGhCommandEnvHandling:
                 with pytest.raises(GitHubOperationError) as exc_info:
                     _run_gh_command(repo_dir, "issue", "list")
                 assert "timed out" in str(exc_info.value)
+
+    def test_run_gh_command_called_process_error(self):
+        """Test _run_gh_command handles CalledProcessError (lines 72-75)."""
+        repo_dir = Path("/tmp/repo")
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.CalledProcessError(
+                returncode=1,
+                cmd=["gh", "issue", "list"],
+                stderr="Command failed",
+            )
+
+            with patch("auto_slopp.utils.github_operations.settings") as mock_settings:
+                mock_settings.additional_env_file = None
+
+                from auto_slopp.utils.github_operations import (
+                    GitHubOperationError,
+                    _run_gh_command,
+                )
+
+                with pytest.raises(GitHubOperationError) as exc_info:
+                    _run_gh_command(repo_dir, "issue", "list")
+                assert "Command failed" in str(exc_info.value)

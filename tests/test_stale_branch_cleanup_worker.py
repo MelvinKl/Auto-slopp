@@ -218,6 +218,21 @@ class TestStaleBranchCleanupWorker:
 
         assert len(stale) == 0
 
+    def test_process_repository_valid_repo(self, temp_repo_dir):
+        """Test _process_repository with valid repo_info calls analyze_repository_branches."""
+        worker = StaleBranchCleanupWorker(days_threshold=5, dry_run=True)
+
+        repo_info = {
+            "path": str(temp_repo_dir),
+            "name": temp_repo_dir.name,
+            "valid": True,
+            "errors": [],
+        }
+
+        result = worker._process_repository(repo_info)
+
+        assert result["success"] is True
+
 
 class TestStaleBranchCleanupWorkerInvalidRepo:
     """Tests for invalid repository handling."""
