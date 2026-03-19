@@ -113,10 +113,8 @@ class TestStaleBranchCleanupWorker:
         """Test deletion of current branch is prevented."""
         worker = StaleBranchCleanupWorker()
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_repo_path = Path(temp_dir)
-
-            with patch("subprocess.run") as mock_run:
+         with tempfile.TemporaryDirectory():
+             with patch("subprocess.run") as mock_run:
                 mock_run.return_value = Mock(stdout="test-branch", returncode=0)
 
                 original_method = worker._delete_branch

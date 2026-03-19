@@ -352,30 +352,29 @@ class TestGitHubIssueWorker:
                 },
             ]
 
-            for i, test_case in enumerate(test_cases, start=1):
-                issue = {
-                    "number": i,
-                    "title": test_case["title"],
-                    "body": "Test body",
-                    "url": f"https://github.com/test/repo/issues/{i}",
-                    "author": {"login": "MelvinKl"},
-                    "labels": [{"name": "ai"}],
-                }
+             for i, test_case in enumerate(test_cases, start=1):
+                 issue = {
+                     "number": i,
+                     "title": test_case["title"],
+                     "body": "Test body",
+                     "url": f"https://github.com/test/repo/issues/{i}",
+                     "author": {"login": "MelvinKl"},
+                     "labels": [{"name": "ai"}],
+                 }
 
-                with patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues:
-                    mock_issues.return_value = [issue]
+                 with patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues:
+                     mock_issues.return_value = [issue]
 
-                    result = worker.run(repo_path)
+                     result = worker.run(repo_path)
 
-                    assert result["success"] is True
-                    assert result["issues_processed"] == 1
+                     assert result["success"] is True
+                     assert result["issues_processed"] == 1
 
-                    from auto_slopp.utils.git_operations import sanitize_branch_name
+                     from auto_slopp.utils.git_operations import sanitize_branch_name
 
-                    sanitized_title = sanitize_branch_name(test_case["title"][:30].lower())
-                    expected_branch = f"ai/issue-{i}-{sanitized_title}"
+                     sanitized_title = sanitize_branch_name(test_case["title"][:30].lower())
 
-                    assert result["issue_results"][0]["issue_title"] == test_case["title"]
+                     assert result["issue_results"][0]["issue_title"] == test_case["title"]
 
     def test_should_process_issue_with_required_label(self):
         """Test that issues with required label from allowed creator are processed."""

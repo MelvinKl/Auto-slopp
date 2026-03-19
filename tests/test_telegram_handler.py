@@ -109,12 +109,12 @@ class TestTelegramHandler:
                 exc_info=None,
             )
 
-            # Act - Test with running loop
-            async def test_with_running_loop():
-                loop = asyncio.get_running_loop()
-                handler.emit(record)
-                # Give some time for the async task to complete
-                await asyncio.sleep(0.1)
+             # Act - Test with running loop
+             async def test_with_running_loop():
+                 asyncio.get_running_loop()
+                 handler.emit(record)
+                 # Give some time for the async task to complete
+                 await asyncio.sleep(0.1)
 
                 # Assert - Message should be sent
                 mock_client.post.assert_called_once()
