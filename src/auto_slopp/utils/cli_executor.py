@@ -42,9 +42,7 @@ def _check_cooldowns(working_dir: Path) -> None:
                 logger.info(f"CLI tool {config.name} successfully recovered.")
                 state["active"] = True
             else:
-                logger.warning(
-                    f"CLI tool {config.name} still timing out. Resetting cooldown."
-                )
+                logger.warning(f"CLI tool {config.name} still timing out. Resetting cooldown.")
                 state["cooldown_until"] = now + config.cooldown_seconds
 
 
@@ -161,13 +159,9 @@ def _execute_command(
             )
 
         if success:
-            logger.info(
-                f"{cli_command} completed successfully in {execution_time:.2f}s"
-            )
+            logger.info(f"{cli_command} completed successfully in {execution_time:.2f}s")
         else:
-            logger.error(
-                f"{cli_command} failed with return code {result.returncode} in {execution_time:.2f}s"
-            )
+            logger.error(f"{cli_command} failed with return code {result.returncode} in {execution_time:.2f}s")
             if capture_output and result.stderr:
                 logger.error(f"stderr: {result.stderr}")
 
@@ -280,16 +274,12 @@ def run_cli_executor(
     working_dir = working_directory or Path.cwd()
     cli_configurations = _get_cli_configurations()
 
-    logger.info(
-        f"Executing with instructions: {additional_instructions if additional_instructions else 'None'}..."
-    )
+    logger.info(f"Executing with instructions: {additional_instructions if additional_instructions else 'None'}...")
     logger.info(f"Working directory: {working_dir}")
     logger.info(f"Timeout: {timeout}s")
     logger.info(f"Agent args: {agent_args}")
 
-    task_rating = settings.task_difficulties.get(
-        task_name, settings.task_difficulties["default"]
-    )
+    task_rating = settings.task_difficulties.get(task_name, settings.task_difficulties["default"])
 
     final_result: Optional[Dict[str, Any]] = None
     tried_indices = set()
@@ -298,9 +288,7 @@ def run_cli_executor(
         config_index = _choose_best_config_index(task_rating, working_dir)
 
         if config_index == -1:
-            available_capabilities = [
-                cfg.capability for cfg in settings.cli_configurations
-            ]
+            available_capabilities = [cfg.capability for cfg in settings.cli_configurations]
             logger.error(
                 f"No CLI configuration meets min_rating={task_rating.min_rating} for task '{task_name}'. "
                 f"Available configurations have capabilities: {available_capabilities}"
@@ -344,13 +332,9 @@ def run_cli_executor(
         final_result = result
 
         if not result.get("success", False):
-            logger.warning(
-                f"Error on configuration {config['name']}, placing in cooldown"
-            )
+            logger.warning(f"Error on configuration {config['name']}, placing in cooldown")
             state["active"] = False
-            state["cooldown_until"] = (
-                time.time() + settings.cli_configurations[config_index].cooldown_seconds
-            )
+            state["cooldown_until"] = time.time() + settings.cli_configurations[config_index].cooldown_seconds
             continue
 
         _active_cli_configuration_index = config_index
@@ -457,9 +441,7 @@ def execute_openagent_with_instructions(
     Returns:
         Dictionary containing execution results.
     """
-    logger.warning(
-        "execute_openagent_with_instructions is deprecated, use execute_with_instructions instead"
-    )
+    logger.warning("execute_openagent_with_instructions is deprecated, use execute_with_instructions instead")
     return execute_with_instructions(
         instructions=instructions,
         work_dir=work_dir,
