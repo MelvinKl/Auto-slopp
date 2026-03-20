@@ -978,6 +978,7 @@ For comprehensive documentation, see the [docs/](docs/) directory:
 - **[Architecture Overview](docs/architecture.md)** - System architecture and design
 - **[OpenProject Worker Specification](docs/openproject_worker_specification.md)** - Specification for the OpenProject Worker
 - **[OpenProject Worker Design](docs/openproject_worker_design.md)** - Design documentation for the OpenProject Worker
+- **[OpenProject CLI Requirements](docs/openproject_cli_requirements.md)** - Requirements for the Go CLI connecting to OpenProject
 - **[Contributing Guide](docs/contributing.md)** - Contribution guidelines
 
 ## Telegram Logging
