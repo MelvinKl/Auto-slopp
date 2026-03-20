@@ -129,17 +129,19 @@ class TelegramHandler(logging.Handler):
                         retry_after = int(e.response.headers.get("retry-after", self.retry_delay))
                         await asyncio.sleep(retry_after)
                         continue
-                    elif attempt == self.retry_attempts - 1:
-                        raise
-                    await asyncio.sleep(self.retry_delay)
+                    # For non-429 HTTP errors, fall through to generic handling
                 except Exception:
-                    if attempt == self.retry_attempts - 1:
-                        raise
-                    await asyncio.sleep(self.retry_delay)
+                    # For non-HTTP errors, fall through to generic handling
+                    pass
+
+                # Common handling for HTTP errors (non-429) and other exceptions
+                if attempt == self.retry_attempts - 1:
+                    raise
+                await asyncio.sleep(self.retry_delay)
 
         except Exception as e:
             # Log the error but don't raise it
-            logging.getLogger(__name__).error(f"Failed to send Telegram message: {e}")
+            logging.getLogger(__name__).error("Failed to send Telegram message: %s", e)
 
     def _escape_html(self, text: str) -> str:
         """Escape HTML special characters for Telegram messages.

@@ -9,6 +9,8 @@ import re
 from pathlib import Path
 from typing import List, Optional
 
+from auto_slopp.utils.exception_handling import safe_execute
+
 logger = logging.getLogger(__name__)
 
 
@@ -21,7 +23,8 @@ def find_text_files(directory: Path) -> List[Path]:
     Returns:
         List of paths to .txt files, sorted by modification time (oldest first).
     """
-    try:
+
+    def _find_text_files():
         text_files = []
         for file_path in directory.rglob("*.txt"):
             if file_path.is_file():
@@ -33,9 +36,8 @@ def find_text_files(directory: Path) -> List[Path]:
         logger.info(f"Found {len(text_files)} .txt files in {directory.name}")
         return text_files
 
-    except Exception as e:
-        logger.error(f"Error finding .txt files in {directory.name}: {str(e)}")
-        return []
+    result = safe_execute(_find_text_files, default=[], log_errors=True)
+    return result if result is not None else []
 
 
 def read_file_content(file_path: Path) -> Optional[str]:
@@ -47,16 +49,15 @@ def read_file_content(file_path: Path) -> Optional[str]:
     Returns:
         File content as string, or None if reading failed.
     """
-    try:
+
+    def _read_file_content():
         content = file_path.read_text(encoding="utf-8").strip()
         if not content:
             logger.warning(f"File is empty: {file_path}")
             return None
         return content
 
-    except Exception as e:
-        logger.error(f"Error reading file {file_path}: {str(e)}")
-        return None
+    return safe_execute(_read_file_content, default=None, log_errors=True)
 
 
 def get_next_counter(directory: Path, counter_start: int = 1) -> int:
@@ -69,7 +70,8 @@ def get_next_counter(directory: Path, counter_start: int = 1) -> int:
     Returns:
         Next available counter number.
     """
-    try:
+
+    def _get_next_counter():
         # Find all files with counter prefix pattern
         counter_pattern = re.compile(r"^(\d{4})_.*\.used$")
         existing_counters = []
@@ -87,8 +89,8 @@ def get_next_counter(directory: Path, counter_start: int = 1) -> int:
         else:
             return counter_start
 
-    except Exception:
-        return counter_start
+    result = safe_execute(_get_next_counter, default=counter_start, log_errors=True)
+    return result if result is not None else counter_start
 
 
 def rename_processed_file(original_file: Path, counter_start: int = 1) -> Optional[Path]:

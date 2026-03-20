@@ -45,6 +45,112 @@ from auto_slopp.worker import Worker
 from settings.main import settings
 
 
+def extract_author_login(issue: Dict[str, Any]) -> str:
+    """Extract author login from an issue dictionary.
+
+    Args:
+        issue: The issue dictionary from GitHub API
+
+    Returns:
+        Author login string or empty string if not available
+    """
+    author = issue.get("author", {})
+    return author.get("login", "") if author else ""
+
+
+def extract_label_names(issue: Dict[str, Any]) -> List[str]:
+    """Extract label names from an issue dictionary.
+
+    Args:
+        issue: The issue dictionary from GitHub API
+
+    Returns:
+        List of label names
+    """
+    labels = issue.get("labels", [])
+    return [label.get("name", "") for label in labels]
+
+
+def build_branch_instruction(branch_name: Optional[str] = None) -> str:
+    """Build the branch instruction prefix for CLI commands.
+
+    Args:
+        branch_name: Name of the branch already created for this issue
+
+    Returns:
+        Branch instruction string
+    """
+    if branch_name:
+        return f"You are already on branch '{branch_name}'. Work on this branch, implement the changes, commit them, and push.\n"
+    return (
+        "Create a new branch that starts with ai/ from base origin/main "
+        "if no branch or PR is linked in the issue. "
+        "If there is a branch/PR linked in the issue use this branch.\n"
+    )
+
+
+def build_comments_section(comment_texts: List[str]) -> str:
+    """Build the comments section for instructions.
+
+    Args:
+        comment_texts: List of comment bodies
+
+    Returns:
+        Formatted comments section or empty string
+    """
+    if not comment_texts:
+        return ""
+    return "\nComments:\n" + "\n".join(f"- {comment}" for comment in comment_texts if comment) + "\n"
+
+
+def build_body_section(body: str) -> str:
+    """Build the body section for instructions.
+
+    Args:
+        body: The body text
+
+    Returns:
+        Formatted body section or empty string
+    """
+    return f"\n{body}" if body else ""
+
+
+def build_task_directive() -> str:
+    """Build the standard task directive for instructions.
+
+    Returns:
+        Standard task directive string
+    """
+    return (
+        "Focus only on completing this step. Once done, mark it as complete in your work. "
+        "Keep your implementation simple. Only implement what is required. "
+        "Check if there are components you can reuse. "
+        "Ensure that 'make test' runs successful. Only push if ALL tests are successful. "
+        "Check if you need to update the README.md."
+    )
+
+
+def build_plan_text() -> str:
+    """Build the standard plan text for instructions.
+
+    Returns:
+        Standard plan text
+    """
+    return """
+Plan:
+1. Understand the requirements by analyzing the issue title and description
+2. Explore the codebase to understand the current implementation
+3. Identify components that can be reused
+4. Design a solution that is simple and focused
+5. Write or update tests for the changes
+6. Implement the solution
+7. Run 'make lint' to ensure code quality
+8. Run 'make test' to verify all tests pass
+9. Commit the changes with a clear commit message
+10. Push the changes to the remote branch
+"""
+
+
 class GitHubIssueWorker(Worker):
     """Worker for processing GitHub issues as instructions.
 
@@ -177,13 +283,11 @@ class GitHubIssueWorker(Worker):
         Returns:
             True if the issue is from Renovate, False otherwise
         """
-        author = issue.get("author", {})
-        author_login = author.get("login", "") if author else ""
+        author_login = extract_author_login(issue)
         if author_login in ("renovate[bot]", "renovate"):
             return True
 
-        labels = issue.get("labels", [])
-        label_names = [label.get("name", "") for label in labels]
+        label_names = extract_label_names(issue)
         if "renovate" in label_names:
             return True
 
@@ -218,13 +322,11 @@ class GitHubIssueWorker(Worker):
         required_label = settings.github_issue_worker_required_label
         allowed_creator = settings.github_issue_worker_allowed_creator
 
-        labels = issue.get("labels", [])
-        label_names = [label.get("name", "") for label in labels]
+        label_names = extract_label_names(issue)
         label_names_lower = [label.lower() for label in label_names]
 
         has_required_label = required_label.lower() in label_names_lower
-        author = issue.get("author", {})
-        author_login = author.get("login", "") if author else ""
+        author_login = extract_author_login(issue)
         is_allowed_creator = author_login == allowed_creator
 
         return has_required_label and is_allowed_creator
@@ -268,7 +370,7 @@ class GitHubIssueWorker(Worker):
 
         self.logger.info(f"Processing issue #{issue_number}: {issue_title}")
 
-        issue_author_login = issue.get("author", {}).get("login", "") if issue.get("author") else ""
+        issue_author_login = extract_author_login(issue)
         comments = get_issue_comments(repo_dir, issue_number)
         comment_texts = [
             comment.get("body", "") or "" for comment in comments if comment.get("author") == issue_author_login
@@ -855,11 +957,8 @@ class GitHubIssueWorker(Worker):
         Returns:
             Instructions string for the step
         """
-        body_text = f"\n{issue_body}" if issue_body else ""
-        comments_text = ""
-        if comment_texts:
-            comments_text = "\nComments:\n" + "\n".join(f"- {comment}" for comment in comment_texts if comment)
-
+        body_text = build_body_section(issue_body)
+        comments_text = build_comments_section(comment_texts)
         progress_info = self._build_progress_info(plan)
 
         return (
@@ -871,11 +970,7 @@ class GitHubIssueWorker(Worker):
             f"{comments_text}\n\n"
             f"Current Progress:\n{progress_info}\n\n"
             f"Your current task is Step {step.number}: {step.description}\n\n"
-            f"Focus only on completing this step. Once done, mark it as complete in your work. "
-            f"Keep your implementation simple. Only implement what is required. "
-            f"Check if there are components you can reuse. "
-            f"Ensure that 'make test' runs successful. Only push if ALL tests are successful. "
-            f"Check if you need to update the README.md."
+            f"{build_task_directive()}"
         )
 
     def _build_progress_info(self, plan: Plan) -> str:
@@ -902,9 +997,7 @@ class GitHubIssueWorker(Worker):
         branch_name: str,
     ) -> str:
         """Build instructions for refining the issue task file."""
-        comments_text = ""
-        if comment_texts:
-            comments_text = "\nComments:\n" + "\n".join(f"- {comment}" for comment in comment_texts if comment)
+        comments_text = build_comments_section(comment_texts)
 
         return (
             f"You are already on branch '{branch_name}'. "
@@ -1039,49 +1132,18 @@ class GitHubIssueWorker(Worker):
         Returns:
             Complete instructions string
         """
-        body_text = f"\n{issue_body}" if issue_body else ""
-        comments_text = ""
-        if comments:
-            comments_text = "\nComments:\n" + "\n".join(f"- {comment}" for comment in comments if comment)
-
-        branch_instruction = ""
-        if branch_name:
-            branch_instruction = (
-                f"You are already on branch '{branch_name}'. "
-                f"Work on this branch, implement the changes, commit them, and push.\n"
-            )
-        else:
-            branch_instruction = (
-                "Create a new branch that starts with ai/ from base origin/main "
-                "if no branch or PR is linked in the issue. "
-                "If there is a branch/PR linked in the issue use this branch.\n"
-            )
-
-        plan_text = """
-Plan:
-1. Understand the requirements by analyzing the issue title and description
-2. Explore the codebase to understand the current implementation
-3. Identify components that can be reused
-4. Design a solution that is simple and focused
-5. Write or update tests for the changes
-6. Implement the solution
-7. Run 'make lint' to ensure code quality
-8. Run 'make test' to verify all tests pass
-9. Commit the changes with a clear commit message
-10. Push the changes to the remote branch
-"""
+        body_text = build_body_section(issue_body)
+        comments_text = build_comments_section(comments) if comments else ""
+        branch_instruction = build_branch_instruction(branch_name)
 
         return (
             f"{branch_instruction}"
             f"Implement the following:\n"
             f"Title: {issue_title}\n"
             f"Description:{body_text}\n"
-            f"{comments_text}\n"
-            f"{plan_text}\n"
-            f"Keep your implementation simple. Only implement what is required. "
-            f"Check if there are components you can reuse. "
-            f"Ensure that 'make test' runs successful. Only push if ALL tests are successful. "
-            f"Check if you need to update the README.md."
+            f"{comments_text}"
+            f"{build_plan_text()}\n"
+            f"{build_task_directive()}"
         )
 
     def _generate_pr_body_from_task_file(
