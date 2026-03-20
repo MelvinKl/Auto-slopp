@@ -128,16 +128,16 @@ class Settings(BaseSettings):
             #    capability=10,
             #    name="opencode glm-5",
             #),
-            #CLIConfiguration(
-            #    cli_command="claude",
-            #    cli_args=[
-            #        "--model",
-            #        "opus",
-            #        "-p",
-            #    ],
-            #    capability=10,
-            #    name="claude opus",
-            #),
+            CLIConfiguration(
+                cli_command="claude",
+                cli_args=[
+                    "--model",
+                    "opus",
+                    "-p",
+                ],
+                capability=10,
+                name="claude opus",
+            ),
             CLIConfiguration(
                 cli_command="claude",
                 cli_args=[
@@ -165,7 +165,7 @@ class Settings(BaseSettings):
                     "nvidia/private/nvidia/nemotron-3-super-120b-a12b",
                     "run",
                 ],
-                capability=9,
+                capability=8,
                 name="opencode nvidia nemotron 3",
             ),
             CLIConfiguration(
@@ -207,7 +207,7 @@ class Settings(BaseSettings):
                     "opencode/nemotron-3-super-free",
                     "run",
                 ],
-                capability=9,
+                capability=8,
                 name="opencode nemotron-3-super-free",
             ),
             CLIConfiguration(
