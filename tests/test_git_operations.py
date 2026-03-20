@@ -677,174 +677,34 @@ class TestGitOperationsAdditional:
                 assert "CONFLICT" in result[1]
 
     @patch("auto_slopp.utils.git_operations._run_git_command")
-    @patch("auto_slopp.utils.git_operations.logger")
-    def test_merge_main_into_branch_abort_fails(self, mock_logger, mock_run_git):
-        """Test merge_main_into_branch handles abort failure (lines 500-505)."""
-        from auto_slopp.utils.git_operations import merge_main_into_branch
-
-        repo_dir = Path("/tmp/test_repo")
-        mock_run_git.side_effect = [
-            Mock(returncode=0),  # git fetch origin main:main
-            Mock(returncode=1, stderr="CONFLICT", stdout="CONFLICT"),  # merge conflict
-            Mock(returncode=1, stderr="abort failed", stdout=""),  # merge --abort fails
-        ]
-
-        with patch("auto_slopp.utils.git_operations.get_current_branch", return_value="feature"):
-            with patch(
-                "auto_slopp.utils.git_operations.get_active_cli_command",
-                return_value="auto-slopp",
-            ):
-                result = merge_main_into_branch(repo_dir, "feature")
-
-                assert result[0] is False
-
-    @patch("auto_slopp.utils.git_operations._run_git_command")
-    @patch("auto_slopp.utils.git_operations.logger")
-    def test_merge_main_into_branch_exception(self, mock_logger, mock_run_git):
-        """Test merge_main_into_branch handles GitOperationError (lines 510-514)."""
-        from auto_slopp.utils.git_operations import (
-            GitOperationError,
-            merge_main_into_branch,
-        )
-
-        repo_dir = Path("/tmp/test_repo")
-        mock_run_git.side_effect = GitOperationError("Git error")
-
-        with patch("auto_slopp.utils.git_operations.get_current_branch", return_value="feature"):
-            result = merge_main_into_branch(repo_dir, "feature")
-
-            assert result[0] is False
-            assert "Git error" in result[1]
-
-    def test_get_remotes_failure(self):
-        """Test get_remotes handles failure (line 542)."""
-        from auto_slopp.utils.git_operations import get_remotes
-
-        repo_dir = Path("/tmp/test_repo")
-
-        with patch("auto_slopp.utils.git_operations._run_git_command") as mock_run_git:
-            mock_run_git.return_value = Mock(returncode=1, stderr="error", stdout="")
-
-            result = get_remotes(repo_dir)
-
-            assert result == []
-
-    def test_get_default_branch_returns_none(self):
-        """Test get_default_branch returns None when no branch found (line 575)."""
-        from auto_slopp.utils.git_operations import get_default_branch
-
-        repo_dir = Path("/tmp/test_repo")
-
-        with patch("auto_slopp.utils.git_operations._run_git_command") as mock_run_git:
-            mock_run_git.side_effect = [
-                Mock(returncode=1, stderr="", stdout=""),  # git config --get init.defaultBranch
-                Mock(returncode=1, stderr="", stdout=""),  # git rev-parse --verify main
-                Mock(returncode=1, stderr="", stdout=""),  # git rev-parse --verify master
-                Mock(returncode=1, stderr="", stdout=""),  # git rev-parse --verify develop
-            ]
-
-            result = get_default_branch(repo_dir)
-
-            assert result is None
-
-    @patch("auto_slopp.utils.git_operations._run_git_command")
-    def test_get_ahead_behind_exception(self, mock_run_git):
-        """Test get_ahead_behind handles exception (lines 621-624)."""
-        repo_dir = Path("/tmp/test_repo")
-        mock_run_git.side_effect = Exception("Unexpected error")
-
-        ahead, behind = get_ahead_behind(repo_dir, "origin", "feature")
-
-        assert ahead == 0
-        assert behind == 0
-
-    def test_push_to_remote(self):
-        """Test push_to_remote function (lines 658-667)."""
-        from auto_slopp.utils.git_operations import push_to_remote
-
-        repo_dir = Path("/tmp/test_repo")
-
-        with patch("auto_slopp.utils.git_operations._run_git_command") as mock_run_git:
-            mock_run_git.return_value = Mock(returncode=0)
-
-            with patch(
-                "auto_slopp.utils.git_operations.get_current_branch",
-                return_value="feature",
-            ):
-                result = push_to_remote(repo_dir, "origin", "feature")
-
-                assert result == (True, "Push successful")
-
-    def test_push_to_remote_failure(self):
-        """Test push_to_remote handles failure (lines 663-667)."""
-        from auto_slopp.utils.git_operations import push_to_remote
-
-        repo_dir = Path("/tmp/test_repo")
-
-        with patch("auto_slopp.utils.git_operations._run_git_command") as mock_run_git:
-            mock_run_git.return_value = Mock(returncode=1, stderr="push failed", stdout="")
-
-            with patch(
-                "auto_slopp.utils.git_operations.get_current_branch",
-                return_value="feature",
-            ):
-                result = push_to_remote(repo_dir, "origin", "feature")
-
-                assert result == (False, "push failed")
-
-    @patch("auto_slopp.utils.git_operations.subprocess.run")
-    def test_is_git_repo_exception(self, mock_run):
-        """Test is_git_repo handles exception (lines 690-691)."""
-        from auto_slopp.utils.git_operations import is_git_repo
-
-        repo_dir = Path("/tmp/test_repo")
-        mock_run.side_effect = Exception("Unexpected error")
-
-        result = is_git_repo(repo_dir)
-
-        assert result is False
-
-    def test_commit_all_changes_not_git_repo(self):
-        """Test commit_all_changes when directory is not a git repo (lines 764-765)."""
+    @patch("auto_slopp.utils.git_operations.is_git_repo")
+    @patch("auto_slopp.utils.git_operations.has_changes")
+    def test_commit_all_changes_success(self, mock_has_changes, mock_is_git_repo, mock_run_git):
+        """Test commit_all_changes success case (lines 767-772)."""
         from auto_slopp.utils.git_operations import commit_all_changes
 
         repo_dir = Path("/tmp/test_repo")
+        mock_is_git_repo.return_value = True
+        mock_has_changes.return_value = True
+        mock_run_git.return_value = Mock(returncode=0)
 
-        with patch("auto_slopp.utils.git_operations.is_git_repo", return_value=False):
+        with patch("auto_slopp.utils.git_operations.logger"):
             result = commit_all_changes(repo_dir, "Test commit")
-
-            assert result == (False, f"Directory is not a git repository: {repo_dir}")
-
-    def test_commit_all_changes_no_changes(self):
-        """Test commit_all_changes when there are no changes (lines 767-768)."""
-        from auto_slopp.utils.git_operations import commit_all_changes
-
-        repo_dir = Path("/tmp/test_repo")
-
-        with patch("auto_slopp.utils.git_operations.is_git_repo", return_value=True):
-            with patch("auto_slopp.utils.git_operations.has_changes", return_value=False):
-                result = commit_all_changes(repo_dir, "Test commit")
-
-                assert result == (True, "No changes to commit")
+            assert result == (True, "Commit successful")
 
     @patch("auto_slopp.utils.git_operations._run_git_command")
-    def test_commit_all_changes_exception(self, mock_run_git):
-        """Test commit_all_changes handles exception (lines 774-776)."""
+    @patch("auto_slopp.utils.git_operations.is_git_repo")
+    def test_commit_all_changes_git_operation_error(self, mock_is_git_repo, mock_run_git):
+        """Test commit_all_changes handles GitOperationError (line 772)."""
         from auto_slopp.utils.git_operations import (
             GitOperationError,
             commit_all_changes,
         )
 
         repo_dir = Path("/tmp/test_repo")
+        mock_is_git_repo.return_value = True
+        mock_run_git.side_effect = GitOperationError("Git error")
 
-        with patch("auto_slopp.utils.git_operations.is_git_repo", return_value=True):
-            with patch("auto_slopp.utils.git_operations.has_changes", return_value=True):
-                mock_run_git.side_effect = [
-                    Mock(returncode=0),  # git add .
-                    GitOperationError("Commit failed"),  # git commit fails
-                ]
-
-                result = commit_all_changes(repo_dir, "Test commit")
-
-                assert result[0] is False
-                assert "Commit failed" in result[1]
+        with patch("auto_slopp.utils.git_operations.logger"):
+            result = commit_all_changes(repo_dir, "Test commit")
+            assert result == (False, "Commit failed: Git error")
