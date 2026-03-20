@@ -24,7 +24,11 @@ This document outlines the requirements for a standalone CLI program used to int
 ### 3. Subtask Management
 - **Create Subtask:** Create a new subtask (implementation step) linked to a specific parent work package.
 
-### 4. Dependency Management
+### 4. Subtask Generation
+- **Analyze Task:** Analyze a parent task's subject and description to generate a structured breakdown of implementation subtasks.
+- **Output Format:** Return subtask descriptions as a numbered or bulleted list in JSON format for easy parsing.
+
+### 5. Dependency Management
 - **Check Dependencies:** Retrieve relations/dependencies for a specific task.
 - **Verify State:** Be able to check if all dependent tasks (blocking the current task) are in a closed state.
 - **Create Dependency:** Create a new dependency/relation between two tasks (e.g., "blocks" or "precedes").
