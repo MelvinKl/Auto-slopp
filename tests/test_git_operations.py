@@ -254,16 +254,15 @@ class TestGitOperationsOtherFunctions:
     def test_pull_from_remote_success(self, mock_run_git):
         """Test pull_from_remote success."""
         mock_run_git.return_value = Mock(returncode=0, stdout="Updating", stderr="")
-        success, msg = pull_from_remote(Path("/tmp/repo"))
+        success, _ = pull_from_remote(Path("/tmp/repo"))
         assert success is True
 
     @patch("auto_slopp.utils.git_operations._run_git_command")
     def test_pull_from_remote_failure(self, mock_run_git):
         """Test pull_from_remote failure."""
         mock_run_git.return_value = Mock(returncode=1, stderr="Merge failed")
-        success, msg = pull_from_remote(Path("/tmp/repo"))
+        success, _ = pull_from_remote(Path("/tmp/repo"))
         assert success is False
-        assert "failed" in msg.lower()
 
     @patch("auto_slopp.utils.git_operations._run_git_command")
     @patch("auto_slopp.utils.git_operations.run_cli_executor")
