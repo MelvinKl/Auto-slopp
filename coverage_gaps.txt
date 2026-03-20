@@ -1,0 +1,5 @@
+Current coverage: 93%
+To reach 99% we need to cover additional lines in the following files:
+
+src/auto_slopp/utils/git_operations.py: 64% coverage (107 statements missing)
+src/auto_slopp/workers/github_issue_worker.py: 94% coverage (23 statements missing)

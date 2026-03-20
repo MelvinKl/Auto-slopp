@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from auto_slopp.utils.cli_executor import (
+    execute_openagent_with_instructions,
     execute_with_instructions,
     get_active_cli_command,
     run_cli_executor,
@@ -20,7 +21,9 @@ def test_codex_uses_exec_subcommand_by_default(mock_run, monkeypatch):
     mock_run.return_value.stdout = "ok"
     mock_run.return_value.stderr = ""
 
-    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor._active_cli_configuration_index", 0
+    )
     monkeypatch.setattr(
         "auto_slopp.utils.cli_executor.settings.cli_configurations",
         [
@@ -33,7 +36,11 @@ def test_codex_uses_exec_subcommand_by_default(mock_run, monkeypatch):
 
     run_cli_executor(additional_instructions="Do work", working_directory=Path.cwd())
 
-    cmd = mock_run.call_args.kwargs["args"] if "args" in mock_run.call_args.kwargs else mock_run.call_args.args[0]
+    cmd = (
+        mock_run.call_args.kwargs["args"]
+        if "args" in mock_run.call_args.kwargs
+        else mock_run.call_args.args[0]
+    )
     # Check that it uses the provided args from CLIConfiguration
     assert cmd[0] == "codex"
     assert "--dangerously-bypass-approvals-and-sandbox" in cmd
@@ -48,15 +55,23 @@ def test_codex_preserves_existing_subcommand(mock_run, monkeypatch):
     mock_run.return_value.stdout = "ok"
     mock_run.return_value.stderr = ""
 
-    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor._active_cli_configuration_index", 0
+    )
     monkeypatch.setattr(
         "auto_slopp.utils.cli_executor.settings.cli_configurations",
         [CLIConfiguration(cli_command="codex", cli_args=["review"])],
     )
 
-    run_cli_executor(additional_instructions="Review this", working_directory=Path.cwd())
+    run_cli_executor(
+        additional_instructions="Review this", working_directory=Path.cwd()
+    )
 
-    cmd = mock_run.call_args.kwargs["args"] if "args" in mock_run.call_args.kwargs else mock_run.call_args.args[0]
+    cmd = (
+        mock_run.call_args.kwargs["args"]
+        if "args" in mock_run.call_args.kwargs
+        else mock_run.call_args.args[0]
+    )
     assert cmd[:2] == ["codex", "review"]
     assert "exec" not in cmd
 
@@ -65,10 +80,14 @@ def test_codex_preserves_existing_subcommand(mock_run, monkeypatch):
 def test_timeout_falls_back_to_next_configuration(mock_run, monkeypatch):
     """Timeout on preferred configuration should trigger next configured CLI."""
     timeout_exc = subprocess.TimeoutExpired(cmd=["opencode"], timeout=30)
-    success_result = type("Result", (), {"returncode": 0, "stdout": "ok", "stderr": ""})()
+    success_result = type(
+        "Result", (), {"returncode": 0, "stdout": "ok", "stderr": ""}
+    )()
     mock_run.side_effect = [timeout_exc, success_result, success_result, success_result]
 
-    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor._active_cli_configuration_index", 0
+    )
     monkeypatch.setattr(
         "auto_slopp.utils.cli_executor.settings.cli_configurations",
         [
@@ -77,7 +96,9 @@ def test_timeout_falls_back_to_next_configuration(mock_run, monkeypatch):
         ],
     )
 
-    result = run_cli_executor(additional_instructions="Do work", working_directory=Path.cwd(), timeout=30)
+    result = run_cli_executor(
+        additional_instructions="Do work", working_directory=Path.cwd(), timeout=30
+    )
 
     assert result["success"] is True
     called_commands = [call.args[0] for call in mock_run.call_args_list]
@@ -92,7 +113,9 @@ def test_no_config_meets_min_rating_returns_error(mock_run, monkeypatch):
     mock_run.return_value.stdout = "ok"
     mock_run.return_value.stderr = ""
 
-    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor._active_cli_configuration_index", 0
+    )
     monkeypatch.setattr(
         "auto_slopp.utils.cli_executor.settings.cli_configurations",
         [
@@ -103,7 +126,9 @@ def test_no_config_meets_min_rating_returns_error(mock_run, monkeypatch):
     monkeypatch.setattr(
         "auto_slopp.utils.cli_executor.settings.task_difficulties",
         {
-            "github_issue": TaskRating(min_rating=7, max_rating=10, recommended_rating=8),
+            "github_issue": TaskRating(
+                min_rating=7, max_rating=10, recommended_rating=8
+            ),
             "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
         },
     )
@@ -127,7 +152,9 @@ def test_high_min_rating_skips_low_capability_tools(mock_run, monkeypatch):
     mock_run.return_value.stdout = "ok"
     mock_run.return_value.stderr = ""
 
-    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor._active_cli_configuration_index", 0
+    )
     monkeypatch.setattr(
         "auto_slopp.utils.cli_executor.settings.cli_configurations",
         [
@@ -148,7 +175,9 @@ def test_high_min_rating_skips_low_capability_tools(mock_run, monkeypatch):
     monkeypatch.setattr(
         "auto_slopp.utils.cli_executor.settings.task_difficulties",
         {
-            "github_issue": TaskRating(min_rating=7, max_rating=10, recommended_rating=8),
+            "github_issue": TaskRating(
+                min_rating=7, max_rating=10, recommended_rating=8
+            ),
             "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
         },
     )
@@ -172,12 +201,16 @@ def test_min_rating_respects_max_rating_boundary(mock_run, monkeypatch):
     mock_run.return_value.stdout = "ok"
     mock_run.return_value.stderr = ""
 
-    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor._active_cli_configuration_index", 0
+    )
     monkeypatch.setattr(
         "auto_slopp.utils.cli_executor.settings.cli_configurations",
         [
             CLIConfiguration(cli_command="low-tool", cli_args=["run"], capability=3),
-            CLIConfiguration(cli_command="perfect-tool", cli_args=["run"], capability=7),
+            CLIConfiguration(
+                cli_command="perfect-tool", cli_args=["run"], capability=7
+            ),
             CLIConfiguration(cli_command="high-tool", cli_args=["run"], capability=9),
         ],
     )
@@ -214,7 +247,9 @@ def test_get_active_cli_command_index_out_of_range(monkeypatch):
         "auto_slopp.utils.cli_executor.settings.cli_configurations",
         [CLIConfiguration(cli_command="tool", cli_args=["run"])],
     )
-    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 99)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor._active_cli_configuration_index", 99
+    )
     result = get_active_cli_command()
     assert result == "tool"
 
@@ -226,13 +261,17 @@ def test_execute_command_failure_logs_stderr(mock_run, monkeypatch):
     mock_run.return_value.stdout = "output"
     mock_run.return_value.stderr = "error message"
 
-    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor._active_cli_configuration_index", 0
+    )
     monkeypatch.setattr(
         "auto_slopp.utils.cli_executor.settings.cli_configurations",
         [CLIConfiguration(cli_command="tool", cli_args=["run"])],
     )
 
-    result = run_cli_executor(additional_instructions="test", working_directory=Path.cwd())
+    result = run_cli_executor(
+        additional_instructions="test", working_directory=Path.cwd()
+    )
 
     assert result["success"] is False or "error" in result
 
@@ -244,7 +283,9 @@ def test_execute_with_instructions(mock_run, monkeypatch):
     mock_run.return_value.stdout = "ok"
     mock_run.return_value.stderr = ""
 
-    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor._active_cli_configuration_index", 0
+    )
     monkeypatch.setattr(
         "auto_slopp.utils.cli_executor.settings.cli_configurations",
         [CLIConfiguration(cli_command="tool", cli_args=["run"])],
@@ -268,7 +309,9 @@ def test_run_opencode_deprecated(mock_run, monkeypatch):
     mock_run.return_value.stdout = "ok"
     mock_run.return_value.stderr = ""
 
-    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor._active_cli_configuration_index", 0
+    )
     monkeypatch.setattr(
         "auto_slopp.utils.cli_executor.settings.cli_configurations",
         [CLIConfiguration(cli_command="tool", cli_args=["run"])],
@@ -286,7 +329,9 @@ def test_run_cli_executor_tried_indices_break(mock_run, monkeypatch):
     mock_run.return_value.stdout = "ok"
     mock_run.return_value.stderr = ""
 
-    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor._active_cli_configuration_index", 0
+    )
     monkeypatch.setattr(
         "auto_slopp.utils.cli_executor.settings.cli_configurations",
         [
@@ -299,7 +344,9 @@ def test_run_cli_executor_tried_indices_break(mock_run, monkeypatch):
     )
 
     with patch("auto_slopp.utils.cli_executor._probe_configuration", return_value=True):
-        result = run_cli_executor(additional_instructions="test", working_directory=Path.cwd())
+        result = run_cli_executor(
+            additional_instructions="test", working_directory=Path.cwd()
+        )
 
     assert result["success"] is True
 
@@ -311,10 +358,104 @@ def test_run_cli_executor_capability_mismatch(mock_run, monkeypatch):
     mock_run.return_value.stdout = "ok"
     mock_run.return_value.stderr = ""
 
-    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor._active_cli_configuration_index", 0
+    )
     monkeypatch.setattr(
         "auto_slopp.utils.cli_executor.settings.cli_configurations",
         [
             CLIConfiguration(cli_command="tool1", cli_args=["run"], capability=3),
         ],
     )
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.task_difficulties",
+        {"default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5)},
+    )
+
+    with patch("auto_slopp.utils.cli_executor._probe_configuration", return_value=True):
+        result = run_cli_executor(
+            additional_instructions="test", working_directory=Path.cwd()
+        )
+
+    assert result["success"] is True
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_check_cooldowns_recovery(mock_run, monkeypatch):
+    """Test cooldown recovery path (lines 35-46)."""
+    from auto_slopp.utils.cli_executor import _check_cooldowns, _get_cli_state
+
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(
+                cli_command="tool1", cli_args=["run"], name="tool1", cooldown_seconds=10
+            ),
+        ],
+    )
+
+    state = _get_cli_state(0)
+    state["active"] = False
+    state["cooldown_until"] = 0
+
+    with patch("auto_slopp.utils.cli_executor._probe_configuration", return_value=True):
+        _check_cooldowns(Path.cwd())
+
+    state = _get_cli_state(0)
+    assert state["active"] is True
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_check_cooldowns_no_recovery(mock_run, monkeypatch):
+    """Test cooldown no recovery path (lines 44-46)."""
+    from auto_slopp.utils.cli_executor import _check_cooldowns, _get_cli_state
+
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(
+                cli_command="tool1", cli_args=["run"], name="tool1", cooldown_seconds=10
+            ),
+        ],
+    )
+
+    state = _get_cli_state(0)
+    state["active"] = False
+    state["cooldown_until"] = 0
+
+    with patch(
+        "auto_slopp.utils.cli_executor._probe_configuration", return_value=False
+    ):
+        _check_cooldowns(Path.cwd())
+
+    state = _get_cli_state(0)
+    assert state["active"] is False
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_execute_openagent_with_instructions_deprecated(mock_run, monkeypatch):
+    """Test deprecated execute_openagent_with_instructions still works (line 444)."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor._active_cli_configuration_index", 0
+    )
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="tool1", cli_args=["run"], capability=5),
+        ],
+    )
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.task_difficulties",
+        {"default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5)},
+    )
+
+    with patch("auto_slopp.utils.cli_executor._probe_configuration", return_value=True):
+        result = execute_openagent_with_instructions(
+            instructions="test", work_dir=Path.cwd()
+        )
+
+    assert result["success"] is True

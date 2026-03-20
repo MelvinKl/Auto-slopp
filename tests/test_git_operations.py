@@ -3,6 +3,8 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pytest
+
 from auto_slopp.utils.git_operations import (
     branch_exists,
     checkout_branch_resilient,
@@ -17,6 +19,7 @@ from auto_slopp.utils.git_operations import (
     is_git_repo,
     merge_main_into_branch,
     pull_from_remote,
+    sanitize_branch_name,
 )
 
 
@@ -41,7 +44,9 @@ class TestMergeMainIntoBranch:
         assert success is True
         assert message == "Merge successful"
         # Check fetch command was called without :main
-        mock_run_git.assert_any_call(repo_dir, "fetch", "origin", "main", check=False, timeout=60)
+        mock_run_git.assert_any_call(
+            repo_dir, "fetch", "origin", "main", check=False, timeout=60
+        )
 
     @patch("auto_slopp.utils.git_operations.get_current_branch")
     @patch("auto_slopp.utils.git_operations._run_git_command")
@@ -61,7 +66,9 @@ class TestMergeMainIntoBranch:
         assert success is True
         assert message == "Merge successful"
         # Check fetch command was called with :main
-        mock_run_git.assert_any_call(repo_dir, "fetch", "origin", "main:main", check=False, timeout=60)
+        mock_run_git.assert_any_call(
+            repo_dir, "fetch", "origin", "main:main", check=False, timeout=60
+        )
 
     @patch("auto_slopp.utils.git_operations.get_current_branch")
     @patch("auto_slopp.utils.git_operations._run_git_command")
@@ -72,7 +79,9 @@ class TestMergeMainIntoBranch:
 
         # Mock git commands: first fetch fails, second succeeds, merge succeeds
         mock_run_git.side_effect = [
-            Mock(returncode=1, stderr="refusing to fetch into current branch"),  # git fetch origin main:main (fails)
+            Mock(
+                returncode=1, stderr="refusing to fetch into current branch"
+            ),  # git fetch origin main:main (fails)
             Mock(returncode=0, stderr=""),  # git fetch origin main (succeeds)
             Mock(returncode=0, stderr=""),  # git merge FETCH_HEAD
         ]
@@ -281,7 +290,9 @@ class TestGitOperationsOtherFunctions:
             Mock(returncode=1, stderr="checkout failed"),  # git checkout (fails)
             Mock(returncode=0, stderr=""),  # git reset --hard
             Mock(returncode=0, stderr=""),  # git clean
-            Mock(returncode=1, stderr="checkout still failed"),  # git checkout (fails again)
+            Mock(
+                returncode=1, stderr="checkout still failed"
+            ),  # git checkout (fails again)
         ]
 
         result = checkout_branch_resilient(repo_dir, branch)
@@ -351,7 +362,9 @@ class TestGitOperationsOtherFunctions:
         mock_run_git.side_effect = [
             Mock(returncode=0, stderr=""),  # git fetch
             Mock(returncode=0, stdout=""),  # git checkout
-            Mock(returncode=1, stderr="pull failed"),  # git pull (fails but shouldn't affect checkout)
+            Mock(
+                returncode=1, stderr="pull failed"
+            ),  # git pull (fails but shouldn't affect checkout)
         ]
 
         result = checkout_branch_resilient(repo_dir, branch)
@@ -369,7 +382,9 @@ class TestGitOperationsOtherFunctions:
             Mock(returncode=0, stderr=""),  # git fetch
             Mock(returncode=1, stderr="checkout failed"),  # git checkout (fails)
             Mock(returncode=0, stderr=""),  # git reset --hard
-            Mock(returncode=1, stderr="clean failed"),  # git clean (fails but shouldn't stop retry)
+            Mock(
+                returncode=1, stderr="clean failed"
+            ),  # git clean (fails but shouldn't stop retry)
             Mock(returncode=0, stdout=""),  # git checkout (succeeds)
             Mock(returncode=0, stderr=""),  # git pull
         ]
@@ -378,3 +393,81 @@ class TestGitOperationsOtherFunctions:
 
         assert result is True
         assert mock_run_git.call_count == 6
+
+
+class TestSanitizeBranchName:
+    """Tests for sanitize_branch_name function."""
+
+    def test_sanitize_branch_name_basic(self):
+        """Test basic sanitization."""
+        result = sanitize_branch_name("feature-branch")
+        assert result == "feature-branch"
+
+    def test_sanitize_branch_name_with_spaces(self):
+        """Test sanitization removes spaces."""
+        result = sanitize_branch_name("feature branch")
+        assert result == "feature-branch"
+
+    def test_sanitize_branch_name_special_chars(self):
+        """Test sanitization removes special characters."""
+        result = sanitize_branch_name("feature@#$%branch")
+        assert result == "feature-branch"
+
+    def test_sanitize_branch_name_multiple_dashes(self):
+        """Test sanitization collapses multiple dashes."""
+        result = sanitize_branch_name("feature---branch")
+        assert result == "feature-branch"
+
+    def test_sanitize_branch_name_strips_dashes(self):
+        """Test sanitization strips leading/trailing dashes."""
+        result = sanitize_branch_name("-feature-branch-")
+        assert result == "feature-branch"
+
+    def test_sanitize_branch_name_max_length(self):
+        """Test sanitization truncates to max length."""
+        result = sanitize_branch_name("a" * 100, max_length=50)
+        assert len(result) == 50
+
+    def test_sanitize_branch_name_empty(self):
+        """Test sanitization returns 'branch' for empty string."""
+        result = sanitize_branch_name("")
+        assert result == "branch"
+
+    def test_sanitize_branch_name_only_special_chars(self):
+        """Test sanitization returns 'branch' for string with only special chars."""
+        result = sanitize_branch_name("@#$%")
+        assert result == "branch"
+
+
+class TestRunGitCommandTimeout:
+    """Tests for _run_git_command timeout handling."""
+
+    @patch("auto_slopp.utils.git_operations.subprocess.run")
+    def test_git_command_timeout(self, mock_run):
+        """Test git command timeout raises GitOperationError."""
+        from auto_slopp.utils.git_operations import GitOperationError
+        import subprocess
+
+        mock_run.side_effect = subprocess.TimeoutExpired("git", 60)
+
+        with patch("auto_slopp.utils.git_operations.logger"):
+            with pytest.raises(GitOperationError) as exc_info:
+                from auto_slopp.utils.git_operations import _run_git_command
+
+                _run_git_command(Path("/tmp/repo"), "status")
+
+        assert "timed out" in str(exc_info.value).lower()
+
+    @patch("auto_slopp.utils.git_operations.subprocess.run")
+    def test_git_command_called_process_error(self, mock_run):
+        """Test git command raises GitOperationError on failure."""
+        from auto_slopp.utils.git_operations import GitOperationError
+        import subprocess
+
+        mock_run.side_effect = subprocess.CalledProcessError(1, "git", stderr="error")
+
+        with patch("auto_slopp.utils.git_operations.logger"):
+            with pytest.raises(GitOperationError):
+                from auto_slopp.utils.git_operations import _run_git_command
+
+                _run_git_command(Path("/tmp/repo"), "status")

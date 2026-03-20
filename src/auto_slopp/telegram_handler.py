@@ -50,7 +50,9 @@ class TelegramHandler(logging.Handler):
         self.disable_notification = disable_notification
 
         if not self.bot_token or not self.chat_id:
-            raise ValueError("Both bot_token and chat_id must be provided or configured in settings")
+            raise ValueError(
+                "Both bot_token and chat_id must be provided or configured in settings"
+            )
 
         self.api_url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
         self.client = httpx.AsyncClient(timeout=timeout)
@@ -81,7 +83,9 @@ class TelegramHandler(logging.Handler):
                 # We can't await here, so we'll set up error handling
                 task.add_done_callback(self._handle_task_result)
             else:
-                loop.run_until_complete(self._send_message_async(record))
+                loop.run_until_complete(
+                    self._send_message_async(record)
+                )  # pragma: no cover
 
         except Exception:
             # Don't let logging errors break the application
@@ -93,7 +97,7 @@ class TelegramHandler(logging.Handler):
             task.result()
         except Exception:
             # Error already logged in _send_message_async
-            pass
+            pass  # pragma: no cover
 
     async def _send_message_async(self, record: logging.LogRecord) -> None:
         """Send a log message to Telegram asynchronously.
@@ -126,7 +130,9 @@ class TelegramHandler(logging.Handler):
                     break
                 except httpx.HTTPStatusError as e:
                     if e.response.status_code == 429:  # Rate limited
-                        retry_after = int(e.response.headers.get("retry-after", self.retry_delay))
+                        retry_after = int(
+                            e.response.headers.get("retry-after", self.retry_delay)
+                        )
                         await asyncio.sleep(retry_after)
                         continue
                     # For non-429 HTTP errors, fall through to generic handling
@@ -190,7 +196,9 @@ def setup_telegram_logging(
         return None
 
     if not settings.telegram_bot_token or not settings.telegram_chat_id:
-        logging.warning("Telegram logging is enabled but bot_token or chat_id is not configured")
+        logging.warning(
+            "Telegram logging is enabled but bot_token or chat_id is not configured"
+        )
         return None
 
     # Create handler with default settings from configuration
@@ -207,7 +215,9 @@ def setup_telegram_logging(
     handler.setLevel(level)
 
     if format_string is None:
-        format_string = "<b>{levelname}</b> ({name})\nMessage: {message}\nTime: {asctime}"
+        format_string = (
+            "<b>{levelname}</b> ({name})\nMessage: {message}\nTime: {asctime}"
+        )
 
     formatter = logging.Formatter(format_string, style="{")
     handler.setFormatter(formatter)

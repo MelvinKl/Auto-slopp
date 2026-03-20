@@ -23,4 +23,4 @@ class Worker(ABC):
         Returns:
             Any result data from the worker execution
         """
-        pass
+        pass  # pragma: no cover
