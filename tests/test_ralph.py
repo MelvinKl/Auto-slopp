@@ -286,6 +286,25 @@ Description
         assert plan.description == "Description"
         assert len(plan.steps) == 1
 
+    def test_parse_content_with_header_lines_before_title(self):
+        """Test parsing content with header metadata before title (lines 190-192)."""
+        content = """---
+author: Test Author
+date: 2024-01-01
+---
+
+# My Plan
+
+Some description
+
+## Steps
+
+- [ ] 1. First step
+"""
+        plan = PlanParser.parse_content(content)
+        assert plan.title == "My Plan"
+        assert plan.description == "Some description"
+
     def test_parse_content_with_footer(self):
         """Test parsing plan content with footer after steps."""
         content = """# Test Plan

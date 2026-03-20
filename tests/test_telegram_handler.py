@@ -1375,3 +1375,63 @@ class TestTelegramEndToEnd:
 
         handler._handle_task_result(mock_task)
         mock_task.result.assert_called_once()
+
+    @patch("httpx.AsyncClient")
+    def test_emit_exception_handling(self, mock_client_class):
+        """Test that emit method handles exceptions gracefully (lines 86-88)."""
+        mock_client = AsyncMock()
+        mock_client_class.return_value = mock_client
+
+        with patch.dict(
+            "auto_slopp.telegram_handler.settings.__dict__",
+            {"telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
+        ):
+            handler = TelegramHandler()
+
+            record = logging.LogRecord(
+                name="test_logger",
+                level=logging.INFO,
+                pathname="",
+                lineno=0,
+                msg="Test message",
+                args=(),
+                exc_info=None,
+            )
+
+            with patch.object(handler, "_send_message_async", side_effect=RuntimeError("Test error")):
+                handler.emit(record)
+
+    @patch("httpx.AsyncClient")
+    def test_emit_with_inactive_loop(self, mock_client_class):
+        """Test emit with an inactive event loop (line 84)."""
+        mock_client = AsyncMock()
+        mock_client_class.return_value = mock_client
+        mock_response = AsyncMock()
+        mock_response.raise_for_status = AsyncMock()
+        mock_client.post.return_value = mock_response
+
+        with patch.dict(
+            "auto_slopp.telegram_handler.settings.__dict__",
+            {"telegram_bot_token": "test_token", "telegram_chat_id": "test_chat"},
+        ):
+            handler = TelegramHandler()
+
+            record = logging.LogRecord(
+                name="test_logger",
+                level=logging.INFO,
+                pathname="",
+                lineno=0,
+                msg="Test message",
+                args=(),
+                exc_info=None,
+            )
+
+            with patch("asyncio.get_running_loop", side_effect=RuntimeError("No running loop")):
+                with patch("asyncio.new_event_loop") as mock_new_loop:
+                    mock_loop = MagicMock()
+                    mock_loop.is_running.return_value = False
+                    mock_new_loop.return_value = mock_loop
+
+                    handler.emit(record)
+
+                    mock_loop.run_until_complete.assert_called_once()
