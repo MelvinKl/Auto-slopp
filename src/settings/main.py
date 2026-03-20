@@ -118,15 +118,25 @@ class Settings(BaseSettings):
 
     cli_configurations: List[CLIConfiguration] = Field(
         default_factory=lambda: [
+            #CLIConfiguration(
+            #    cli_command="opencode",
+            #    cli_args=[
+            #        "--model",
+            #        "zai-coding-plan/glm-5",
+            #        "run",
+            #    ],
+            #    capability=10,
+            #    name="opencode glm-5",
+            #),
             CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[
                     "--model",
-                    "zai-coding-plan/glm-5",
+                    "nvidia/private/nvidia/nemotron-3-super-120b-a12b",
                     "run",
                 ],
-                capability=10,
-                name="opencode glm-5",
+                capability=9,
+                name="opencode nvidia nemotron 3",
             ),
             CLIConfiguration(
                 cli_command="opencode",
