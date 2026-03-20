@@ -976,6 +976,8 @@ For comprehensive documentation, see the [docs/](docs/) directory:
 - **[API Reference](docs/api-reference.md)** - Complete API documentation
 - **[Development Guide](docs/development-guide.md)** - Development setup and workflow
 - **[Architecture Overview](docs/architecture.md)** - System architecture and design
+- **[OpenProject Worker Specification](docs/openproject_worker_specification.md)** - Specification for the OpenProject Worker
+- **[OpenProject Worker Design](docs/openproject_worker_design.md)** - Design documentation for the OpenProject Worker
 - **[Contributing Guide](docs/contributing.md)** - Contribution guidelines
 
 ## Telegram Logging
