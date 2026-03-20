@@ -120,9 +120,7 @@ Following the pattern from GithubIssueWorker but adapted for OpenProject:
 ### 6. Dependency Handling
 
 Using OpenProject native features:
-- Before processing a task, check if all dependencies are in closed state
-- Only work on tasks where all dependencies are completed
-- Optionally create/update dependencies between subtasks using OpenProject API
+- The worker creates dependencies between tasks in a ready state and only works on tasks where all task dependencies are closed.
 - Leverage OpenProject's built-in dependency tracking rather than reimplementing
 - Dependencies can be checked by retrieving the work package and examining its relationships
 
