@@ -128,6 +128,36 @@ class Settings(BaseSettings):
             #    capability=10,
             #    name="opencode glm-5",
             #),
+            #CLIConfiguration(
+            #    cli_command="claude",
+            #    cli_args=[
+            #        "--model",
+            #        "opus",
+            #        "-p",
+            #    ],
+            #    capability=10,
+            #    name="claude opus",
+            #),
+            CLIConfiguration(
+                cli_command="claude",
+                cli_args=[
+                    "--model",
+                    "sonnet",
+                    "-p",
+                ],
+                capability=8,
+                name="claude sonnet",
+            ),
+            CLIConfiguration(
+                cli_command="claude",
+                cli_args=[
+                    "--model",
+                    "haiku",
+                    "-p",
+                ],
+                capability=4,
+                name="claude haiku",
+            ),
             CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[
