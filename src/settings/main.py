@@ -168,7 +168,7 @@ class Settings(BaseSettings):
                     "run",
                 ],
                 capability=7,
-                name="opencode nemotron-3-super-free",
+                name="opencode big pickle",
             ),
             CLIConfiguration(
                 cli_command="opencode",
