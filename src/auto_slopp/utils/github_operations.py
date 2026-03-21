@@ -407,3 +407,36 @@ def get_pr_for_branch(repo_dir: Path, branch: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Unexpected error getting PR for branch {branch} from {repo_dir.name}: {str(e)}")
         return None
+
+
+def remove_label_from_issue(repo_dir: Path, issue_number: int, label: str) -> bool:
+    """Remove a label from an issue in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+        issue_number: Issue number to remove label from
+        label: Label to remove
+
+    Returns:
+        True if successful, False otherwise.
+    """
+    try:
+        result = _run_gh_command(
+            repo_dir,
+            "issue",
+            "edit",
+            str(issue_number),
+            "--remove-label",
+            label,
+            check=False,
+        )
+        return result.returncode == 0
+
+    except GitHubOperationError as e:
+        logger.error(f"Error removing label '{label}' from issue #{issue_number} in {repo_dir.name}: {str(e)}")
+        return False
+    except Exception as e:
+        logger.error(
+            f"Unexpected error removing label '{label}' from issue #{issue_number} in {repo_dir.name}: {str(e)}"
+        )
+        return False

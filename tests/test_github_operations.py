@@ -2,7 +2,7 @@
 
 import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -16,6 +16,7 @@ from auto_slopp.utils.github_operations import (
     get_open_pr_branches,
     get_open_prs,
     get_pr_for_branch,
+    remove_label_from_issue,
 )
 
 
@@ -156,9 +157,7 @@ class TestGitHubOperationsGetIssueComments:
 
         mock_result = MagicMock()
         mock_result.returncode = 0
-        mock_result.stdout = (
-            '{"comments": [{"body": "Test comment", "author": {"login": "user1"}, "createdAt": "2024-01-01"}]}'
-        )
+        mock_result.stdout = '{"comments": [{"body": "Test comment", "author": {"login": "user1"}, "createdAt": "2024-01-01"}]}'
 
         with patch(
             "auto_slopp.utils.github_operations._run_gh_command",
@@ -673,7 +672,9 @@ class TestRunGhCommandEnvHandling:
                 mock_env_file.exists.return_value = True
                 mock_settings.additional_env_file = mock_env_file
 
-                with patch("auto_slopp.utils.github_operations.dotenv_values") as mock_dotenv:
+                with patch(
+                    "auto_slopp.utils.github_operations.dotenv_values"
+                ) as mock_dotenv:
                     mock_dotenv.return_value = {
                         "KEY1": "value1",
                         "KEY2": None,
@@ -700,7 +701,9 @@ class TestRunGhCommandEnvHandling:
             mock_run.return_value = mock_result
 
             with patch.dict("os.environ", {"GITHUB_TOKEN": "token123"}, clear=False):
-                with patch("auto_slopp.utils.github_operations.settings") as mock_settings:
+                with patch(
+                    "auto_slopp.utils.github_operations.settings"
+                ) as mock_settings:
                     mock_settings.additional_env_file = None
 
                     from auto_slopp.utils.github_operations import _run_gh_command
@@ -771,3 +774,50 @@ class TestRunGhCommandEnvHandling:
                 with pytest.raises(GitHubOperationError) as exc_info:
                     _run_gh_command(repo_dir, "issue", "list")
                 assert "Command failed" in str(exc_info.value)
+
+
+class TestRemoveLabelFromIssue:
+    """Test cases for remove_label_from_issue function."""
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_remove_label_success(self, mock_run_gh):
+        """Test successful label removal."""
+        mock_run_gh.return_value = Mock(returncode=0)
+        repo_dir = Path("/tmp/test_repo")
+
+        result = remove_label_from_issue(repo_dir, 42, "ai")
+
+        assert result is True
+        mock_run_gh.assert_called_once_with(
+            repo_dir, "issue", "edit", "42", "--remove-label", "ai", check=False
+        )
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_remove_label_failure_nonzero_exit(self, mock_run_gh):
+        """Test label removal with non-zero exit code."""
+        mock_run_gh.return_value = Mock(returncode=1)
+        repo_dir = Path("/tmp/test_repo")
+
+        result = remove_label_from_issue(repo_dir, 42, "ai")
+
+        assert result is False
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_remove_label_handles_github_operation_error(self, mock_run_gh):
+        """Test label removal handles GitHubOperationError."""
+        mock_run_gh.side_effect = GitHubOperationError("API error")
+        repo_dir = Path("/tmp/test_repo")
+
+        result = remove_label_from_issue(repo_dir, 42, "ai")
+
+        assert result is False
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_remove_label_handles_unexpected_exception(self, mock_run_gh):
+        """Test label removal handles unexpected exceptions."""
+        mock_run_gh.side_effect = RuntimeError("Unexpected error")
+        repo_dir = Path("/tmp/test_repo")
+
+        result = remove_label_from_issue(repo_dir, 42, "ai")
+
+        assert result is False

@@ -102,16 +102,6 @@ The capability rating system (0-10) helps match tasks with appropriate CLI tools
 4. Preference is given to tools closest to the task's recommended rating
 5. If a tool encounters errors, it enters cooldown (configurable duration)
 
-## Recommended Addons
-
-### OpenAgentsControl
-
-[**OpenAgentsControl**](https://github.com/darrenhinde/OpenAgentsControl) is a recommended addon when using opencode. It is **required for the default settings** to work properly.
-
-- **Repository**: https://github.com/darrenhinde/OpenAgentsControl
-- **Required**: Yes (for default settings with opencode)
-- **Recommended**: Yes (when using opencode)
-
 ## Installation
 
 ### Prerequisites
@@ -419,11 +409,6 @@ docker exec -it auto-slopp /bin/bash
 Run Auto-slopp with default settings:
 ```bash
 auto-slopp
-```
-
-Run with custom repository path:
-```bash
-auto-slopp --repo-path /path/to/repo
 ```
 
 ### Development
