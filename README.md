@@ -2,6 +2,10 @@
 
 A Python-based automation framework for task execution with pluggable worker system. Auto-slopp provides a flexible foundation for creating automation workflows with support for configuration management, logging (including Telegram integration), and extensible worker implementations.
 
+> **Warning: AI-Generated Code**
+>
+> This project contains a significant amount of AI-generated code. As a result, some features may be non-functional, incomplete, or behave unexpectedly now or in the future. AI-generated code can introduce "slop" — plausible-looking but incorrect or unreliable implementations. Please review and test thoroughly before relying on any functionality in production environments.
+
 ## Features
 
 - **Pluggable Worker System**: Abstract base class for creating custom automation workers
@@ -126,6 +130,43 @@ uv sync
 ```bash
 source .venv/bin/activate
 ```
+
+4. Configure your GitHub token:
+
+> **🚨🚨🚨 CRITICAL SECURITY WARNING 🚨🚨🚨**
+>
+> **NEVER, EVER PUT YOUR GITHUB TOKEN IN .env FILE!**
+>
+> **⛔ DO NOT add `GH_TOKEN` or `GITHUB_TOKEN` to the `.env` file** in this project's root directory. The `.env` file is loaded by CLI tools spawned by auto-slopp, which will prevent them from interacting with GitHub directly and protect against unauthorized access.
+>
+> **⛔ DO NOT set `GH_TOKEN` or `GITHUB_TOKEN` in your shell environment variables** (bashrc, zshrc, etc.). This ensures CLI tools spawned by auto-slopp cannot access the GitHub token.
+>
+> **✅ INSTEAD:** Create a separate, dedicated `.gh.env` file **OUTSIDE** this project directory and only source it when **manually** using the `gh` CLI yourself.
+>
+> ---
+>
+> **Why this separation is critical:**
+>
+> When auto-slopp spawns CLI tools (like opencode, codex, gemini), it passes the entire `.env` file to them. If your GitHub token is in `.env`, these tools will gain access to your GitHub account and could make unauthorized changes. By keeping `GH_TOKEN` separate, you ensure that only YOU can interact with GitHub via the `gh` CLI, not the automated tools.
+>
+> ---
+
+Auto-slopp uses the `gh` CLI for GitHub operations (issues, pull requests, etc.). The `gh` CLI requires a `GH_TOKEN` (or `GITHUB_TOKEN`) environment variable to authenticate with GitHub. This token must be provided **separately** from the main `.env` file — it is not an `AUTO_SLOPP_` prefixed variable.
+
+To manually use `gh` CLI commands:
+
+```bash
+# Create a separate .gh.env file outside the project
+cat > ~/.gh.env <<EOF
+GH_TOKEN=ghp_your_github_personal_access_token
+EOF
+
+# Source it only when you need to use gh CLI manually
+source ~/.gh.env
+gh repo list
+```
+
+> **Note:** If `GITHUB_TOKEN` is set but `GH_TOKEN` is not, Auto-slopp will automatically map `GITHUB_TOKEN` to `GH_TOKEN` for `gh` CLI compatibility.
 
 ## Autostart with Systemd
 
@@ -273,6 +314,8 @@ docker run -d \
   auto-slopp:latest
 ```
 
+> **⚠️ DO NOT pass GH_TOKEN as environment variable** - See the "Configure your GitHub token" section above for the critical security warning.
+
 #### With CLI Configuration
 
 Configure tiered CLI tools:
@@ -315,6 +358,8 @@ docker run -d \
   auto-slopp:latest
 ```
 
+> **🚨 CRITICAL: DO NOT include GH_TOKEN in .env file** - See the "Configure your GitHub token" section above. Adding GH_TOKEN to this file will expose your GitHub token to CLI tools spawned by auto-slopp, creating a security vulnerability.
+
 ### Docker Compose
 
 For easier management, use Docker Compose. Create a `docker-compose.yml` file:
@@ -339,6 +384,8 @@ services:
     env_file:
       - .env
 ```
+
+> **🚨 CRITICAL: DO NOT include GH_TOKEN in docker-compose.yml or .env file** - See the "Configure your GitHub token" section above. Adding GH_TOKEN here will expose your GitHub token to CLI tools spawned by auto-slopp, creating a security vulnerability.
 
 Run with Docker Compose:
 

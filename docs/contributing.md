@@ -2,6 +2,8 @@
 
 This guide provides comprehensive information for contributing to Auto-slopp, including development setup, contribution guidelines, and community practices.
 
+> **Note:** This project contains a significant amount of AI-generated code. Contributors should be aware that existing implementations may include "slop" — plausible-looking but incorrect or unreliable code produced by LLMs. Please review existing code carefully and test thoroughly when building upon it.
+
 ## Table of Contents
 
 1. [Getting Started](#getting-started)

@@ -2,6 +2,8 @@
 
 This document provides comprehensive API reference for Auto-slopp classes, functions, and interfaces.
 
+> **Note:** This project contains a significant amount of AI-generated code. API signatures and behaviors documented here may not fully match the actual implementation due to LLM-generated "slop." Always verify against the source code.
+
 ## Table of Contents
 
 - [Core Classes](#core-classes)
