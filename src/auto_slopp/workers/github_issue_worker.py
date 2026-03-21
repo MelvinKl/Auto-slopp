@@ -458,6 +458,10 @@ class GitHubIssueWorker(Worker):
                     "steps_completed": 0,
                     "task_path": str(task_path),
                 }
+            # Refinement is intentionally skipped after an update: the file was
+            # already refined when first created, and _update_issue_task_file
+            # already adjusts open steps via the CLI.  Re-running refinement
+            # could overwrite the preserved completed steps.
         else:
             self._create_issue_task_file(
                 task_path=task_path,
