@@ -439,31 +439,56 @@ class GitHubIssueWorker(Worker):
     ) -> Dict[str, Any]:
         """Execute issue processing using refined task execution in .ralph/github-<issue>.md."""
         task_path = self._get_issue_task_path(repo_dir, issue_number)
-        self._create_issue_task_file(
-            task_path=task_path,
-            issue_number=issue_number,
-            issue_title=issue_title,
-            issue_body=issue_body,
-            comment_texts=comment_texts,
-            branch_name=branch_name,
-        )
 
-        refinement_result = self._refine_issue_task_file(
-            repo_dir=repo_dir,
-            task_path=task_path,
-            issue_title=issue_title,
-            issue_body=issue_body,
-            comment_texts=comment_texts,
-            branch_name=branch_name,
-        )
-        if not refinement_result.get("success", False):
-            return {
-                "success": False,
-                "error": refinement_result.get("error", "Failed to refine issue task"),
-                "loops_executed": 1,
-                "steps_completed": 0,
-                "task_path": str(task_path),
-            }
+        if task_path.exists():
+            self.logger.info(f"Task file already exists: {task_path}, updating via CLI")
+            update_result = self._update_issue_task_file(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_number=issue_number,
+                issue_title=issue_title,
+                issue_body=issue_body,
+                comment_texts=comment_texts,
+                branch_name=branch_name,
+            )
+            if not update_result.get("success", False):
+                return {
+                    "success": False,
+                    "error": update_result.get("error", "Failed to update issue task file"),
+                    "loops_executed": 1,
+                    "steps_completed": 0,
+                    "task_path": str(task_path),
+                }
+            # Refinement is intentionally skipped after an update: the file was
+            # already refined when first created, and _update_issue_task_file
+            # already adjusts open steps via the CLI.  Re-running refinement
+            # could overwrite the preserved completed steps.
+        else:
+            self._create_issue_task_file(
+                task_path=task_path,
+                issue_number=issue_number,
+                issue_title=issue_title,
+                issue_body=issue_body,
+                comment_texts=comment_texts,
+                branch_name=branch_name,
+            )
+
+            refinement_result = self._refine_issue_task_file(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title=issue_title,
+                issue_body=issue_body,
+                comment_texts=comment_texts,
+                branch_name=branch_name,
+            )
+            if not refinement_result.get("success", False):
+                return {
+                    "success": False,
+                    "error": refinement_result.get("error", "Failed to refine issue task"),
+                    "loops_executed": 1,
+                    "steps_completed": 0,
+                    "task_path": str(task_path),
+                }
 
         self._ensure_last_step_is_make_test(task_path)
 
@@ -521,6 +546,69 @@ class GitHubIssueWorker(Worker):
         task_path.parent.mkdir(parents=True, exist_ok=True)
         task_path.write_text(content)
         self.logger.info(f"Created issue task file: {task_path}")
+
+    def _update_issue_task_file(
+        self,
+        repo_dir: Path,
+        task_path: Path,
+        issue_number: int,
+        issue_title: str,
+        issue_body: str,
+        comment_texts: List[str],
+        branch_name: str,
+    ) -> Dict[str, Any]:
+        """Update an existing task file via the CLI instead of overwriting it."""
+        comments_text = ""
+        if comment_texts:
+            comments_text = "\nComments:\n" + "\n".join(f"- {comment}" for comment in comment_texts if comment)
+
+        instructions = (
+            f"You are already on branch '{branch_name}'. "
+            f"Update the existing task file at '{task_path}' for GitHub issue #{issue_number}.\n"
+            f"Issue title: {issue_title}\n"
+            f"Issue description:\n{issue_body}\n"
+            f"{comments_text}\n\n"
+            "The task file already exists and may contain completed steps from prior work.\n"
+            "Requirements:\n"
+            "- Preserve all completed (checked) steps exactly as they are.\n"
+            "- Update only the open (unchecked) steps to reflect the latest issue description and comments.\n"
+            "- Add new steps if the issue description or comments require additional work.\n"
+            "- Remove open steps that are no longer relevant.\n"
+            "- Keep the '## Steps' section and the existing file format.\n"
+            "- Keep step numbering sequential and stable.\n"
+            "- The last step must always verify that `make test` succeeds.\n"
+            "- Do not commit, do not push, and do not create a PR.\n"
+        )
+
+        result = execute_with_instructions(
+            instructions,
+            repo_dir,
+            self.agent_args,
+            self.timeout,
+            task_name="github_issue",
+        )
+
+        if not result.get("success", False):
+            return {
+                "success": False,
+                "error": result.get("error", "Failed to update task file via CLI"),
+            }
+
+        try:
+            updated_plan = PlanParser.parse_file(task_path)
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to parse updated task file: {str(e)}",
+            }
+
+        if not updated_plan.steps:
+            return {
+                "success": False,
+                "error": "Updated task file does not contain any executable steps",
+            }
+
+        return {"success": True}
 
     def _refine_issue_task_file(
         self,
