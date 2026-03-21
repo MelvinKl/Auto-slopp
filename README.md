@@ -133,13 +133,23 @@ source .venv/bin/activate
 
 4. Configure your GitHub token:
 
-> **⚠️ CRITICAL WARNING: DO NOT ADD GITHUB TOKEN TO .env FILE OR ENVIRONMENT VARIABLES**
-> 
-> **NEVER** add your `GH_TOKEN` or `GITHUB_TOKEN` to the `.env` file in this project's root directory. The `.env` file is loaded by CLI tools and this will prevent them from interacting with GitHub directly and protect against unauthorized access.
-> 
-> **DO NOT** set `GH_TOKEN` or `GITHUB_TOKEN` in your shell environment variables (bashrc, zshrc, etc.). This ensures CLI tools spawned by auto-slopp cannot access the GitHub token.
-> 
-> **Instead**, create a separate, dedicated `.gh.env` file outside the project directory and only source it when manually using the `gh` CLI.
+> **🚨🚨🚨 CRITICAL SECURITY WARNING 🚨🚨🚨**
+>
+> **NEVER, EVER PUT YOUR GITHUB TOKEN IN .env FILE!**
+>
+> **⛔ DO NOT add `GH_TOKEN` or `GITHUB_TOKEN` to the `.env` file** in this project's root directory. The `.env` file is loaded by CLI tools spawned by auto-slopp, which will prevent them from interacting with GitHub directly and protect against unauthorized access.
+>
+> **⛔ DO NOT set `GH_TOKEN` or `GITHUB_TOKEN` in your shell environment variables** (bashrc, zshrc, etc.). This ensures CLI tools spawned by auto-slopp cannot access the GitHub token.
+>
+> **✅ INSTEAD:** Create a separate, dedicated `.gh.env` file **OUTSIDE** this project directory and only source it when **manually** using the `gh` CLI yourself.
+>
+> ---
+>
+> **Why this separation is critical:**
+>
+> When auto-slopp spawns CLI tools (like opencode, codex, gemini), it passes the entire `.env` file to them. If your GitHub token is in `.env`, these tools will gain access to your GitHub account and could make unauthorized changes. By keeping `GH_TOKEN` separate, you ensure that only YOU can interact with GitHub via the `gh` CLI, not the automated tools.
+>
+> ---
 
 Auto-slopp uses the `gh` CLI for GitHub operations (issues, pull requests, etc.). The `gh` CLI requires a `GH_TOKEN` (or `GITHUB_TOKEN`) environment variable to authenticate with GitHub. This token must be provided **separately** from the main `.env` file — it is not an `AUTO_SLOPP_` prefixed variable.
 
@@ -296,7 +306,6 @@ Configure auto-slopp using environment variables:
 docker run -d \
   --name auto-slopp \
   -v /path/to/managed/repos:/repos \
-  -e GH_TOKEN=ghp_your_github_personal_access_token \
   -e AUTO_SLOPP_DEBUG=false \
   -e AUTO_SLOPP_TELEGRAM_ENABLED=true \
   -e AUTO_SLOPP_TELEGRAM_BOT_TOKEN=your_bot_token \
@@ -304,6 +313,8 @@ docker run -d \
   -e AUTO_SLOPP_WORKERS_DISABLED='[]' \
   auto-slopp:latest
 ```
+
+> **⚠️ DO NOT pass GH_TOKEN as environment variable** - See the "Configure your GitHub token" section above for the critical security warning.
 
 #### With CLI Configuration
 
@@ -331,7 +342,6 @@ For complex configurations, use an environment file:
 ```bash
 # Create .env file with your configuration
 cat > .env <<EOF
-GH_TOKEN=ghp_your_github_personal_access_token
 AUTO_SLOPP_DEBUG=false
 AUTO_SLOPP_TELEGRAM_ENABLED=true
 AUTO_SLOPP_TELEGRAM_BOT_TOKEN=your_bot_token
@@ -348,6 +358,8 @@ docker run -d \
   auto-slopp:latest
 ```
 
+> **🚨 CRITICAL: DO NOT include GH_TOKEN in .env file** - See the "Configure your GitHub token" section above. Adding GH_TOKEN to this file will expose your GitHub token to CLI tools spawned by auto-slopp, creating a security vulnerability.
+
 ### Docker Compose
 
 For easier management, use Docker Compose. Create a `docker-compose.yml` file:
@@ -363,7 +375,6 @@ services:
     volumes:
       - /path/to/managed/repos:/repos
     environment:
-      - GH_TOKEN=${GH_TOKEN}
       - AUTO_SLOPP_DEBUG=false
       - AUTO_SLOPP_TELEGRAM_ENABLED=true
       - AUTO_SLOPP_TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
@@ -373,6 +384,8 @@ services:
     env_file:
       - .env
 ```
+
+> **🚨 CRITICAL: DO NOT include GH_TOKEN in docker-compose.yml or .env file** - See the "Configure your GitHub token" section above. Adding GH_TOKEN here will expose your GitHub token to CLI tools spawned by auto-slopp, creating a security vulnerability.
 
 Run with Docker Compose:
 
