@@ -109,6 +109,7 @@ class GitHubIssueWorker(Worker):
 
         issues = self._filter_renovate_issues(issues)
         issues = self._filter_by_label_and_creator(issues)
+        issues = sorted(issues, key=lambda i: i.get("number", 0))
 
         for issue in issues:
             issue_result = self._process_single_issue(repo_path, issue)
