@@ -118,16 +118,6 @@ class Settings(BaseSettings):
 
     cli_configurations: List[CLIConfiguration] = Field(
         default_factory=lambda: [
-            #CLIConfiguration(
-            #    cli_command="opencode",
-            #    cli_args=[
-            #        "--model",
-            #        "zai-coding-plan/glm-5",
-            #        "run",
-            #    ],
-            #    capability=10,
-            #    name="opencode glm-5",
-            #),
             CLIConfiguration(
                 cli_command="claude",
                 cli_args=[
