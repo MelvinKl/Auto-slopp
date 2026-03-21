@@ -123,7 +123,12 @@ class TestGitHubIssueWorker:
 
                 assert result["success"] is True
                 assert result["issues_processed"] == 4
-                assert [r["issue_number"] for r in result["issue_results"]] == [1, 2, 5, 8]
+                assert [r["issue_number"] for r in result["issue_results"]] == [
+                    1,
+                    2,
+                    5,
+                    8,
+                ]
 
     def test_run_with_nonexistent_repo(self):
         """Test run with nonexistent repository path."""
@@ -762,7 +767,10 @@ class TestGitHubIssueWorker:
             step = Step(number=1, description="Implement changes")
 
             with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
-                mock_execute.return_value = {"success": True, "stdout": "ACCEPTANCE_STATUS: fail"}
+                mock_execute.return_value = {
+                    "success": True,
+                    "stdout": "ACCEPTANCE_STATUS: fail",
+                }
 
                 result = worker._execute_step_acceptance_check(
                     repo_dir=repo_path,
@@ -787,7 +795,10 @@ class TestGitHubIssueWorker:
             step = Step(number=1, description="Implement changes")
 
             with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
-                mock_execute.return_value = {"success": True, "stdout": "ACCEPTANCE_STATUS: pass"}
+                mock_execute.return_value = {
+                    "success": True,
+                    "stdout": "ACCEPTANCE_STATUS: pass",
+                }
 
                 result = worker._execute_step_acceptance_check(
                     repo_dir=repo_path,
@@ -810,8 +821,15 @@ class TestGitHubIssueWorker:
             task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
 
             with (
-                patch("auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations", 2),
-                patch.object(worker, "_execute_step", return_value={"success": False, "error": "retry needed"}),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations",
+                    2,
+                ),
+                patch.object(
+                    worker,
+                    "_execute_step",
+                    return_value={"success": False, "error": "retry needed"},
+                ),
             ):
                 result = worker._run_refined_task_loop(
                     repo_dir=repo_path,
@@ -842,11 +860,21 @@ class TestGitHubIssueWorker:
 """)
 
             with (
-                patch("auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations", 3),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations",
+                    3,
+                ),
                 patch.object(worker, "_execute_step", return_value={"success": True}),
-                patch.object(worker, "_execute_step_acceptance_check", return_value={"success": True}),
+                patch.object(
+                    worker,
+                    "_execute_step_acceptance_check",
+                    return_value={"success": True},
+                ),
                 patch.object(worker, "_update_remaining_steps", return_value={"success": True}),
-                patch("auto_slopp.workers.github_issue_worker.has_changes", return_value=True),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.has_changes",
+                    return_value=True,
+                ),
                 patch("auto_slopp.workers.github_issue_worker.commit_and_push_changes") as mock_commit,
             ):
                 mock_commit.return_value = (True, "ok")
@@ -878,7 +906,10 @@ class TestGitHubIssueWorker:
             task_path.write_text("# Task\n\n## Steps\n\n- [x] 1. Implement changes\n")
 
             with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
-                mock_execute.return_value = {"success": True, "stdout": "## Summary\n- Implemented changes"}
+                mock_execute.return_value = {
+                    "success": True,
+                    "stdout": "## Summary\n- Implemented changes",
+                }
 
                 body = worker._generate_pr_body_from_task_file(
                     repo_dir=repo_path,
@@ -914,7 +945,11 @@ class TestGitHubIssueWorker:
                 patch.object(
                     worker,
                     "_run_refined_task_loop",
-                    return_value={"success": True, "loops_executed": 1, "steps_completed": 1},
+                    return_value={
+                        "success": True,
+                        "loops_executed": 1,
+                        "steps_completed": 1,
+                    },
                 ) as mock_loop,
             ):
                 result = worker._execute_with_ralph_loop(
@@ -948,7 +983,11 @@ class TestGitHubIssueWorker:
                 patch.object(
                     worker,
                     "_run_refined_task_loop",
-                    return_value={"success": True, "loops_executed": 1, "steps_completed": 1},
+                    return_value={
+                        "success": True,
+                        "loops_executed": 1,
+                        "steps_completed": 1,
+                    },
                 ),
             ):
                 result = worker._execute_with_ralph_loop(
@@ -976,7 +1015,11 @@ class TestGitHubIssueWorker:
             task_path.write_text("# Existing task\n\n## Steps\n\n- [ ] 1. Do stuff\n")
 
             with (
-                patch.object(worker, "_update_issue_task_file", return_value={"success": False, "error": "CLI failed"}),
+                patch.object(
+                    worker,
+                    "_update_issue_task_file",
+                    return_value={"success": False, "error": "CLI failed"},
+                ),
             ):
                 result = worker._execute_with_ralph_loop(
                     repo_dir=repo_path,
@@ -1105,3 +1148,261 @@ class TestGitHubIssueWorker:
 
             assert result["success"] is False
             assert "does not contain any executable steps" in result["error"]
+
+    def test_execute_handles_ralph_max_loops_reached(self):
+        """Test that execute method handles Ralph max_loops_reached by commenting and removing label."""
+        worker = GitHubIssueWorker(dry_run=False)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            mock_issue = {
+                "number": 42,
+                "title": "Test Issue",
+                "body": "Test body",
+                "url": "https://github.com/test/repo/issues/42",
+                "author": {"login": "MelvinKl"},
+                "labels": [{"name": "ai"}],
+            }
+
+            ralph_result = {
+                "success": False,
+                "error": "Maximum iterations (5) reached before all steps completed",
+                "max_loops_reached": True,
+                "loops_executed": 5,
+                "steps_completed": 3,
+                "total_steps": 6,
+            }
+
+            with (
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings.ralph_enabled",
+                    True,
+                ),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.get_issue_comments",
+                    return_value=[],
+                ),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.create_and_checkout_branch",
+                    return_value=True,
+                ),
+                patch.object(worker, "_execute_with_ralph_loop", return_value=ralph_result),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.comment_on_issue",
+                    return_value=True,
+                ) as mock_comment,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.remove_label_from_issue",
+                    return_value=True,
+                ) as mock_remove_label,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings.github_issue_worker_required_label",
+                    "ai",
+                ),
+            ):
+                result = worker._process_single_issue(repo_path, mock_issue)
+
+            assert result["success"] is False
+            assert result["ralph_loops_executed"] == 5
+            assert result["ralph_steps_completed"] == 3
+            assert result["label_removed"] is True
+            assert result["issue_commented"] is True
+
+            mock_comment.assert_called_once()
+            comment_arg = mock_comment.call_args[0][2]
+            assert "Maximum Iterations Reached" in comment_arg
+            assert "Steps completed: 3/6" in comment_arg
+            assert "Loops executed: 5" in comment_arg
+
+            mock_remove_label.assert_called_once()
+            call_args = mock_remove_label.call_args[0]
+            assert call_args[1] == 42
+            assert call_args[2] == "ai"
+
+    def test_execute_does_not_remove_label_on_normal_ralph_failure(self):
+        """Test that execute method does not comment or remove label on normal Ralph failure."""
+        worker = GitHubIssueWorker(dry_run=False)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            mock_issue = {
+                "number": 42,
+                "title": "Test Issue",
+                "body": "Test body",
+                "url": "https://github.com/test/repo/issues/42",
+                "author": {"login": "MelvinKl"},
+                "labels": [{"name": "ai"}],
+            }
+
+            ralph_result = {
+                "success": False,
+                "error": "Step execution failed",
+                "max_loops_reached": False,
+                "loops_executed": 2,
+                "steps_completed": 1,
+            }
+
+            with (
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings.ralph_enabled",
+                    True,
+                ),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.get_issue_comments",
+                    return_value=[],
+                ),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.create_and_checkout_branch",
+                    return_value=True,
+                ),
+                patch.object(worker, "_execute_with_ralph_loop", return_value=ralph_result),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.comment_on_issue",
+                    return_value=True,
+                ) as mock_comment,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.remove_label_from_issue",
+                    return_value=True,
+                ) as mock_remove_label,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings.github_issue_worker_required_label",
+                    "ai",
+                ),
+            ):
+                result = worker._process_single_issue(repo_path, mock_issue)
+
+            assert result["success"] is False
+            assert result["error"] == "Ralph loop failed: Step execution failed"
+            assert "label_removed" not in result
+            assert "issue_commented" not in result
+
+            mock_comment.assert_not_called()
+            mock_remove_label.assert_not_called()
+
+    def test_execute_max_loops_reached_comment_fails_still_removes_label(self):
+        """Test that label is still removed even if commenting on the issue fails."""
+        worker = GitHubIssueWorker(dry_run=False)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            mock_issue = {
+                "number": 42,
+                "title": "Test Issue",
+                "body": "Test body",
+                "url": "https://github.com/test/repo/issues/42",
+                "author": {"login": "MelvinKl"},
+                "labels": [{"name": "ai"}],
+            }
+
+            ralph_result = {
+                "success": False,
+                "error": "Maximum iterations (5) reached before all steps completed",
+                "max_loops_reached": True,
+                "loops_executed": 5,
+                "steps_completed": 3,
+                "total_steps": 6,
+            }
+
+            with (
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings.ralph_enabled",
+                    True,
+                ),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.get_issue_comments",
+                    return_value=[],
+                ),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.create_and_checkout_branch",
+                    return_value=True,
+                ),
+                patch.object(worker, "_execute_with_ralph_loop", return_value=ralph_result),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.comment_on_issue",
+                    return_value=False,
+                ) as mock_comment,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.remove_label_from_issue",
+                    return_value=True,
+                ) as mock_remove_label,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings.github_issue_worker_required_label",
+                    "ai",
+                ),
+            ):
+                result = worker._process_single_issue(repo_path, mock_issue)
+
+            assert result["success"] is False
+            assert result["issue_commented"] is False
+            assert result["label_removed"] is True
+
+            mock_comment.assert_called_once()
+            mock_remove_label.assert_called_once()
+
+    def test_execute_max_loops_reached_label_removal_fails(self):
+        """Test that label_removed is not set when remove_label_from_issue fails."""
+        worker = GitHubIssueWorker(dry_run=False)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            mock_issue = {
+                "number": 42,
+                "title": "Test Issue",
+                "body": "Test body",
+                "url": "https://github.com/test/repo/issues/42",
+                "author": {"login": "MelvinKl"},
+                "labels": [{"name": "ai"}],
+            }
+
+            ralph_result = {
+                "success": False,
+                "error": "Maximum iterations (5) reached before all steps completed",
+                "max_loops_reached": True,
+                "loops_executed": 5,
+                "steps_completed": 3,
+                "total_steps": 6,
+            }
+
+            with (
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings.ralph_enabled",
+                    True,
+                ),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.get_issue_comments",
+                    return_value=[],
+                ),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.create_and_checkout_branch",
+                    return_value=True,
+                ),
+                patch.object(worker, "_execute_with_ralph_loop", return_value=ralph_result),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.comment_on_issue",
+                    return_value=True,
+                ) as mock_comment,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.remove_label_from_issue",
+                    return_value=False,
+                ) as mock_remove_label,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings.github_issue_worker_required_label",
+                    "ai",
+                ),
+            ):
+                result = worker._process_single_issue(repo_path, mock_issue)
+
+            assert result["success"] is False
+            assert result["issue_commented"] is True
+            assert "label_removed" not in result
+
+            mock_comment.assert_called_once()
+            mock_remove_label.assert_called_once()
