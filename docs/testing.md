@@ -2,6 +2,8 @@
 
 This guide covers how to run tests locally, understand test coverage, and integrate with CI/CD pipelines.
 
+> **Note:** This project contains a significant amount of AI-generated code. Some tests may cover features that are non-functional or behave unexpectedly due to LLM-generated "slop." When writing or modifying tests, verify the underlying implementation is correct.
+
 ## Table of Contents
 
 - [Local Testing](#local-testing)

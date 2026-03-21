@@ -2,6 +2,8 @@
 
 This document provides a comprehensive overview of Auto-slopp's architecture, design principles, and component interactions.
 
+> **Note:** This project contains a significant amount of AI-generated code. Some features described in this document may be non-functional, incomplete, or behave unexpectedly. AI-generated code can introduce "slop" — plausible-looking but incorrect or unreliable implementations. Please verify implementations against the actual source code.
+
 ## Table of Contents
 
 1. [Design Principles](#design-principles)

@@ -119,9 +119,59 @@ class Settings(BaseSettings):
     cli_configurations: List[CLIConfiguration] = Field(
         default_factory=lambda: [
             CLIConfiguration(
+                cli_command="claude",
+                cli_args=[
+                    "--model",
+                    "opus",
+                    "-p",
+                ],
+                capability=10,
+                name="claude opus",
+            ),
+            CLIConfiguration(
+                cli_command="claude",
+                cli_args=[
+                    "--model",
+                    "sonnet",
+                    "-p",
+                ],
+                capability=8,
+                name="claude sonnet",
+            ),
+            CLIConfiguration(
+                cli_command="claude",
+                cli_args=[
+                    "--model",
+                    "haiku",
+                    "-p",
+                ],
+                capability=4,
+                name="claude haiku",
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "nvidia/private/nvidia/nemotron-3-super-120b-a12b",
+                    "run",
+                ],
+                capability=7,
+                name="opencode nvidia nemotron 3",
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "zai-coding-plan/glm-4.7",
+                    "run",
+                ],
+                capability=8,
+                name="opencode glm-4.7",
+            ),
+            CLIConfiguration(
                 cli_command="gemini",
                 cli_args=["--yolo", "--model", "gemini-3.1-pro-preview", "-p"],
-                capability=7,
+                capability=5,
                 name="gemini gemini-3.1-pro-preview",
             ),
             CLIConfiguration(
@@ -137,8 +187,8 @@ class Settings(BaseSettings):
                     "opencode/big-pickle",
                     "run",
                 ],
-                capability=7,
-                name="opencode nemotron-3-super-free",
+                capability=5,
+                name="opencode big pickle",
             ),
             CLIConfiguration(
                 cli_command="opencode",
@@ -147,7 +197,7 @@ class Settings(BaseSettings):
                     "opencode/nemotron-3-super-free",
                     "run",
                 ],
-                capability=9,
+                capability=7,
                 name="opencode nemotron-3-super-free",
             ),
             CLIConfiguration(
