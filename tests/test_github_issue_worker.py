@@ -965,6 +965,9 @@ class TestGitHubIssueWorker:
             assert "Update the existing task file" in instructions
             assert "Preserve all completed" in instructions
             assert "A comment" in instructions
+            assert str(task_path) in instructions
+            assert "Test issue" in instructions
+            assert "Do something" in instructions
 
     def test_update_issue_task_file_excludes_comments_when_empty(self):
         """Test _update_issue_task_file omits comments section when no comments provided."""
