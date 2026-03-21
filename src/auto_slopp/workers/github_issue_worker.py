@@ -35,6 +35,7 @@ from auto_slopp.utils.github_operations import (
     get_issue_comments,
     get_open_issues,
     get_pr_for_branch,
+    remove_label_from_issue,
 )
 from auto_slopp.utils.ralph import (
     Plan,
@@ -320,6 +321,35 @@ class GitHubIssueWorker(Worker):
 
                 if not ralph_result.get("success", False):
                     result["error"] = f"Ralph loop failed: {ralph_result.get('error', 'Unknown error')}"
+
+                    if ralph_result.get("max_loops_reached", False):
+                        self.logger.warning(f"Ralph loop reached max iterations for issue #{issue_number}")
+
+                        failure_comment = (
+                            f"⚠️ **Task Failed: Maximum Iterations Reached**\n\n"
+                            f" Ralph loop reached maximum iterations without completing all steps.\n\n"
+                            f"**Progress:**\n"
+                            f"- Steps completed: {ralph_result.get('steps_completed', 0)}/{ralph_result.get('total_steps', 0)}\n"
+                            f"- Loops executed: {ralph_result.get('loops_executed', 0)}\n"
+                            f"- Last error: {ralph_result.get('error', 'Unknown error')}\n\n"
+                            f"This issue will not be processed again automatically."
+                        )
+                        comment_success = comment_on_issue(repo_dir, issue_number, failure_comment)
+                        result["issue_commented"] = comment_success
+
+                        label_removed = remove_label_from_issue(
+                            repo_dir,
+                            issue_number,
+                            settings.github_issue_worker_required_label,
+                        )
+                        if label_removed:
+                            self.logger.info(
+                                f"Removed required label '{settings.github_issue_worker_required_label}' from issue #{issue_number}"
+                            )
+                            result["label_removed"] = True
+                        else:
+                            self.logger.warning(f"Failed to remove required label from issue #{issue_number}")
+
                     return result
 
                 result["openagent_executed"] = True
