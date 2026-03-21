@@ -57,10 +57,6 @@ class Executor:
             self.running = False
             print("Executor stopped.")
 
-    def stop(self) -> None:
-        """Stop the execution loop."""
-        self.running = False
-
     def _run_iteration(self) -> None:
         """Run a single iteration of worker execution."""
         try:

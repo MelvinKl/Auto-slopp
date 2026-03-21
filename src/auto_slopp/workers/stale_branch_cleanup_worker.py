@@ -15,7 +15,6 @@ from auto_slopp.utils.git_operations import (
     get_local_branches,
     get_remote_branches,
 )
-from auto_slopp.utils.repository_utils import discover_repositories
 from auto_slopp.worker import Worker
 
 
@@ -151,7 +150,7 @@ class StaleBranchCleanupWorker(Worker):
         """Process a single repository directory for stale branch cleanup.
 
         Args:
-            repo_info: Repository information from discover_repositories
+            repo_info: Repository information
 
         Returns:
             Dictionary containing processing results for this repository.
@@ -227,6 +226,19 @@ class StaleBranchCleanupWorker(Worker):
             results["repositories_with_errors"] += 1
             results["success"] = False
 
+    def _log_completion_summary(self, results: Dict[str, Any]) -> None:
+        """Log completion summary.
+
+        Args:
+            results: Final results dictionary
+        """
+        self.logger.info(
+            f"StaleBranchCleanupWorker completed. Processed: {results['repositories_processed']}, "
+            f"Errors: {results['repositories_with_errors']}, "
+            f"Total branches deleted: {results['total_branches_deleted']}, "
+            f"Total failed: {results['total_branches_failed']}"
+        )
+
     def _get_local_branches(self) -> List[Dict[str, Any]]:
         """Get local branches for testing purposes.
 
@@ -276,16 +288,3 @@ class StaleBranchCleanupWorker(Worker):
             return True
         except Exception:
             return False
-
-    def _log_completion_summary(self, results: Dict[str, Any]) -> None:
-        """Log completion summary.
-
-        Args:
-            results: Final results dictionary
-        """
-        self.logger.info(
-            f"StaleBranchCleanupWorker completed. Processed: {results['repositories_processed']}, "
-            f"Errors: {results['repositories_with_errors']}, "
-            f"Total branches deleted: {results['total_branches_deleted']}, "
-            f"Total failed: {results['total_branches_failed']}"
-        )
