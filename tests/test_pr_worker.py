@@ -1,7 +1,7 @@
 """Tests for PRWorker."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from auto_slopp.workers.pr_worker import PRWorker
 

@@ -1,11 +1,6 @@
 """Tests for auto-update functionality."""
 
-import subprocess
-import time
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, call, patch
-
-import pytest
+from unittest.mock import MagicMock, Mock, patch
 
 from auto_slopp.executor import Executor
 

@@ -4,7 +4,7 @@ import subprocess
 import time
 import traceback
 from pathlib import Path
-from typing import Any, Optional, Type
+from typing import Optional, Type
 
 from auto_slopp.worker import Worker
 from auto_slopp.workers import (

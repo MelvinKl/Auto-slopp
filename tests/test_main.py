@@ -5,8 +5,6 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from auto_slopp.main import parse_arguments, setup_logging
 
 

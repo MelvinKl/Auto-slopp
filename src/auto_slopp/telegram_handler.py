@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-import time
+from contextlib import suppress
 from typing import Optional
 
 import httpx
@@ -90,11 +90,8 @@ class TelegramHandler(logging.Handler):
 
     def _handle_task_result(self, task: asyncio.Task) -> None:
         """Handle the result of an async task."""
-        try:
+        with suppress(Exception):
             task.result()
-        except Exception:
-            # Error already logged in _send_message_async
-            pass
 
     async def _send_message_async(self, record: logging.LogRecord) -> None:
         """Send a log message to Telegram asynchronously.

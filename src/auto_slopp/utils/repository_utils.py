@@ -5,14 +5,11 @@ and ensuring they are proper git repositories.
 """
 
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from auto_slopp.utils.git_operations import (
-    get_ahead_behind,
-    get_current_branch,
     get_default_branch,
     get_remotes,
-    has_changes,
     is_bare_repository,
 )
 

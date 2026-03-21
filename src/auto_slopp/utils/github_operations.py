@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import subprocess
+from contextlib import suppress
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -285,10 +286,8 @@ def create_pull_request(
         if pr_url:
             parts = pr_url.rstrip("/").split("/")
             if parts:
-                try:
+                with suppress(ValueError, IndexError):
                     pr_number = int(parts[-1])
-                except ValueError, IndexError:
-                    pass
 
         return {"url": pr_url, "number": pr_number}
 
