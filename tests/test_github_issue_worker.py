@@ -434,7 +434,6 @@ class TestGitHubIssueWorker:
                     from auto_slopp.utils.git_operations import sanitize_branch_name
 
                     sanitized_title = sanitize_branch_name(test_case["title"][:30].lower())
-                    expected_branch = f"ai/issue-{i}-{sanitized_title}"
 
                     assert result["issue_results"][0]["issue_title"] == test_case["title"]
 

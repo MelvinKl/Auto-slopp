@@ -84,7 +84,7 @@ class TelegramHandler(logging.Handler):
             else:
                 loop.run_until_complete(self._send_message_async(record))
 
-        except Exception as e:
+        except Exception:
             # Don't let logging errors break the application
             self.handleError(record)
 
@@ -133,7 +133,7 @@ class TelegramHandler(logging.Handler):
                     elif attempt == self.retry_attempts - 1:
                         raise
                     await asyncio.sleep(self.retry_delay)
-                except Exception as e:
+                except Exception:
                     if attempt == self.retry_attempts - 1:
                         raise
                     await asyncio.sleep(self.retry_delay)
@@ -206,7 +206,7 @@ def setup_telegram_logging(
     handler.setLevel(level)
 
     if format_string is None:
-        format_string = "<b>{levelname}</b> ({name})\n" "Message: {message}\n" "Time: {asctime}"
+        format_string = "<b>{levelname}</b> ({name})\nMessage: {message}\nTime: {asctime}"
 
     formatter = logging.Formatter(format_string, style="{")
     handler.setFormatter(formatter)

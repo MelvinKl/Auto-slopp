@@ -114,8 +114,6 @@ class TestAutoUpdate:
         mock_subprocess_run.return_value = Mock(returncode=0, stdout="Already up to date.", stderr="")
 
         with patch("auto_slopp.executor.settings", mock_settings):
-            executor = Executor(repo_path=temp_repo_dir)
-
             assert hasattr(mock_settings, "auto_update_reboot_delay")
             assert mock_settings.auto_update_reboot_delay == custom_delay
 
