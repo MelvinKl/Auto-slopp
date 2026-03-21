@@ -77,40 +77,53 @@ class TestGitHubIssueWorker:
 
             issues = [
                 {
-                    "number": 50,
-                    "title": "Issue 50",
-                    "body": "Body 50",
-                    "url": "https://github.com/test/repo/issues/50",
+                    "number": 5,
+                    "title": "Issue 5",
+                    "body": "Body 5",
+                    "url": "https://github.com/test/repo/issues/5",
                     "author": {"login": "MelvinKl"},
                     "labels": [{"name": "ai"}],
                 },
                 {
-                    "number": 10,
-                    "title": "Issue 10",
-                    "body": "Body 10",
-                    "url": "https://github.com/test/repo/issues/10",
+                    "number": 2,
+                    "title": "Issue 2",
+                    "body": "Body 2",
+                    "url": "https://github.com/test/repo/issues/2",
                     "author": {"login": "MelvinKl"},
                     "labels": [{"name": "ai"}],
                 },
                 {
-                    "number": 30,
-                    "title": "Issue 30",
-                    "body": "Body 30",
-                    "url": "https://github.com/test/repo/issues/30",
+                    "number": 8,
+                    "title": "Issue 8",
+                    "body": "Body 8",
+                    "url": "https://github.com/test/repo/issues/8",
+                    "author": {"login": "MelvinKl"},
+                    "labels": [{"name": "ai"}],
+                },
+                {
+                    "number": 1,
+                    "title": "Issue 1",
+                    "body": "Body 1",
+                    "url": "https://github.com/test/repo/issues/1",
                     "author": {"login": "MelvinKl"},
                     "labels": [{"name": "ai"}],
                 },
             ]
 
-            with patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues:
+            with (
+                patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
+                patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues,
+            ):
+                mock_settings.github_issue_worker_required_label = "ai"
+                mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
                 mock_issues.return_value = issues
 
                 worker = GitHubIssueWorker(dry_run=True)
                 result = worker.run(repo_path)
 
                 assert result["success"] is True
-                processed_numbers = [r["issue_number"] for r in result["issue_results"]]
-                assert processed_numbers == [10, 30, 50]
+                assert result["issues_processed"] == 4
+                assert [r["issue_number"] for r in result["issue_results"]] == [1, 2, 5, 8]
 
     def test_run_with_nonexistent_repo(self):
         """Test run with nonexistent repository path."""
