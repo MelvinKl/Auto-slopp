@@ -348,5 +348,11 @@ Total unused variables found: 5
 ## Next Steps
 
 1. ✅ Step 3 Complete - All unused functions, methods, classes, imports, and variables identified and documented
-2. Step 4: Remove all identified unused variables from the codebase
-3. Step 5: Remove all identified unused functions, methods, and classes from the codebase
+2. ✅ Step 4 Complete - All identified unused variables removed from the codebase
+3. ✅ Step 5 Complete - All identified unused functions, methods, and classes removed from the codebase
+   - Removed: get_open_pr_branches, ThreadPoolExecutor import, Literal import, model_validator import, DEFAULT_WORKERS
+   - Kept (used in tests): stale_branch_cleanup_worker.py private methods, expand_user_paths method
+4. Step 6: Review and resolve any flake8 warnings that are currently ignored or suppressed
+5. Step 7: Review and remove any unused imports throughout the codebase
+6. Step 8: Run flake8 again to verify that all code quality improvements are effective
+7. Step 9: Run `make test` and confirm it succeeds
