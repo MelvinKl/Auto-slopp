@@ -1282,3 +1282,127 @@ class TestGitHubIssueWorker:
 
             mock_comment.assert_not_called()
             mock_remove_label.assert_not_called()
+
+    def test_execute_max_loops_reached_comment_fails_still_removes_label(self):
+        """Test that label is still removed even if commenting on the issue fails."""
+        worker = GitHubIssueWorker(dry_run=False)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            mock_issue = {
+                "number": 42,
+                "title": "Test Issue",
+                "body": "Test body",
+                "url": "https://github.com/test/repo/issues/42",
+                "author": {"login": "MelvinKl"},
+                "labels": [{"name": "ai"}],
+            }
+
+            ralph_result = {
+                "success": False,
+                "error": "Maximum iterations (5) reached before all steps completed",
+                "max_loops_reached": True,
+                "loops_executed": 5,
+                "steps_completed": 3,
+                "total_steps": 6,
+            }
+
+            with (
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings.ralph_enabled",
+                    True,
+                ),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.get_issue_comments",
+                    return_value=[],
+                ),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.create_and_checkout_branch",
+                    return_value=True,
+                ),
+                patch.object(worker, "_execute_with_ralph_loop", return_value=ralph_result),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.comment_on_issue",
+                    return_value=False,
+                ) as mock_comment,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.remove_label_from_issue",
+                    return_value=True,
+                ) as mock_remove_label,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings.github_issue_worker_required_label",
+                    "ai",
+                ),
+            ):
+                result = worker._process_single_issue(repo_path, mock_issue)
+
+            assert result["success"] is False
+            assert result["issue_commented"] is False
+            assert result["label_removed"] is True
+
+            mock_comment.assert_called_once()
+            mock_remove_label.assert_called_once()
+
+    def test_execute_max_loops_reached_label_removal_fails(self):
+        """Test that label_removed is not set when remove_label_from_issue fails."""
+        worker = GitHubIssueWorker(dry_run=False)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            mock_issue = {
+                "number": 42,
+                "title": "Test Issue",
+                "body": "Test body",
+                "url": "https://github.com/test/repo/issues/42",
+                "author": {"login": "MelvinKl"},
+                "labels": [{"name": "ai"}],
+            }
+
+            ralph_result = {
+                "success": False,
+                "error": "Maximum iterations (5) reached before all steps completed",
+                "max_loops_reached": True,
+                "loops_executed": 5,
+                "steps_completed": 3,
+                "total_steps": 6,
+            }
+
+            with (
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings.ralph_enabled",
+                    True,
+                ),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.get_issue_comments",
+                    return_value=[],
+                ),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.create_and_checkout_branch",
+                    return_value=True,
+                ),
+                patch.object(worker, "_execute_with_ralph_loop", return_value=ralph_result),
+                patch(
+                    "auto_slopp.workers.github_issue_worker.comment_on_issue",
+                    return_value=True,
+                ) as mock_comment,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.remove_label_from_issue",
+                    return_value=False,
+                ) as mock_remove_label,
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings.github_issue_worker_required_label",
+                    "ai",
+                ),
+            ):
+                result = worker._process_single_issue(repo_path, mock_issue)
+
+            assert result["success"] is False
+            assert result["issue_commented"] is True
+            assert "label_removed" not in result
+
+            mock_comment.assert_called_once()
+            mock_remove_label.assert_called_once()
