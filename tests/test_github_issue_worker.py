@@ -69,6 +69,49 @@ class TestGitHubIssueWorker:
                 assert result["issue_results"][0]["issue_number"] == 1
                 assert result["issue_results"][0]["issue_title"] == "Test Issue"
 
+    def test_run_processes_issues_in_ascending_order(self):
+        """Test that issues are processed in ascending issue-number order."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "repos" / "test_repo"
+            repo_path.mkdir(parents=True)
+
+            issues = [
+                {
+                    "number": 50,
+                    "title": "Issue 50",
+                    "body": "Body 50",
+                    "url": "https://github.com/test/repo/issues/50",
+                    "author": {"login": "MelvinKl"},
+                    "labels": [{"name": "ai"}],
+                },
+                {
+                    "number": 10,
+                    "title": "Issue 10",
+                    "body": "Body 10",
+                    "url": "https://github.com/test/repo/issues/10",
+                    "author": {"login": "MelvinKl"},
+                    "labels": [{"name": "ai"}],
+                },
+                {
+                    "number": 30,
+                    "title": "Issue 30",
+                    "body": "Body 30",
+                    "url": "https://github.com/test/repo/issues/30",
+                    "author": {"login": "MelvinKl"},
+                    "labels": [{"name": "ai"}],
+                },
+            ]
+
+            with patch("auto_slopp.workers.github_issue_worker.get_open_issues") as mock_issues:
+                mock_issues.return_value = issues
+
+                worker = GitHubIssueWorker(dry_run=True)
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                processed_numbers = [r["issue_number"] for r in result["issue_results"]]
+                assert processed_numbers == [10, 30, 50]
+
     def test_run_with_nonexistent_repo(self):
         """Test run with nonexistent repository path."""
         with tempfile.TemporaryDirectory() as temp_dir:
