@@ -2,6 +2,10 @@
 
 A Python-based automation framework for task execution with pluggable worker system. Auto-slopp provides a flexible foundation for creating automation workflows with support for configuration management, logging (including Telegram integration), and extensible worker implementations.
 
+> **Warning: AI-Generated Code**
+>
+> This project contains a significant amount of AI-generated code. As a result, some features may be non-functional, incomplete, or behave unexpectedly now or in the future. AI-generated code can introduce "slop" — plausible-looking but incorrect or unreliable implementations. Please review and test thoroughly before relying on any functionality in production environments.
+
 ## Features
 
 - **Pluggable Worker System**: Abstract base class for creating custom automation workers
@@ -126,6 +130,24 @@ uv sync
 ```bash
 source .venv/bin/activate
 ```
+
+4. Configure your GitHub token:
+
+Auto-slopp uses the `gh` CLI for GitHub operations (issues, pull requests, etc.). The `gh` CLI requires a `GH_TOKEN` (or `GITHUB_TOKEN`) environment variable to authenticate with GitHub. This token must be provided **separately** from the main `.env` file — it is not an `AUTO_SLOPP_` prefixed variable.
+
+You can set it in your shell environment, in a separate `.env` file loaded by your shell, or pass it directly:
+
+```bash
+# Option 1: Export in your shell profile (~/.bashrc, ~/.zshrc, etc.)
+export GH_TOKEN=ghp_your_github_personal_access_token
+
+# Option 2: Set it in your .env file (note: not prefixed with AUTO_SLOPP_)
+GH_TOKEN=ghp_your_github_personal_access_token
+
+# Option 3: For systemd/Docker, pass it as an environment variable (see sections below)
+```
+
+> **Note:** If `GITHUB_TOKEN` is set but `GH_TOKEN` is not, Auto-slopp will automatically map `GITHUB_TOKEN` to `GH_TOKEN` for `gh` CLI compatibility.
 
 ## Autostart with Systemd
 

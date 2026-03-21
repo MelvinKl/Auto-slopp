@@ -2,6 +2,8 @@
 
 This guide provides comprehensive information for developers working on Auto-slopp, including setup, architecture, testing, and contribution guidelines.
 
+> **Note:** This project contains a significant amount of AI-generated code. Some features may be non-functional or behave unexpectedly due to LLM-generated "slop." Please review and test thoroughly.
+
 ## Table of Contents
 
 1. [Getting Started](#getting-started)
