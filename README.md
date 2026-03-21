@@ -287,6 +287,7 @@ Configure auto-slopp using environment variables:
 docker run -d \
   --name auto-slopp \
   -v /path/to/managed/repos:/repos \
+  -e GH_TOKEN=ghp_your_github_personal_access_token \
   -e AUTO_SLOPP_DEBUG=false \
   -e AUTO_SLOPP_TELEGRAM_ENABLED=true \
   -e AUTO_SLOPP_TELEGRAM_BOT_TOKEN=your_bot_token \
@@ -321,6 +322,7 @@ For complex configurations, use an environment file:
 ```bash
 # Create .env file with your configuration
 cat > .env <<EOF
+GH_TOKEN=ghp_your_github_personal_access_token
 AUTO_SLOPP_DEBUG=false
 AUTO_SLOPP_TELEGRAM_ENABLED=true
 AUTO_SLOPP_TELEGRAM_BOT_TOKEN=your_bot_token
@@ -352,6 +354,7 @@ services:
     volumes:
       - /path/to/managed/repos:/repos
     environment:
+      - GH_TOKEN=${GH_TOKEN}
       - AUTO_SLOPP_DEBUG=false
       - AUTO_SLOPP_TELEGRAM_ENABLED=true
       - AUTO_SLOPP_TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
