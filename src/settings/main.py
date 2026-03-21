@@ -155,7 +155,7 @@ class Settings(BaseSettings):
                     "nvidia/private/nvidia/nemotron-3-super-120b-a12b",
                     "run",
                 ],
-                capability=8,
+                capability=7,
                 name="opencode nvidia nemotron 3",
             ),
             CLIConfiguration(
@@ -165,13 +165,13 @@ class Settings(BaseSettings):
                     "zai-coding-plan/glm-4.7",
                     "run",
                 ],
-                capability=6,
+                capability=8,
                 name="opencode glm-4.7",
             ),
             CLIConfiguration(
                 cli_command="gemini",
                 cli_args=["--yolo", "--model", "gemini-3.1-pro-preview", "-p"],
-                capability=7,
+                capability=5,
                 name="gemini gemini-3.1-pro-preview",
             ),
             CLIConfiguration(
@@ -187,7 +187,7 @@ class Settings(BaseSettings):
                     "opencode/big-pickle",
                     "run",
                 ],
-                capability=7,
+                capability=5,
                 name="opencode big pickle",
             ),
             CLIConfiguration(
@@ -197,7 +197,7 @@ class Settings(BaseSettings):
                     "opencode/nemotron-3-super-free",
                     "run",
                 ],
-                capability=8,
+                capability=7,
                 name="opencode nemotron-3-super-free",
             ),
             CLIConfiguration(
