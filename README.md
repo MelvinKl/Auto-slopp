@@ -133,18 +133,27 @@ source .venv/bin/activate
 
 4. Configure your GitHub token:
 
+> **⚠️ CRITICAL WARNING: DO NOT ADD GITHUB TOKEN TO .env FILE OR ENVIRONMENT VARIABLES**
+> 
+> **NEVER** add your `GH_TOKEN` or `GITHUB_TOKEN` to the `.env` file in this project's root directory. The `.env` file is loaded by CLI tools and this will prevent them from interacting with GitHub directly and protect against unauthorized access.
+> 
+> **DO NOT** set `GH_TOKEN` or `GITHUB_TOKEN` in your shell environment variables (bashrc, zshrc, etc.). This ensures CLI tools spawned by auto-slopp cannot access the GitHub token.
+> 
+> **Instead**, create a separate, dedicated `.gh.env` file outside the project directory and only source it when manually using the `gh` CLI.
+
 Auto-slopp uses the `gh` CLI for GitHub operations (issues, pull requests, etc.). The `gh` CLI requires a `GH_TOKEN` (or `GITHUB_TOKEN`) environment variable to authenticate with GitHub. This token must be provided **separately** from the main `.env` file — it is not an `AUTO_SLOPP_` prefixed variable.
 
-You can set it in your shell environment, in a separate `.env` file loaded by your shell, or pass it directly:
+To manually use `gh` CLI commands:
 
 ```bash
-# Option 1: Export in your shell profile (~/.bashrc, ~/.zshrc, etc.)
-export GH_TOKEN=ghp_your_github_personal_access_token
-
-# Option 2: Set it in your .env file (note: not prefixed with AUTO_SLOPP_)
+# Create a separate .gh.env file outside the project
+cat > ~/.gh.env <<EOF
 GH_TOKEN=ghp_your_github_personal_access_token
+EOF
 
-# Option 3: For systemd/Docker, pass it as an environment variable (see sections below)
+# Source it only when you need to use gh CLI manually
+source ~/.gh.env
+gh repo list
 ```
 
 > **Note:** If `GITHUB_TOKEN` is set but `GH_TOKEN` is not, Auto-slopp will automatically map `GITHUB_TOKEN` to `GH_TOKEN` for `gh` CLI compatibility.
