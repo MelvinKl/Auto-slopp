@@ -725,6 +725,7 @@ class GitHubIssueWorker(Worker):
             "success": False,
             "loops_executed": 0,
             "steps_completed": 0,
+            "total_steps": 0,
             "max_loops_reached": False,
         }
 
@@ -740,6 +741,7 @@ class GitHubIssueWorker(Worker):
                     "max_loops_reached": False,
                 }
 
+            result["total_steps"] = len(plan.steps)
             next_step = plan.get_next_open_step()
             if not next_step:
                 result["success"] = True
