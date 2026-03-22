@@ -84,7 +84,7 @@ AUTO_SLOPP_SLOP_TIMEOUT=7200
 
 The capability rating system (0-10) helps match tasks with appropriate CLI tools:
 
-**Low Rating (0-3):** 
+**Low Rating (0-3):**
 - Suitable for simple, straightforward tasks
 - Examples: Basic git operations, simple file modifications, straightforward code reviews
 - These tools are faster but may struggle with complex logic or nuanced decisions
@@ -480,6 +480,28 @@ make coverage
 make security
 ```
 
+#### Pre-commit Hooks
+
+The project uses pre-commit hooks to ensure code quality before commits and pushes:
+
+```bash
+# Install pre-commit hooks
+pre-commit install
+
+# Run pre-commit hooks on all files
+pre-commit run --all-files
+
+# Run specific hook
+pre-commit run make-format
+```
+
+The pre-commit hooks automatically:
+- Format code using `make format` (black + isort)
+- Check for trailing whitespace
+- Validate YAML syntax
+- Run flake8 linting
+- Check for merge conflicts
+
 #### Available Makefile Targets
 
 | Target | Description |
@@ -507,7 +529,7 @@ The same `make test` command is used in GitHub Actions CI/CD pipelines, ensuring
 The `make test` target includes comprehensive validation:
 
 1. **Code Formatting**: Black code formatting validation
-2. **Import Sorting**: isort import organization checks  
+2. **Import Sorting**: isort import organization checks
 3. **Linting**: flake8 code quality checks
 4. **Security**: Safety dependency scan + Bandit security linter
 5. **Testing**: Full pytest test suite execution
