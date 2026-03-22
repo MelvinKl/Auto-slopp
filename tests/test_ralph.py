@@ -1,5 +1,6 @@
 """Tests for Ralph loop implementation."""
 
+import logging
 import tempfile
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from auto_slopp.utils.ralph import (
     Plan,
     PlanParser,
     PlanWriter,
+    RalphExecutor,
     Step,
 )
 
@@ -254,3 +256,243 @@ class TestPlanWriter:
 
             assert plan_path.exists()
             assert plan_path.parent.is_dir()
+
+
+class TestRalphExecutor:
+    """Tests for RalphExecutor class."""
+
+    @pytest.fixture
+    def logger(self):
+        """Create a test logger."""
+        return logging.getLogger("test_ralph_executor")
+
+    @pytest.fixture
+    def mock_execute_fn(self):
+        """Mock execute function."""
+        return lambda *args, **kwargs: {"success": True, "stdout": "test output"}
+
+    @pytest.fixture
+    def mock_has_changes_fn(self):
+        """Mock has_changes function."""
+        return lambda path: False
+
+    @pytest.fixture
+    def mock_commit_fn(self):
+        """Mock commit function."""
+        return lambda path, msg, push: (True, None)
+
+    @pytest.fixture
+    def ralph_executor(
+        self,
+        logger,
+        mock_execute_fn,
+        mock_has_changes_fn,
+        mock_commit_fn,
+    ):
+        """Create a RalphExecutor instance for testing."""
+        return RalphExecutor(
+            logger=logger,
+            agent_args=[],
+            timeout=60,
+            execute_fn=mock_execute_fn,
+            has_changes_fn=mock_has_changes_fn,
+            commit_fn=mock_commit_fn,
+            max_iterations=10,
+        )
+
+    def test_initialization(self, ralph_executor, logger):
+        """Test RalphExecutor initialization."""
+        assert ralph_executor.logger is logger
+        assert ralph_executor.agent_args == []
+        assert ralph_executor.timeout == 60
+        assert ralph_executor.max_iterations == 10
+
+    def test_get_issue_task_path(self):
+        """Test static method _get_issue_task_path."""
+        repo_dir = Path("/test/repo")
+        task_path = RalphExecutor._get_issue_task_path(repo_dir, 123)
+        expected = Path("/test/repo/.ralph/github-123.md")
+        assert task_path == expected
+
+    def test_create_issue_task_file(self, ralph_executor):
+        """Test creating an issue task file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / ".ralph" / "github-123.md"
+
+            ralph_executor._create_issue_task_file(
+                task_path=task_path,
+                issue_number=123,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=["Comment 1", "Comment 2"],
+                branch_name="ai/branch-123",
+            )
+
+            assert task_path.exists()
+            content = task_path.read_text()
+            assert "Test Issue" in content
+            assert "123" in content
+            assert "ai/branch-123" in content
+            assert "Test body" in content
+            assert "Comment 1" in content
+            assert "Comment 2" in content
+
+    def test_mark_step_completed_in_file(self, ralph_executor):
+        """Test marking a step as completed in a file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            task_path = Path(tmpdir) / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. Step 1\n- [ ] 2. Step 2\n")
+
+            ralph_executor._mark_step_completed_in_file(task_path, 1)
+
+            content = task_path.read_text()
+            assert "- [x] 1. Step 1" in content
+            assert "- [ ] 2. Step 2" in content
+
+    def test_extract_step_block(self, ralph_executor):
+        """Test extracting a step block from task file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            task_path = Path(tmpdir) / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Second step\n")
+
+            block = ralph_executor._extract_step_block(task_path, 1)
+            assert "- [ ] 1. First step" in block
+            assert "Second step" not in block
+
+    def test_find_step_description(self, ralph_executor):
+        """Test finding step description."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            task_path = Path(tmpdir) / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Second step\n")
+
+            desc = ralph_executor._find_step_description(task_path, 1)
+            assert desc == "First step"
+
+            desc = ralph_executor._find_step_description(task_path, 999)
+            assert desc == "Unknown step"
+
+    def test_step_is_closed(self, ralph_executor):
+        """Test checking if a step is closed."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            task_path = Path(tmpdir) / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [x] 1. First step\n- [ ] 2. Second step\n")
+
+            assert ralph_executor._step_is_closed(task_path, 1) is True
+            assert ralph_executor._step_is_closed(task_path, 2) is False
+            assert ralph_executor._step_is_closed(task_path, 999) is False
+
+    def test_ensure_last_step_is_make_test(self, ralph_executor):
+        """Test ensuring last step is make test."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            task_path = Path(tmpdir) / "task.md"
+
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n")
+
+            ralph_executor._ensure_last_step_is_make_test(task_path)
+
+            content = task_path.read_text()
+            assert "make test" in content.lower()
+
+    def test_ensure_last_step_is_make_test_already_present(self, ralph_executor):
+        """Test ensuring last step is make test when already present."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            task_path = Path(tmpdir) / "task.md"
+
+            original = "# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Run make test\n"
+            task_path.write_text(original)
+
+            ralph_executor._ensure_last_step_is_make_test(task_path)
+
+            content = task_path.read_text()
+            assert content == original
+
+    def test_build_progress_info(self, ralph_executor):
+        """Test building progress info."""
+        steps = [
+            Step(number=1, description="Step 1", is_closed=True),
+            Step(number=2, description="Step 2", is_closed=False),
+        ]
+        plan = Plan(title="Test", description="", steps=steps)
+
+        progress = ralph_executor._build_progress_info(plan)
+
+        assert "✓ Step 1: Step 1" in progress or "\u2713 Step 1: Step 1" in progress
+        assert "○ Step 2: Step 2" in progress or "\u25cb Step 2: Step 2" in progress
+
+    def test_build_refinement_instructions(self, ralph_executor):
+        """Test building refinement instructions."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            task_path = Path(tmpdir) / "task.md"
+            task_path.write_text("# Test")
+
+            instructions = ralph_executor._build_refinement_instructions(
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=["Comment 1"],
+                branch_name="ai/branch",
+            )
+
+            assert "Test Issue" in instructions
+            assert "Test body" in instructions
+            assert "Comment 1" in instructions
+            assert "ai/branch" in instructions
+            assert "## Steps" in instructions
+            assert "make test" in instructions
+
+    def test_build_step_instructions(self, ralph_executor):
+        """Test building step instructions."""
+        step = Step(number=1, description="Test step", is_closed=False)
+        plan = Plan(title="Test", description="", steps=[step])
+
+        instructions = ralph_executor._build_step_instructions(
+            step=step,
+            plan=plan,
+            issue_title="Test Issue",
+            issue_body="Test body",
+            comment_texts=["Comment 1"],
+            branch_name="ai/branch",
+        )
+
+        assert "Test Issue" in instructions
+        assert "Test body" in instructions
+        assert "Comment 1" in instructions
+        assert "ai/branch" in instructions
+        assert "Step 1: Test step" in instructions
+
+    def test_build_acceptance_check_instructions(self, ralph_executor):
+        """Test building acceptance check instructions."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            task_path = Path(tmpdir) / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n")
+
+            instructions = ralph_executor._build_acceptance_check_instructions(
+                task_path=task_path,
+                step=Step(number=1, description="First step"),
+                issue_title="Test Issue",
+                issue_body="Test body",
+                branch_name="ai/branch",
+            )
+
+            assert "Test Issue" in instructions
+            assert "ACCEPTANCE_STATUS" in instructions
+            assert "First step" in instructions
+
+    def test_build_remaining_steps_update_instructions(self, ralph_executor):
+        """Test building remaining steps update instructions."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            task_path = Path(tmpdir) / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n")
+
+            instructions = ralph_executor._build_remaining_steps_update_instructions(
+                task_path=task_path,
+                step=Step(number=1, description="First step"),
+                issue_title="Test Issue",
+                issue_body="Test body",
+                branch_name="ai/branch",
+            )
+
+            assert "Test Issue" in instructions
+            assert "First step" in instructions
+            assert "Update only unchecked steps" in instructions
