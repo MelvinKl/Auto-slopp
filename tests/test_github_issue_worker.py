@@ -836,6 +836,7 @@ class TestGitHubIssueWorker:
             assert result["success"] is False
             assert result["max_loops_reached"] is True
             assert result["loops_executed"] == 2
+            assert result["total_steps"] == 1
             assert "maximum iterations (2)" in result["error"].lower()
 
     def test_run_refined_task_loop_commits_on_successful_step(self):
@@ -884,6 +885,7 @@ class TestGitHubIssueWorker:
             assert result["success"] is True
             assert result["loops_executed"] == 1
             assert result["steps_completed"] == 1
+            assert result["total_steps"] == 1
             mock_commit.assert_called_once()
             assert mock_commit.call_args.kwargs["push_if_remote"] is False
             assert "Complete issue step 1" in mock_commit.call_args.kwargs["commit_message"]
