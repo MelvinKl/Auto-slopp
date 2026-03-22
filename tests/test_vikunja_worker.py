@@ -83,6 +83,7 @@ class TestVikunjaWorkerRun:
                 patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
                 patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
                 patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_has_no_open_dependencies", return_value=True),
                 patch.object(VikunjaWorker, "_process_single_task") as mock_process,
             ):
                 mock_checkout.return_value = True

@@ -123,6 +123,8 @@ class VikunjaWorker(Worker):
 
         tasks = self._filter_tasks_by_tag(tasks, settings.github_issue_worker_required_label)
 
+        tasks = [t for t in tasks if self._has_no_open_dependencies(t["id"])]
+
         tasks = sorted(tasks, key=lambda t: t.get("priority", 0), reverse=True)
 
         for task in tasks:
