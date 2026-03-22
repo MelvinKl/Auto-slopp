@@ -13,6 +13,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from settings.main import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -761,6 +763,193 @@ class RalphExecutor:
         )
         with task_path.open("a") as task_file:
             task_file.write(append_content)
+
+    def execute(
+        self,
+        repo_dir: Path,
+        issue_number: int,
+        issue_title: str,
+        issue_body: str,
+        comment_texts: List[str],
+        branch_name: str,
+    ) -> Dict[str, Any]:
+        """Execute issue processing using refined task execution in .ralph/github-<issue>.md."""
+        task_path = self._get_issue_task_path(repo_dir, issue_number)
+
+        if task_path.exists():
+            self.logger.info(f"Task file already exists: {task_path}, updating via CLI")
+            update_result = self._update_issue_task_file(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_number=issue_number,
+                issue_title=issue_title,
+                issue_body=issue_body,
+                comment_texts=comment_texts,
+                branch_name=branch_name,
+            )
+            if not update_result.get("success", False):
+                return {
+                    "success": False,
+                    "error": update_result.get("error", "Failed to update issue task file"),
+                    "loops_executed": 1,
+                    "steps_completed": 0,
+                    "task_path": str(task_path),
+                }
+        else:
+            self._create_issue_task_file(
+                task_path=task_path,
+                issue_number=issue_number,
+                issue_title=issue_title,
+                issue_body=issue_body,
+                comment_texts=comment_texts,
+                branch_name=branch_name,
+            )
+
+            refinement_result = self._refine_issue_task_file(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title=issue_title,
+                issue_body=issue_body,
+                comment_texts=comment_texts,
+                branch_name=branch_name,
+            )
+            if not refinement_result.get("success", False):
+                return {
+                    "success": False,
+                    "error": refinement_result.get("error", "Failed to refine issue task"),
+                    "loops_executed": 1,
+                    "steps_completed": 0,
+                    "task_path": str(task_path),
+                }
+
+        self._ensure_last_step_is_make_test(task_path)
+
+        execution_result = self._run_refined_task_loop(
+            repo_dir=repo_dir,
+            task_path=task_path,
+            issue_title=issue_title,
+            issue_body=issue_body,
+            comment_texts=comment_texts,
+            branch_name=branch_name,
+        )
+        execution_result["task_path"] = str(task_path)
+        return execution_result
+
+    def _run_refined_task_loop(
+        self,
+        repo_dir: Path,
+        task_path: Path,
+        issue_title: str,
+        issue_body: str,
+        comment_texts: List[str],
+        branch_name: str,
+    ) -> Dict[str, Any]:
+        """Iterate through task steps, implementing and validating acceptance criteria."""
+        max_iterations = settings.github_issue_step_max_iterations
+        result: Dict[str, Any] = {
+            "success": False,
+            "loops_executed": 0,
+            "steps_completed": 0,
+            "max_loops_reached": False,
+        }
+
+        for iteration in range(1, max_iterations + 1):
+            try:
+                plan = PlanParser.parse_file(task_path)
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": f"Failed to parse task file during iteration: {str(e)}",
+                    "loops_executed": iteration,
+                    "steps_completed": result["steps_completed"],
+                    "max_loops_reached": False,
+                }
+
+            next_step = plan.get_next_open_step()
+            if not next_step:
+                result["success"] = True
+                result["loops_executed"] = iteration - 1
+                result["steps_completed"] = len([step for step in plan.steps if step.is_closed])
+                return result
+
+            step_result = self._execute_step(
+                step=next_step,
+                plan=plan,
+                repo_dir=repo_dir,
+                issue_title=issue_title,
+                issue_body=issue_body,
+                comment_texts=comment_texts,
+                branch_name=branch_name,
+            )
+            if not step_result.get("success", False):
+                result["last_error"] = step_result.get("error", "Step implementation failed")
+                result["loops_executed"] = iteration
+                continue
+
+            acceptance_result = self._execute_step_acceptance_check(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                step=next_step,
+                issue_title=issue_title,
+                issue_body=issue_body,
+                branch_name=branch_name,
+            )
+            if not acceptance_result.get("success", False):
+                result["last_error"] = acceptance_result.get("error", "Acceptance criteria check failed")
+                result["loops_executed"] = iteration
+                continue
+
+            if not self._step_is_closed(task_path, next_step.number):
+                self._mark_step_completed_in_file(task_path, next_step.number)
+
+            if not self._step_is_closed(task_path, next_step.number):
+                result["last_error"] = f"Step {next_step.number} is still open after acceptance check"
+                result["loops_executed"] = iteration
+                continue
+
+            remaining_steps_update_result = self._update_remaining_steps(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                step=next_step,
+                issue_title=issue_title,
+                issue_body=issue_body,
+                branch_name=branch_name,
+            )
+            if not remaining_steps_update_result.get("success", False):
+                self.logger.warning(
+                    "Failed to update remaining steps after step completion: "
+                    f"{remaining_steps_update_result.get('error', 'Unknown error')}"
+                )
+
+            repo_has_changes = False
+            try:
+                repo_has_changes = self.has_changes_fn(repo_dir)
+            except Exception as e:
+                self.logger.warning(f"Could not determine git changes for step commit: {str(e)}")
+
+            if repo_has_changes:
+                commit_message = f"Complete issue step {next_step.number}: {next_step.description}"
+                commit_success, _ = self.commit_fn(repo_dir, commit_message, False)
+                if not commit_success:
+                    return {
+                        "success": False,
+                        "error": f"Failed to commit changes for step {next_step.number}",
+                        "loops_executed": iteration,
+                        "steps_completed": result["steps_completed"],
+                        "max_loops_reached": False,
+                    }
+
+            try:
+                updated_plan = PlanParser.parse_file(task_path)
+                result["steps_completed"] = len([step for step in updated_plan.steps if step.is_closed])
+            except Exception:
+                pass
+
+            result["loops_executed"] = iteration
+
+        result["max_loops_reached"] = True
+        result["error"] = f"Maximum iterations ({max_iterations}) reached before all steps completed"
+        return result
 
 
 class PlanWriter:
