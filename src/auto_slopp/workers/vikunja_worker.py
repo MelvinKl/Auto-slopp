@@ -123,7 +123,21 @@ class VikunjaWorker(Worker):
 
         tasks = self._filter_tasks_by_tag(tasks, settings.github_issue_worker_required_label)
 
-        tasks = [t for t in tasks if self._has_no_open_dependencies(t["id"])]
+        dep_filtered = []
+        for t in tasks:
+            if self._has_no_open_dependencies(t["id"]):
+                dep_filtered.append(t)
+            else:
+                self.logger.info(
+                    f"Skipping task #{t['id']} '{t.get('title')}': has open dependencies"
+                )
+        tasks = dep_filtered
+
+        if not tasks:
+            self.logger.info("No tasks remaining after dependency filtering")
+            results["execution_time"] = self._get_elapsed_time(start_time)
+            self._log_completion_summary(results)
+            return results
 
         tasks = sorted(tasks, key=lambda t: t.get("priority", 0), reverse=True)
 
