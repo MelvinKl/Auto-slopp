@@ -9,7 +9,6 @@ This worker:
 """
 
 import logging
-import re
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -604,10 +603,10 @@ class GitHubIssueWorker(Worker):
                 result["loops_executed"] = iteration
                 continue
 
-            if not self._step_is_closed(task_path, next_step.number):
-                self._mark_step_completed_in_file(task_path, next_step.number)
+            if not self.ralph_executor._step_is_closed(task_path, next_step.number):
+                self.ralph_executor._mark_step_completed_in_file(task_path, next_step.number)
 
-            if not self._step_is_closed(task_path, next_step.number):
+            if not self.ralph_executor._step_is_closed(task_path, next_step.number):
                 result["last_error"] = f"Step {next_step.number} is still open after acceptance check"
                 result["loops_executed"] = iteration
                 continue
@@ -659,25 +658,6 @@ class GitHubIssueWorker(Worker):
         result["max_loops_reached"] = True
         result["error"] = f"Maximum iterations ({max_iterations}) reached before all steps completed"
         return result
-
-    def _step_is_closed(self, task_path: Path, step_number: int) -> bool:
-        """Check whether a step is marked as completed in the task file."""
-        try:
-            plan = PlanParser.parse_file(task_path)
-        except Exception:
-            return False
-        for step in plan.steps:
-            if step.number == step_number:
-                return step.is_closed
-        return False
-
-    def _mark_step_completed_in_file(self, task_path: Path, step_number: int) -> None:
-        """Mark a step as completed directly in markdown without rewriting the full file."""
-        content = task_path.read_text()
-        pattern = re.compile(rf"^(\s*-\s)\[\s\](\s*{step_number}\.\s+)", re.MULTILINE)
-        updated_content, replacements = pattern.subn(r"\1[x]\2", content, count=1)
-        if replacements > 0:
-            task_path.write_text(updated_content)
 
     def _build_instructions(
         self,

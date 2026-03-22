@@ -720,6 +720,25 @@ class RalphExecutor:
                 return step.description
         return "Unknown step"
 
+    def _step_is_closed(self, task_path: Path, step_number: int) -> bool:
+        """Check whether a step is marked as completed in the task file."""
+        try:
+            plan = PlanParser.parse_file(task_path)
+        except Exception:
+            return False
+        for step in plan.steps:
+            if step.number == step_number:
+                return step.is_closed
+        return False
+
+    def _mark_step_completed_in_file(self, task_path: Path, step_number: int) -> None:
+        """Mark a step as completed directly in markdown without rewriting the full file."""
+        content = task_path.read_text()
+        pattern = re.compile(rf"^(\s*-\s)\[\s\](\s*{step_number}\.\s+)", re.MULTILINE)
+        updated_content, replacements = pattern.subn(r"\1[x]\2", content, count=1)
+        if replacements > 0:
+            task_path.write_text(updated_content)
+
     def _ensure_last_step_is_make_test(self, task_path: Path) -> None:
         """Ensure the last task step always verifies that make test succeeds."""
         try:
