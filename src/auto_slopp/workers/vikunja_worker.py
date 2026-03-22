@@ -264,10 +264,10 @@ class VikunjaWorker(Worker):
 
             status_success = update_task_status(task_id, "done")
             result["task_completed"] = status_success
+            result["tasks_completed"] = 1 if status_success else 0
 
             if status_success:
-                pr_url = f"https://github.com/TODO/{repo_dir.name}/tree/{current_branch}"
-                comment = f"Completed on branch: {current_branch} ({pr_url})"
+                comment = f"Completed on branch: {current_branch}"
                 comment_success = comment_on_task(task_id, comment)
                 result["task_commented"] = comment_success
                 if not comment_success:
