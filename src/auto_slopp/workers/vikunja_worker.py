@@ -202,8 +202,6 @@ class VikunjaWorker(Worker):
             "success": False,
             "openagent_executed": False,
             "openagent_executions": 0,
-            "pr_created": False,
-            "prs_created": 0,
             "task_closed": False,
             "tasks_closed": 0,
             "error": None,
@@ -251,6 +249,7 @@ class VikunjaWorker(Worker):
                 comment_success = comment_on_task(task_id, no_changes_comment)
                 result["task_commented"] = comment_success
 
+                update_task_status(task_id, "done")
                 result["task_completed"] = True
                 result["tasks_completed"] = 1
 
