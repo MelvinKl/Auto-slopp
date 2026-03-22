@@ -1,10 +1,11 @@
-.PHONY: help test lint format clean install dev-install coverage security
+.PHONY: help test lint format clean install dev-install coverage security install-hooks
 
 # Default target
 help:
 	@echo "Available targets:"
 	@echo "  install      - Install dependencies using uv"
 	@echo "  dev-install  - Install development dependencies"
+	@echo "  install-hooks- Install git hooks"
 	@echo "  test         - Run all tests and linting checks (main target)"
 	@echo "  lint         - Run linting checks only"
 	@echo "  format       - Format code with black and isort"
@@ -19,6 +20,14 @@ install:
 # Install development dependencies
 dev-install:
 	uv sync --extra dev
+
+# Install git hooks
+install-hooks:
+	@echo "🪝 Installing git hooks..."
+	@mkdir -p .git/hooks
+	@cp githooks/pre-commit .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo "✅ Git hooks installed successfully"
 
 # Main target: run all tests and linting checks
 test: lint security test-unit
