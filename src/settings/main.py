@@ -112,16 +112,6 @@ class Settings(BaseSettings):
 
     cli_configurations: List[CLIConfiguration] = Field(
         default_factory=lambda: [
-            #CLIConfiguration(
-            #    cli_command="claude",
-            #    cli_args=[
-            #        "--model",
-            #        "opus",
-            #        "-p",
-            #    ],
-            #    capability=10,
-            #    name="claude opus",
-            #),
             CLIConfiguration(
                 cli_command="claude",
                 cli_args=[
