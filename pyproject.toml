@@ -42,6 +42,7 @@ dev = [
     "isort>=7.0.0",
     "safety>=2.3.0",
     "bandit>=1.7.0",
+    "pre-commit>=3.6.0",
 ]
 
 [tool.hatch.build.targets.wheel]
