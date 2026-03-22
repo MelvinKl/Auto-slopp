@@ -204,6 +204,7 @@ class VikunjaWorker(Worker):
             "openagent_executions": 0,
             "task_closed": False,
             "tasks_closed": 0,
+            "task_failed": False,
             "error": None,
         }
 
@@ -219,6 +220,20 @@ class VikunjaWorker(Worker):
             branch_created = create_and_checkout_branch(repo_dir, branch_name, base_branch="main")
             if not branch_created:
                 result["error"] = f"Failed to create branch {branch_name}"
+
+                failure_comment = (
+                    f"⚠️ **Task Failed: Branch Creation Error**\n\n"
+                    f"Failed to create branch '{branch_name}'.\n\n"
+                    f"**Task:** {task_title}\n\n"
+                    f"The system could not create a working branch for this task.\n\n"
+                    f"This task will not be processed again automatically."
+                )
+                comment_success = comment_on_task(task_id, failure_comment)
+                result["task_commented"] = comment_success
+
+                update_task_status(task_id, "failed")
+                result["task_failed"] = True
+
                 return result
 
             instructions = self._build_instructions(task_title, task_description, branch_name=branch_name)
@@ -236,7 +251,22 @@ class VikunjaWorker(Worker):
 
             if not openagent_result["success"]:
                 cli_tool = get_active_cli_command()
-                result["error"] = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
+                error_msg = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
+                result["error"] = error_msg
+
+                failure_comment = (
+                    f"⚠️ **Task Failed: CLI Execution Error**\n\n"
+                    f"The {cli_tool} CLI tool failed to execute the task.\n\n"
+                    f"**Error:** {openagent_result.get('error', 'Unknown error')}\n\n"
+                    f"Branch: {branch_name}\n\n"
+                    f"This task will not be processed again automatically."
+                )
+                comment_success = comment_on_task(task_id, failure_comment)
+                result["task_commented"] = comment_success
+
+                update_task_status(task_id, "failed")
+                result["task_failed"] = True
+
                 return result
 
             current_branch = get_current_branch(repo_dir)
@@ -244,14 +274,18 @@ class VikunjaWorker(Worker):
                 self.logger.info(f"No changes made for task {task_id}, closing task with comment")
 
                 no_changes_comment = (
-                    "No changes required for this task. The task has been reviewed and no modifications are needed."
+                    f"✅ **Task Completed: No Changes Required**\n\n"
+                    f"The task has been reviewed and no modifications were needed.\n\n"
+                    f"**Task:** {task_title}\n\n"
+                    f"After analyzing the requirements and exploring the codebase, "
+                    f"the task was determined to be already complete or not applicable."
                 )
                 comment_success = comment_on_task(task_id, no_changes_comment)
                 result["task_commented"] = comment_success
 
-                update_task_status(task_id, "done")
-                result["task_completed"] = True
-                result["tasks_completed"] = 1
+                status_success = update_task_status(task_id, "done")
+                result["task_completed"] = status_success
+                result["tasks_completed"] = 1 if status_success else 0
 
                 result["success"] = True
                 result["no_changes"] = True
@@ -260,6 +294,20 @@ class VikunjaWorker(Worker):
             push_success, push_message = push_to_remote(repo_dir, remote="origin", branch=current_branch)
             if not push_success:
                 result["error"] = f"Failed to push branch '{current_branch}': {push_message}"
+
+                failure_comment = (
+                    f"⚠️ **Task Failed: Push Error**\n\n"
+                    f"Failed to push branch '{current_branch}' to remote.\n\n"
+                    f"**Error:** {push_message}\n\n"
+                    f"Local changes have been committed but could not be pushed.\n\n"
+                    f"This task will not be processed again automatically."
+                )
+                comment_success = comment_on_task(task_id, failure_comment)
+                result["task_commented"] = comment_success
+
+                update_task_status(task_id, "failed")
+                result["task_failed"] = True
+
                 return result
 
             status_success = update_task_status(task_id, "done")
@@ -267,8 +315,14 @@ class VikunjaWorker(Worker):
             result["tasks_completed"] = 1 if status_success else 0
 
             if status_success:
-                comment = f"Completed on branch: {current_branch}"
-                comment_success = comment_on_task(task_id, comment)
+                success_comment = (
+                    f"✅ **Task Completed Successfully**\n\n"
+                    f"**Task:** {task_title}\n\n"
+                    f"The task has been implemented and pushed to branch `{current_branch}`.\n\n"
+                    f"**Branch:** {current_branch}\n\n"
+                    f"Changes have been committed and pushed. The task is ready for review."
+                )
+                comment_success = comment_on_task(task_id, success_comment)
                 result["task_commented"] = comment_success
                 if not comment_success:
                     self.logger.warning(f"Failed to add comment to task {task_id}")
@@ -280,6 +334,19 @@ class VikunjaWorker(Worker):
         except Exception as e:
             self.logger.error(f"Error processing task {task_id}: {str(e)}")
             result["error"] = str(e)
+
+            exception_comment = (
+                f"⚠️ **Task Failed: Unexpected Error**\n\n"
+                f"An unexpected error occurred while processing the task.\n\n"
+                f"**Error:** {str(e)}\n\n"
+                f"**Task:** {task_title}\n\n"
+                f"This task will not be processed again automatically."
+            )
+            comment_success = comment_on_task(task_id, exception_comment)
+            result["task_commented"] = comment_success
+
+            update_task_status(task_id, "failed")
+            result["task_failed"] = True
 
         return result
 
