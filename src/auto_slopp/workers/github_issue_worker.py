@@ -672,21 +672,8 @@ class GitHubIssueWorker(Worker):
         comment_texts: List[str],
         branch_name: str,
     ) -> Dict[str, Any]:
-        """Execute a single step from the plan.
-
-        Args:
-            step: Step to execute
-            plan: Current plan
-            repo_dir: Repository directory
-            issue_title: Issue title
-            issue_body: Issue body
-            comment_texts: Comment texts
-            branch_name: Branch name
-
-        Returns:
-            Execution result dictionary
-        """
-        step_instructions = self._build_step_instructions(
+        """Execute a single step from the plan, delegating to RalphExecutor."""
+        instructions = self._build_step_instructions(
             step=step,
             plan=plan,
             issue_title=issue_title,
@@ -694,23 +681,11 @@ class GitHubIssueWorker(Worker):
             comment_texts=comment_texts,
             branch_name=branch_name,
         )
-
-        self.logger.info(f"Executing step {step.number}: {step.description}")
-
-        result = execute_with_instructions(
-            step_instructions,
-            repo_dir,
-            self.agent_args,
-            self.timeout,
-            task_name="github_issue",
+        return self.ralph_executor._execute_step(
+            repo_dir=repo_dir,
+            step=step,
+            instructions=instructions,
         )
-
-        if result.get("success", False):
-            self.logger.info(f"Step {step.number} completed successfully")
-        else:
-            self.logger.warning(f"Step {step.number} failed: {result.get('error', 'Unknown error')}")
-
-        return result
 
     def _execute_step_acceptance_check(
         self,
@@ -721,7 +696,7 @@ class GitHubIssueWorker(Worker):
         issue_body: str,
         branch_name: str,
     ) -> Dict[str, Any]:
-        """Run acceptance criteria validation for a step."""
+        """Run acceptance criteria validation for a step, delegating to RalphExecutor."""
         instructions = self._build_acceptance_check_instructions(
             task_path=task_path,
             step=step,
@@ -729,28 +704,11 @@ class GitHubIssueWorker(Worker):
             issue_body=issue_body,
             branch_name=branch_name,
         )
-        result = execute_with_instructions(
-            instructions,
-            repo_dir,
-            self.agent_args,
-            self.timeout,
-            task_name="github_issue",
+        return self.ralph_executor._execute_step_acceptance_check(
+            repo_dir=repo_dir,
+            step=step,
+            instructions=instructions,
         )
-
-        if not result.get("success", False):
-            return {
-                "success": False,
-                "error": result.get("error", "Acceptance criteria check command failed"),
-            }
-
-        stdout_lower = (result.get("stdout") or "").lower()
-        if "acceptance_status: fail" in stdout_lower or "acceptance status: fail" in stdout_lower:
-            return {
-                "success": False,
-                "error": "Acceptance criteria were not fulfilled",
-            }
-
-        return {"success": True}
 
     def _update_remaining_steps(
         self,
@@ -761,7 +719,7 @@ class GitHubIssueWorker(Worker):
         issue_body: str,
         branch_name: str,
     ) -> Dict[str, Any]:
-        """Update future steps with details learned from a completed step."""
+        """Update future steps with details learned from a completed step, delegating to RalphExecutor."""
         instructions = self._build_remaining_steps_update_instructions(
             task_path=task_path,
             step=step,
@@ -769,20 +727,10 @@ class GitHubIssueWorker(Worker):
             issue_body=issue_body,
             branch_name=branch_name,
         )
-        result = execute_with_instructions(
-            instructions,
-            repo_dir,
-            self.agent_args,
-            self.timeout,
-            task_name="github_issue",
+        return self.ralph_executor._update_remaining_steps(
+            repo_dir=repo_dir,
+            instructions=instructions,
         )
-        if not result.get("success", False):
-            return {
-                "success": False,
-                "error": result.get("error", "Failed to update remaining steps"),
-            }
-
-        return {"success": True}
 
     def _build_step_instructions(
         self,

@@ -763,7 +763,7 @@ class TestGitHubIssueWorker:
             task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
             step = Step(number=1, description="Implement changes")
 
-            with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
+            with patch.object(worker.ralph_executor, "execute_fn") as mock_execute:
                 mock_execute.return_value = {
                     "success": True,
                     "stdout": "ACCEPTANCE_STATUS: fail",
@@ -791,7 +791,7 @@ class TestGitHubIssueWorker:
             task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
             step = Step(number=1, description="Implement changes")
 
-            with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
+            with patch.object(worker.ralph_executor, "execute_fn") as mock_execute:
                 mock_execute.return_value = {
                     "success": True,
                     "stdout": "ACCEPTANCE_STATUS: pass",

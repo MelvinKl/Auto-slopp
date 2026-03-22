@@ -432,6 +432,107 @@ class RalphExecutor:
             "- Do not commit, do not push, and do not create a PR.\n"
         )
 
+    def _execute_step(
+        self,
+        repo_dir: Path,
+        step: Step,
+        instructions: str,
+    ) -> Dict[str, Any]:
+        """Execute a single step from the plan.
+
+        Args:
+            repo_dir: Repository directory
+            step: Step to execute
+            instructions: Pre-built instructions for the CLI tool
+
+        Returns:
+            Execution result dictionary
+        """
+        self.logger.info(f"Executing step {step.number}: {step.description}")
+
+        result = self.execute_fn(
+            instructions,
+            repo_dir,
+            self.agent_args,
+            self.timeout,
+            task_name="github_issue",
+        )
+
+        if result.get("success", False):
+            self.logger.info(f"Step {step.number} completed successfully")
+        else:
+            self.logger.warning(f"Step {step.number} failed: {result.get('error', 'Unknown error')}")
+
+        return result
+
+    def _execute_step_acceptance_check(
+        self,
+        repo_dir: Path,
+        step: Step,
+        instructions: str,
+    ) -> Dict[str, Any]:
+        """Run acceptance criteria validation for a step.
+
+        Args:
+            repo_dir: Repository directory
+            step: Step to validate
+            instructions: Pre-built instructions for the acceptance check
+
+        Returns:
+            Dictionary with 'success' key and optional 'error'
+        """
+        result = self.execute_fn(
+            instructions,
+            repo_dir,
+            self.agent_args,
+            self.timeout,
+            task_name="github_issue",
+        )
+
+        if not result.get("success", False):
+            return {
+                "success": False,
+                "error": result.get("error", "Acceptance criteria check command failed"),
+            }
+
+        stdout_lower = (result.get("stdout") or "").lower()
+        if "acceptance_status: fail" in stdout_lower or "acceptance status: fail" in stdout_lower:
+            return {
+                "success": False,
+                "error": "Acceptance criteria were not fulfilled",
+            }
+
+        return {"success": True}
+
+    def _update_remaining_steps(
+        self,
+        repo_dir: Path,
+        instructions: str,
+    ) -> Dict[str, Any]:
+        """Update future steps with details learned from a completed step.
+
+        Args:
+            repo_dir: Repository directory
+            instructions: Pre-built instructions for updating remaining steps
+
+        Returns:
+            Dictionary with 'success' key and optional 'error'
+        """
+        result = self.execute_fn(
+            instructions,
+            repo_dir,
+            self.agent_args,
+            self.timeout,
+            task_name="github_issue",
+        )
+        if not result.get("success", False):
+            return {
+                "success": False,
+                "error": result.get("error", "Failed to update remaining steps"),
+            }
+
+        return {"success": True}
+
     def _ensure_last_step_is_make_test(self, task_path: Path) -> None:
         """Ensure the last task step always verifies that make test succeeds."""
         try:
