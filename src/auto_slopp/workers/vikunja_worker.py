@@ -13,9 +13,22 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from auto_slopp.utils.cli_executor import (
+    execute_with_instructions,
+    get_active_cli_command,
+)
+from auto_slopp.utils.git_operations import (
+    checkout_branch_resilient,
+    create_and_checkout_branch,
+    get_current_branch,
+    push_to_remote,
+    sanitize_branch_name,
+)
 from auto_slopp.utils.vikunja_operations import (
-    find_project,
+    comment_on_task,
+    find_or_create_project,
     get_open_tasks_by_project,
+    update_task_status,
 )
 from auto_slopp.worker import Worker
 from settings.main import settings
@@ -68,13 +81,20 @@ class VikunjaWorker(Worker):
 
         results = self._create_results_dict(start_time, repo_path)
 
+        if not self._checkout_main_branch(repo_dir=repo_path):
+            results["repositories_with_errors"] += 1
+            results["success"] = False
+            results["execution_time"] = self._get_elapsed_time(start_time)
+            self._log_completion_summary(results)
+            return results
+
         # Get project name from repo_path or settings
         project_name = repo_path.name
 
-        # Find the project in Vikunja to get its ID
-        project = find_project(project_name)
+        # Find or create the project in Vikunja to get its ID
+        project = find_or_create_project(project_name)
         if not project:
-            self.logger.warning(f"Project '{project_name}' not found in Vikunja")
+            self.logger.error(f"Failed to find or create Vikunja project: {project_name}")
             results["repositories_with_errors"] += 1
             results["success"] = False
             results["execution_time"] = self._get_elapsed_time(start_time)
@@ -83,12 +103,14 @@ class VikunjaWorker(Worker):
 
         project_id = project.get("id")
         if not project_id:
-            self.logger.warning(f"Project '{project_name}' does not have a valid ID")
+            self.logger.error(f"Project missing ID: {project}")
             results["repositories_with_errors"] += 1
             results["success"] = False
             results["execution_time"] = self._get_elapsed_time(start_time)
             self._log_completion_summary(results)
             return results
+
+        self.logger.info(f"Using Vikunja project: {project.get('title')} (ID: {project_id})")
 
         tasks = get_open_tasks_by_project(project_id)
 
@@ -98,6 +120,8 @@ class VikunjaWorker(Worker):
             self._log_completion_summary(results)
             return results
 
+        tasks = sorted(tasks, key=lambda t: t.get("id", 0))
+
         for task in tasks:
             task_result = self._process_single_task(repo_path, task)
             results["task_results"].append(task_result)
@@ -105,8 +129,7 @@ class VikunjaWorker(Worker):
             if task_result["success"]:
                 results["tasks_processed"] += 1
                 results["openagent_executions"] += task_result.get("openagent_executions", 0)
-                results["prs_created"] += task_result.get("prs_created", 0)
-                results["tasks_closed"] += task_result.get("tasks_closed", 0)
+                results["tasks_completed"] += task_result.get("tasks_completed", 0)
             else:
                 self.logger.warning(
                     f"Failed to process task #{task.get('id')}: {task_result.get('error', 'Unknown error')}"
@@ -116,6 +139,27 @@ class VikunjaWorker(Worker):
         self._log_completion_summary(results)
 
         return results
+
+    def _checkout_main_branch(self, repo_dir: Path) -> bool:
+        """Checkout the main branch and pull latest changes.
+
+        Args:
+            repo_dir: Path to the repository directory
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.dry_run:
+            pull_success = checkout_branch_resilient(
+                repo_dir=repo_dir,
+                branch="main",
+                fetch_first=True,
+                timeout=60,
+            )
+            if not pull_success:
+                self.logger.warning(f"Failed to pull latest changes from {repo_dir.name}")
+                return False
+        return True
 
     def _create_results_dict(self, start_time: float, repo_path: Path) -> Dict[str, Any]:
         """Create the initial results dictionary."""
@@ -129,8 +173,7 @@ class VikunjaWorker(Worker):
             "repositories_with_errors": 0,
             "tasks_processed": 0,
             "openagent_executions": 0,
-            "prs_created": 0,
-            "tasks_closed": 0,
+            "tasks_completed": 0,
             "task_results": [],
             "success": True,
         }
@@ -168,22 +211,135 @@ class VikunjaWorker(Worker):
         }
 
         try:
+            branch_name = f"ai/task-{task_id}-{sanitize_branch_name(task_title[:30].lower())}"
+
             if self.dry_run:
-                self.logger.info(f"DRY RUN: Would execute task '{task_title}'")
+                self.logger.info(f"DRY RUN: Would create branch {branch_name} and execute instructions")
                 result["openagent_executed"] = True
                 result["success"] = True
                 return result
 
-            self.logger.info(f"Task '{task_title}' marked for processing (detailed logic in Step 5)")
+            branch_created = create_and_checkout_branch(repo_dir, branch_name, base_branch="main")
+            if not branch_created:
+                result["error"] = f"Failed to create branch {branch_name}"
+                return result
+
+            instructions = self._build_instructions(task_title, task_description, branch_name=branch_name)
+
+            openagent_result = execute_with_instructions(
+                instructions,
+                repo_dir,
+                self.agent_args,
+                self.timeout,
+                task_name="vikunja_task",
+            )
+            result["openagent_executed"] = openagent_result["success"]
+            if openagent_result["success"]:
+                result["openagent_executions"] = 1
+
+            if not openagent_result["success"]:
+                cli_tool = get_active_cli_command()
+                result["error"] = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
+                return result
+
+            current_branch = get_current_branch(repo_dir)
+            if current_branch in ("main", "master"):
+                self.logger.info(f"No changes made for task {task_id}, closing task with comment")
+
+                no_changes_comment = (
+                    "No changes required for this task. The task has been reviewed and no modifications are needed."
+                )
+                comment_success = comment_on_task(task_id, no_changes_comment)
+                result["task_commented"] = comment_success
+
+                result["task_completed"] = True
+                result["tasks_completed"] = 1
+
+                result["success"] = True
+                result["no_changes"] = True
+                return result
+
+            push_success, push_message = push_to_remote(repo_dir, remote="origin", branch=current_branch)
+            if not push_success:
+                result["error"] = f"Failed to push branch '{current_branch}': {push_message}"
+                return result
+
+            status_success = update_task_status(task_id, "done")
+            result["task_completed"] = status_success
+
+            if status_success:
+                pr_url = f"https://github.com/TODO/{repo_dir.name}/tree/{current_branch}"
+                comment = f"Completed on branch: {current_branch} ({pr_url})"
+                comment_success = comment_on_task(task_id, comment)
+                result["task_commented"] = comment_success
+                if not comment_success:
+                    self.logger.warning(f"Failed to add comment to task {task_id}")
+            else:
+                self.logger.warning(f"Failed to update status for task {task_id}")
+
             result["success"] = True
-            result["openagent_executed"] = True
-            result["openagent_executions"] = 1
 
         except Exception as e:
-            self.logger.error(f"Error processing task #{task_id}: {str(e)}")
+            self.logger.error(f"Error processing task {task_id}: {str(e)}")
             result["error"] = str(e)
 
         return result
+
+    def _build_instructions(
+        self,
+        task_title: str,
+        task_description: str,
+        branch_name: Optional[str] = None,
+    ) -> str:
+        """Build the instructions string from task title and description.
+
+        Args:
+            task_title: Task title
+            task_description: Task description
+            branch_name: Name of the branch already created for this task
+
+        Returns:
+            Complete instructions string
+        """
+        body_text = f"\n{task_description}" if task_description else ""
+
+        branch_instruction = ""
+        if branch_name:
+            branch_instruction = (
+                f"You are already on branch '{branch_name}'. "
+                f"Work on this branch, implement the changes, commit them, and push.\n"
+            )
+        else:
+            branch_instruction = (
+                "Create a new branch that starts with ai/ from base origin/main. "
+                "Work on this branch, implement the changes, commit them, and push.\n"
+            )
+
+        plan_text = """
+Plan:
+1. Understand the requirements by analyzing the task title and description
+2. Explore the codebase to understand the current implementation
+3. Identify components that can be reused
+4. Design a solution that is simple and focused
+5. Write or update tests for the changes
+6. Implement the solution
+7. Run 'make lint' to ensure code quality
+8. Run 'make test' to verify all tests pass
+9. Commit the changes with a clear commit message
+10. Push the changes to the remote branch
+"""
+
+        return (
+            f"{branch_instruction}"
+            f"Implement the following:\n"
+            f"Title: {task_title}\n"
+            f"Description:{body_text}\n"
+            f"{plan_text}\n"
+            f"Keep your implementation simple. Only implement what is required. "
+            f"Check if there are components you can reuse. "
+            f"Ensure that 'make test' runs successful. Only push if ALL tests are successful. "
+            f"Check if you need to update the README.md."
+        )
 
     def _create_error_result(self, start_time: float, repo_path: Path, error_msg: str) -> Dict[str, Any]:
         """Create an error result dictionary."""
@@ -199,8 +355,7 @@ class VikunjaWorker(Worker):
             "repositories_with_errors": 1,
             "tasks_processed": 0,
             "openagent_executions": 0,
-            "prs_created": 0,
-            "tasks_closed": 0,
+            "tasks_completed": 0,
             "task_results": [],
         }
 
@@ -214,10 +369,11 @@ class VikunjaWorker(Worker):
 
     def _log_completion_summary(self, results: Dict[str, Any]) -> None:
         """Log completion summary."""
+        cli_tool = get_active_cli_command()
         self.logger.info(
             f"VikunjaWorker completed. Processed: "
             f"{results['tasks_processed']}, "
-            f"PRs created: {results['prs_created']}, "
-            f"Tasks closed: {results['tasks_closed']}, "
+            f"{cli_tool} executions: {results['openagent_executions']}, "
+            f"Tasks completed: {results['tasks_completed']}, "
             f"Errors: {results['repositories_with_errors']}"
         )
