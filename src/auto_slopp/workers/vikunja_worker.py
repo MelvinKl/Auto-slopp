@@ -120,6 +120,8 @@ class VikunjaWorker(Worker):
             self._log_completion_summary(results)
             return results
 
+        tasks = self._filter_tasks_by_tag(tasks, settings.github_issue_worker_required_label)
+
         tasks = sorted(tasks, key=lambda t: t.get("priority", 0), reverse=True)
 
         for task in tasks:
@@ -457,9 +459,7 @@ Plan:
             if tag_lower in label_titles:
                 filtered.append(task)
             else:
-                self.logger.info(
-                    f"Skipping task #{task.get('id')} '{task.get('title')}': missing tag '{tag_name}'"
-                )
+                self.logger.info(f"Skipping task #{task.get('id')} '{task.get('title')}': missing tag '{tag_name}'")
         return filtered
 
     def _log_completion_summary(self, results: Dict[str, Any]) -> None:

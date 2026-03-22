@@ -72,10 +72,11 @@ class TestVikunjaWorkerRun:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_path = Path(temp_dir)
 
+            ai_label = [{"title": "ai"}]
             tasks = [
-                {"id": 1, "title": "Low prio", "description": "", "priority": 1},
-                {"id": 2, "title": "High prio", "description": "", "priority": 5},
-                {"id": 3, "title": "Mid prio", "description": "", "priority": 3},
+                {"id": 1, "title": "Low prio", "description": "", "priority": 1, "labels": ai_label},
+                {"id": 2, "title": "High prio", "description": "", "priority": 5, "labels": ai_label},
+                {"id": 3, "title": "Mid prio", "description": "", "priority": 3, "labels": ai_label},
             ]
 
             with (
