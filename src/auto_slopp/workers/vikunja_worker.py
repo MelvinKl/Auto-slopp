@@ -439,17 +439,17 @@ Plan:
         """Get elapsed time from start time."""
         return time.time() - start_time
 
-    def _filter_tasks_by_tag(self, tasks: List[Dict[str, Any]], tag: str) -> List[Dict[str, Any]]:
+    def _filter_tasks_by_tag(self, tasks: List[Dict[str, Any]], tag_name: str) -> List[Dict[str, Any]]:
         """Filter tasks to only those whose labels contain a label with a matching title.
 
         Args:
             tasks: List of task dictionaries from Vikunja
-            tag: Tag title to filter by (case-insensitive)
+            tag_name: Tag title to filter by (case-insensitive)
 
         Returns:
             List of tasks that have the specified tag
         """
-        tag_lower = tag.lower()
+        tag_lower = tag_name.lower()
         filtered = []
         for task in tasks:
             labels = task.get("labels") or []
@@ -457,7 +457,9 @@ Plan:
             if tag_lower in label_titles:
                 filtered.append(task)
             else:
-                self.logger.debug(f"Skipping task #{task.get('id')}: missing tag '{tag}'")
+                self.logger.info(
+                    f"Skipping task #{task.get('id')} '{task.get('title')}': missing tag '{tag_name}'"
+                )
         return filtered
 
     def _log_completion_summary(self, results: Dict[str, Any]) -> None:
