@@ -40,6 +40,7 @@ from auto_slopp.utils.github_operations import (
 from auto_slopp.utils.ralph import (
     Plan,
     PlanParser,
+    RalphExecutor,
     Step,
 )
 from auto_slopp.worker import Worker
@@ -71,6 +72,14 @@ class GitHubIssueWorker(Worker):
         self.agent_args = agent_args or []
         self.dry_run = dry_run
         self.logger = logging.getLogger("auto_slopp.workers.GitHubIssueWorker")
+        self.ralph_executor = RalphExecutor(
+            logger=self.logger,
+            agent_args=self.agent_args,
+            timeout=self.timeout,
+            execute_fn=execute_with_instructions,
+            has_changes_fn=has_changes,
+            commit_fn=commit_and_push_changes,
+        )
 
     def run(self, repo_path: Path) -> Dict[str, Any]:
         """Execute the GitHub issue processing workflow for a single repository.
@@ -535,7 +544,7 @@ class GitHubIssueWorker(Worker):
 
     def _get_issue_task_path(self, repo_dir: Path, issue_number: int) -> Path:
         """Get the canonical task file path for a GitHub issue."""
-        return repo_dir / ".ralph" / f"github-{issue_number}.md"
+        return self.ralph_executor._get_issue_task_path(repo_dir, issue_number)
 
     def _create_issue_task_file(
         self,
@@ -547,35 +556,14 @@ class GitHubIssueWorker(Worker):
         branch_name: str,
     ) -> None:
         """Create the initial GitHub issue task file in .ralph."""
-        comments_text = ""
-        if comment_texts:
-            comments_text = "Comments:\n" + "\n".join(f"- {comment}" for comment in comment_texts if comment) + "\n\n"
-
-        content = (
-            f"# GitHub Issue Task: {issue_title}\n\n"
-            f"Issue Number: {issue_number}\n"
-            f"Branch: {branch_name}\n\n"
-            f"## Required Task\n\n"
-            f"{issue_body}\n\n"
-            f"{comments_text}"
-            "## Steps\n\n"
-            "- [ ] 1. Analyze the required implementation changes for this issue.\n"
-            "  - Acceptance Criteria:\n"
-            "    - The affected files and expected behavior are clearly identified.\n"
-            "- [ ] 2. Implement the required code changes.\n"
-            "  - Acceptance Criteria:\n"
-            "    - Code changes are applied in the correct files.\n"
-            "- [ ] 3. Update or add tests for the implementation.\n"
-            "  - Acceptance Criteria:\n"
-            "    - Tests cover the implemented behavior.\n"
-            "- [ ] 4. Run `make test` and confirm it succeeds.\n"
-            "  - Acceptance Criteria:\n"
-            "    - `make test` exits successfully.\n"
+        return self.ralph_executor._create_issue_task_file(
+            task_path=task_path,
+            issue_number=issue_number,
+            issue_title=issue_title,
+            issue_body=issue_body,
+            comment_texts=comment_texts,
+            branch_name=branch_name,
         )
-
-        task_path.parent.mkdir(parents=True, exist_ok=True)
-        task_path.write_text(content)
-        self.logger.info(f"Created issue task file: {task_path}")
 
     def _update_issue_task_file(
         self,
@@ -588,57 +576,15 @@ class GitHubIssueWorker(Worker):
         branch_name: str,
     ) -> Dict[str, Any]:
         """Update an existing task file via the CLI instead of overwriting it."""
-        comments_text = ""
-        if comment_texts:
-            comments_text = "\nComments:\n" + "\n".join(f"- {comment}" for comment in comment_texts if comment)
-
-        instructions = (
-            f"You are already on branch '{branch_name}'. "
-            f"Update the existing task file at '{task_path}' for GitHub issue #{issue_number}.\n"
-            f"Issue title: {issue_title}\n"
-            f"Issue description:\n{issue_body}\n"
-            f"{comments_text}\n\n"
-            "The task file already exists and may contain completed steps from prior work.\n"
-            "Requirements:\n"
-            "- Preserve all completed (checked) steps exactly as they are.\n"
-            "- Update only the open (unchecked) steps to reflect the latest issue description and comments.\n"
-            "- Add new steps if the issue description or comments require additional work.\n"
-            "- Remove open steps that are no longer relevant.\n"
-            "- Keep the '## Steps' section and the existing file format.\n"
-            "- Keep step numbering sequential and stable.\n"
-            "- The last step must always verify that `make test` succeeds.\n"
-            "- Do not commit, do not push, and do not create a PR.\n"
+        return self.ralph_executor._update_issue_task_file(
+            repo_dir=repo_dir,
+            task_path=task_path,
+            issue_number=issue_number,
+            issue_title=issue_title,
+            issue_body=issue_body,
+            comment_texts=comment_texts,
+            branch_name=branch_name,
         )
-
-        result = execute_with_instructions(
-            instructions,
-            repo_dir,
-            self.agent_args,
-            self.timeout,
-            task_name="github_issue",
-        )
-
-        if not result.get("success", False):
-            return {
-                "success": False,
-                "error": result.get("error", "Failed to update task file via CLI"),
-            }
-
-        try:
-            updated_plan = PlanParser.parse_file(task_path)
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Failed to parse updated task file: {str(e)}",
-            }
-
-        if not updated_plan.steps:
-            return {
-                "success": False,
-                "error": "Updated task file does not contain any executable steps",
-            }
-
-        return {"success": True}
 
     def _refine_issue_task_file(
         self,
@@ -650,65 +596,18 @@ class GitHubIssueWorker(Worker):
         branch_name: str,
     ) -> Dict[str, Any]:
         """Ask slopmachine to refine the task into concrete steps with acceptance criteria."""
-        instructions = self._build_refinement_instructions(
+        return self.ralph_executor._refine_issue_task_file(
+            repo_dir=repo_dir,
             task_path=task_path,
             issue_title=issue_title,
             issue_body=issue_body,
             comment_texts=comment_texts,
             branch_name=branch_name,
         )
-        result = execute_with_instructions(
-            instructions,
-            repo_dir,
-            self.agent_args,
-            self.timeout,
-            task_name="github_issue",
-        )
-
-        if not result.get("success", False):
-            return {
-                "success": False,
-                "error": result.get("error", "Task refinement failed"),
-            }
-
-        try:
-            refined_plan = PlanParser.parse_file(task_path)
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Failed to parse refined task file: {str(e)}",
-            }
-
-        if not refined_plan.steps:
-            return {
-                "success": False,
-                "error": "Refined task file does not contain any executable steps",
-            }
-
-        return {"success": True}
 
     def _ensure_last_step_is_make_test(self, task_path: Path) -> None:
         """Ensure the last task step always verifies that make test succeeds."""
-        try:
-            plan = PlanParser.parse_file(task_path)
-        except Exception:
-            return
-
-        if not plan.steps:
-            return
-
-        last_step = plan.steps[-1]
-        if "make test" in last_step.description.lower():
-            return
-
-        next_step_number = last_step.number + 1
-        append_content = (
-            f"\n- [ ] {next_step_number}. Run `make test` and confirm it succeeds.\n"
-            "  - Acceptance Criteria:\n"
-            "    - `make test` exits successfully.\n"
-        )
-        with task_path.open("a") as task_file:
-            task_file.write(append_content)
+        return self.ralph_executor._ensure_last_step_is_make_test(task_path)
 
     def _run_refined_task_loop(
         self,

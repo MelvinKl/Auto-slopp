@@ -220,6 +220,7 @@ class TestGitHubIssueWorker:
                 patch("auto_slopp.workers.github_issue_worker.close_issue") as mock_close,
                 patch("auto_slopp.workers.github_issue_worker.delete_branch") as mock_delete,
                 patch("auto_slopp.workers.github_issue_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
             ):
                 mock_issues.return_value = [mock_issue]
                 mock_create_branch.return_value = True
@@ -229,6 +230,9 @@ class TestGitHubIssueWorker:
                 mock_close.return_value = True
                 mock_delete.return_value = True
                 mock_checkout.return_value = True
+                mock_settings.ralph_enabled = False
+                mock_settings.github_issue_worker_required_label = "ai"
+                mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
 
                 worker = GitHubIssueWorker(dry_run=False)
                 result = worker.run(repo_path)
@@ -1038,18 +1042,20 @@ class TestGitHubIssueWorker:
                 "# GitHub Issue Task: Test\n\n" "## Steps\n\n" "- [x] 1. Already done\n" "- [ ] 2. Open step\n"
             )
 
-            with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
-                mock_execute.return_value = {"success": True}
+            from unittest.mock import MagicMock
 
-                result = worker._update_issue_task_file(
-                    repo_dir=repo_path,
-                    task_path=task_path,
-                    issue_number=42,
-                    issue_title="Test issue",
-                    issue_body="Do something",
-                    comment_texts=["A comment"],
-                    branch_name="ai/issue-42",
-                )
+            mock_execute = MagicMock(return_value={"success": True})
+            worker.ralph_executor.execute_fn = mock_execute
+
+            result = worker._update_issue_task_file(
+                repo_dir=repo_path,
+                task_path=task_path,
+                issue_number=42,
+                issue_title="Test issue",
+                issue_body="Do something",
+                comment_texts=["A comment"],
+                branch_name="ai/issue-42",
+            )
 
             assert result["success"] is True
             mock_execute.assert_called_once()
@@ -1073,18 +1079,20 @@ class TestGitHubIssueWorker:
                 "# GitHub Issue Task: Test\n\n" "## Steps\n\n" "- [x] 1. Already done\n" "- [ ] 2. Open step\n"
             )
 
-            with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
-                mock_execute.return_value = {"success": True}
+            from unittest.mock import MagicMock
 
-                result = worker._update_issue_task_file(
-                    repo_dir=repo_path,
-                    task_path=task_path,
-                    issue_number=42,
-                    issue_title="Test issue",
-                    issue_body="Do something",
-                    comment_texts=[],
-                    branch_name="ai/issue-42",
-                )
+            mock_execute = MagicMock(return_value={"success": True})
+            worker.ralph_executor.execute_fn = mock_execute
+
+            result = worker._update_issue_task_file(
+                repo_dir=repo_path,
+                task_path=task_path,
+                issue_number=42,
+                issue_title="Test issue",
+                issue_body="Do something",
+                comment_texts=[],
+                branch_name="ai/issue-42",
+            )
 
             assert result["success"] is True
             instructions = mock_execute.call_args[0][0]
@@ -1100,18 +1108,19 @@ class TestGitHubIssueWorker:
             task_path.parent.mkdir(parents=True, exist_ok=True)
             task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Do stuff\n")
 
-            with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
-                mock_execute.return_value = {"success": False, "error": "timeout"}
+            from unittest.mock import MagicMock
 
-                result = worker._update_issue_task_file(
-                    repo_dir=repo_path,
-                    task_path=task_path,
-                    issue_number=42,
-                    issue_title="Test",
-                    issue_body="Body",
-                    comment_texts=[],
-                    branch_name="ai/issue-42",
-                )
+            worker.ralph_executor.execute_fn = MagicMock(return_value={"success": False, "error": "timeout"})
+
+            result = worker._update_issue_task_file(
+                repo_dir=repo_path,
+                task_path=task_path,
+                issue_number=42,
+                issue_title="Test",
+                issue_body="Body",
+                comment_texts=[],
+                branch_name="ai/issue-42",
+            )
 
             assert result["success"] is False
             assert "timeout" in result["error"]
@@ -1126,18 +1135,19 @@ class TestGitHubIssueWorker:
             task_path.parent.mkdir(parents=True, exist_ok=True)
             task_path.write_text("# Task\n\nNo steps here.\n")
 
-            with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
-                mock_execute.return_value = {"success": True}
+            from unittest.mock import MagicMock
 
-                result = worker._update_issue_task_file(
-                    repo_dir=repo_path,
-                    task_path=task_path,
-                    issue_number=42,
-                    issue_title="Test",
-                    issue_body="Body",
-                    comment_texts=[],
-                    branch_name="ai/issue-42",
-                )
+            worker.ralph_executor.execute_fn = MagicMock(return_value={"success": True})
+
+            result = worker._update_issue_task_file(
+                repo_dir=repo_path,
+                task_path=task_path,
+                issue_number=42,
+                issue_title="Test",
+                issue_body="Body",
+                comment_texts=[],
+                branch_name="ai/issue-42",
+            )
 
             assert result["success"] is False
             assert "does not contain any executable steps" in result["error"]
