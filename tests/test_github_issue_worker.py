@@ -769,7 +769,7 @@ class TestGitHubIssueWorker:
                     "stdout": "ACCEPTANCE_STATUS: fail",
                 }
 
-                result = worker._execute_step_acceptance_check(
+                result = worker.ralph_executor._execute_step_acceptance_check(
                     repo_dir=repo_path,
                     task_path=task_path,
                     step=step,
@@ -797,7 +797,7 @@ class TestGitHubIssueWorker:
                     "stdout": "ACCEPTANCE_STATUS: pass",
                 }
 
-                result = worker._execute_step_acceptance_check(
+                result = worker.ralph_executor._execute_step_acceptance_check(
                     repo_dir=repo_path,
                     task_path=task_path,
                     step=step,
@@ -823,7 +823,7 @@ class TestGitHubIssueWorker:
                     2,
                 ),
                 patch.object(
-                    worker,
+                    worker.ralph_executor,
                     "_execute_step",
                     return_value={"success": False, "error": "retry needed"},
                 ),
@@ -861,13 +861,13 @@ class TestGitHubIssueWorker:
                     "auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations",
                     3,
                 ),
-                patch.object(worker, "_execute_step", return_value={"success": True}),
+                patch.object(worker.ralph_executor, "_execute_step", return_value={"success": True}),
                 patch.object(
-                    worker,
+                    worker.ralph_executor,
                     "_execute_step_acceptance_check",
                     return_value={"success": True},
                 ),
-                patch.object(worker, "_update_remaining_steps", return_value={"success": True}),
+                patch.object(worker.ralph_executor, "_update_remaining_steps", return_value={"success": True}),
                 patch(
                     "auto_slopp.workers.github_issue_worker.has_changes",
                     return_value=True,

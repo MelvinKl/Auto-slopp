@@ -580,6 +580,146 @@ class RalphExecutor:
 
         return {"success": True}
 
+    def _build_step_instructions(
+        self,
+        step: Step,
+        plan: Plan,
+        issue_title: str,
+        issue_body: str,
+        comment_texts: List[str],
+        branch_name: str,
+    ) -> str:
+        """Build instructions for a single step.
+
+        Args:
+            step: Step to build instructions for
+            plan: Current plan
+            issue_title: Issue title
+            issue_body: Issue body
+            comment_texts: Comment texts
+            branch_name: Branch name
+
+        Returns:
+            Instructions string for the step
+        """
+        body_text = f"\n{issue_body}" if issue_body else ""
+        comments_text = ""
+        if comment_texts:
+            comments_text = "\nComments:\n" + "\n".join(f"- {comment}" for comment in comment_texts if comment)
+
+        progress_info = self._build_progress_info(plan)
+
+        return (
+            f"You are already on branch '{branch_name}'. "
+            f"Work on this branch, implement the changes, commit them, and push.\n"
+            f"Implement the following:\n"
+            f"Title: {issue_title}\n"
+            f"Description:{body_text}\n"
+            f"{comments_text}\n\n"
+            f"Current Progress:\n{progress_info}\n\n"
+            f"Your current task is Step {step.number}: {step.description}\n\n"
+            f"Focus only on completing this step. Once done, mark it as complete in your work. "
+            f"Keep your implementation simple. Only implement what is required. "
+            f"Check if there are components you can reuse. "
+            f"Ensure that 'make test' runs successful. Only push if ALL tests are successful. "
+            f"Check if you need to update the README.md."
+        )
+
+    def _build_progress_info(self, plan: Plan) -> str:
+        """Build progress information string.
+
+        Args:
+            plan: Current plan
+
+        Returns:
+            Progress information string
+        """
+        lines = []
+        for step in plan.steps:
+            status = "\u2713" if step.is_closed else "\u25cb"
+            lines.append(f"{status} Step {step.number}: {step.description}")
+        return "\n".join(lines)
+
+    def _build_acceptance_check_instructions(
+        self,
+        task_path: Path,
+        step: Step,
+        issue_title: str,
+        issue_body: str,
+        branch_name: str,
+    ) -> str:
+        """Build instructions for acceptance criteria checks."""
+        step_block = self._extract_step_block(task_path, step.number)
+        return (
+            f"You are already on branch '{branch_name}'. "
+            f"Check acceptance criteria for Step {step.number} in '{task_path}'.\n"
+            f"Issue title: {issue_title}\n"
+            f"Issue description:\n{issue_body}\n\n"
+            f"Step details:\n{step_block}\n\n"
+            "Validate that all acceptance criteria are fulfilled.\n"
+            "If all criteria are fulfilled, mark the step as completed in the task file.\n"
+            "If criteria are not fulfilled, keep the step open.\n"
+            "Do not commit, do not push, and do not create a PR.\n"
+            "At the end, output exactly one line: ACCEPTANCE_STATUS: pass or ACCEPTANCE_STATUS: fail"
+        )
+
+    def _build_remaining_steps_update_instructions(
+        self,
+        task_path: Path,
+        step: Step,
+        issue_title: str,
+        issue_body: str,
+        branch_name: str,
+    ) -> str:
+        """Build instructions for updating remaining steps after a successful step."""
+        step_block = self._extract_step_block(task_path, step.number)
+        return (
+            f"You are already on branch '{branch_name}'. "
+            f"Update remaining open steps in '{task_path}' after completion of Step {step.number}.\n"
+            f"Issue title: {issue_title}\n"
+            f"Issue description:\n{issue_body}\n\n"
+            f"Completed step details:\n{step_block}\n\n"
+            "Update only unchecked steps to include concrete details learned from the completed step.\n"
+            "Do not alter numbering, and do not modify completed steps.\n"
+            "Do not commit, do not push, and do not create a PR."
+        )
+
+    def _extract_step_block(self, task_path: Path, step_number: int) -> str:
+        """Extract a step block (step line plus child lines) from the task markdown file."""
+        content = task_path.read_text()
+        lines = content.splitlines()
+        step_pattern = re.compile(r"^\s*-\s\[[ x]\]\s*\d+\.\s+")
+        target_pattern = re.compile(rf"^\s*-\s\[[ x]\]\s*{step_number}\.\s+")
+
+        start_idx: Optional[int] = None
+        end_idx = len(lines)
+
+        for idx, line in enumerate(lines):
+            if target_pattern.match(line):
+                start_idx = idx
+                break
+
+        if start_idx is None:
+            return f"- [ ] {step_number}. {self._find_step_description(task_path, step_number)}"
+
+        for idx in range(start_idx + 1, len(lines)):
+            if step_pattern.match(lines[idx]):
+                end_idx = idx
+                break
+
+        return "\n".join(lines[start_idx:end_idx]).strip()
+
+    def _find_step_description(self, task_path: Path, step_number: int) -> str:
+        """Fallback helper to retrieve the step description for a given step number."""
+        try:
+            plan = PlanParser.parse_file(task_path)
+        except Exception:
+            return "Unknown step"
+        for step in plan.steps:
+            if step.number == step_number:
+                return step.description
+        return "Unknown step"
+
     def _ensure_last_step_is_make_test(self, task_path: Path) -> None:
         """Ensure the last task step always verifies that make test succeeds."""
         try:
