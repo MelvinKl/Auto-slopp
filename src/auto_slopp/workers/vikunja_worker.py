@@ -29,6 +29,7 @@ from auto_slopp.utils.vikunja_operations import (
     find_or_create_project,
     get_open_tasks_by_project,
     update_task_status,
+    verify_blocking_closed,
 )
 from auto_slopp.worker import Worker
 from settings.main import settings
@@ -461,6 +462,17 @@ Plan:
             else:
                 self.logger.info(f"Skipping task #{task.get('id')} '{task.get('title')}': missing tag '{tag_name}'")
         return filtered
+
+    def _has_no_open_dependencies(self, task: Dict[str, Any]) -> bool:
+        """Check if a task has no open dependencies.
+
+        Args:
+            task: The task dictionary from Vikunja
+
+        Returns:
+            True if all blocking tasks are closed (or there are none), False otherwise
+        """
+        return verify_blocking_closed(task["id"])
 
     def _log_completion_summary(self, results: Dict[str, Any]) -> None:
         """Log completion summary."""
