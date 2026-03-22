@@ -248,7 +248,8 @@ class RalphExecutor:
         self.has_changes_fn = has_changes_fn
         self.commit_fn = commit_fn
 
-    def _get_issue_task_path(self, repo_dir: Path, issue_number: int) -> Path:
+    @staticmethod
+    def _get_issue_task_path(repo_dir: Path, issue_number: int) -> Path:
         """Get the canonical task file path for a GitHub issue."""
         return repo_dir / ".ralph" / f"github-{issue_number}.md"
 
