@@ -220,6 +220,7 @@ class TestGitHubIssueWorker:
                 patch("auto_slopp.workers.github_issue_worker.close_issue") as mock_close,
                 patch("auto_slopp.workers.github_issue_worker.delete_branch") as mock_delete,
                 patch("auto_slopp.workers.github_issue_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.github_issue_worker.settings") as mock_settings,
             ):
                 mock_issues.return_value = [mock_issue]
                 mock_create_branch.return_value = True
@@ -229,6 +230,9 @@ class TestGitHubIssueWorker:
                 mock_close.return_value = True
                 mock_delete.return_value = True
                 mock_checkout.return_value = True
+                mock_settings.ralph_enabled = False
+                mock_settings.github_issue_worker_required_label = "ai"
+                mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
 
                 worker = GitHubIssueWorker(dry_run=False)
                 result = worker.run(repo_path)
@@ -683,7 +687,7 @@ class TestGitHubIssueWorker:
 
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_path = Path(temp_dir)
-            task_path = worker._get_issue_task_path(repo_path, 281)
+            task_path = worker.ralph_executor._get_issue_task_path(repo_path, 281)
 
             assert task_path == repo_path / ".ralph" / "github-281.md"
 
@@ -695,7 +699,7 @@ class TestGitHubIssueWorker:
             repo_path = Path(temp_dir)
             task_path = repo_path / ".ralph" / "github-281.md"
 
-            worker._create_issue_task_file(
+            worker.ralph_executor._create_issue_task_file(
                 task_path=task_path,
                 issue_number=281,
                 issue_title="Rework worker",
@@ -725,7 +729,7 @@ class TestGitHubIssueWorker:
 - [ ] 2. Update tests
 """)
 
-            worker._ensure_last_step_is_make_test(task_path)
+            worker.ralph_executor._ensure_last_step_is_make_test(task_path)
             updated = task_path.read_text()
 
             assert "- [ ] 3. Run `make test` and confirm it succeeds." in updated
@@ -744,7 +748,7 @@ class TestGitHubIssueWorker:
 - [ ] 2. Run `make test` and confirm it succeeds.
 """)
 
-            worker._ensure_last_step_is_make_test(task_path)
+            worker.ralph_executor._ensure_last_step_is_make_test(task_path)
             updated = task_path.read_text()
 
             assert updated.count("Run `make test` and confirm it succeeds.") == 1
@@ -759,13 +763,13 @@ class TestGitHubIssueWorker:
             task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
             step = Step(number=1, description="Implement changes")
 
-            with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
+            with patch.object(worker.ralph_executor, "execute_fn") as mock_execute:
                 mock_execute.return_value = {
                     "success": True,
                     "stdout": "ACCEPTANCE_STATUS: fail",
                 }
 
-                result = worker._execute_step_acceptance_check(
+                result = worker.ralph_executor._execute_step_acceptance_check(
                     repo_dir=repo_path,
                     task_path=task_path,
                     step=step,
@@ -787,13 +791,13 @@ class TestGitHubIssueWorker:
             task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
             step = Step(number=1, description="Implement changes")
 
-            with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
+            with patch.object(worker.ralph_executor, "execute_fn") as mock_execute:
                 mock_execute.return_value = {
                     "success": True,
                     "stdout": "ACCEPTANCE_STATUS: pass",
                 }
 
-                result = worker._execute_step_acceptance_check(
+                result = worker.ralph_executor._execute_step_acceptance_check(
                     repo_dir=repo_path,
                     task_path=task_path,
                     step=step,
@@ -814,17 +818,18 @@ class TestGitHubIssueWorker:
             task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
 
             with (
-                patch(
-                    "auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations",
+                patch.object(
+                    worker.ralph_executor,
+                    "max_iterations",
                     2,
                 ),
                 patch.object(
-                    worker,
+                    worker.ralph_executor,
                     "_execute_step",
                     return_value={"success": False, "error": "retry needed"},
                 ),
             ):
-                result = worker._run_refined_task_loop(
+                result = worker.ralph_executor._run_refined_task_loop(
                     repo_dir=repo_path,
                     task_path=task_path,
                     issue_title="Issue",
@@ -896,26 +901,36 @@ class TestGitHubIssueWorker:
 """)
 
             with (
-                patch(
-                    "auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations",
+                patch.object(
+                    worker.ralph_executor,
+                    "max_iterations",
                     3,
                 ),
-                patch.object(worker, "_execute_step", return_value={"success": True}),
                 patch.object(
-                    worker,
+                    worker.ralph_executor,
+                    "_execute_step",
+                    return_value={"success": True},
+                ),
+                patch.object(
+                    worker.ralph_executor,
                     "_execute_step_acceptance_check",
                     return_value={"success": True},
                 ),
-                patch.object(worker, "_update_remaining_steps", return_value={"success": True}),
-                patch(
-                    "auto_slopp.workers.github_issue_worker.has_changes",
+                patch.object(
+                    worker.ralph_executor,
+                    "_update_remaining_steps",
+                    return_value={"success": True},
+                ),
+                patch.object(
+                    worker.ralph_executor,
+                    "has_changes_fn",
                     return_value=True,
                 ),
-                patch("auto_slopp.workers.github_issue_worker.commit_and_push_changes") as mock_commit,
+                patch.object(worker.ralph_executor, "commit_fn") as mock_commit,
             ):
                 mock_commit.return_value = (True, "ok")
 
-                result = worker._run_refined_task_loop(
+                result = worker.ralph_executor._run_refined_task_loop(
                     repo_dir=repo_path,
                     task_path=task_path,
                     issue_title="Issue",
@@ -929,8 +944,8 @@ class TestGitHubIssueWorker:
             assert result["steps_completed"] == 1
             assert result["total_steps"] == 1
             mock_commit.assert_called_once()
-            assert mock_commit.call_args.kwargs["push_if_remote"] is False
-            assert "Complete issue step 1" in mock_commit.call_args.kwargs["commit_message"]
+            assert mock_commit.call_args[0][2] is False
+            assert "Complete issue step 1" in mock_commit.call_args[0][1]
 
     def test_generate_pr_body_from_task_file_prefixes_closes_issue(self):
         """Test generated PR body includes closing reference."""
@@ -959,7 +974,7 @@ class TestGitHubIssueWorker:
             assert "Implemented changes" in body
 
     def test_execute_with_ralph_loop_updates_existing_task_file(self):
-        """Test that _execute_with_ralph_loop calls update instead of create when task file exists."""
+        """Test that execute calls update instead of create when task file exists."""
         worker = GitHubIssueWorker(dry_run=True)
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -975,12 +990,16 @@ class TestGitHubIssueWorker:
             )
 
             with (
-                patch.object(worker, "_update_issue_task_file", return_value={"success": True}) as mock_update,
-                patch.object(worker, "_create_issue_task_file") as mock_create,
-                patch.object(worker, "_refine_issue_task_file") as mock_refine,
-                patch.object(worker, "_ensure_last_step_is_make_test") as mock_ensure_test,
                 patch.object(
-                    worker,
+                    worker.ralph_executor,
+                    "_update_issue_task_file",
+                    return_value={"success": True},
+                ) as mock_update,
+                patch.object(worker.ralph_executor, "_create_issue_task_file") as mock_create,
+                patch.object(worker.ralph_executor, "_refine_issue_task_file") as mock_refine,
+                patch.object(worker.ralph_executor, "_ensure_last_step_is_make_test") as mock_ensure_test,
+                patch.object(
+                    worker.ralph_executor,
                     "_run_refined_task_loop",
                     return_value={
                         "success": True,
@@ -989,7 +1008,7 @@ class TestGitHubIssueWorker:
                     },
                 ) as mock_loop,
             ):
-                result = worker._execute_with_ralph_loop(
+                result = worker.ralph_executor.execute(
                     repo_dir=repo_path,
                     issue_number=42,
                     issue_title="Existing issue",
@@ -1006,19 +1025,23 @@ class TestGitHubIssueWorker:
             mock_loop.assert_called_once()
 
     def test_execute_with_ralph_loop_creates_new_task_file_when_missing(self):
-        """Test that _execute_with_ralph_loop creates and refines when task file does not exist."""
+        """Test that execute creates and refines when task file does not exist."""
         worker = GitHubIssueWorker(dry_run=True)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_path = Path(temp_dir)
 
             with (
-                patch.object(worker, "_update_issue_task_file") as mock_update,
-                patch.object(worker, "_create_issue_task_file") as mock_create,
-                patch.object(worker, "_refine_issue_task_file", return_value={"success": True}) as mock_refine,
-                patch.object(worker, "_ensure_last_step_is_make_test"),
+                patch.object(worker.ralph_executor, "_update_issue_task_file") as mock_update,
+                patch.object(worker.ralph_executor, "_create_issue_task_file") as mock_create,
                 patch.object(
-                    worker,
+                    worker.ralph_executor,
+                    "_refine_issue_task_file",
+                    return_value={"success": True},
+                ) as mock_refine,
+                patch.object(worker.ralph_executor, "_ensure_last_step_is_make_test"),
+                patch.object(
+                    worker.ralph_executor,
                     "_run_refined_task_loop",
                     return_value={
                         "success": True,
@@ -1027,7 +1050,7 @@ class TestGitHubIssueWorker:
                     },
                 ),
             ):
-                result = worker._execute_with_ralph_loop(
+                result = worker.ralph_executor.execute(
                     repo_dir=repo_path,
                     issue_number=42,
                     issue_title="New issue",
@@ -1042,7 +1065,7 @@ class TestGitHubIssueWorker:
             mock_refine.assert_called_once()
 
     def test_execute_with_ralph_loop_returns_error_when_update_fails(self):
-        """Test that _execute_with_ralph_loop returns error when update fails."""
+        """Test that execute returns error when update fails."""
         worker = GitHubIssueWorker(dry_run=True)
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1053,12 +1076,12 @@ class TestGitHubIssueWorker:
 
             with (
                 patch.object(
-                    worker,
+                    worker.ralph_executor,
                     "_update_issue_task_file",
                     return_value={"success": False, "error": "CLI failed"},
                 ),
             ):
-                result = worker._execute_with_ralph_loop(
+                result = worker.ralph_executor.execute(
                     repo_dir=repo_path,
                     issue_number=42,
                     issue_title="Existing issue",
@@ -1082,18 +1105,20 @@ class TestGitHubIssueWorker:
                 "# GitHub Issue Task: Test\n\n" "## Steps\n\n" "- [x] 1. Already done\n" "- [ ] 2. Open step\n"
             )
 
-            with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
-                mock_execute.return_value = {"success": True}
+            from unittest.mock import MagicMock
 
-                result = worker._update_issue_task_file(
-                    repo_dir=repo_path,
-                    task_path=task_path,
-                    issue_number=42,
-                    issue_title="Test issue",
-                    issue_body="Do something",
-                    comment_texts=["A comment"],
-                    branch_name="ai/issue-42",
-                )
+            mock_execute = MagicMock(return_value={"success": True})
+            worker.ralph_executor.execute_fn = mock_execute
+
+            result = worker.ralph_executor._update_issue_task_file(
+                repo_dir=repo_path,
+                task_path=task_path,
+                issue_number=42,
+                issue_title="Test issue",
+                issue_body="Do something",
+                comment_texts=["A comment"],
+                branch_name="ai/issue-42",
+            )
 
             assert result["success"] is True
             mock_execute.assert_called_once()
@@ -1117,18 +1142,20 @@ class TestGitHubIssueWorker:
                 "# GitHub Issue Task: Test\n\n" "## Steps\n\n" "- [x] 1. Already done\n" "- [ ] 2. Open step\n"
             )
 
-            with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
-                mock_execute.return_value = {"success": True}
+            from unittest.mock import MagicMock
 
-                result = worker._update_issue_task_file(
-                    repo_dir=repo_path,
-                    task_path=task_path,
-                    issue_number=42,
-                    issue_title="Test issue",
-                    issue_body="Do something",
-                    comment_texts=[],
-                    branch_name="ai/issue-42",
-                )
+            mock_execute = MagicMock(return_value={"success": True})
+            worker.ralph_executor.execute_fn = mock_execute
+
+            result = worker.ralph_executor._update_issue_task_file(
+                repo_dir=repo_path,
+                task_path=task_path,
+                issue_number=42,
+                issue_title="Test issue",
+                issue_body="Do something",
+                comment_texts=[],
+                branch_name="ai/issue-42",
+            )
 
             assert result["success"] is True
             instructions = mock_execute.call_args[0][0]
@@ -1144,18 +1171,19 @@ class TestGitHubIssueWorker:
             task_path.parent.mkdir(parents=True, exist_ok=True)
             task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Do stuff\n")
 
-            with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
-                mock_execute.return_value = {"success": False, "error": "timeout"}
+            from unittest.mock import MagicMock
 
-                result = worker._update_issue_task_file(
-                    repo_dir=repo_path,
-                    task_path=task_path,
-                    issue_number=42,
-                    issue_title="Test",
-                    issue_body="Body",
-                    comment_texts=[],
-                    branch_name="ai/issue-42",
-                )
+            worker.ralph_executor.execute_fn = MagicMock(return_value={"success": False, "error": "timeout"})
+
+            result = worker.ralph_executor._update_issue_task_file(
+                repo_dir=repo_path,
+                task_path=task_path,
+                issue_number=42,
+                issue_title="Test",
+                issue_body="Body",
+                comment_texts=[],
+                branch_name="ai/issue-42",
+            )
 
             assert result["success"] is False
             assert "timeout" in result["error"]
@@ -1170,18 +1198,19 @@ class TestGitHubIssueWorker:
             task_path.parent.mkdir(parents=True, exist_ok=True)
             task_path.write_text("# Task\n\nNo steps here.\n")
 
-            with patch("auto_slopp.workers.github_issue_worker.execute_with_instructions") as mock_execute:
-                mock_execute.return_value = {"success": True}
+            from unittest.mock import MagicMock
 
-                result = worker._update_issue_task_file(
-                    repo_dir=repo_path,
-                    task_path=task_path,
-                    issue_number=42,
-                    issue_title="Test",
-                    issue_body="Body",
-                    comment_texts=[],
-                    branch_name="ai/issue-42",
-                )
+            worker.ralph_executor.execute_fn = MagicMock(return_value={"success": True})
+
+            result = worker.ralph_executor._update_issue_task_file(
+                repo_dir=repo_path,
+                task_path=task_path,
+                issue_number=42,
+                issue_title="Test",
+                issue_body="Body",
+                comment_texts=[],
+                branch_name="ai/issue-42",
+            )
 
             assert result["success"] is False
             assert "does not contain any executable steps" in result["error"]
@@ -1225,7 +1254,7 @@ class TestGitHubIssueWorker:
                     "auto_slopp.workers.github_issue_worker.create_and_checkout_branch",
                     return_value=True,
                 ),
-                patch.object(worker, "_execute_with_ralph_loop", return_value=ralph_result),
+                patch.object(worker.ralph_executor, "execute", return_value=ralph_result),
                 patch(
                     "auto_slopp.workers.github_issue_worker.comment_on_issue",
                     return_value=True,
@@ -1296,7 +1325,7 @@ class TestGitHubIssueWorker:
                     "auto_slopp.workers.github_issue_worker.create_and_checkout_branch",
                     return_value=True,
                 ),
-                patch.object(worker, "_execute_with_ralph_loop", return_value=ralph_result),
+                patch.object(worker.ralph_executor, "execute", return_value=ralph_result),
                 patch(
                     "auto_slopp.workers.github_issue_worker.comment_on_issue",
                     return_value=True,
@@ -1359,7 +1388,7 @@ class TestGitHubIssueWorker:
                     "auto_slopp.workers.github_issue_worker.create_and_checkout_branch",
                     return_value=True,
                 ),
-                patch.object(worker, "_execute_with_ralph_loop", return_value=ralph_result),
+                patch.object(worker.ralph_executor, "execute", return_value=ralph_result),
                 patch(
                     "auto_slopp.workers.github_issue_worker.comment_on_issue",
                     return_value=False,
@@ -1421,7 +1450,7 @@ class TestGitHubIssueWorker:
                     "auto_slopp.workers.github_issue_worker.create_and_checkout_branch",
                     return_value=True,
                 ),
-                patch.object(worker, "_execute_with_ralph_loop", return_value=ralph_result),
+                patch.object(worker.ralph_executor, "execute", return_value=ralph_result),
                 patch(
                     "auto_slopp.workers.github_issue_worker.comment_on_issue",
                     return_value=True,
