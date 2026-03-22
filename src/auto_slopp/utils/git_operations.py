@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from auto_slopp.utils.cli_executor import get_active_cli_command, run_cli_executor
-from settings.main import settings
 
 logger = logging.getLogger(__name__)
 
@@ -239,15 +238,6 @@ def delete_branch(repo_dir: Path, branch_name: str) -> bool:
     except GitOperationError as e:
         logger.error(f"Failed to delete branch '{branch_name}': {e}")
         return False
-
-        # Delete the branch
-        subprocess.run(
-            ["git", "branch", "-D", branch_name],
-            cwd=repo_dir,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
 
         logger.info(f"Successfully deleted branch '{branch_name}'")
         return True
@@ -640,26 +630,6 @@ def get_ahead_behind(repo_dir: Path, remote: str = "origin", branch: Optional[st
     return 0, 0
 
 
-def pull_from_remote(repo_dir: Path, remote: str = "origin", branch: str = "main") -> Tuple[bool, str]:
-    """Pull changes from a remote branch.
-
-    Args:
-        repo_dir: Path to the git repository
-        remote: Remote name (default: origin)
-        branch: Branch name (default: main)
-
-    Returns:
-        Tuple of (success, message).
-    """
-    result = _run_git_command(repo_dir, "pull", remote, branch, check=False)
-
-    if result.returncode == 0:
-        return True, "Pull successful"
-
-    error_msg = result.stderr.strip() or result.stdout.strip()
-    return False, error_msg
-
-
 def push_to_remote(repo_dir: Path, remote: str = "origin", branch: Optional[str] = None) -> Tuple[bool, str]:
     """Push changes to a remote branch.
 
@@ -764,29 +734,3 @@ def commit_and_push_changes(
 
     finally:
         os.chdir(original_cwd)
-
-
-def commit_all_changes(repo_dir: Path, commit_message: str) -> Tuple[bool, str]:
-    """Commit all changes in a git repository.
-
-    Args:
-        repo_dir: Path to the git repository
-        commit_message: Message for the commit
-
-    Returns:
-        Tuple of (success, message).
-    """
-    try:
-        if not is_git_repo(repo_dir):
-            return False, f"Directory is not a git repository: {repo_dir}"
-
-        if not has_changes(repo_dir):
-            return True, "No changes to commit"
-
-        _run_git_command(repo_dir, "add", ".")
-        _run_git_command(repo_dir, "commit", "-m", commit_message)
-        return True, "Commit successful"
-
-    except GitOperationError as e:
-        error_msg = str(e)
-        return False, f"Commit failed: {error_msg}"

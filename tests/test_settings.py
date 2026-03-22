@@ -1,14 +1,13 @@
 """Tests for Pydantic settings validation."""
 
 import os
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 from pydantic import ValidationError
 
-from settings.main import Settings, settings
+from settings.main import Settings
 
 
 class TestSettings:

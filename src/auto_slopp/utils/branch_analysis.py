@@ -4,13 +4,13 @@ This module provides utilities for analyzing and identifying stale branches.
 """
 
 import logging
+from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Set
 
 from auto_slopp.utils.git_operations import (
     delete_branch,
-    get_current_branch,
     get_local_branches,
     get_remote_branches,
 )
@@ -158,10 +158,8 @@ def analyze_repository_branches(repo_dir: Path, days_threshold: int, dry_run: bo
 
     except Exception as e:
         # Restore working directory on error
-        try:
+        with suppress(OSError):
             os.chdir(original_cwd)
-        except OSError:
-            pass
 
         logger.error(f"Stale branch cleanup failed for {repo_dir.name}: {str(e)}")
         result["error"] = str(e)
@@ -169,7 +167,5 @@ def analyze_repository_branches(repo_dir: Path, days_threshold: int, dry_run: bo
 
     finally:
         # Restore working directory
-        try:
+        with suppress(OSError):
             os.chdir(original_cwd)
-        except OSError:
-            pass

@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import List, Optional, Callable, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -274,7 +274,9 @@ class RalphLoop:
         if self.plan:
             PlanWriter.write_file(self.plan, self.plan_path)
 
-    def create_plan(self, title: str, description: str, step_descriptions: List[str]) -> Plan:
+    def create_plan(
+        self, title: str, description: str, step_descriptions: List[str]
+    ) -> Plan:
         """Create a new plan with the given steps.
 
         Args:
@@ -285,7 +287,10 @@ class RalphLoop:
         Returns:
             Created Plan object
         """
-        steps = [Step(number=i + 1, description=desc, is_closed=False) for i, desc in enumerate(step_descriptions)]
+        steps = [
+            Step(number=i + 1, description=desc, is_closed=False)
+            for i, desc in enumerate(step_descriptions)
+        ]
         self.plan = Plan(title=title, description=description, steps=steps)
         self.save_plan()
         return self.plan
@@ -349,7 +354,9 @@ class RalphLoop:
                 self.logger.info("All steps completed!")
                 break
 
-            self.logger.info(f"Executing step {next_step.number}: {next_step.description}")
+            self.logger.info(
+                f"Executing step {next_step.number}: {next_step.description}"
+            )
             step_result = self.execute_step(next_step)
 
             if step_result.get("success", False):
@@ -359,7 +366,9 @@ class RalphLoop:
                 result["steps_completed"] = len([s for s in plan.steps if s.is_closed])
                 self.logger.info(f"Step {next_step.number} completed successfully")
             else:
-                self.logger.warning(f"Step {next_step.number} failed: {step_result.get('error', 'Unknown error')}")
+                self.logger.warning(
+                    f"Step {next_step.number} failed: {step_result.get('error', 'Unknown error')}"
+                )
                 result["last_error"] = step_result.get("error", "Unknown error")
 
             result["loops_executed"] = loop_num
@@ -370,7 +379,9 @@ class RalphLoop:
                 break
         else:
             result["max_loops_reached"] = True
-            self.logger.warning(f"Max loops ({self.max_loops}) reached without completing all steps")
+            self.logger.warning(
+                f"Max loops ({self.max_loops}) reached without completing all steps"
+            )
 
         return result
 
