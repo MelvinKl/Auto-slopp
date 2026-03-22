@@ -818,8 +818,9 @@ class TestGitHubIssueWorker:
             task_path.write_text("# Task\n\n## Steps\n\n- [ ] 1. Implement changes\n")
 
             with (
-                patch(
-                    "auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations",
+                patch.object(
+                    worker.ralph_executor,
+                    "max_iterations",
                     2,
                 ),
                 patch.object(
@@ -857,8 +858,9 @@ class TestGitHubIssueWorker:
 """)
 
             with (
-                patch(
-                    "auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations",
+                patch.object(
+                    worker.ralph_executor,
+                    "max_iterations",
                     3,
                 ),
                 patch.object(

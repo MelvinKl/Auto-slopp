@@ -73,6 +73,7 @@ class GitHubIssueWorker(Worker):
             execute_fn=execute_with_instructions,
             has_changes_fn=has_changes,
             commit_fn=commit_and_push_changes,
+            max_iterations=settings.github_issue_step_max_iterations,
         )
 
     def run(self, repo_path: Path) -> Dict[str, Any]:

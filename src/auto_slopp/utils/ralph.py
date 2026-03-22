@@ -13,8 +13,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from settings.main import settings
-
 logger = logging.getLogger(__name__)
 
 
@@ -230,6 +228,7 @@ class RalphExecutor:
         execute_fn: Callable[..., Dict[str, Any]],
         has_changes_fn: Callable[[Path], bool],
         commit_fn: Callable[[Path, str, bool], Tuple[bool, Optional[bool]]],
+        max_iterations: int,
     ):
         """Initialize the RalphExecutor.
 
@@ -242,6 +241,7 @@ class RalphExecutor:
             has_changes_fn: Callable that checks if a repo directory has uncommitted changes.
             commit_fn: Callable that commits (and optionally pushes) changes.
                 Signature: ``(repo_dir, commit_message, push_if_remote) -> (commit_ok, push_ok)``.
+            max_iterations: Maximum number of iterations for the task loop.
         """
         self.logger = logger
         self.agent_args = agent_args
@@ -249,6 +249,7 @@ class RalphExecutor:
         self.execute_fn = execute_fn
         self.has_changes_fn = has_changes_fn
         self.commit_fn = commit_fn
+        self.max_iterations = max_iterations
 
     @staticmethod
     def _get_issue_task_path(repo_dir: Path, issue_number: int) -> Path:
@@ -845,7 +846,7 @@ class RalphExecutor:
         branch_name: str,
     ) -> Dict[str, Any]:
         """Iterate through task steps, implementing and validating acceptance criteria."""
-        max_iterations = settings.github_issue_step_max_iterations
+        max_iterations = self.max_iterations
         result: Dict[str, Any] = {
             "success": False,
             "loops_executed": 0,
