@@ -90,13 +90,13 @@ def main() -> None:
     """Main entry point for Auto-slopp."""
     # 1. Parse command-line arguments
     args = parse_arguments()
-    
+
     # 2. Load configuration
     settings = load_settings(args)
-    
+
     # 3. Set up logging
     setup_logging(settings)
-    
+
     # 4. Execute workers
     run_executor(settings)
 ```
@@ -114,14 +114,14 @@ The executor manages worker discovery and execution:
 ```python
 class Executor:
     """Discovers and executes worker implementations."""
-    
+
     def __init__(self, search_path: Path):
         self.search_path = search_path
         self.workers: List[Type[Worker]] = []
-    
+
     def discover_workers(self) -> List[Type[Worker]]:
         """Discover worker implementations dynamically."""
-        
+
     def execute_workers(self, repo_path: Path) -> Dict[str, Any]:
         """Execute all discovered workers."""
 ```
@@ -139,7 +139,7 @@ The worker interface defines the contract for all automation tasks:
 ```python
 class Worker(ABC):
     """Abstract base class for all worker implementations."""
-    
+
     @abstractmethod
     def run(self, repo_path: Path) -> Any:
         """Execute the worker's automation task."""
@@ -159,14 +159,14 @@ Configuration management using Pydantic:
 ```python
 class Settings(BaseSettings):
     """Application settings with environment variable support."""
-    
+
     # Path configuration
     base_repo_path: Path = Field(default_factory=lambda: Path.cwd())
-    
+
     # Execution configuration
     debug: bool = Field(default=False)
     executor_sleep_interval: float = Field(default=1.0)
-    
+
     # Telegram configuration
     telegram_enabled: bool = Field(default=False)
     telegram_bot_token: Optional[str] = Field(default=None)
@@ -186,13 +186,13 @@ Async logging handler for Telegram notifications:
 ```python
 class TelegramHandler(logging.Handler):
     """Async logging handler for Telegram bot integration."""
-    
+
     def __init__(self, **kwargs):
         # Initialize HTTP client and configuration
-        
+
     def emit(self, record: logging.LogRecord) -> None:
         """Send log record to Telegram asynchronously."""
-        
+
     def _send_message_async(self, record: logging.LogRecord) -> None:
         """Handle async message sending with retries."""
 ```
@@ -253,10 +253,10 @@ Error → Log Error → Send to Telegram → Continue Execution → Report Resul
 def main():
     # Load settings
     settings = load_settings()
-    
+
     # Create executor
     executor = Executor(search_path=settings.worker_search_path)
-    
+
     # Execute workers
     results = executor.execute_workers(
         repo_path=settings.base_repo_path
@@ -269,20 +269,20 @@ def main():
 # executor.py
 def execute_workers(self, repo_path: Path):
     results = {}
-    
+
     for worker_class in self.workers:
         try:
             # Instantiate worker
             worker = worker_class()
-            
+
             # Execute worker
             result = worker.run(repo_path)
             results[worker_class.__name__] = result
-            
+
         except Exception as e:
             # Handle worker failure
             results[worker_class.__name__] = {"error": str(e)}
-    
+
     return results
 ```
 
@@ -313,10 +313,10 @@ Create new workers by inheriting from the base class:
 ```python
 class CustomWorker(Worker):
     """Custom worker for specific automation task."""
-    
+
     def __init__(self, custom_config: str = "default"):
         self.custom_config = custom_config
-    
+
     def run(self, repo_path: Path) -> Dict[str, Any]:
         # Custom automation logic
         return {
@@ -332,7 +332,7 @@ Extend settings for worker-specific configuration:
 ```python
 class CustomSettings(Settings):
     """Extended settings for custom workers."""
-    
+
     custom_worker_enabled: bool = Field(default=False)
     custom_worker_config: str = Field(default="default")
     custom_worker_timeout: float = Field(default=30.0)
@@ -345,7 +345,7 @@ Add custom logging handlers:
 ```python
 class CustomLogHandler(logging.Handler):
     """Custom logging handler for specific needs."""
-    
+
     def emit(self, record: logging.LogRecord):
         # Custom logging logic
         pass
@@ -364,13 +364,13 @@ Implement a plugin registry for dynamic loading:
 ```python
 class PluginRegistry:
     """Registry for worker plugins."""
-    
+
     def __init__(self):
         self._plugins = {}
-    
+
     def register(self, name: str, worker_class: Type[Worker]):
         self._plugins[name] = worker_class
-    
+
     def load_plugins(self, plugin_dir: Path):
         # Load plugins from directory
         pass

@@ -30,7 +30,7 @@ from typing import Any
 
 class Worker(ABC):
     """Abstract base class for all worker implementations."""
-    
+
     @abstractmethod
     def run(self, repo_path: Path) -> Any:
         """
@@ -57,7 +57,7 @@ from typing import Dict, Any
 
 class MyWorker(Worker):
     """Custom worker implementation."""
-    
+
     def run(self, repo_path: Path) -> Dict[str, Any]:
         """Execute custom automation logic."""
         result = {
@@ -80,7 +80,7 @@ import logging
 
 class Executor:
     """Discovers and executes worker implementations."""
-    
+
     def __init__(self, search_path: Path):
         """
         Initialize the executor.
@@ -91,7 +91,7 @@ class Executor:
         self.search_path = search_path
         self.logger = logging.getLogger("auto_slopp.executor")
         self.workers: List[Type[Worker]] = []
-    
+
     def discover_workers(self) -> List[Type[Worker]]:
         """
         Discover worker implementations in the search path.
@@ -103,7 +103,7 @@ class Executor:
             ImportError: If worker modules cannot be imported
         """
         pass
-    
+
     def execute_workers(self, repo_path: Path) -> Dict[str, Any]:
         """
         Execute all discovered workers.
@@ -156,75 +156,75 @@ from pydantic import Field, BaseSettings
 
 class Settings(BaseSettings):
     """Application settings with environment variable support."""
-    
+
     # Path Configuration
     base_repo_path: Path = Field(
         default_factory=lambda: Path.cwd(),
         description="Base path for repository operations"
     )
-    
+
     worker_search_path: Path = Field(
         default_factory=lambda: Path(__file__).parent.parent,
         description="Path to search for worker implementations"
     )
-    
+
     # Execution Configuration
     executor_sleep_interval: float = Field(
         default=1.0,
         description="Sleep interval between worker executions in seconds"
     )
-    
+
     debug: bool = Field(
         default=False,
         description="Enable debug mode with verbose logging"
     )
-    
+
     # Telegram Configuration
     telegram_enabled: bool = Field(
         default=False,
         description="Enable Telegram logging integration"
     )
-    
+
     telegram_bot_token: Optional[str] = Field(
         default=None,
         description="Telegram bot token for logging"
     )
-    
+
     telegram_chat_id: Optional[str] = Field(
         default=None,
         description="Telegram chat ID for notifications"
     )
-    
+
     telegram_timeout: float = Field(
         default=30.0,
         description="Telegram API request timeout in seconds"
     )
-    
+
     telegram_retry_attempts: int = Field(
         default=3,
         description="Number of retry attempts for failed Telegram requests"
     )
-    
+
     telegram_retry_delay: float = Field(
         default=1.0,
         description="Delay between retry attempts in seconds"
     )
-    
+
     telegram_parse_mode: str = Field(
         default="HTML",
         description="Message parse mode (HTML, Markdown, or empty)"
     )
-    
+
     telegram_disable_web_page_preview: bool = Field(
         default=True,
         description="Disable link previews in Telegram messages"
     )
-    
+
     telegram_disable_notification: bool = Field(
         default=False,
         description="Send Telegram messages silently"
     )
-    
+
     class Config:
         env_prefix = "AUTO_SLOPP_"
         env_file = ".env"
@@ -245,7 +245,7 @@ import httpx
 
 class TelegramHandler(logging.Handler):
     """Async logging handler for Telegram bot integration."""
-    
+
     def __init__(
         self,
         bot_token: Optional[str] = None,
@@ -271,7 +271,7 @@ class TelegramHandler(logging.Handler):
             disable_notification: Send messages silently
         """
         pass
-    
+
     def emit(self, record: logging.LogRecord) -> None:
         """
         Send a log record to Telegram.
@@ -280,7 +280,7 @@ class TelegramHandler(logging.Handler):
             record: Log record to send
         """
         pass
-    
+
     def close(self) -> None:
         """Close the HTTP client and clean up resources."""
         pass
@@ -324,7 +324,7 @@ def setup_telegram_logging(
 ```python
 class SimpleLogger(Worker):
     """Logs basic information about repository path."""
-    
+
     def run(self, repo_path: Path) -> Dict[str, Any]:
         """
         Log path information and return basic details.
@@ -340,7 +340,7 @@ class SimpleLogger(Worker):
 ```python
 class FileMonitor(Worker):
     """Scans repository for files matching specific patterns."""
-    
+
     def __init__(self, file_patterns: List[str] = None):
         """
         Initialize file monitor.
@@ -349,7 +349,7 @@ class FileMonitor(Worker):
             file_patterns: List of file patterns to match (default: ["*"])
         """
         self.file_patterns = file_patterns or ["*"]
-    
+
     def run(self, repo_path: Path) -> Dict[str, Any]:
         """
         Scan repository and return file statistics.
@@ -365,7 +365,7 @@ class FileMonitor(Worker):
 ```python
 class HeartbeatWorker(Worker):
     """Demonstrates periodic execution with status messages."""
-    
+
     def __init__(self, message: str = "Auto-slopp heartbeat"):
         """
         Initialize heartbeat worker.
@@ -374,7 +374,7 @@ class HeartbeatWorker(Worker):
             message: Custom heartbeat message
         """
         self.message = message
-    
+
     def run(self, repo_path: Path) -> Dict[str, Any]:
         """
         Generate heartbeat status message.

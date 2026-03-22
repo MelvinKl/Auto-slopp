@@ -238,17 +238,17 @@ from typing import Any, Dict, List
 
 class ExampleWorker(Worker):
     """Example worker implementation."""
-    
+
     def __init__(self, max_items: int = 100):
         self.max_items = max_items
         self.logger = logging.getLogger(__name__)
-    
+
     def run(self, repo_path: Path) -> Dict[str, Any]:
         """Process items with configurable limits."""
         self.logger.info(f"Processing up to {self.max_items} items")
-        
+
         processed_items = self._process_items(repo_path)
-        
+
         return {
             "worker_name": "ExampleWorker",
             "processed_items": processed_items,
@@ -269,20 +269,20 @@ def process_data(
     max_size: int = 1024 * 1024
 ) -> Dict[str, Any]:
     """Process data from input file with configuration.
-    
+
     Args:
         input_path: Path to the input data file
         config: Configuration dictionary for processing
         max_size: Maximum file size in bytes (default: 1MB)
-    
+
     Returns:
         Dictionary containing processing results and metadata
-    
+
     Raises:
         FileNotFoundError: If input_path does not exist
         ValueError: If config contains invalid values
         PermissionError: If unable to read input file
-    
+
     Example:
         >>> result = process_data(
         ...     Path("data.txt"),
@@ -319,7 +319,7 @@ from pathlib import Path
 
 class WorkerResult:
     """Result from worker execution."""
-    
+
     def __init__(
         self,
         status: str,
@@ -357,7 +357,7 @@ class WorkerError(Exception):
 
 class WorkerExecutionError(WorkerError):
     """Exception raised when worker execution fails."""
-    
+
     def __init__(self, worker_name: str, cause: Exception):
         self.worker_name = worker_name
         self.cause = cause
@@ -405,38 +405,38 @@ from auto_slopp.worker import Worker
 
 class TestWorker:
     """Test the Worker base class."""
-    
+
     def test_worker_is_abstract(self):
         """Test that Worker cannot be instantiated directly."""
         with pytest.raises(TypeError, match="Can't instantiate abstract class"):
             Worker()
-    
+
     def test_custom_worker_implementation(self, temp_repo_path):
         """Test custom worker implementation."""
         class TestWorker(Worker):
             def run(self, repo_path):
                 return {"test": True, "repo": str(repo_path)}
-        
+
         worker = TestWorker()
         result = worker.run(temp_repo_path)
-        
+
         assert result["test"] is True
         assert result["repo"] == str(temp_repo_path)
-    
+
     @patch('auto_slopp.worker.logging.getLogger')
     def test_worker_logging(self, mock_getter):
         """Test worker logging setup."""
         mock_logger = Mock()
         mock_getter.return_value = mock_logger
-        
+
         class LoggingWorker(Worker):
             def run(self, repo_path):
                 self.logger.info("Test message")
                 return {"logged": True}
-        
+
         worker = LoggingWorker()
         worker.run(Path("/test"))
-        
+
         mock_logger.info.assert_called_once_with("Test message")
 ```
 
@@ -448,7 +448,7 @@ from auto_slopp.executor import Executor
 
 class TestExecutorIntegration:
     """Integration tests for Executor."""
-    
+
     def test_full_worker_discovery_and_execution(self, tmp_path):
         """Test complete worker discovery and execution cycle."""
         # Create test worker file
@@ -464,14 +464,14 @@ class TestWorker(Worker):
             "repo_exists": repo_path.exists()
         }
 """)
-        
+
         # Test discovery and execution
         executor = Executor(tmp_path)
         workers = executor.discover_workers()
-        
+
         assert len(workers) == 1
         assert workers[0].__name__ == "TestWorker"
-        
+
         results = executor.execute_workers(tmp_path)
         assert "TestWorker" in results
         assert results["TestWorker"]["worker_name"] == "TestWorker"
@@ -493,11 +493,11 @@ def temp_repo_path(tmp_path):
     """Create a temporary repository path."""
     repo_path = tmp_path / "test_repo"
     repo_path.mkdir()
-    
+
     # Create basic repo structure
     (repo_path / "README.md").write_text("# Test Repo")
     (repo_path / "src").mkdir()
-    
+
     return repo_path
 
 @pytest.fixture
@@ -578,17 +578,17 @@ Document all public APIs:
 def example_function(param1: str, param2: int = 0) -> bool:
     """
     Brief description of the function.
-    
+
     Args:
         param1: Description of param1
         param2: Description of param2 (default: 0)
-    
+
     Returns:
         Description of return value
-    
+
     Raises:
         ValueError: If param1 is invalid
-    
+
     Example:
         >>> result = example_function("test", 5)
         >>> print(result)

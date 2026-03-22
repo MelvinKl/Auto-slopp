@@ -58,7 +58,7 @@ You should see Telegram connection logs in the output.
    ```
    /newbot
    ```
-   
+
 3. **Choose Bot Details**
    - Bot name: `My Auto-slopp Bot` (display name)
    - Bot username: `my_auto_slopp_bot` (must end with `_bot`)
@@ -244,7 +244,7 @@ telegram_handler = setup_telegram_logging(
 
 Telegram handler respects standard Python logging levels:
 - `DEBUG` (10) - Detailed debugging information
-- `INFO` (20) - General information messages  
+- `INFO` (20) - General information messages
 - `WARNING` (30) - Warning messages
 - `ERROR` (40) - Error messages
 - `CRITICAL` (50) - Critical error messages
@@ -415,7 +415,7 @@ async def test_telegram():
     try:
         handler = TelegramHandler()
         handler.setFormatter(logging.Formatter("Test message: %(message)s"))
-        
+
         record = logging.LogRecord(
             name="test",
             level=logging.INFO,
@@ -425,10 +425,10 @@ async def test_telegram():
             args=(),
             exc_info=None,
         )
-        
+
         await handler._send_message_async(record)
         print("✅ Telegram test successful")
-        
+
     except Exception as e:
         print(f"❌ Telegram test failed: {e}")
     finally:
@@ -516,10 +516,10 @@ class ScheduledTaskMonitor:
             level=logging.INFO,
             format_string="📅 Task Update\n\n<b>{levelname}</b>\nTask: {task_name}\nStatus: {message}\nTime: {asctime}"
         )
-        
+
     def task_completed(self, task_name: str, duration: float):
         self.logger.info(f"{task_name} completed in {duration:.2f}s", extra={"task_name": task_name})
-        
+
     def task_failed(self, task_name: str, error: str):
         self.logger.error(f"{task_name} failed: {error}", extra={"task_name": task_name})
 ```
@@ -559,19 +559,19 @@ async def health_check_notifier():
             cpu_usage = get_cpu_usage()
             memory_usage = get_memory_usage()
             disk_space = get_disk_space()
-            
+
             # Create health message
             health_status = f"🏥 System Health\n\n"
             health_status += f"CPU: {cpu_usage}%\n"
             health_status += f"Memory: {memory_usage}%\n"
             health_status += f"Disk: {disk_space}%\n"
-            
+
             # Send to health monitoring channel
             logger.info(health_status)
-            
+
         except Exception as e:
             logger.error(f"Health check failed: {e}")
-            
+
         await asyncio.sleep(3600)  # Every hour
 ```
 
@@ -703,10 +703,10 @@ def split_message(message: str, max_length: int = 4096) -> list[str]:
     """Split long messages into multiple parts."""
     if len(message) <= max_length:
         return [message]
-    
+
     parts = []
     current_part = ""
-    
+
     for line in message.split('\n'):
         if len(current_part) + len(line) + 1 > max_length:
             if current_part:
@@ -717,10 +717,10 @@ def split_message(message: str, max_length: int = 4096) -> list[str]:
                 current_part += '\n' + line
             else:
                 current_part = line
-    
+
     if current_part:
         parts.append(current_part)
-    
+
     return parts
 ```
 

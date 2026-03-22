@@ -331,7 +331,7 @@ When adding new features:
 Regularly monitor:
 
 - Test execution time trends
-- Coverage percentage changes  
+- Coverage percentage changes
 - Test flakiness/reliability
 - CI pipeline duration
 

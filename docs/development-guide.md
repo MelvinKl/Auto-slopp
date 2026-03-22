@@ -160,7 +160,7 @@ from typing import Any
 
 class Worker(ABC):
     """Abstract base class for all worker implementations."""
-    
+
     @abstractmethod
     def run(self, repo_path: Path) -> Any:
         """Execute the worker's automation task."""
@@ -176,19 +176,19 @@ Workers are discovered dynamically using Python's importlib:
 def discover_workers(search_path: Path) -> List[Type[Worker]]:
     """Discover worker implementations in the search path."""
     workers = []
-    
+
     for file_path in search_path.rglob("*.py"):
         if file_path.name.startswith("test_"):
             continue
-            
+
         # Import module and find Worker subclasses
         module = import_module_from_path(file_path)
         for name, obj in inspect.getmembers(module):
-            if (inspect.isclass(obj) and 
-                issubclass(obj, Worker) and 
+            if (inspect.isclass(obj) and
+                issubclass(obj, Worker) and
                 obj is not Worker):
                 workers.append(obj)
-    
+
     return workers
 ```
 
@@ -203,10 +203,10 @@ from pathlib import Path
 
 class Settings(BaseSettings):
     """Application settings with environment variable support."""
-    
+
     base_repo_path: Path = Field(default_factory=lambda: Path.cwd())
     debug: bool = Field(default=False)
-    
+
     class Config:
         env_prefix = "AUTO_SLOPP_"
         env_file = ".env"
@@ -346,21 +346,21 @@ from auto_slopp.worker import Worker
 
 class TestWorker:
     """Test the Worker base class."""
-    
+
     def test_worker_is_abstract(self):
         """Test that Worker cannot be instantiated directly."""
         with pytest.raises(TypeError):
             Worker()
-    
+
     def test_custom_worker_implementation(self, temp_repo_path):
         """Test custom worker implementation."""
         class TestWorker(Worker):
             def run(self, repo_path):
                 return {"test": True}
-        
+
         worker = TestWorker()
         result = worker.run(temp_repo_path)
-        
+
         assert result["test"] is True
 ```
 
@@ -373,7 +373,7 @@ from auto_slopp.executor import Executor
 
 class TestExecutor:
     """Test the Executor class."""
-    
+
     def test_worker_discovery(self, temp_repo_path):
         """Test worker discovery functionality."""
         # Create test worker file
@@ -385,10 +385,10 @@ class TestWorker(Worker):
     def run(self, repo_path):
         return {"discovered": True}
 """)
-        
+
         executor = Executor(temp_repo_path)
         workers = executor.discover_workers()
-        
+
         assert len(workers) > 0
         assert any("TestWorker" in w.__name__ for w in workers)
 ```
@@ -555,10 +555,10 @@ import logging
 class DebugWorker(Worker):
     def __init__(self):
         self.logger = logging.getLogger(f"{__name__}.DebugWorker")
-    
+
     def run(self, repo_path):
         self.logger.debug(f"Starting worker with repo={repo_path}")
-        
+
         try:
             result = self._do_work(repo_path)
             self.logger.debug(f"Worker completed successfully: {result}")
@@ -593,7 +593,7 @@ class Executor:
     def __init__(self, search_path: Path):
         self.search_path = search_path
         self._workers_cache: Optional[List[Type[Worker]]] = None
-    
+
     def discover_workers(self) -> List[Type[Worker]]:
         if self._workers_cache is None:
             self._workers_cache = self._load_workers()
@@ -614,7 +614,7 @@ async def process_files_async(file_paths: List[Path]):
     for file_path in file_paths:
         task = asyncio.create_task(process_file_async(file_path))
         tasks.append(task)
-    
+
     results = await asyncio.gather(*tasks)
     return results
 ```
@@ -646,14 +646,14 @@ import logging
 
 class WorkerBase(Worker):
     """Base worker with error handling."""
-    
+
     def run(self, repo_path: Path) -> Any:
         try:
             return self._execute(repo_path)
         except Exception as e:
             self.logger.error(f"Worker {self.__class__.__name__} failed: {e}")
             return {"error": str(e), "status": "failed"}
-    
+
     def _execute(self, repo_path: Path) -> Any:
         """Override this method in subclasses."""
         raise NotImplementedError
@@ -668,7 +668,7 @@ from pydantic import validator
 
 class Settings(BaseSettings):
     max_file_size: int = Field(default=5 * 1024 * 1024)
-    
+
     @validator('max_file_size')
     def validate_max_file_size(cls, v):
         if v <= 0:
@@ -704,18 +704,18 @@ Implement plugin system:
 ```python
 class PluginRegistry:
     """Registry for worker plugins."""
-    
+
     def __init__(self):
         self._plugins = {}
-    
+
     def register(self, name: str, worker_class: Type[Worker]):
         """Register a worker plugin."""
         self._plugins[name] = worker_class
-    
+
     def get(self, name: str) -> Optional[Type[Worker]]:
         """Get a registered worker plugin."""
         return self._plugins.get(name)
-    
+
     def list_all(self) -> List[str]:
         """List all registered plugin names."""
         return list(self._plugins.keys())
