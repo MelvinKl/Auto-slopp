@@ -477,11 +477,11 @@ class GitHubIssueWorker(Worker):
         branch_name: str,
     ) -> Dict[str, Any]:
         """Execute issue processing using refined task execution in .ralph/github-<issue>.md."""
-        task_path = self._get_issue_task_path(repo_dir, issue_number)
+        task_path = self.ralph_executor._get_issue_task_path(repo_dir, issue_number)
 
         if task_path.exists():
             self.logger.info(f"Task file already exists: {task_path}, updating via CLI")
-            update_result = self._update_issue_task_file(
+            update_result = self.ralph_executor._update_issue_task_file(
                 repo_dir=repo_dir,
                 task_path=task_path,
                 issue_number=issue_number,
@@ -503,7 +503,7 @@ class GitHubIssueWorker(Worker):
             # already adjusts open steps via the CLI.  Re-running refinement
             # could overwrite the preserved completed steps.
         else:
-            self._create_issue_task_file(
+            self.ralph_executor._create_issue_task_file(
                 task_path=task_path,
                 issue_number=issue_number,
                 issue_title=issue_title,
@@ -512,7 +512,7 @@ class GitHubIssueWorker(Worker):
                 branch_name=branch_name,
             )
 
-            refinement_result = self._refine_issue_task_file(
+            refinement_result = self.ralph_executor._refine_issue_task_file(
                 repo_dir=repo_dir,
                 task_path=task_path,
                 issue_title=issue_title,
@@ -529,7 +529,7 @@ class GitHubIssueWorker(Worker):
                     "task_path": str(task_path),
                 }
 
-        self._ensure_last_step_is_make_test(task_path)
+        self.ralph_executor._ensure_last_step_is_make_test(task_path)
 
         execution_result = self._run_refined_task_loop(
             repo_dir=repo_dir,
@@ -541,73 +541,6 @@ class GitHubIssueWorker(Worker):
         )
         execution_result["task_path"] = str(task_path)
         return execution_result
-
-    def _get_issue_task_path(self, repo_dir: Path, issue_number: int) -> Path:
-        """Get the canonical task file path for a GitHub issue."""
-        return self.ralph_executor._get_issue_task_path(repo_dir, issue_number)
-
-    def _create_issue_task_file(
-        self,
-        task_path: Path,
-        issue_number: int,
-        issue_title: str,
-        issue_body: str,
-        comment_texts: List[str],
-        branch_name: str,
-    ) -> None:
-        """Create the initial GitHub issue task file in .ralph."""
-        return self.ralph_executor._create_issue_task_file(
-            task_path=task_path,
-            issue_number=issue_number,
-            issue_title=issue_title,
-            issue_body=issue_body,
-            comment_texts=comment_texts,
-            branch_name=branch_name,
-        )
-
-    def _update_issue_task_file(
-        self,
-        repo_dir: Path,
-        task_path: Path,
-        issue_number: int,
-        issue_title: str,
-        issue_body: str,
-        comment_texts: List[str],
-        branch_name: str,
-    ) -> Dict[str, Any]:
-        """Update an existing task file via the CLI instead of overwriting it."""
-        return self.ralph_executor._update_issue_task_file(
-            repo_dir=repo_dir,
-            task_path=task_path,
-            issue_number=issue_number,
-            issue_title=issue_title,
-            issue_body=issue_body,
-            comment_texts=comment_texts,
-            branch_name=branch_name,
-        )
-
-    def _refine_issue_task_file(
-        self,
-        repo_dir: Path,
-        task_path: Path,
-        issue_title: str,
-        issue_body: str,
-        comment_texts: List[str],
-        branch_name: str,
-    ) -> Dict[str, Any]:
-        """Ask slopmachine to refine the task into concrete steps with acceptance criteria."""
-        return self.ralph_executor._refine_issue_task_file(
-            repo_dir=repo_dir,
-            task_path=task_path,
-            issue_title=issue_title,
-            issue_body=issue_body,
-            comment_texts=comment_texts,
-            branch_name=branch_name,
-        )
-
-    def _ensure_last_step_is_make_test(self, task_path: Path) -> None:
-        """Ensure the last task step always verifies that make test succeeds."""
-        return self.ralph_executor._ensure_last_step_is_make_test(task_path)
 
     def _run_refined_task_loop(
         self,
@@ -1098,7 +1031,7 @@ Plan:
         issue_body: str,
     ) -> str:
         """Generate PR description from the refined GitHub task file using slopmachine."""
-        task_path = self._get_issue_task_path(repo_dir, issue_number)
+        task_path = self.ralph_executor._get_issue_task_path(repo_dir, issue_number)
         default_body = f"Closes #{issue_number}\n\n{issue_body}"
 
         if not task_path.exists():

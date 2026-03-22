@@ -687,7 +687,7 @@ class TestGitHubIssueWorker:
 
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_path = Path(temp_dir)
-            task_path = worker._get_issue_task_path(repo_path, 281)
+            task_path = worker.ralph_executor._get_issue_task_path(repo_path, 281)
 
             assert task_path == repo_path / ".ralph" / "github-281.md"
 
@@ -699,7 +699,7 @@ class TestGitHubIssueWorker:
             repo_path = Path(temp_dir)
             task_path = repo_path / ".ralph" / "github-281.md"
 
-            worker._create_issue_task_file(
+            worker.ralph_executor._create_issue_task_file(
                 task_path=task_path,
                 issue_number=281,
                 issue_title="Rework worker",
@@ -729,7 +729,7 @@ class TestGitHubIssueWorker:
 - [ ] 2. Update tests
 """)
 
-            worker._ensure_last_step_is_make_test(task_path)
+            worker.ralph_executor._ensure_last_step_is_make_test(task_path)
             updated = task_path.read_text()
 
             assert "- [ ] 3. Run `make test` and confirm it succeeds." in updated
@@ -748,7 +748,7 @@ class TestGitHubIssueWorker:
 - [ ] 2. Run `make test` and confirm it succeeds.
 """)
 
-            worker._ensure_last_step_is_make_test(task_path)
+            worker.ralph_executor._ensure_last_step_is_make_test(task_path)
             updated = task_path.read_text()
 
             assert updated.count("Run `make test` and confirm it succeeds.") == 1
@@ -935,10 +935,12 @@ class TestGitHubIssueWorker:
             )
 
             with (
-                patch.object(worker, "_update_issue_task_file", return_value={"success": True}) as mock_update,
-                patch.object(worker, "_create_issue_task_file") as mock_create,
-                patch.object(worker, "_refine_issue_task_file") as mock_refine,
-                patch.object(worker, "_ensure_last_step_is_make_test") as mock_ensure_test,
+                patch.object(
+                    worker.ralph_executor, "_update_issue_task_file", return_value={"success": True}
+                ) as mock_update,
+                patch.object(worker.ralph_executor, "_create_issue_task_file") as mock_create,
+                patch.object(worker.ralph_executor, "_refine_issue_task_file") as mock_refine,
+                patch.object(worker.ralph_executor, "_ensure_last_step_is_make_test") as mock_ensure_test,
                 patch.object(
                     worker,
                     "_run_refined_task_loop",
@@ -973,10 +975,12 @@ class TestGitHubIssueWorker:
             repo_path = Path(temp_dir)
 
             with (
-                patch.object(worker, "_update_issue_task_file") as mock_update,
-                patch.object(worker, "_create_issue_task_file") as mock_create,
-                patch.object(worker, "_refine_issue_task_file", return_value={"success": True}) as mock_refine,
-                patch.object(worker, "_ensure_last_step_is_make_test"),
+                patch.object(worker.ralph_executor, "_update_issue_task_file") as mock_update,
+                patch.object(worker.ralph_executor, "_create_issue_task_file") as mock_create,
+                patch.object(
+                    worker.ralph_executor, "_refine_issue_task_file", return_value={"success": True}
+                ) as mock_refine,
+                patch.object(worker.ralph_executor, "_ensure_last_step_is_make_test"),
                 patch.object(
                     worker,
                     "_run_refined_task_loop",
@@ -1013,7 +1017,7 @@ class TestGitHubIssueWorker:
 
             with (
                 patch.object(
-                    worker,
+                    worker.ralph_executor,
                     "_update_issue_task_file",
                     return_value={"success": False, "error": "CLI failed"},
                 ),
@@ -1047,7 +1051,7 @@ class TestGitHubIssueWorker:
             mock_execute = MagicMock(return_value={"success": True})
             worker.ralph_executor.execute_fn = mock_execute
 
-            result = worker._update_issue_task_file(
+            result = worker.ralph_executor._update_issue_task_file(
                 repo_dir=repo_path,
                 task_path=task_path,
                 issue_number=42,
@@ -1084,7 +1088,7 @@ class TestGitHubIssueWorker:
             mock_execute = MagicMock(return_value={"success": True})
             worker.ralph_executor.execute_fn = mock_execute
 
-            result = worker._update_issue_task_file(
+            result = worker.ralph_executor._update_issue_task_file(
                 repo_dir=repo_path,
                 task_path=task_path,
                 issue_number=42,
@@ -1112,7 +1116,7 @@ class TestGitHubIssueWorker:
 
             worker.ralph_executor.execute_fn = MagicMock(return_value={"success": False, "error": "timeout"})
 
-            result = worker._update_issue_task_file(
+            result = worker.ralph_executor._update_issue_task_file(
                 repo_dir=repo_path,
                 task_path=task_path,
                 issue_number=42,
@@ -1139,7 +1143,7 @@ class TestGitHubIssueWorker:
 
             worker.ralph_executor.execute_fn = MagicMock(return_value={"success": True})
 
-            result = worker._update_issue_task_file(
+            result = worker.ralph_executor._update_issue_task_file(
                 repo_dir=repo_path,
                 task_path=task_path,
                 issue_number=42,
