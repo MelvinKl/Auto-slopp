@@ -128,9 +128,7 @@ class VikunjaWorker(Worker):
             if self._has_no_open_dependencies(t["id"]):
                 dep_filtered.append(t)
             else:
-                self.logger.info(
-                    f"Skipping task #{t['id']} '{t.get('title')}': has open dependencies"
-                )
+                self.logger.info(f"Skipping task #{t['id']} '{t.get('title')}': has open dependencies")
         tasks = dep_filtered
 
         if not tasks:

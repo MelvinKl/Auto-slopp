@@ -305,6 +305,50 @@ class TestProcessSingleTask:
                 mock_status.assert_any_call(1, "failed")
 
 
+class TestFilterTasksByTag:
+    """Tests for VikunjaWorker._filter_tasks_by_tag."""
+
+    def test_keeps_tasks_with_matching_label(self):
+        worker = VikunjaWorker()
+        tasks = [{"id": 1, "title": "T1", "labels": [{"title": "ai"}]}]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert result == tasks
+
+    def test_removes_tasks_without_matching_label(self):
+        worker = VikunjaWorker()
+        tasks = [{"id": 1, "title": "T1", "labels": [{"title": "other"}]}]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert result == []
+
+    def test_case_insensitive_match(self):
+        worker = VikunjaWorker()
+        tasks = [{"id": 1, "title": "T1", "labels": [{"title": "AI"}]}]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert len(result) == 1
+
+    def test_no_labels_field(self):
+        worker = VikunjaWorker()
+        tasks = [{"id": 1, "title": "T1"}]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert result == []
+
+    def test_none_labels_field(self):
+        worker = VikunjaWorker()
+        tasks = [{"id": 1, "title": "T1", "labels": None}]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert result == []
+
+    def test_mixed_tasks(self):
+        worker = VikunjaWorker()
+        tasks = [
+            {"id": 1, "title": "T1", "labels": [{"title": "ai"}]},
+            {"id": 2, "title": "T2", "labels": [{"title": "other"}]},
+            {"id": 3, "title": "T3", "labels": [{"title": "ai"}, {"title": "extra"}]},
+        ]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert [t["id"] for t in result] == [1, 3]
+
+
 class TestBuildInstructions:
     """Tests for VikunjaWorker._build_instructions."""
 
