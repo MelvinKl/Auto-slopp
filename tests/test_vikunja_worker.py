@@ -104,7 +104,12 @@ class TestProcessSingleTask:
     """Tests for VikunjaWorker._process_single_task."""
 
     def _make_task(self, task_id=1, title="Test Task", description="Test description", priority=0):
-        return {"id": task_id, "title": title, "description": description, "priority": priority}
+        return {
+            "id": task_id,
+            "title": title,
+            "description": description,
+            "priority": priority,
+        }
 
     def test_dry_run_returns_success(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -125,13 +130,23 @@ class TestProcessSingleTask:
             worker = VikunjaWorker(dry_run=False)
             task = self._make_task()
 
-            with patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch:
+            with (
+                patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
+            ):
                 mock_branch.return_value = False
+                mock_comment.return_value = True
+                mock_status.return_value = True
 
                 result = worker._process_single_task(repo_path, task)
 
                 assert result["success"] is False
                 assert "Failed to create branch" in result["error"]
+                assert result["task_commented"] is True
+                assert result["task_failed"] is True
+                mock_comment.assert_called_once()
+                mock_status.assert_called_once_with(1, "failed")
 
     def test_cli_execution_failure(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -142,14 +157,24 @@ class TestProcessSingleTask:
             with (
                 patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
                 patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.vikunja_worker.get_active_cli_command") as mock_cli,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
             ):
                 mock_branch.return_value = True
                 mock_exec.return_value = {"success": False, "error": "Execution failed"}
+                mock_cli.return_value = "slopmachine"
+                mock_comment.return_value = True
+                mock_status.return_value = True
 
                 result = worker._process_single_task(repo_path, task)
 
                 assert result["success"] is False
                 assert result["openagent_executed"] is False
+                assert result["task_commented"] is True
+                assert result["task_failed"] is True
+                mock_comment.assert_called_once()
+                mock_status.assert_called_once_with(1, "failed")
 
     def test_no_changes_closes_task(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -217,16 +242,24 @@ class TestProcessSingleTask:
                 patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
                 patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_branch_name,
                 patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
             ):
                 mock_branch.return_value = True
                 mock_exec.return_value = {"success": True}
                 mock_branch_name.return_value = "ai/task-1-test-task"
                 mock_push.return_value = (False, "push failed")
+                mock_comment.return_value = True
+                mock_status.return_value = True
 
                 result = worker._process_single_task(repo_path, task)
 
                 assert result["success"] is False
                 assert "Failed to push branch" in result["error"]
+                assert result["task_commented"] is True
+                assert result["task_failed"] is True
+                mock_comment.assert_called_once()
+                mock_status.assert_called_once_with(1, "failed")
 
     def test_task_with_none_description(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -238,6 +271,30 @@ class TestProcessSingleTask:
 
             assert result["success"] is True
             assert result["task_id"] == 5
+
+    def test_exception_handling_updates_task_status(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            worker = VikunjaWorker(dry_run=False)
+            task = self._make_task()
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
+            ):
+                mock_branch.side_effect = Exception("Unexpected error")
+                mock_comment.return_value = True
+                mock_status.return_value = True
+
+                result = worker._process_single_task(repo_path, task)
+
+                assert result["success"] is False
+                assert result["error"] == "Unexpected error"
+                assert result["task_commented"] is True
+                assert result["task_failed"] is True
+                mock_comment.assert_called_once()
+                mock_status.assert_called_once_with(1, "failed")
 
 
 class TestBuildInstructions:
