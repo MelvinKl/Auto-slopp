@@ -49,8 +49,12 @@ def _run_vikunja_command(
         )
         return result
     except subprocess.CalledProcessError as e:
-        error_output = (e.stderr.strip() or e.stdout.strip()) if e.stderr or e.stdout else str(e)
-        logger.error(f"Vikunja command 'vikunja-cli-helper {' '.join(args)}' failed: {error_output}")
+        error_output = (
+            (e.stderr.strip() or e.stdout.strip()) if e.stderr or e.stdout else str(e)
+        )
+        logger.error(
+            f"Vikunja command 'vikunja-cli-helper {' '.join(args)}' failed: {error_output}"
+        )
         raise VikunjaOperationError(f"Vikunja command failed: {error_output}")
     except (subprocess.TimeoutExpired, TimeoutError) as e:
         logger.error(f"Vikunja command 'vikunja-cli-helper {' '.join(args)}' timed out")
@@ -85,7 +89,11 @@ def find_project(project_name: str) -> Optional[Dict[str, Any]]:
             return None
 
         project_data = json.loads(result.stdout)
-        return project_data.get("data") if isinstance(project_data, dict) and "data" in project_data else project_data
+        return (
+            project_data.get("data")
+            if isinstance(project_data, dict) and "data" in project_data
+            else project_data
+        )
 
     except VikunjaOperationError as e:
         logger.error(f"Error finding project '{project_name}': {str(e)}")
@@ -98,7 +106,9 @@ def find_project(project_name: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def create_project(project_name: str, project_identifier: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def create_project(
+    project_name: str, project_identifier: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
     """Create a new project.
 
     Args:
@@ -126,16 +136,94 @@ def create_project(project_name: str, project_identifier: Optional[str] = None) 
             return None
 
         project_data = json.loads(result.stdout)
-        return project_data.get("data") if isinstance(project_data, dict) and "data" in project_data else project_data
+        return (
+            project_data.get("data")
+            if isinstance(project_data, dict) and "data" in project_data
+            else project_data
+        )
 
     except VikunjaOperationError as e:
         logger.error(f"Error creating project '{project_name}': {str(e)}")
         return None
     except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse create project JSON for '{project_name}': {str(e)}")
+        logger.error(
+            f"Failed to parse create project JSON for '{project_name}': {str(e)}"
+        )
         return None
     except Exception as e:
         logger.error(f"Unexpected error creating project '{project_name}': {str(e)}")
+        return None
+
+
+def find_or_create_project(
+    project_name: str, project_identifier: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Find an existing project or create a new one if not found.
+
+    Args:
+        project_name: Project name or identifier to search for/create
+        project_identifier: Optional identifier for the new project (defaults to project_name)
+
+    Returns:
+        Dictionary containing project information or None if failed.
+    """
+    project = find_project(project_name)
+    if project is not None:
+        return project
+
+    logger.info(f"Project '{project_name}' not found, creating new project")
+    return create_project(project_name, project_identifier)
+
+
+def create_task(
+    project_id: int,
+    title: str,
+    description: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """Create a new task in a project.
+
+    Args:
+        project_id: ID of the project to create the task in
+        title: Title for the new task
+        description: Optional description for the task
+
+    Returns:
+        Dictionary containing task information or None if failed.
+    """
+    try:
+        cmd_args = [
+            "-create-task",
+            str(project_id),
+            "-task-title",
+            title,
+        ]
+        if description:
+            cmd_args.extend(["-task-description", description])
+
+        result = _run_vikunja_command(*cmd_args, check=False)
+
+        if result.returncode != 0:
+            error_output = result.stderr.strip() or result.stdout.strip()
+            logger.error(
+                f"Failed to create task '{title}' in project {project_id}: {error_output}"
+            )
+            return None
+
+        task_data = json.loads(result.stdout)
+        return (
+            task_data.get("data")
+            if isinstance(task_data, dict) and "data" in task_data
+            else task_data
+        )
+
+    except VikunjaOperationError as e:
+        logger.error(f"Error creating task '{title}' in project {project_id}: {str(e)}")
+        return None
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse create task JSON for '{title}': {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error creating task '{title}': {str(e)}")
         return None
 
 
@@ -273,7 +361,9 @@ def comment_on_task(task_id: int, comment: str) -> bool:
         return False
 
 
-def create_subtask(parent_task_id: int, title: str, description: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def create_subtask(
+    parent_task_id: int, title: str, description: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
     """Create a subtask for a parent task.
 
     Args:
@@ -293,20 +383,70 @@ def create_subtask(parent_task_id: int, title: str, description: Optional[str] =
 
         if result.returncode != 0:
             error_output = result.stderr.strip() or result.stdout.strip()
-            logger.error(f"Failed to create subtask for task {parent_task_id}: {error_output}")
+            logger.error(
+                f"Failed to create subtask for task {parent_task_id}: {error_output}"
+            )
             return None
 
         subtask_data = json.loads(result.stdout)
-        return subtask_data.get("data") if isinstance(subtask_data, dict) and "data" in subtask_data else subtask_data
+        return (
+            subtask_data.get("data")
+            if isinstance(subtask_data, dict) and "data" in subtask_data
+            else subtask_data
+        )
 
     except VikunjaOperationError as e:
         logger.error(f"Error creating subtask for task {parent_task_id}: {str(e)}")
         return None
     except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse create subtask JSON for task {parent_task_id}: {str(e)}")
+        logger.error(
+            f"Failed to parse create subtask JSON for task {parent_task_id}: {str(e)}"
+        )
         return None
     except Exception as e:
-        logger.error(f"Unexpected error creating subtask for task {parent_task_id}: {str(e)}")
+        logger.error(
+            f"Unexpected error creating subtask for task {parent_task_id}: {str(e)}"
+        )
+        return None
+
+
+def analyze_task(task_id: int) -> Optional[List[Dict[str, Any]]]:
+    """Analyze a task and generate subtasks using AI.
+
+    Args:
+        task_id: ID of the task to analyze
+
+    Returns:
+        List of created subtask dictionaries or None if failed.
+    """
+    try:
+        result = _run_vikunja_command(
+            "-analyze-task",
+            str(task_id),
+            check=False,
+        )
+
+        if result.returncode != 0:
+            error_output = result.stderr.strip() or result.stdout.strip()
+            logger.error(f"Failed to analyze task {task_id}: {error_output}")
+            return None
+
+        data = json.loads(result.stdout)
+        subtasks = (
+            data.get("data", [])
+            if isinstance(data, dict) and "data" in data
+            else (data if isinstance(data, list) else [])
+        )
+        return subtasks
+
+    except VikunjaOperationError as e:
+        logger.error(f"Error analyzing task {task_id}: {str(e)}")
+        return None
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse analyze task JSON for task {task_id}: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error analyzing task {task_id}: {str(e)}")
         return None
 
 
@@ -328,7 +468,9 @@ def check_task_dependencies(task_id: int) -> List[Dict[str, Any]]:
 
         if result.returncode != 0:
             error_output = result.stderr.strip() or result.stdout.strip()
-            logger.warning(f"Failed to check dependencies for task {task_id}: {error_output}")
+            logger.warning(
+                f"Failed to check dependencies for task {task_id}: {error_output}"
+            )
             return []
 
         data = json.loads(result.stdout)
@@ -346,7 +488,9 @@ def check_task_dependencies(task_id: int) -> List[Dict[str, Any]]:
         logger.error(f"Failed to parse dependencies JSON for task {task_id}: {str(e)}")
         return []
     except Exception as e:
-        logger.error(f"Unexpected error checking dependencies for task {task_id}: {str(e)}")
+        logger.error(
+            f"Unexpected error checking dependencies for task {task_id}: {str(e)}"
+        )
         return []
 
 
@@ -368,7 +512,9 @@ def verify_blocking_closed(task_id: int) -> bool:
 
         if result.returncode != 0:
             error_output = result.stderr.strip() or result.stdout.strip()
-            logger.warning(f"Failed to verify blocking tasks for task {task_id}: {error_output}")
+            logger.warning(
+                f"Failed to verify blocking tasks for task {task_id}: {error_output}"
+            )
             return False
 
         data = json.loads(result.stdout)
@@ -384,10 +530,14 @@ def verify_blocking_closed(task_id: int) -> bool:
         logger.error(f"Error verifying blocking tasks for task {task_id}: {str(e)}")
         return False
     except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse verify blocking JSON for task {task_id}: {str(e)}")
+        logger.error(
+            f"Failed to parse verify blocking JSON for task {task_id}: {str(e)}"
+        )
         return False
     except Exception as e:
-        logger.error(f"Unexpected error verifying blocking tasks for task {task_id}: {str(e)}")
+        logger.error(
+            f"Unexpected error verifying blocking tasks for task {task_id}: {str(e)}"
+        )
         return False
 
 
