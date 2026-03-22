@@ -738,6 +738,7 @@ class GitHubIssueWorker(Worker):
                     "error": f"Failed to parse task file during iteration: {str(e)}",
                     "loops_executed": iteration,
                     "steps_completed": result["steps_completed"],
+                    "total_steps": result["total_steps"],
                     "max_loops_reached": False,
                 }
 
@@ -817,6 +818,7 @@ class GitHubIssueWorker(Worker):
                         "error": f"Failed to commit changes for step {next_step.number}",
                         "loops_executed": iteration,
                         "steps_completed": result["steps_completed"],
+                        "total_steps": result["total_steps"],
                         "max_loops_reached": False,
                     }
 
