@@ -496,3 +496,314 @@ class TestRalphExecutor:
             assert "Test Issue" in instructions
             assert "First step" in instructions
             assert "Update only unchecked steps" in instructions
+
+    def test_update_issue_task_file(self, ralph_executor):
+        """Test updating an existing issue task file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / ".ralph" / "github-123.md"
+            task_path.parent.mkdir(parents=True, exist_ok=True)
+
+            initial_content = "# Test\n\n## Steps\n\n- [x] 1. Completed step\n- [ ] 2. Old step\n"
+            task_path.write_text(initial_content)
+
+            result = ralph_executor._update_issue_task_file(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_number=123,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=["Comment 1"],
+                branch_name="ai/branch-123",
+            )
+
+            assert result["success"] is True
+
+    def test_update_issue_task_file_execute_failure(self, ralph_executor):
+        """Test updating issue task file when execute_fn fails."""
+        ralph_executor.execute_fn = lambda *args, **kwargs: {
+            "success": False,
+            "error": "CLI execution failed",
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / ".ralph" / "github-123.md"
+            task_path.parent.mkdir(parents=True, exist_ok=True)
+            task_path.write_text("# Test")
+
+            result = ralph_executor._update_issue_task_file(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_number=123,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch-123",
+            )
+
+            assert result["success"] is False
+            assert "error" in result
+
+    def test_refine_issue_task_file(self, ralph_executor):
+        """Test refining an issue task file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / ".ralph" / "github-123.md"
+            task_path.parent.mkdir(parents=True, exist_ok=True)
+
+            initial_content = "# Test\n\n## Steps\n\n- [ ] 1. First step\n"
+            task_path.write_text(initial_content)
+
+            result = ralph_executor._refine_issue_task_file(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=["Comment 1"],
+                branch_name="ai/branch-123",
+            )
+
+            assert result["success"] is True
+
+    def test_refine_issue_task_file_execute_failure(self, ralph_executor):
+        """Test refining issue task file when execute_fn fails."""
+        ralph_executor.execute_fn = lambda *args, **kwargs: {
+            "success": False,
+            "error": "CLI execution failed",
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / ".ralph" / "github-123.md"
+            task_path.parent.mkdir(parents=True, exist_ok=True)
+            task_path.write_text("# Test")
+
+            result = ralph_executor._refine_issue_task_file(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch-123",
+            )
+
+            assert result["success"] is False
+            assert "error" in result
+
+    def test_execute_step(self, ralph_executor):
+        """Test executing a single step."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            step = Step(number=1, description="Test step", is_closed=False)
+            plan = Plan(title="Test", description="", steps=[step])
+
+            result = ralph_executor._execute_step(
+                step=step,
+                plan=plan,
+                repo_dir=repo_dir,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is True
+
+    def test_execute_step_failure(self, ralph_executor):
+        """Test executing a step that fails."""
+        ralph_executor.execute_fn = lambda *args, **kwargs: {
+            "success": False,
+            "error": "Step execution failed",
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            step = Step(number=1, description="Test step", is_closed=False)
+            plan = Plan(title="Test", description="", steps=[step])
+
+            result = ralph_executor._execute_step(
+                step=step,
+                plan=plan,
+                repo_dir=repo_dir,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is False
+
+    def test_execute_step_acceptance_check(self, ralph_executor):
+        """Test acceptance check for a step."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n")
+
+            ralph_executor.execute_fn = lambda *args, **kwargs: {
+                "success": True,
+                "stdout": "ACCEPTANCE_STATUS: pass",
+            }
+
+            result = ralph_executor._execute_step_acceptance_check(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                step=Step(number=1, description="First step"),
+                issue_title="Test Issue",
+                issue_body="Test body",
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is True
+
+    def test_execute_step_acceptance_check_failure(self, ralph_executor):
+        """Test acceptance check when criteria are not met."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n")
+
+            ralph_executor.execute_fn = lambda *args, **kwargs: {
+                "success": True,
+                "stdout": "ACCEPTANCE_STATUS: fail",
+            }
+
+            result = ralph_executor._execute_step_acceptance_check(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                step=Step(number=1, description="First step"),
+                issue_title="Test Issue",
+                issue_body="Test body",
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is False
+
+    def test_update_remaining_steps(self, ralph_executor):
+        """Test updating remaining steps after a completed step."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Second step\n")
+
+            result = ralph_executor._update_remaining_steps(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                step=Step(number=1, description="First step"),
+                issue_title="Test Issue",
+                issue_body="Test body",
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is True
+
+    def test_update_remaining_steps_failure(self, ralph_executor):
+        """Test updating remaining steps when execution fails."""
+        ralph_executor.execute_fn = lambda *args, **kwargs: {
+            "success": False,
+            "error": "Update failed",
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n")
+
+            result = ralph_executor._update_remaining_steps(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                step=Step(number=1, description="First step"),
+                issue_title="Test Issue",
+                issue_body="Test body",
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is False
+
+    def test_execute_new_issue(self, ralph_executor):
+        """Test execute method for a new issue (no existing task file)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+
+            result = ralph_executor.execute(
+                repo_dir=repo_dir,
+                issue_number=123,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=["Comment 1"],
+                branch_name="ai/branch-123",
+            )
+
+            assert "success" in result
+            assert "task_path" in result
+            assert result["task_path"] == str(repo_dir / ".ralph" / "github-123.md")
+
+    def test_execute_existing_issue(self, ralph_executor):
+        """Test execute method for an existing issue (task file exists)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / ".ralph" / "github-123.md"
+            task_path.parent.mkdir(parents=True, exist_ok=True)
+            task_path.write_text("# Test\n\n## Steps\n\n- [x] 1. Completed step\n")
+
+            result = ralph_executor.execute(
+                repo_dir=repo_dir,
+                issue_number=123,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch-123",
+            )
+
+            assert "success" in result
+            assert "task_path" in result
+
+    def test_run_refined_task_loop_all_steps_completed(self, ralph_executor):
+        """Test refined task loop when all steps are already completed."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [x] 1. Completed step\n- [x] 2. Also completed\n")
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is True
+            assert result["steps_completed"] == 2
+
+    def test_run_refined_task_loop_max_iterations(self, ralph_executor):
+        """Test refined task loop reaching max iterations."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. Step that will never complete\n")
+
+            ralph_executor.max_iterations = 2
+
+            execute_count = [0]
+
+            def failing_execute_fn(*args, **kwargs):
+                execute_count[0] += 1
+                return {"success": False, "error": "Step execution failed"}
+
+            ralph_executor.execute_fn = failing_execute_fn
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is False
+            assert result["max_loops_reached"] is True
+            assert "loops_executed" in result

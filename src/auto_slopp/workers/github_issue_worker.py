@@ -122,9 +122,7 @@ class GitHubIssueWorker(Worker):
 
             if issue_result["success"]:
                 results["issues_processed"] += 1
-                results["openagent_executions"] += issue_result.get(
-                    "openagent_executions", 0
-                )
+                results["openagent_executions"] += issue_result.get("openagent_executions", 0)
                 results["prs_created"] += issue_result.get("prs_created", 0)
                 results["issues_closed"] += issue_result.get("issues_closed", 0)
             else:
@@ -137,9 +135,7 @@ class GitHubIssueWorker(Worker):
 
         return results
 
-    def _create_results_dict(
-        self, start_time: float, repo_path: Path
-    ) -> Dict[str, Any]:
+    def _create_results_dict(self, start_time: float, repo_path: Path) -> Dict[str, Any]:
         """Create the initial results dictionary."""
         return {
             "worker_name": "GitHubIssueWorker",
@@ -174,9 +170,7 @@ class GitHubIssueWorker(Worker):
                 timeout=60,
             )
             if not pull_success:
-                self.logger.warning(
-                    f"Failed to pull latest changes from {repo_dir.name}"
-                )
+                self.logger.warning(f"Failed to pull latest changes from {repo_dir.name}")
                 return False
         return True
 
@@ -201,9 +195,7 @@ class GitHubIssueWorker(Worker):
 
         return False
 
-    def _filter_renovate_issues(
-        self, issues: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    def _filter_renovate_issues(self, issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Filter out issues created by Renovate.
 
         Args:
@@ -215,9 +207,7 @@ class GitHubIssueWorker(Worker):
         filtered = []
         for issue in issues:
             if self._is_renovate_issue(issue):
-                self.logger.info(
-                    f"Skipping renovate issue #{issue.get('number')}: {issue.get('title')}"
-                )
+                self.logger.info(f"Skipping renovate issue #{issue.get('number')}: {issue.get('title')}")
             else:
                 filtered.append(issue)
         return filtered
@@ -245,9 +235,7 @@ class GitHubIssueWorker(Worker):
 
         return has_required_label and is_allowed_creator
 
-    def _filter_by_label_and_creator(
-        self, issues: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    def _filter_by_label_and_creator(self, issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Filter issues based on required label and allowed creator.
 
         Args:
@@ -268,9 +256,7 @@ class GitHubIssueWorker(Worker):
                 )
         return filtered
 
-    def _process_single_issue(
-        self, repo_dir: Path, issue: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _process_single_issue(self, repo_dir: Path, issue: Dict[str, Any]) -> Dict[str, Any]:
         """Process a single issue from the repository using Ralph loop.
 
         Args:
@@ -288,14 +274,10 @@ class GitHubIssueWorker(Worker):
 
         self.logger.info(f"Processing issue #{issue_number}: {issue_title}")
 
-        issue_author_login = (
-            issue.get("author", {}).get("login", "") if issue.get("author") else ""
-        )
+        issue_author_login = issue.get("author", {}).get("login", "") if issue.get("author") else ""
         comments = get_issue_comments(repo_dir, issue_number)
         comment_texts = [
-            comment.get("body", "") or ""
-            for comment in comments
-            if comment.get("author") == issue_author_login
+            comment.get("body", "") or "" for comment in comments if comment.get("author") == issue_author_login
         ]
 
         result = {
@@ -318,16 +300,12 @@ class GitHubIssueWorker(Worker):
             branch_name = f"ai/issue-{issue_number}-{sanitize_branch_name(issue_title[:30].lower())}"
 
             if self.dry_run:
-                self.logger.info(
-                    f"DRY RUN: Would create branch {branch_name} and execute with Ralph loop"
-                )
+                self.logger.info(f"DRY RUN: Would create branch {branch_name} and execute with Ralph loop")
                 result["openagent_executed"] = True
                 result["success"] = True
                 return result
 
-            branch_created = create_and_checkout_branch(
-                repo_dir, branch_name, base_branch="main"
-            )
+            branch_created = create_and_checkout_branch(repo_dir, branch_name, base_branch="main")
             if not branch_created:
                 result["error"] = f"Failed to create branch {branch_name}"
                 return result
@@ -346,14 +324,10 @@ class GitHubIssueWorker(Worker):
                 result["openagent_executions"] = ralph_result.get("loops_executed", 0)
 
                 if not ralph_result.get("success", False):
-                    result["error"] = (
-                        f"Ralph loop failed: {ralph_result.get('error', 'Unknown error')}"
-                    )
+                    result["error"] = f"Ralph loop failed: {ralph_result.get('error', 'Unknown error')}"
 
                     if ralph_result.get("max_loops_reached", False):
-                        self.logger.warning(
-                            f"Ralph loop reached max iterations for issue #{issue_number}"
-                        )
+                        self.logger.warning(f"Ralph loop reached max iterations for issue #{issue_number}")
 
                         failure_comment = (
                             f"⚠️ **Task Failed: Maximum Iterations Reached**\n\n"
@@ -364,9 +338,7 @@ class GitHubIssueWorker(Worker):
                             f"- Last error: {ralph_result.get('error', 'Unknown error')}\n\n"
                             f"This issue will not be processed again automatically."
                         )
-                        comment_success = comment_on_issue(
-                            repo_dir, issue_number, failure_comment
-                        )
+                        comment_success = comment_on_issue(repo_dir, issue_number, failure_comment)
                         result["issue_commented"] = comment_success
 
                         label_removed = remove_label_from_issue(
@@ -380,17 +352,13 @@ class GitHubIssueWorker(Worker):
                             )
                             result["label_removed"] = True
                         else:
-                            self.logger.warning(
-                                f"Failed to remove required label from issue #{issue_number}"
-                            )
+                            self.logger.warning(f"Failed to remove required label from issue #{issue_number}")
 
                     return result
 
                 result["openagent_executed"] = True
             else:
-                instructions = self._build_instructions(
-                    issue_title, issue_body, comment_texts, branch_name=branch_name
-                )
+                instructions = self._build_instructions(issue_title, issue_body, comment_texts, branch_name=branch_name)
 
                 openagent_result = execute_with_instructions(
                     instructions,
@@ -405,21 +373,17 @@ class GitHubIssueWorker(Worker):
 
                 if not openagent_result["success"]:
                     cli_tool = get_active_cli_command()
-                    result["error"] = (
-                        f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
-                    )
+                    result["error"] = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
                     return result
 
             current_branch = get_current_branch(repo_dir)
             if current_branch in ("main", "master"):
-                self.logger.info(
-                    f"No changes made for issue #{issue_number}, closing issue with comment"
-                )
+                self.logger.info(f"No changes made for issue #{issue_number}, closing issue with comment")
 
-                no_changes_comment = "No changes required for this issue. The task has been reviewed and no modifications are needed."
-                comment_success = comment_on_issue(
-                    repo_dir, issue_number, no_changes_comment
+                no_changes_comment = (
+                    "No changes required for this issue. The task has been reviewed and no modifications are needed."
                 )
+                comment_success = comment_on_issue(repo_dir, issue_number, no_changes_comment)
                 result["issue_commented"] = comment_success
 
                 close_success = close_issue(repo_dir, issue_number)
@@ -433,13 +397,9 @@ class GitHubIssueWorker(Worker):
                 return result
 
             if settings.ralph_enabled:
-                push_success, push_message = push_to_remote(
-                    repo_dir, remote="origin", branch=current_branch
-                )
+                push_success, push_message = push_to_remote(repo_dir, remote="origin", branch=current_branch)
                 if not push_success:
-                    result["error"] = (
-                        f"Failed to push branch '{current_branch}': {push_message}"
-                    )
+                    result["error"] = f"Failed to push branch '{current_branch}': {push_message}"
                     return result
 
                 pr_body = self._generate_pr_body_from_task_file(
@@ -455,9 +415,7 @@ class GitHubIssueWorker(Worker):
             if existing_pr and existing_pr.get("state") == "OPEN":
                 result["pr_created"] = True
                 result["pr_url"] = existing_pr.get("url", "")
-                self.logger.info(
-                    f"PR already exists for branch '{current_branch}': {existing_pr.get('url', 'N/A')}"
-                )
+                self.logger.info(f"PR already exists for branch '{current_branch}': {existing_pr.get('url', 'N/A')}")
             else:
                 pr_result = create_pull_request(
                     repo_dir,
@@ -470,9 +428,7 @@ class GitHubIssueWorker(Worker):
                 if pr_result:
                     result["pr_created"] = True
                     result["pr_url"] = pr_result.get("url", "")
-                    self.logger.info(
-                        f"Created PR for issue #{issue_number}: {pr_result.get('url', 'N/A')}"
-                    )
+                    self.logger.info(f"Created PR for issue #{issue_number}: {pr_result.get('url', 'N/A')}")
                 else:
                     existing_pr = get_pr_for_branch(repo_dir, current_branch)
                     if existing_pr:
@@ -494,9 +450,7 @@ class GitHubIssueWorker(Worker):
                 comment_success = comment_on_issue(repo_dir, issue_number, comment)
                 result["issue_commented"] = comment_success
                 if not comment_success:
-                    self.logger.warning(
-                        f"Failed to add comment to issue #{issue_number}"
-                    )
+                    self.logger.warning(f"Failed to add comment to issue #{issue_number}")
             else:
                 self.logger.warning(f"Failed to close issue #{issue_number}")
 
@@ -529,9 +483,7 @@ class GitHubIssueWorker(Worker):
         body_text = f"\n{issue_body}" if issue_body else ""
         comments_text = ""
         if comments:
-            comments_text = "\nComments:\n" + "\n".join(
-                f"- {comment}" for comment in comments if comment
-            )
+            comments_text = "\nComments:\n" + "\n".join(f"- {comment}" for comment in comments if comment)
 
         branch_instruction = ""
         if branch_name:
@@ -639,9 +591,7 @@ Plan:
             "- Return markdown only. Do not modify files.\n"
         )
 
-    def _create_error_result(
-        self, start_time: float, repo_path: Path, error_msg: str
-    ) -> Dict[str, Any]:
+    def _create_error_result(self, start_time: float, repo_path: Path, error_msg: str) -> Dict[str, Any]:
         """Create an error result dictionary."""
         return {
             "worker_name": "GitHubIssueWorker",
