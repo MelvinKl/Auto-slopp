@@ -1,17 +1,11 @@
 """Main settings configuration using Pydantic BaseSettings."""
 
 from pathlib import Path
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Optional
 
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
-
-DEFAULT_WORKERS = [
-    "GitHubIssueWorker",
-    "PRWorker",
-    "StaleBranchCleanupWorker",
-]
 
 
 class TaskRating(BaseModel):

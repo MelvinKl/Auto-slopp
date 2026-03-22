@@ -5,8 +5,6 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from auto_slopp.main import parse_arguments, setup_logging
 
 
@@ -188,7 +186,7 @@ class TestMainApplication:
                 mock_parse.return_value = mock_args
 
                 with patch("auto_slopp.main.setup_logging"):
-                    with patch("auto_slopp.main.sys.exit") as mock_exit:
+                    with patch("auto_slopp.main.sys.exit"):
                         from auto_slopp.main import main
 
                         mock_run_executor.assert_not_called()

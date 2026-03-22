@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import subprocess
+from contextlib import suppress
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -285,10 +286,8 @@ def create_pull_request(
         if pr_url:
             parts = pr_url.rstrip("/").split("/")
             if parts:
-                try:
+                with suppress(ValueError, IndexError):
                     pr_number = int(parts[-1])
-                except ValueError, IndexError:
-                    pass
 
         return {"url": pr_url, "number": pr_number}
 
@@ -345,23 +344,6 @@ def get_open_prs(repo_dir: Path) -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Unexpected error getting PRs from {repo_dir.name}: {str(e)}")
         return []
-
-
-def get_open_pr_branches(repo_dir: Path) -> List[str]:
-    """Get list of branches from open PRs in the repository.
-
-    Args:
-        repo_dir: Path to the git repository
-
-    Returns:
-        List of branch names from open PRs.
-
-    Raises:
-        GitHubOperationError: If gh command fails
-    """
-    prs = get_open_prs(repo_dir)
-    branches = [pr["headRefName"] for pr in prs]
-    return branches
 
 
 def get_pr_for_branch(repo_dir: Path, branch: str) -> Optional[Dict[str, Any]]:

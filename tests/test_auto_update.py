@@ -1,11 +1,6 @@
 """Tests for auto-update functionality."""
 
-import subprocess
-import time
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, call, patch
-
-import pytest
+from unittest.mock import MagicMock, Mock, patch
 
 from auto_slopp.executor import Executor
 
@@ -114,8 +109,6 @@ class TestAutoUpdate:
         mock_subprocess_run.return_value = Mock(returncode=0, stdout="Already up to date.", stderr="")
 
         with patch("auto_slopp.executor.settings", mock_settings):
-            executor = Executor(repo_path=temp_repo_dir)
-
             assert hasattr(mock_settings, "auto_update_reboot_delay")
             assert mock_settings.auto_update_reboot_delay == custom_delay
 
