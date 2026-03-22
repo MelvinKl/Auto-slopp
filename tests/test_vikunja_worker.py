@@ -37,15 +37,9 @@ class TestVikunjaWorkerRun:
             repo_path = Path(temp_dir)
 
             with (
-                patch(
-                    "auto_slopp.workers.vikunja_worker.checkout_branch_resilient"
-                ) as mock_checkout,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.find_or_create_project"
-                ) as mock_project,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.get_open_tasks_by_project"
-                ) as mock_tasks,
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
             ):
                 mock_checkout.return_value = True
                 mock_project.return_value = {"id": 1, "title": repo_path.name}
@@ -63,12 +57,8 @@ class TestVikunjaWorkerRun:
             repo_path = Path(temp_dir)
 
             with (
-                patch(
-                    "auto_slopp.workers.vikunja_worker.checkout_branch_resilient"
-                ) as mock_checkout,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.find_or_create_project"
-                ) as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
             ):
                 mock_checkout.return_value = True
                 mock_project.return_value = None
@@ -109,18 +99,10 @@ class TestVikunjaWorkerRun:
             ]
 
             with (
-                patch(
-                    "auto_slopp.workers.vikunja_worker.checkout_branch_resilient"
-                ) as mock_checkout,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.find_or_create_project"
-                ) as mock_project,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.get_open_tasks_by_project"
-                ) as mock_tasks,
-                patch.object(
-                    VikunjaWorker, "_has_no_open_dependencies", return_value=True
-                ),
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_has_no_open_dependencies", return_value=True),
                 patch.object(VikunjaWorker, "_process_single_task") as mock_process,
             ):
                 mock_checkout.return_value = True
@@ -135,9 +117,7 @@ class TestVikunjaWorkerRun:
                 worker = VikunjaWorker(dry_run=False)
                 worker.run(repo_path)
 
-                processed_ids = [
-                    call.args[1]["id"] for call in mock_process.call_args_list
-                ]
+                processed_ids = [call.args[1]["id"] for call in mock_process.call_args_list]
                 assert processed_ids == [2, 3, 1]
 
     def test_run_empty_after_tag_filtering(self):
@@ -147,15 +127,9 @@ class TestVikunjaWorkerRun:
             tasks = [{"id": 1, "title": "Task 1", "labels": [{"title": "other"}]}]
 
             with (
-                patch(
-                    "auto_slopp.workers.vikunja_worker.checkout_branch_resilient"
-                ) as mock_checkout,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.find_or_create_project"
-                ) as mock_project,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.get_open_tasks_by_project"
-                ) as mock_tasks,
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
                 patch.object(VikunjaWorker, "_filter_tasks_by_tag", return_value=[]),
                 patch.object(VikunjaWorker, "_process_single_task") as mock_process,
             ):
@@ -222,9 +196,7 @@ class TestFilterTasksByTag:
 class TestProcessSingleTask:
     """Tests for VikunjaWorker._process_single_task."""
 
-    def _make_task(
-        self, task_id=1, title="Test Task", description="Test description", priority=0
-    ):
+    def _make_task(self, task_id=1, title="Test Task", description="Test description", priority=0):
         return {
             "id": task_id,
             "title": title,
@@ -252,15 +224,9 @@ class TestProcessSingleTask:
             task = self._make_task()
 
             with (
-                patch(
-                    "auto_slopp.workers.vikunja_worker.create_and_checkout_branch"
-                ) as mock_branch,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.comment_on_task"
-                ) as mock_comment,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.update_task_status"
-                ) as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
             ):
                 mock_branch.return_value = False
                 mock_comment.return_value = True
@@ -283,21 +249,11 @@ class TestProcessSingleTask:
             task = self._make_task()
 
             with (
-                patch(
-                    "auto_slopp.workers.vikunja_worker.create_and_checkout_branch"
-                ) as mock_branch,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.execute_with_instructions"
-                ) as mock_exec,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.get_active_cli_command"
-                ) as mock_cli,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.comment_on_task"
-                ) as mock_comment,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.update_task_status"
-                ) as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.vikunja_worker.get_active_cli_command") as mock_cli,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
             ):
                 mock_branch.return_value = True
                 mock_exec.return_value = {"success": False, "error": "Execution failed"}
@@ -322,21 +278,11 @@ class TestProcessSingleTask:
             task = self._make_task()
 
             with (
-                patch(
-                    "auto_slopp.workers.vikunja_worker.create_and_checkout_branch"
-                ) as mock_branch,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.execute_with_instructions"
-                ) as mock_exec,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.get_current_branch"
-                ) as mock_branch_name,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.comment_on_task"
-                ) as mock_comment,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.update_task_status"
-                ) as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_branch_name,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
             ):
                 mock_branch.return_value = True
                 mock_exec.return_value = {"success": True}
@@ -359,22 +305,12 @@ class TestProcessSingleTask:
             task = self._make_task()
 
             with (
-                patch(
-                    "auto_slopp.workers.vikunja_worker.create_and_checkout_branch"
-                ) as mock_branch,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.execute_with_instructions"
-                ) as mock_exec,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.get_current_branch"
-                ) as mock_branch_name,
+                patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_branch_name,
                 patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.update_task_status"
-                ) as mock_status,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.comment_on_task"
-                ) as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
             ):
                 mock_branch.return_value = True
                 mock_exec.return_value = {"success": True}
@@ -399,22 +335,12 @@ class TestProcessSingleTask:
             task = self._make_task()
 
             with (
-                patch(
-                    "auto_slopp.workers.vikunja_worker.create_and_checkout_branch"
-                ) as mock_branch,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.execute_with_instructions"
-                ) as mock_exec,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.get_current_branch"
-                ) as mock_branch_name,
+                patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_branch_name,
                 patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.comment_on_task"
-                ) as mock_comment,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.update_task_status"
-                ) as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
             ):
                 mock_branch.return_value = True
                 mock_exec.return_value = {"success": True}
@@ -451,15 +377,9 @@ class TestProcessSingleTask:
             task = self._make_task()
 
             with (
-                patch(
-                    "auto_slopp.workers.vikunja_worker.create_and_checkout_branch"
-                ) as mock_branch,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.comment_on_task"
-                ) as mock_comment,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.update_task_status"
-                ) as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
             ):
                 mock_branch.side_effect = Exception("Unexpected error")
                 mock_comment.return_value = True
@@ -530,15 +450,9 @@ class TestDependencyFilteringInRun:
             ]
 
             with (
-                patch(
-                    "auto_slopp.workers.vikunja_worker.checkout_branch_resilient"
-                ) as mock_checkout,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.find_or_create_project"
-                ) as mock_project,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.get_open_tasks_by_project"
-                ) as mock_tasks,
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
                 patch.object(
                     VikunjaWorker,
                     "_has_no_open_dependencies",
@@ -558,9 +472,7 @@ class TestDependencyFilteringInRun:
                 worker = VikunjaWorker(dry_run=False)
                 worker.run(repo_path)
 
-                processed_ids = [
-                    call.args[1]["id"] for call in mock_process.call_args_list
-                ]
+                processed_ids = [call.args[1]["id"] for call in mock_process.call_args_list]
                 assert processed_ids == [1]
 
     def test_no_tasks_after_dependency_filtering(self):
@@ -579,18 +491,10 @@ class TestDependencyFilteringInRun:
             ]
 
             with (
-                patch(
-                    "auto_slopp.workers.vikunja_worker.checkout_branch_resilient"
-                ) as mock_checkout,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.find_or_create_project"
-                ) as mock_project,
-                patch(
-                    "auto_slopp.workers.vikunja_worker.get_open_tasks_by_project"
-                ) as mock_tasks,
-                patch.object(
-                    VikunjaWorker, "_has_no_open_dependencies", return_value=False
-                ),
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_has_no_open_dependencies", return_value=False),
                 patch.object(VikunjaWorker, "_process_single_task") as mock_process,
             ):
                 mock_checkout.return_value = True
@@ -616,9 +520,7 @@ class TestBuildInstructions:
 
     def test_with_branch_name(self):
         worker = VikunjaWorker()
-        instructions = worker._build_instructions(
-            "My Task", "desc", branch_name="ai/task-1-my-task"
-        )
+        instructions = worker._build_instructions("My Task", "desc", branch_name="ai/task-1-my-task")
         assert "already on branch 'ai/task-1-my-task'" in instructions
         assert "Create a new branch" not in instructions
 
