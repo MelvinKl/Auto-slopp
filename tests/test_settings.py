@@ -201,7 +201,7 @@ class TestSettings:
     def test_github_issue_step_max_iterations_default(self):
         """Test default github_issue_step_max_iterations value."""
         test_settings = Settings()
-        assert test_settings.github_issue_step_max_iterations == 25
+        assert test_settings.github_issue_step_max_iterations == 50
 
     def test_github_issue_step_max_iterations_validation(self):
         """Test github_issue_step_max_iterations must be at least 1."""
