@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -211,6 +211,42 @@ class PlanParser:
             header_content="\n".join(header_lines).strip(),
             footer_content="\n".join(footer_lines).strip(),
         )
+
+
+class RalphExecutor:
+    """Executes step-based task plans using the Ralph loop.
+
+    This class encapsulates the logic for creating, refining, and executing
+    task plans defined in markdown files with step-by-step checkboxes.
+    """
+
+    def __init__(
+        self,
+        logger: logging.Logger,
+        agent_args: List[str],
+        timeout: int,
+        execute_fn: Callable[..., Dict[str, Any]],
+        has_changes_fn: Callable[[Path], bool],
+        commit_fn: Callable[[Path, str, bool], Tuple[bool, Optional[bool]]],
+    ):
+        """Initialize the RalphExecutor.
+
+        Args:
+            logger: Logger instance for logging messages.
+            agent_args: Additional arguments to pass to the CLI tool.
+            timeout: Timeout for CLI execution in seconds.
+            execute_fn: Callable matching the signature of
+                ``execute_with_instructions(instructions, work_dir, agent_args, timeout, task_name)``.
+            has_changes_fn: Callable that checks if a repo directory has uncommitted changes.
+            commit_fn: Callable that commits (and optionally pushes) changes.
+                Signature: ``(repo_dir, commit_message, push_if_remote) -> (commit_ok, push_ok)``.
+        """
+        self.logger = logger
+        self.agent_args = agent_args
+        self.timeout = timeout
+        self.execute_fn = execute_fn
+        self.has_changes_fn = has_changes_fn
+        self.commit_fn = commit_fn
 
 
 class PlanWriter:
