@@ -502,6 +502,23 @@ The pre-commit hooks automatically:
 - Run flake8 linting
 - Check for merge conflicts
 
+#### Git Hooks
+
+The project includes git hooks to automate code quality checks during git operations:
+
+```bash
+# Install git hooks (pre-commit and pre-push)
+make install-hooks
+```
+
+**Pre-commit hook** runs on every commit:
+- Flushes pending beads issue changes
+- Runs `make format` to ensure code is properly formatted
+
+**Pre-push hook** runs before pushing to remote:
+- Runs `make lint` to verify code formatting without modifying files
+- Ensures code quality before it reaches the remote repository
+
 #### Available Makefile Targets
 
 | Target | Description |
@@ -509,6 +526,7 @@ The pre-commit hooks automatically:
 | `make help` | Show all available targets |
 | `make install` | Install production dependencies |
 | `make dev-install` | Install development dependencies |
+| `make install-hooks` | Install git hooks (pre-commit and pre-push) |
 | `make test` | Run all tests and linting checks |
 | `make test-unit` | Run unit tests only |
 | `make test-performance` | Run performance tests |

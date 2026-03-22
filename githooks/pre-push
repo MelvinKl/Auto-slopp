@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# pre-push hook
+#
+# This hook verifies that code is properly formatted before pushing.
+# Unlike the pre-commit hook which runs 'make format', this hook only
+# checks formatting without modifying files to avoid accidental changes
+# during push.
+
+echo "🔍 Verifying code formatting before push..."
+
+# Check if uv is available
+if ! command -v uv >/dev/null 2>&1; then
+    echo "Error: uv not found. Cannot run formatting checks" >&2
+    exit 1
+fi
+
+# Run lint checks to verify formatting
+if command -v make >/dev/null 2>&1; then
+    uv run make lint || exit 1
+else
+    echo "Error: make not found. Cannot run formatting checks" >&2
+    exit 1
+fi
+
+echo "✅ Code formatting verification passed"
+exit 0
