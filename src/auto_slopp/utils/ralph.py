@@ -434,24 +434,41 @@ class RalphExecutor:
 
     def _execute_step(
         self,
-        repo_dir: Path,
         step: Step,
-        instructions: str,
+        plan: Plan,
+        repo_dir: Path,
+        issue_title: str,
+        issue_body: str,
+        comment_texts: List[str],
+        branch_name: str,
     ) -> Dict[str, Any]:
         """Execute a single step from the plan.
 
         Args:
-            repo_dir: Repository directory
             step: Step to execute
-            instructions: Pre-built instructions for the CLI tool
+            plan: The full plan containing all steps
+            repo_dir: Repository directory
+            issue_title: GitHub issue title
+            issue_body: GitHub issue body
+            comment_texts: List of comment texts from the issue
+            branch_name: Git branch name
 
         Returns:
             Execution result dictionary
         """
+        step_instructions = self._build_step_instructions(
+            step=step,
+            plan=plan,
+            issue_title=issue_title,
+            issue_body=issue_body,
+            comment_texts=comment_texts,
+            branch_name=branch_name,
+        )
+
         self.logger.info(f"Executing step {step.number}: {step.description}")
 
         result = self.execute_fn(
-            instructions,
+            step_instructions,
             repo_dir,
             self.agent_args,
             self.timeout,
@@ -468,19 +485,33 @@ class RalphExecutor:
     def _execute_step_acceptance_check(
         self,
         repo_dir: Path,
+        task_path: Path,
         step: Step,
-        instructions: str,
+        issue_title: str,
+        issue_body: str,
+        branch_name: str,
     ) -> Dict[str, Any]:
         """Run acceptance criteria validation for a step.
 
         Args:
             repo_dir: Repository directory
+            task_path: Path to the task file
             step: Step to validate
-            instructions: Pre-built instructions for the acceptance check
+            issue_title: GitHub issue title
+            issue_body: GitHub issue body
+            branch_name: Git branch name
 
         Returns:
             Dictionary with 'success' key and optional 'error'
         """
+        instructions = self._build_acceptance_check_instructions(
+            task_path=task_path,
+            step=step,
+            issue_title=issue_title,
+            issue_body=issue_body,
+            branch_name=branch_name,
+        )
+
         result = self.execute_fn(
             instructions,
             repo_dir,
@@ -507,17 +538,33 @@ class RalphExecutor:
     def _update_remaining_steps(
         self,
         repo_dir: Path,
-        instructions: str,
+        task_path: Path,
+        step: Step,
+        issue_title: str,
+        issue_body: str,
+        branch_name: str,
     ) -> Dict[str, Any]:
         """Update future steps with details learned from a completed step.
 
         Args:
             repo_dir: Repository directory
-            instructions: Pre-built instructions for updating remaining steps
+            task_path: Path to the task file
+            step: Step whose completion triggered the update
+            issue_title: GitHub issue title
+            issue_body: GitHub issue body
+            branch_name: Git branch name
 
         Returns:
             Dictionary with 'success' key and optional 'error'
         """
+        instructions = self._build_remaining_steps_update_instructions(
+            task_path=task_path,
+            step=step,
+            issue_title=issue_title,
+            issue_body=issue_body,
+            branch_name=branch_name,
+        )
+
         result = self.execute_fn(
             instructions,
             repo_dir,

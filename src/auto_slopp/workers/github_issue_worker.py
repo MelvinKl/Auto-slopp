@@ -579,7 +579,7 @@ class GitHubIssueWorker(Worker):
                 result["steps_completed"] = len([step for step in plan.steps if step.is_closed])
                 return result
 
-            step_result = self._execute_step(
+            step_result = self.ralph_executor._execute_step(
                 step=next_step,
                 plan=plan,
                 repo_dir=repo_dir,
@@ -593,7 +593,7 @@ class GitHubIssueWorker(Worker):
                 result["loops_executed"] = iteration
                 continue
 
-            acceptance_result = self._execute_step_acceptance_check(
+            acceptance_result = self.ralph_executor._execute_step_acceptance_check(
                 repo_dir=repo_dir,
                 task_path=task_path,
                 step=next_step,
@@ -614,7 +614,7 @@ class GitHubIssueWorker(Worker):
                 result["loops_executed"] = iteration
                 continue
 
-            remaining_steps_update_result = self._update_remaining_steps(
+            remaining_steps_update_result = self.ralph_executor._update_remaining_steps(
                 repo_dir=repo_dir,
                 task_path=task_path,
                 step=next_step,
@@ -662,75 +662,6 @@ class GitHubIssueWorker(Worker):
         result["error"] = f"Maximum iterations ({max_iterations}) reached before all steps completed"
         return result
 
-    def _execute_step(
-        self,
-        step: Step,
-        plan: Plan,
-        repo_dir: Path,
-        issue_title: str,
-        issue_body: str,
-        comment_texts: List[str],
-        branch_name: str,
-    ) -> Dict[str, Any]:
-        """Execute a single step from the plan, delegating to RalphExecutor."""
-        instructions = self._build_step_instructions(
-            step=step,
-            plan=plan,
-            issue_title=issue_title,
-            issue_body=issue_body,
-            comment_texts=comment_texts,
-            branch_name=branch_name,
-        )
-        return self.ralph_executor._execute_step(
-            repo_dir=repo_dir,
-            step=step,
-            instructions=instructions,
-        )
-
-    def _execute_step_acceptance_check(
-        self,
-        repo_dir: Path,
-        task_path: Path,
-        step: Step,
-        issue_title: str,
-        issue_body: str,
-        branch_name: str,
-    ) -> Dict[str, Any]:
-        """Run acceptance criteria validation for a step, delegating to RalphExecutor."""
-        instructions = self._build_acceptance_check_instructions(
-            task_path=task_path,
-            step=step,
-            issue_title=issue_title,
-            issue_body=issue_body,
-            branch_name=branch_name,
-        )
-        return self.ralph_executor._execute_step_acceptance_check(
-            repo_dir=repo_dir,
-            step=step,
-            instructions=instructions,
-        )
-
-    def _update_remaining_steps(
-        self,
-        repo_dir: Path,
-        task_path: Path,
-        step: Step,
-        issue_title: str,
-        issue_body: str,
-        branch_name: str,
-    ) -> Dict[str, Any]:
-        """Update future steps with details learned from a completed step, delegating to RalphExecutor."""
-        instructions = self._build_remaining_steps_update_instructions(
-            task_path=task_path,
-            step=step,
-            issue_title=issue_title,
-            issue_body=issue_body,
-            branch_name=branch_name,
-        )
-        return self.ralph_executor._update_remaining_steps(
-            repo_dir=repo_dir,
-            instructions=instructions,
-        )
 
     def _build_step_instructions(
         self,
