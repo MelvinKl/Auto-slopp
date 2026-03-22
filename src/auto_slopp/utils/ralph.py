@@ -402,6 +402,35 @@ class RalphExecutor:
 
         return {"success": True}
 
+    def _build_refinement_instructions(
+        self,
+        task_path: Path,
+        issue_title: str,
+        issue_body: str,
+        comment_texts: List[str],
+        branch_name: str,
+    ) -> str:
+        """Build instructions for refining the issue task file."""
+        comments_text = ""
+        if comment_texts:
+            comments_text = "\nComments:\n" + "\n".join(f"- {comment}" for comment in comment_texts if comment)
+
+        return (
+            f"You are already on branch '{branch_name}'. "
+            f"Refine the GitHub issue task file at '{task_path}'.\n"
+            f"Issue title: {issue_title}\n"
+            f"Issue description:\n{issue_body}\n"
+            f"{comments_text}\n\n"
+            "Rewrite the file into concrete implementation steps with explicit acceptance criteria.\n"
+            "Requirements for the file format:\n"
+            "- Keep a section named '## Steps'.\n"
+            "- Each step must use this exact format: '- [ ] <number>. <step description>'.\n"
+            "- Every step must include acceptance criteria directly below it as bullets.\n"
+            "- Keep step numbering sequential and stable.\n"
+            "- The last step must always verify that `make test` succeeds.\n"
+            "- Do not commit, do not push, and do not create a PR.\n"
+        )
+
     def _ensure_last_step_is_make_test(self, task_path: Path) -> None:
         """Ensure the last task step always verifies that make test succeeds."""
         try:

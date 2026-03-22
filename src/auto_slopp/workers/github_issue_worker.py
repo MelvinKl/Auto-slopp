@@ -920,24 +920,12 @@ class GitHubIssueWorker(Worker):
         branch_name: str,
     ) -> str:
         """Build instructions for refining the issue task file."""
-        comments_text = ""
-        if comment_texts:
-            comments_text = "\nComments:\n" + "\n".join(f"- {comment}" for comment in comment_texts if comment)
-
-        return (
-            f"You are already on branch '{branch_name}'. "
-            f"Refine the GitHub issue task file at '{task_path}'.\n"
-            f"Issue title: {issue_title}\n"
-            f"Issue description:\n{issue_body}\n"
-            f"{comments_text}\n\n"
-            "Rewrite the file into concrete implementation steps with explicit acceptance criteria.\n"
-            "Requirements for the file format:\n"
-            "- Keep a section named '## Steps'.\n"
-            "- Each step must use this exact format: '- [ ] <number>. <step description>'.\n"
-            "- Every step must include acceptance criteria directly below it as bullets.\n"
-            "- Keep step numbering sequential and stable.\n"
-            "- The last step must always verify that `make test` succeeds.\n"
-            "- Do not commit, do not push, and do not create a PR.\n"
+        return self.ralph_executor._build_refinement_instructions(
+            task_path=task_path,
+            issue_title=issue_title,
+            issue_body=issue_body,
+            comment_texts=comment_texts,
+            branch_name=branch_name,
         )
 
     def _build_acceptance_check_instructions(
