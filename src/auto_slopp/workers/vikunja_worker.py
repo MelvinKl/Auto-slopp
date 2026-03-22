@@ -463,16 +463,20 @@ Plan:
                 self.logger.info(f"Skipping task #{task.get('id')} '{task.get('title')}': missing tag '{tag_name}'")
         return filtered
 
-    def _has_no_open_dependencies(self, task: Dict[str, Any]) -> bool:
+    def _has_no_open_dependencies(self, task_id: int) -> bool:
         """Check if a task has no open dependencies.
 
         Args:
-            task: The task dictionary from Vikunja
+            task_id: The Vikunja task ID
 
         Returns:
             True if all blocking tasks are closed (or there are none), False otherwise
         """
-        return verify_blocking_closed(task["id"])
+        try:
+            return verify_blocking_closed(task_id)
+        except Exception as e:
+            self.logger.warning(f"Failed to verify blocking tasks for task {task_id}: {e}")
+            return False
 
     def _log_completion_summary(self, results: Dict[str, Any]) -> None:
         """Log completion summary."""
