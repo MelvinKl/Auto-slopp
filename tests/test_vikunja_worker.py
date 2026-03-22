@@ -145,8 +145,9 @@ class TestProcessSingleTask:
                 assert "Failed to create branch" in result["error"]
                 assert result["task_commented"] is True
                 assert result["task_failed"] is True
-                mock_comment.assert_called_once()
-                mock_status.assert_called_once_with(1, "failed")
+                assert mock_comment.call_count == 2
+                mock_status.assert_any_call(1, "in_progress")
+                mock_status.assert_any_call(1, "failed")
 
     def test_cli_execution_failure(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -173,8 +174,9 @@ class TestProcessSingleTask:
                 assert result["openagent_executed"] is False
                 assert result["task_commented"] is True
                 assert result["task_failed"] is True
-                mock_comment.assert_called_once()
-                mock_status.assert_called_once_with(1, "failed")
+                assert mock_comment.call_count == 2
+                mock_status.assert_any_call(1, "in_progress")
+                mock_status.assert_any_call(1, "failed")
 
     def test_no_changes_closes_task(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -200,7 +202,8 @@ class TestProcessSingleTask:
                 assert result["success"] is True
                 assert result["no_changes"] is True
                 assert result["task_completed"] is True
-                mock_status.assert_called_once_with(1, "done")
+                mock_status.assert_any_call(1, "in_progress")
+                mock_status.assert_any_call(1, "done")
 
     def test_successful_task_with_changes(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -228,8 +231,9 @@ class TestProcessSingleTask:
                 assert result["success"] is True
                 assert result["openagent_executed"] is True
                 assert result["openagent_executions"] == 1
-                mock_status.assert_called_once_with(1, "done")
-                mock_comment.assert_called_once()
+                mock_status.assert_any_call(1, "in_progress")
+                mock_status.assert_any_call(1, "done")
+                assert mock_comment.call_count == 2
 
     def test_push_failure(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -258,8 +262,9 @@ class TestProcessSingleTask:
                 assert "Failed to push branch" in result["error"]
                 assert result["task_commented"] is True
                 assert result["task_failed"] is True
-                mock_comment.assert_called_once()
-                mock_status.assert_called_once_with(1, "failed")
+                assert mock_comment.call_count == 2
+                mock_status.assert_any_call(1, "in_progress")
+                mock_status.assert_any_call(1, "failed")
 
     def test_task_with_none_description(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -293,8 +298,9 @@ class TestProcessSingleTask:
                 assert result["error"] == "Unexpected error"
                 assert result["task_commented"] is True
                 assert result["task_failed"] is True
-                mock_comment.assert_called_once()
-                mock_status.assert_called_once_with(1, "failed")
+                assert mock_comment.call_count == 2
+                mock_status.assert_any_call(1, "in_progress")
+                mock_status.assert_any_call(1, "failed")
 
 
 class TestBuildInstructions:
