@@ -601,7 +601,7 @@ AUTO_SLOPP_BASE_REPO_PATH=/path/to/your/repo
 AUTO_SLOPP_DEBUG=false
 
 # Worker configuration (all workers enabled by default)
-# JSON list of disabled workers. Available: GitHubIssueWorker, PRWorker, StaleBranchCleanupWorker
+# JSON list of disabled workers. Available: GitHubIssueWorker, PRWorker, StaleBranchCleanupWorker, VikunjaWorker
 # Leave empty to enable all workers, or specify workers to disable:
 AUTO_SLOPP_WORKERS_DISABLED='[]'
 # Example: AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker"]'
@@ -741,7 +741,7 @@ To disable specific workers, set the `AUTO_SLOPP_WORKERS_DISABLED` variable in y
 AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker"]'
 
 # Disable all workers
-AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker"]'
+AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker", "VikunjaWorker"]'
 ```
 
 ## Available Workers
@@ -773,6 +773,15 @@ from auto_slopp.workers import StaleBranchCleanupWorker
 
 # Disable in AUTO_SLOPP_WORKERS_DISABLED
 # Returns: cleaned branches, deletion status
+```
+
+### VikunjaWorker
+Processes Vikunja tasks as instructions. Searches open tasks in a Vikunja project (creating it if needed), filters tasks to only those tagged with "ai" and having no open dependencies, uses task title/description as instructions for the configured CLI tool, creates a new branch, executes the instructions, and updates the task status. Works on tasks indiscriminately regardless of assignment or creator.
+```python
+from auto_slopp.workers import VikunjaWorker
+
+# Disable in AUTO_SLOPP_WORKERS_DISABLED
+# Returns: task processing results, branch information, task status updates
 ```
 
 ## API Reference
@@ -876,7 +885,7 @@ Auto-slopp/
 ├── src/                          # Source code
 │   ├── auto_slopp/               # Main package with core modules and workers
 │   │   ├── utils/                # Utility modules (git, github operations)
-│   │   └── workers/              # Worker implementations (PR, GitHub issue, StaleBranchCleanup)
+│   │   └── workers/              # Worker implementations (PR, GitHub issue, StaleBranchCleanup, Vikunja)
 │   └── settings/                 # Configuration management with Pydantic settings
 └── tests/                        # Test suite with pytest tests
 ```
