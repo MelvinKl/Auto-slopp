@@ -419,7 +419,7 @@ class TestGetOpenTasksByProject:
             result = get_open_tasks_by_project(5)
 
             assert len(result) == 2
-            mock_get_tasks.assert_called_once_with(task_filter="project_id=5,done=false")
+            mock_get_tasks.assert_called_once_with(task_filter=["project_id=5", "done=false"])
 
 
 class TestGetTaskByIdentifier:

@@ -508,7 +508,7 @@ def get_open_tasks_by_project(project_id: int) -> List[Dict[str, Any]]:
     Returns:
         List of open task dictionaries for the project.
     """
-    return get_tasks(task_filter=f"project_id={project_id},done=false")
+    return get_tasks(task_filter=[f"project_id={project_id}", "done=false"])
 
 
 def get_task_by_identifier(identifier: str) -> Optional[Dict[str, Any]]:
