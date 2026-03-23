@@ -33,6 +33,46 @@ class TestVikunjaWorkerInit:
         assert worker.logger is not None
         assert worker.logger.name == "auto_slopp.workers.VikunjaWorker"
 
+    def test_worker_inherits_from_worker_base_class(self):
+        from auto_slopp.worker import Worker
+
+        worker = VikunjaWorker()
+        assert isinstance(worker, Worker)
+        assert hasattr(worker, "run")
+        assert callable(worker.run)
+
+    def test_worker_has_required_methods(self):
+        worker = VikunjaWorker()
+        required_methods = [
+            "run",
+            "_process_single_task",
+            "_build_instructions",
+            "_filter_tasks_by_tag",
+            "_has_no_open_dependencies",
+            "_checkout_main_branch",
+            "_create_results_dict",
+            "_create_error_result",
+        ]
+        for method_name in required_methods:
+            assert hasattr(worker, method_name), f"Missing method: {method_name}"
+            method = getattr(worker, method_name)
+            assert callable(method), f"Method {method_name} is not callable"
+
+    def test_worker_respects_dry_run_mode(self):
+        worker = VikunjaWorker(dry_run=True)
+        assert worker.dry_run is True
+
+        worker2 = VikunjaWorker(dry_run=False)
+        assert worker2.dry_run is False
+
+    def test_worker_agent_args_are_stored(self):
+        worker = VikunjaWorker(agent_args=["--verbose", "--debug"])
+        assert worker.agent_args == ["--verbose", "--debug"]
+
+    def test_worker_can_be_created_with_none_timeout(self):
+        worker = VikunjaWorker(timeout=None)
+        assert worker.timeout == settings.slop_timeout
+
 
 class TestVikunjaWorkerRun:
     """Tests for VikunjaWorker.run."""
