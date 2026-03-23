@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from auto_slopp.workers.vikunja_worker import VikunjaWorker
+from settings.main import settings
 
 
 class TestVikunjaWorkerInit:
@@ -72,16 +73,36 @@ class TestVikunjaWorkerRun:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_path = Path(temp_dir)
 
+            ai_label = [{"title": "ai"}]
             tasks = [
-                {"id": 1, "title": "Low prio", "description": "", "priority": 1},
-                {"id": 2, "title": "High prio", "description": "", "priority": 5},
-                {"id": 3, "title": "Mid prio", "description": "", "priority": 3},
+                {
+                    "id": 1,
+                    "title": "Low prio",
+                    "description": "",
+                    "priority": 1,
+                    "labels": ai_label,
+                },
+                {
+                    "id": 2,
+                    "title": "High prio",
+                    "description": "",
+                    "priority": 5,
+                    "labels": ai_label,
+                },
+                {
+                    "id": 3,
+                    "title": "Mid prio",
+                    "description": "",
+                    "priority": 3,
+                    "labels": ai_label,
+                },
             ]
 
             with (
                 patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
                 patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
                 patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_has_no_open_dependencies", return_value=True),
                 patch.object(VikunjaWorker, "_process_single_task") as mock_process,
             ):
                 mock_checkout.return_value = True
@@ -98,6 +119,105 @@ class TestVikunjaWorkerRun:
 
                 processed_ids = [call.args[1]["id"] for call in mock_process.call_args_list]
                 assert processed_ids == [2, 3, 1]
+
+    def test_run_empty_after_tag_filtering(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+
+            tasks = [{"id": 1, "title": "Task 1", "labels": [{"title": "other"}]}]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_filter_tasks_by_tag", return_value=[]),
+                patch.object(VikunjaWorker, "_process_single_task") as mock_process,
+            ):
+                mock_checkout.return_value = True
+                mock_project.return_value = {"id": 1, "title": repo_path.name}
+                mock_tasks.return_value = tasks
+
+                worker = VikunjaWorker(dry_run=False)
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                assert result["tasks_processed"] == 0
+                assert result["task_results"] == []
+                VikunjaWorker._filter_tasks_by_tag.assert_called_once_with(
+                    tasks, settings.github_issue_worker_required_label
+                )
+                mock_process.assert_not_called()
+
+    def test_run_empty_after_dependency_filtering(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+
+            tasks = [{"id": 1, "title": "Task 1"}]
+            filtered_task = [{"id": 1, "title": "Task", "priority": 0, "labels": [{"title": "ai"}]}]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_filter_tasks_by_tag", return_value=filtered_task),
+                patch.object(VikunjaWorker, "_has_no_open_dependencies", return_value=False),
+                patch.object(VikunjaWorker, "_process_single_task") as mock_process,
+            ):
+                mock_checkout.return_value = True
+                mock_project.return_value = {"id": 1, "title": repo_path.name}
+                mock_tasks.return_value = tasks
+
+                worker = VikunjaWorker(dry_run=False)
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                assert result["tasks_processed"] == 0
+                assert result["task_results"] == []
+                mock_process.assert_not_called()
+
+
+class TestFilterTasksByTag:
+    """Tests for VikunjaWorker._filter_tasks_by_tag."""
+
+    def test_keeps_tasks_with_matching_label(self):
+        worker = VikunjaWorker()
+        tasks = [{"id": 1, "title": "T1", "labels": [{"title": "ai"}]}]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert result == tasks
+
+    def test_removes_tasks_without_matching_label(self):
+        worker = VikunjaWorker()
+        tasks = [{"id": 1, "title": "T1", "labels": [{"title": "other"}]}]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert result == []
+
+    def test_case_insensitive_match(self):
+        worker = VikunjaWorker()
+        tasks = [{"id": 1, "title": "T1", "labels": [{"title": "AI"}]}]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert len(result) == 1
+
+    def test_no_labels_field(self):
+        worker = VikunjaWorker()
+        tasks = [{"id": 1, "title": "T1"}]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert result == []
+
+    def test_none_labels_field(self):
+        worker = VikunjaWorker()
+        tasks = [{"id": 1, "title": "T1", "labels": None}]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert result == []
+
+    def test_mixed_tasks(self):
+        worker = VikunjaWorker()
+        tasks = [
+            {"id": 1, "title": "T1", "labels": [{"title": "ai"}]},
+            {"id": 2, "title": "T2", "labels": [{"title": "other"}]},
+            {"id": 3, "title": "T3", "labels": [{"title": "ai"}, {"title": "extra"}]},
+        ]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert [t["id"] for t in result] == [1, 3]
 
 
 class TestProcessSingleTask:
@@ -301,6 +421,119 @@ class TestProcessSingleTask:
                 assert mock_comment.call_count == 2
                 mock_status.assert_any_call(1, "in_progress")
                 mock_status.assert_any_call(1, "failed")
+
+
+class TestHasNoOpenDependencies:
+    """Tests for VikunjaWorker._has_no_open_dependencies."""
+
+    def test_returns_true_when_no_open_deps(self):
+        worker = VikunjaWorker()
+        with patch(
+            "auto_slopp.workers.vikunja_worker.verify_blocking_closed",
+            return_value=True,
+        ):
+            assert worker._has_no_open_dependencies(1) is True
+
+    def test_returns_false_when_open_deps(self):
+        worker = VikunjaWorker()
+        with patch(
+            "auto_slopp.workers.vikunja_worker.verify_blocking_closed",
+            return_value=False,
+        ):
+            assert worker._has_no_open_dependencies(1) is False
+
+    def test_returns_false_on_exception(self):
+        worker = VikunjaWorker()
+        with patch(
+            "auto_slopp.workers.vikunja_worker.verify_blocking_closed",
+            side_effect=Exception("API error"),
+        ):
+            assert worker._has_no_open_dependencies(1) is False
+
+
+class TestDependencyFilteringInRun:
+    """Tests for dependency filtering in VikunjaWorker.run."""
+
+    def test_filters_tasks_with_open_dependencies(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+
+            ai_label = [{"title": "ai"}]
+            tasks = [
+                {
+                    "id": 1,
+                    "title": "No deps",
+                    "description": "",
+                    "priority": 1,
+                    "labels": ai_label,
+                },
+                {
+                    "id": 2,
+                    "title": "Has deps",
+                    "description": "",
+                    "priority": 1,
+                    "labels": ai_label,
+                },
+            ]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(
+                    VikunjaWorker,
+                    "_has_no_open_dependencies",
+                    side_effect=lambda tid: tid == 1,
+                ),
+                patch.object(VikunjaWorker, "_process_single_task") as mock_process,
+            ):
+                mock_checkout.return_value = True
+                mock_project.return_value = {"id": 1, "title": repo_path.name}
+                mock_tasks.return_value = tasks
+                mock_process.return_value = {
+                    "success": True,
+                    "openagent_executions": 1,
+                    "tasks_completed": 1,
+                }
+
+                worker = VikunjaWorker(dry_run=False)
+                worker.run(repo_path)
+
+                processed_ids = [call.args[1]["id"] for call in mock_process.call_args_list]
+                assert processed_ids == [1]
+
+    def test_no_tasks_after_dependency_filtering(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+
+            ai_label = [{"title": "ai"}]
+            tasks = [
+                {
+                    "id": 1,
+                    "title": "Has deps",
+                    "description": "",
+                    "priority": 1,
+                    "labels": ai_label,
+                },
+            ]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_has_no_open_dependencies", return_value=False),
+                patch.object(VikunjaWorker, "_process_single_task") as mock_process,
+            ):
+                mock_checkout.return_value = True
+                mock_project.return_value = {"id": 1, "title": repo_path.name}
+                mock_tasks.return_value = tasks
+
+                worker = VikunjaWorker(dry_run=False)
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                assert result["tasks_processed"] == 0
+                mock_process.assert_not_called()
 
 
 class TestBuildInstructions:
