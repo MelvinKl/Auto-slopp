@@ -6,10 +6,13 @@ import pytest
 
 from auto_slopp.utils.vikunja_operations import (
     VikunjaOperationError,
+    analyze_task,
     check_task_dependencies,
     comment_on_task,
     create_project,
     create_subtask,
+    create_task,
+    find_or_create_project,
     find_project,
     get_open_tasks_by_project,
     get_task_by_identifier,
@@ -445,6 +448,179 @@ class TestGetTaskByIdentifier:
             mock_get_tasks.return_value = [{"id": 1, "identifier": "T5-1"}]
 
             result = get_task_by_identifier("T5-999")
+
+            assert result is None
+
+
+class TestFindOrCreateProject:
+    """Tests for find_or_create_project function."""
+
+    def test_find_existing_project(self):
+        """Test finding an existing project."""
+        with patch("auto_slopp.utils.vikunja_operations.find_project") as mock_find:
+            mock_find.return_value = {
+                "id": 1,
+                "title": "existing-project",
+                "identifier": "existing-project",
+            }
+
+            result = find_or_create_project("existing-project")
+
+            assert result is not None
+            assert result["id"] == 1
+            mock_find.assert_called_once_with("existing-project")
+
+    def test_create_new_project_when_not_found(self):
+        """Test creating a new project when not found."""
+        with (
+            patch("auto_slopp.utils.vikunja_operations.find_project") as mock_find,
+            patch("auto_slopp.utils.vikunja_operations.create_project") as mock_create,
+        ):
+            mock_find.return_value = None
+            mock_create.return_value = {
+                "id": 2,
+                "title": "new-project",
+                "identifier": "new-project",
+            }
+
+            result = find_or_create_project("new-project")
+
+            assert result is not None
+            assert result["id"] == 2
+            mock_find.assert_called_once_with("new-project")
+            mock_create.assert_called_once_with("new-project", None)
+
+    def test_create_new_project_with_custom_identifier(self):
+        """Test creating a new project with custom identifier."""
+        with (
+            patch("auto_slopp.utils.vikunja_operations.find_project") as mock_find,
+            patch("auto_slopp.utils.vikunja_operations.create_project") as mock_create,
+        ):
+            mock_find.return_value = None
+            mock_create.return_value = {
+                "id": 3,
+                "title": "my project",
+                "identifier": "my-custom-id",
+            }
+
+            result = find_or_create_project("my project", "my-custom-id")
+
+            assert result is not None
+            assert result["id"] == 3
+            mock_create.assert_called_once_with("my project", "my-custom-id")
+
+    def test_return_none_on_creation_failure(self):
+        """Test returning None when project creation fails."""
+        with (
+            patch("auto_slopp.utils.vikunja_operations.find_project") as mock_find,
+            patch("auto_slopp.utils.vikunja_operations.create_project") as mock_create,
+        ):
+            mock_find.return_value = None
+            mock_create.return_value = None
+
+            result = find_or_create_project("test-project")
+
+            assert result is None
+
+
+class TestCreateTask:
+    """Tests for create_task function."""
+
+    def test_success(self):
+        """Test successful task creation."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '{"data": {"id": 10, "title": "New Task", "project_id": 5}}'
+            mock_run.return_value = mock_result
+
+            result = create_task(5, "New Task")
+
+            assert result is not None
+            assert result["id"] == 10
+            assert result["title"] == "New Task"
+            assert result["project_id"] == 5
+
+    def test_with_description(self):
+        """Test task creation with description."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '{"data": {"id": 11, "title": "Task with desc", "description": "Test description"}}'
+            mock_run.return_value = mock_result
+
+            result = create_task(5, "Task with desc", "Test description")
+
+            assert result is not None
+            assert result["id"] == 11
+            assert result["description"] == "Test description"
+
+    def test_failure(self):
+        """Test task creation failure."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 1
+            mock_result.stdout = ""
+            mock_result.stderr = "failed to create task"
+            mock_run.return_value = mock_result
+
+            result = create_task(5, "Test Task")
+
+            assert result is None
+
+
+class TestAnalyzeTask:
+    """Tests for analyze_task function."""
+
+    def test_success(self):
+        """Test successful task analysis."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '{"data": [{"id": 2, "title": "Subtask 1"}, {"id": 3, "title": "Subtask 2"}]}'
+            mock_run.return_value = mock_result
+
+            result = analyze_task(1)
+
+            assert result is not None
+            assert len(result) == 2
+            assert result[0]["id"] == 2
+            assert result[1]["title"] == "Subtask 2"
+
+    def test_no_subtasks(self):
+        """Test task analysis with no subtasks."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '{"data": []}'
+            mock_run.return_value = mock_result
+
+            result = analyze_task(1)
+
+            assert result == []
+
+    def test_failure(self):
+        """Test task analysis failure."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 1
+            mock_result.stdout = ""
+            mock_result.stderr = "failed to analyze task"
+            mock_run.return_value = mock_result
+
+            result = analyze_task(1)
+
+            assert result is None
+
+    def test_invalid_json(self):
+        """Test handling invalid JSON response."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = "invalid json"
+            mock_run.return_value = mock_result
+
+            result = analyze_task(1)
 
             assert result is None
 
