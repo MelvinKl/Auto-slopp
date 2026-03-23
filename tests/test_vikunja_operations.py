@@ -184,6 +184,25 @@ class TestGetTasks:
             assert len(result) == 1
             mock_run.assert_called_once()
 
+    def test_with_list_of_filters(self):
+        """Test task listing with a list of filter strings."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '{"data": [{"id": 1, "done": false}]}'
+            mock_run.return_value = mock_result
+
+            result = get_tasks(task_filter=["project_id=5", "done=false"])
+
+            assert len(result) == 1
+            call_args = mock_run.call_args[0]
+            assert "-task-filter" in call_args
+            # Both filters should appear as separate -task-filter arguments
+            filter_indices = [i for i, a in enumerate(call_args) if a == "-task-filter"]
+            assert len(filter_indices) == 2
+            assert call_args[filter_indices[0] + 1] == "project_id=5"
+            assert call_args[filter_indices[1] + 1] == "done=false"
+
     def test_empty_list(self):
         """Test empty task list."""
         with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
@@ -400,7 +419,7 @@ class TestGetOpenTasksByProject:
             result = get_open_tasks_by_project(5)
 
             assert len(result) == 2
-            mock_get_tasks.assert_called_once_with(task_filter="project_id=5,done=false")
+            mock_get_tasks.assert_called_once_with(task_filter=["project_id=5", "done=false"])
 
 
 class TestGetTaskByIdentifier:
