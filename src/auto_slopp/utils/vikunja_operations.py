@@ -484,7 +484,9 @@ def verify_blocking_closed(task_id: int) -> bool:
         if isinstance(data, dict):
             if data.get("error"):
                 return False
-            return data.get("all_blocking_closed", False)
+            if "data" in data and isinstance(data["data"], dict):
+                return data["data"].get("all_closed", False)
+            return data.get("all_closed", False) or data.get("all_blocking_closed", False)
 
         return False
 
