@@ -426,6 +426,35 @@ class TestProcessSingleTask:
             assert result["task_id"] == 1
             assert result["task_title"] == "Test Task"
 
+    def test_dry_run_mode_skips_external_operations(self):
+        """Test that dry_run mode skips external operations after initial setup."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            worker = VikunjaWorker(dry_run=True)
+            task = self._make_task()
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_branch_name,
+                patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
+            ):
+                result = worker._process_single_task(repo_path, task)
+
+                assert result["success"] is True
+                assert result["openagent_executed"] is True
+                assert result["task_id"] == 1
+                assert result["task_title"] == "Test Task"
+
+                mock_status.assert_called_once_with(1, "in_progress")
+                mock_comment.assert_called_once()
+                mock_branch.assert_not_called()
+                mock_exec.assert_not_called()
+                mock_branch_name.assert_not_called()
+                mock_push.assert_not_called()
+
     def test_branch_creation_failure(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_path = Path(temp_dir)
