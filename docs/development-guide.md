@@ -44,9 +44,13 @@ This guide provides comprehensive information for developers working on Auto-slo
    pytest --version
    ```
 
-4. **Set up pre-commit hooks**
+4. **Set up pre-commit and git hooks**
    ```bash
+   # Install pre-commit hooks (black, isort, flake8, etc.)
    pre-commit install
+
+   # Install custom git pre-commit and pre-push hooks
+   make install-hooks
    ```
 
 ### IDE Configuration

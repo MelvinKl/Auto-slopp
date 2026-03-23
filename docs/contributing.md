@@ -51,7 +51,16 @@ This guide provides comprehensive information for contributing to Auto-slopp, in
    pytest --version
    ```
 
-5. **Configure Git**
+5. **Install Git Hooks**
+   ```bash
+   # Install pre-commit hooks (black, isort, flake8, etc.)
+   pre-commit install
+
+   # Install custom git pre-commit and pre-push hooks
+   make install-hooks
+   ```
+
+6. **Configure Git**
    ```bash
    git config user.name "Your Name"
    git config user.email "your.email@example.com"
