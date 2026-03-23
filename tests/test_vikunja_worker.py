@@ -673,6 +673,103 @@ class TestBuildInstructions:
         assert "make test" in instructions
         assert "make lint" in instructions
 
+    def test_complete_instruction_structure(self):
+        worker = VikunjaWorker()
+        instructions = worker._build_instructions("Test Title", "Test Description", branch_name="ai/task-1")
+        assert "Create a new branch" not in instructions
+        assert "already on branch 'ai/task-1'" in instructions
+        assert "Implement the following:" in instructions
+        assert "Title: Test Title" in instructions
+        assert "Description:" in instructions
+        assert "Test Description" in instructions
+        assert "Plan:" in instructions
+
+    def test_instructions_contain_all_plan_steps(self):
+        worker = VikunjaWorker()
+        instructions = worker._build_instructions("Task", "desc")
+        assert "1. Understand the requirements" in instructions
+        assert "2. Explore the codebase" in instructions
+        assert "3. Identify components" in instructions
+        assert "4. Design a solution" in instructions
+        assert "5. Write or update tests" in instructions
+        assert "6. Implement the solution" in instructions
+        assert "7. Run 'make lint'" in instructions
+        assert "8. Run 'make test'" in instructions
+        assert "9. Commit the changes" in instructions
+        assert "10. Push the changes" in instructions
+
+    def test_instructions_include_final_guidance(self):
+        worker = VikunjaWorker()
+        instructions = worker._build_instructions("Task", "desc")
+        assert "Keep your implementation simple" in instructions
+        assert "Only implement what is required" in instructions
+        assert "Check if there are components you can reuse" in instructions
+        assert "Ensure that 'make test' runs successful" in instructions
+        assert "Only push if ALL tests are successful" in instructions
+        assert "Check if you need to update the README.md" in instructions
+
+    def test_multiline_description(self):
+        worker = VikunjaWorker()
+        description = """First line
+Second line
+Third line"""
+        instructions = worker._build_instructions("Task", description)
+        assert "First line" in instructions
+        assert "Second line" in instructions
+        assert "Third line" in instructions
+
+    def test_long_description(self):
+        worker = VikunjaWorker()
+        description = "A" * 1000
+        instructions = worker._build_instructions("Task", description)
+        assert "A" * 100 in instructions
+        assert len(instructions) > 1000
+
+    def test_special_characters_in_title(self):
+        worker = VikunjaWorker()
+        title = "Fix: API endpoint returns 500 error (with special chars: <>&\"')"
+        instructions = worker._build_instructions(title, "desc")
+        assert title in instructions
+
+    def test_empty_title(self):
+        worker = VikunjaWorker()
+        instructions = worker._build_instructions("", "desc")
+        assert "Title:" in instructions
+
+    def test_branch_instruction_without_branch_name(self):
+        worker = VikunjaWorker()
+        instructions = worker._build_instructions("Task", "desc")
+        assert "Create a new branch that starts with ai/" in instructions
+        assert "from base origin/main" in instructions
+        assert "Work on this branch, implement the changes, commit them, and push" in instructions
+
+    def test_description_with_markdown(self):
+        worker = VikunjaWorker()
+        description = """# Header
+- Item 1
+- Item 2
+
+**Bold text** and *italic*"""
+        instructions = worker._build_instructions("Task", description)
+        assert "# Header" in instructions
+        assert "- Item 1" in instructions
+        assert "**Bold text**" in instructions
+
+    def test_instructions_are_string(self):
+        worker = VikunjaWorker()
+        instructions = worker._build_instructions("Task", "desc")
+        assert isinstance(instructions, str)
+        assert len(instructions) > 0
+
+    def test_consistent_formatting(self):
+        worker = VikunjaWorker()
+        instructions1 = worker._build_instructions("Task 1", "desc1", branch_name="ai/branch1")
+        instructions2 = worker._build_instructions("Task 2", "desc2", branch_name="ai/branch2")
+        assert "already on branch 'ai/branch1'" in instructions1
+        assert "already on branch 'ai/branch2'" in instructions2
+        assert "Title: Task 1" in instructions1
+        assert "Title: Task 2" in instructions2
+
 
 class TestBranchCreationAndCheckout:
     """Integration tests for branch creation and checkout functionality."""
