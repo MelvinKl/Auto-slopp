@@ -1,9 +1,14 @@
 """Tests for VikunjaWorker._process_single_task."""
 
+import subprocess
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+from auto_slopp.utils.git_operations import (
+    create_and_checkout_branch,
+    get_current_branch,
+)
 from auto_slopp.workers.vikunja_worker import VikunjaWorker
 from settings.main import settings
 
@@ -667,3 +672,142 @@ class TestBuildInstructions:
         assert "Plan:" in instructions
         assert "make test" in instructions
         assert "make lint" in instructions
+
+
+class TestBranchCreationAndCheckout:
+    """Integration tests for branch creation and checkout functionality."""
+
+    def _create_test_repo(self, repo_path: Path) -> None:
+        """Create a test git repository with main branch."""
+        subprocess.run(["git", "init"], cwd=repo_path, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+
+        test_file = repo_path / "README.md"
+        test_file.write_text("# Test Repository")
+
+        subprocess.run(["git", "add", "."], cwd=repo_path, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+
+        subprocess.run(
+            ["git", "branch", "-M", "main"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+
+    def test_create_new_branch_from_main(self):
+        """Test creating a new branch from main."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo(repo_path)
+
+            result = create_and_checkout_branch(repo_path, "test-branch", base_branch="main")
+
+            assert result is True
+            current_branch = get_current_branch(repo_path)
+            assert current_branch == "test-branch"
+
+    def test_create_branch_with_ai_prefix(self):
+        """Test creating a branch with ai/ prefix."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo(repo_path)
+
+            branch_name = "ai/task-123-test-task"
+            result = create_and_checkout_branch(repo_path, branch_name, base_branch="main")
+
+            assert result is True
+            current_branch = get_current_branch(repo_path)
+            assert current_branch == branch_name
+
+    def test_checkout_existing_branch(self):
+        """Test checking out an existing branch."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo(repo_path)
+
+            branch_name = "existing-branch"
+            create_and_checkout_branch(repo_path, branch_name, base_branch="main")
+
+            create_and_checkout_branch(repo_path, "main", base_branch="main")
+
+            current_branch = get_current_branch(repo_path)
+            assert current_branch == "main"
+
+            result = create_and_checkout_branch(repo_path, branch_name, base_branch="main")
+
+            assert result is True
+            current_branch = get_current_branch(repo_path)
+            assert current_branch == branch_name
+
+    def test_vikunja_worker_branch_creation_in_process_single_task(self):
+        """Test that VikunjaWorker correctly creates and checks out branches during task processing."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo(repo_path)
+
+            worker = VikunjaWorker(dry_run=False)
+            task = {"id": 1, "title": "Test Task", "description": "Test description"}
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_get_branch,
+                patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
+            ):
+                mock_status.return_value = True
+                mock_comment.return_value = True
+                mock_exec.return_value = {"success": True}
+                mock_get_branch.return_value = "ai/task-1-test-task"
+                mock_push.return_value = (True, "pushed")
+
+                result = worker._process_single_task(repo_path, task)
+
+                assert result["success"] is True
+                assert result["openagent_executed"] is True
+
+    def test_vikunja_worker_branch_name_sanitization(self):
+        """Test that branch names are properly sanitized."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo(repo_path)
+
+            worker = VikunjaWorker(dry_run=False)
+
+            long_title = "A very long task title that should be truncated to a reasonable length for the branch name"
+            task = {"id": 42, "title": long_title, "description": ""}
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_get_branch,
+                patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
+            ):
+                mock_status.return_value = True
+                mock_comment.return_value = True
+                mock_exec.return_value = {"success": True}
+                mock_get_branch.return_value = "ai/task-42-a-very-long-task-title-that"
+                mock_push.return_value = (True, "pushed")
+
+                result = worker._process_single_task(repo_path, task)
+
+                assert result["success"] is True
+                assert result["openagent_executed"] is True
