@@ -464,7 +464,7 @@ def verify_blocking_closed(task_id: int) -> bool:
     """Verify if all blocking dependencies for a task are closed.
 
     Args:
-        task_id: ID of the task to verify
+        task_id: ID of task to verify
 
     Returns:
         True if all blocking tasks are closed, False otherwise.
@@ -487,8 +487,23 @@ def verify_blocking_closed(task_id: int) -> bool:
             if data.get("error"):
                 return False
             if "data" in data and isinstance(data["data"], dict):
-                return data["data"].get("all_closed", False)
-            return data.get("all_closed", False) or data.get("all_blocking_closed", False)
+                nested_data = data["data"]
+                if nested_data.get("error"):
+                    return False
+                all_closed = nested_data.get("all_closed")
+                all_blocking_closed = nested_data.get("all_blocking_closed")
+                if all_closed is not None:
+                    return bool(all_closed)
+                if all_blocking_closed is not None:
+                    return bool(all_blocking_closed)
+                return False
+            all_closed = data.get("all_closed")
+            all_blocking_closed = data.get("all_blocking_closed")
+            if all_closed is not None:
+                return bool(all_closed)
+            if all_blocking_closed is not None:
+                return bool(all_blocking_closed)
+            return False
 
         return False
 

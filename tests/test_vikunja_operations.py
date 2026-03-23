@@ -424,6 +424,198 @@ class TestVerifyBlockingClosed:
 
             assert result is False
 
+    def test_nested_data_all_closed_true(self):
+        """Test nested data format with all_closed true."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '{"data": {"all_closed": true}}'
+            mock_run.return_value = mock_result
+
+            result = verify_blocking_closed(1)
+
+            assert result is True
+
+    def test_nested_data_all_closed_false(self):
+        """Test nested data format with all_closed false."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '{"data": {"all_closed": false}}'
+            mock_run.return_value = mock_result
+
+            result = verify_blocking_closed(1)
+
+            assert result is False
+
+    def test_nested_data_missing_all_closed(self):
+        """Test nested data format with missing all_closed key."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '{"data": {"other_key": "value"}}'
+            mock_run.return_value = mock_result
+
+            result = verify_blocking_closed(1)
+
+            assert result is False
+
+    def test_top_level_all_closed_true(self):
+        """Test top-level all_closed true."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '{"all_closed": true}'
+            mock_run.return_value = mock_result
+
+            result = verify_blocking_closed(1)
+
+            assert result is True
+
+    def test_top_level_all_closed_false(self):
+        """Test top-level all_closed false."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '{"all_closed": false}'
+            mock_run.return_value = mock_result
+
+            result = verify_blocking_closed(1)
+
+            assert result is False
+
+    def test_command_failure_returncode(self):
+        """Test command failure with non-zero return code."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 1
+            mock_result.stdout = ""
+            mock_result.stderr = "command failed"
+            mock_run.return_value = mock_result
+
+            result = verify_blocking_closed(1)
+
+            assert result is False
+
+    def test_invalid_json_response(self):
+        """Test invalid JSON response."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = "invalid json"
+            mock_run.return_value = mock_result
+
+            result = verify_blocking_closed(1)
+
+            assert result is False
+
+    def test_empty_json_response(self):
+        """Test empty JSON response."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = "{}"
+            mock_run.return_value = mock_result
+
+            result = verify_blocking_closed(1)
+
+            assert result is False
+
+    def test_nested_data_null_all_closed(self):
+        """Test nested data with null all_closed."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '{"data": {"all_closed": null}}'
+            mock_run.return_value = mock_result
+
+            result = verify_blocking_closed(1)
+
+            assert result is False
+
+    def test_response_with_list_data(self):
+        """Test response with list instead of dict."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = "[]"
+            mock_run.return_value = mock_result
+
+            result = verify_blocking_closed(1)
+
+            assert result is False
+
+    def test_response_with_string_data(self):
+        """Test response with string instead of object."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '"some string"'
+            mock_run.return_value = mock_result
+
+            result = verify_blocking_closed(1)
+
+            assert result is False
+
+    def test_nested_data_all_blocking_closed_true(self):
+        """Test nested data format with all_blocking_closed true."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '{"data": {"all_blocking_closed": true}}'
+            mock_run.return_value = mock_result
+
+            result = verify_blocking_closed(1)
+
+            assert result is True
+
+    def test_nested_data_all_blocking_closed_false(self):
+        """Test nested data format with all_blocking_closed false."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '{"data": {"all_blocking_closed": false}}'
+            mock_run.return_value = mock_result
+
+            result = verify_blocking_closed(1)
+
+            assert result is False
+
+    def test_response_with_error_in_nested_data(self):
+        """Test response with error field in nested data."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '{"data": {"error": "blocking task not found", "all_closed": true}}'
+            mock_run.return_value = mock_result
+
+            result = verify_blocking_closed(1)
+
+            assert result is False
+
+    def test_response_with_mixed_fields(self):
+        """Test response with both all_closed and all_blocking_closed."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '{"data": {"all_closed": true, "all_blocking_closed": false}}'
+            mock_run.return_value = mock_result
+
+            result = verify_blocking_closed(1)
+
+            assert result is True
+
+    def test_command_timeout(self):
+        """Test command timeout handling."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            from auto_slopp.utils.vikunja_operations import VikunjaOperationError
+
+            mock_run.side_effect = VikunjaOperationError("Command timed out")
+
+            result = verify_blocking_closed(1)
+
+            assert result is False
+
 
 class TestGetOpenTasksByProject:
     """Tests for get_open_tasks_by_project function."""
