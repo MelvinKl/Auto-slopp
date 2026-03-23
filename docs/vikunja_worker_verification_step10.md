@@ -99,6 +99,16 @@ Added comprehensive tests for dry_run mode functionality:
   - The `checkout_branch_resilient` function is never called
   - Git operations are properly skipped
 
+**New test in TestProcessSingleTask class:**
+- ✅ **test_dry_run_mode_skips_external_operations**: Tests `_process_single_task` with dry_run mode, verifying:
+  - Task status is updated to "in_progress" (initial setup before dry_run check)
+  - Start comment is added to the task (initial setup before dry_run check)
+  - Branch creation is NOT called
+  - CLI instruction execution is NOT called
+  - Getting current branch is NOT called
+  - Pushing to remote is NOT called
+  - Result shows success with correct task information
+
 **Existing test (already present):**
 - ✅ **test_dry_run_returns_success**: Tests `_process_single_task` with dry_run mode, verifying:
   - Returns success immediately
@@ -145,10 +155,10 @@ Dry run mode handles the following scenarios:
 - Result structure → Maintains correct structure with dry_run=True flag
 
 #### 8. Test Results
-- ✅ All 2 new dry_run tests pass
+- ✅ All 3 new dry_run tests pass
 - ✅ All 4 existing dry_run tests pass
-- ✅ All 65 VikunjaWorker tests pass
-- ✅ All 368 project tests pass
+- ✅ All 66 VikunjaWorker tests pass
+- ✅ All 369 project tests pass
 - ✅ All linting checks pass (black, isort, flake8)
 - ✅ All security checks pass (safety, bandit)
 
@@ -156,10 +166,10 @@ Dry run mode handles the following scenarios:
 
 | Test Category | Total Tests | Passing |
 |--------------|-------------|---------|
-| New Dry Run Tests | 2 | 2 ✅ |
+| New Dry Run Tests | 3 | 3 ✅ |
 | Existing Dry Run Tests | 4 | 4 ✅ |
-| VikunjaWorker Tests | 65 | 65 ✅ |
-| Project Tests | 368 | 368 ✅ |
+| VikunjaWorker Tests | 66 | 66 ✅ |
+| Project Tests | 369 | 369 ✅ |
 | Linting Checks | 3 | 3 ✅ |
 | Security Checks | 2 | 2 ✅ |
 
@@ -167,7 +177,8 @@ Dry run mode handles the following scenarios:
 - Modified: tests/test_vikunja_worker.py
   - Added test_run_with_dry_run_mode_processes_tasks (lines 232-288)
   - Added test_run_with_dry_run_mode_skips_checkout (lines 290-316)
-  - Total lines added: ~85
+  - Added test_dry_run_mode_skips_external_operations (lines 429-458)
+  - Total lines added: ~114
 
 ### Implementation Details
 
@@ -255,6 +266,38 @@ def test_run_with_dry_run_mode_skips_checkout(self):
             mock_checkout.assert_not_called()
 ```
 
+**Test 3: test_dry_run_mode_skips_external_operations**
+```python
+def test_dry_run_mode_skips_external_operations(self):
+    """Test that dry_run mode skips external operations after initial setup."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        repo_path = Path(temp_dir)
+        worker = VikunjaWorker(dry_run=True)
+        task = self._make_task()
+
+        with (
+            patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
+            patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+            patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+            patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+            patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_branch_name,
+            patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
+        ):
+            result = worker._process_single_task(repo_path, task)
+
+            assert result["success"] is True
+            assert result["openagent_executed"] is True
+            assert result["task_id"] == 1
+            assert result["task_title"] == "Test Task"
+
+            mock_status.assert_called_once_with(1, "in_progress")
+            mock_comment.assert_called_once()
+            mock_branch.assert_not_called()
+            mock_exec.assert_not_called()
+            mock_branch_name.assert_not_called()
+            mock_push.assert_not_called()
+```
+
 ### Conclusion
 The VikunjaWorker dry_run mode functionality is working correctly and comprehensively tested. The tests verify:
 
@@ -264,5 +307,7 @@ The VikunjaWorker dry_run mode functionality is working correctly and comprehens
 4. **Priority ordering**: Tasks are processed in correct priority order even in dry_run mode
 5. **Result structure**: Results dictionary maintains correct structure with dry_run flag
 6. **Edge cases**: Handles multiple tasks with different priorities correctly
+7. **External operation verification**: Confirms all external operations (branch creation, CLI execution, git push) are skipped in dry_run mode
+8. **Initial setup behavior**: Verifies that initial task status update and comment occur before dry_run check
 
 All tests pass successfully, including linting and security checks. The dry_run mode is robust and ready for production use, allowing users to test and verify the worker workflow without making actual changes to the repository or executing CLI commands.
