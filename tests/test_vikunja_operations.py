@@ -447,3 +447,27 @@ class TestGetTaskByIdentifier:
             result = get_task_by_identifier("T5-999")
 
             assert result is None
+
+
+class TestAutoSloppProjectExists:
+    """Tests for verifying the Auto-slopp project exists in Vikunja."""
+
+    def test_auto_slopp_project_exists(self):
+        """Test that the Auto-slopp project can be found in Vikunja."""
+        project = find_project("Auto-slopp")
+
+        assert project is not None
+        assert project["id"] > 0
+        assert project["title"] == "Auto-slopp"
+        assert "identifier" in project
+        assert isinstance(project["identifier"], str)
+        assert len(project["identifier"]) > 0
+
+    def test_auto_slopp_project_by_identifier(self):
+        """Test that the Auto-slopp project can be found by identifier."""
+        project = find_project("auto-slopp")
+
+        assert project is not None
+        assert project["id"] > 0
+        assert project["identifier"] == "auto-slopp"
+        assert project["title"] == "Auto-slopp"
