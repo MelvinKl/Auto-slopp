@@ -15,12 +15,23 @@ class TestVikunjaWorkerInit:
         worker = VikunjaWorker()
         assert worker.agent_args == []
         assert worker.dry_run is False
+        assert worker.timeout == settings.slop_timeout
+        assert worker.logger is not None
 
     def test_initialization_custom(self):
         worker = VikunjaWorker(timeout=3600, agent_args=["--verbose"], dry_run=True)
         assert worker.timeout == 3600
         assert worker.agent_args == ["--verbose"]
         assert worker.dry_run is True
+
+    def test_timeout_defaults_from_settings(self):
+        worker = VikunjaWorker()
+        assert worker.timeout == settings.slop_timeout
+
+    def test_logger_initialized(self):
+        worker = VikunjaWorker()
+        assert worker.logger is not None
+        assert worker.logger.name == "auto_slopp.workers.VikunjaWorker"
 
 
 class TestVikunjaWorkerRun:
@@ -130,7 +141,7 @@ class TestVikunjaWorkerRun:
                 patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
                 patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
                 patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
-                patch.object(VikunjaWorker, "_filter_tasks_by_tag", return_value=[]),
+                patch.object(VikunjaWorker, "_filter_tasks_by_tag", return_value=[]) as mock_filter,
                 patch.object(VikunjaWorker, "_process_single_task") as mock_process,
             ):
                 mock_checkout.return_value = True
@@ -143,9 +154,7 @@ class TestVikunjaWorkerRun:
                 assert result["success"] is True
                 assert result["tasks_processed"] == 0
                 assert result["task_results"] == []
-                VikunjaWorker._filter_tasks_by_tag.assert_called_once_with(
-                    tasks, settings.github_issue_worker_required_label
-                )
+                mock_filter.assert_called_once_with(tasks, settings.github_issue_worker_required_label)
                 mock_process.assert_not_called()
 
     def test_run_empty_after_dependency_filtering(self):
