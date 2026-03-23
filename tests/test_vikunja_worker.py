@@ -268,6 +268,56 @@ class TestFilterTasksByTag:
         result = worker._filter_tasks_by_tag(tasks, "ai")
         assert [t["id"] for t in result] == [1, 3]
 
+    def test_empty_task_list(self):
+        worker = VikunjaWorker()
+        tasks = []
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert result == []
+
+    def test_empty_labels_list(self):
+        worker = VikunjaWorker()
+        tasks = [{"id": 1, "title": "T1", "labels": []}]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert result == []
+
+    def test_label_with_empty_string_title(self):
+        worker = VikunjaWorker()
+        tasks = [{"id": 1, "title": "T1", "labels": [{"title": ""}]}]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert result == []
+
+    def test_multiple_labels_with_different_cases(self):
+        worker = VikunjaWorker()
+        tasks = [
+            {"id": 1, "title": "T1", "labels": [{"title": "AI"}, {"title": "Bug"}]},
+            {"id": 2, "title": "T2", "labels": [{"title": "ai"}, {"title": "Feature"}]},
+            {"id": 3, "title": "T3", "labels": [{"title": "Ai"}]},
+        ]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert [t["id"] for t in result] == [1, 2, 3]
+
+    def test_tag_name_with_different_cases(self):
+        worker = VikunjaWorker()
+        tasks = [
+            {"id": 1, "title": "T1", "labels": [{"title": "ai"}]},
+            {"id": 2, "title": "T2", "labels": [{"title": "AI"}]},
+            {"id": 3, "title": "T3", "labels": [{"title": "Ai"}]},
+        ]
+        result = worker._filter_tasks_by_tag(tasks, "AI")
+        assert [t["id"] for t in result] == [1, 2, 3]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert [t["id"] for t in result] == [1, 2, 3]
+
+    def test_preserves_task_order(self):
+        worker = VikunjaWorker()
+        tasks = [
+            {"id": 3, "title": "T3", "labels": [{"title": "ai"}]},
+            {"id": 1, "title": "T1", "labels": [{"title": "ai"}]},
+            {"id": 2, "title": "T2", "labels": [{"title": "ai"}]},
+        ]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert [t["id"] for t in result] == [3, 1, 2]
+
 
 class TestProcessSingleTask:
     """Tests for VikunjaWorker._process_single_task."""
