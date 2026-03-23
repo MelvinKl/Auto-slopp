@@ -141,6 +141,23 @@ class TestCreateProject:
             assert result is not None
             assert result["identifier"] == "my-custom-id"
 
+    def test_long_project_name_truncates_identifier(self):
+        """Test that project identifier is truncated to 10 characters when project name is long."""
+        with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '{"data": {"id": 4, "title": "very-long-project-name", "identifier": "very-long-"}}'
+            mock_run.return_value = mock_result
+
+            result = create_project("very-long-project-name")
+
+            assert result is not None
+            assert result["identifier"] == "very-long-"
+            # Verify the command was called with the truncated identifier
+            call_args = mock_run.call_args
+            assert "-project-identifier" in call_args[0]
+            assert "very-long-" in call_args[0]
+
     def test_failure(self):
         """Test project creation failure."""
         with patch("auto_slopp.utils.vikunja_operations._run_vikunja_command") as mock_run:

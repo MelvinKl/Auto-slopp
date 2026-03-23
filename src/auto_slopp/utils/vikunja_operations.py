@@ -110,6 +110,8 @@ def create_project(project_name: str, project_identifier: Optional[str] = None) 
     """
     if project_identifier is None:
         project_identifier = project_name.lower().replace(" ", "-")
+        # Truncate to 10 characters (Vikunja limit)
+        project_identifier = project_identifier[:10]
 
     try:
         cmd_args = [
