@@ -29,6 +29,7 @@ from auto_slopp.utils.vikunja_operations import (
     find_or_create_project,
     get_open_tasks_by_project,
     update_task_status,
+    verify_blocking_closed,
 )
 from auto_slopp.worker import Worker
 from settings.main import settings
@@ -116,6 +117,22 @@ class VikunjaWorker(Worker):
 
         if not tasks:
             self.logger.info(f"No open tasks found in Vikunja for project '{project_name}' (ID: {project_id})")
+            results["execution_time"] = self._get_elapsed_time(start_time)
+            self._log_completion_summary(results)
+            return results
+
+        tasks = self._filter_tasks_by_tag(tasks, settings.github_issue_worker_required_label)
+
+        dep_filtered = []
+        for t in tasks:
+            if self._has_no_open_dependencies(t["id"]):
+                dep_filtered.append(t)
+            else:
+                self.logger.info(f"Skipping task #{t['id']} '{t.get('title')}': has open dependencies")
+        tasks = dep_filtered
+
+        if not tasks:
+            self.logger.info("No tasks remaining after dependency filtering")
             results["execution_time"] = self._get_elapsed_time(start_time)
             self._log_completion_summary(results)
             return results
@@ -438,6 +455,42 @@ Plan:
     def _get_elapsed_time(self, start_time: float) -> float:
         """Get elapsed time from start time."""
         return time.time() - start_time
+
+    def _filter_tasks_by_tag(self, tasks: List[Dict[str, Any]], tag_name: str) -> List[Dict[str, Any]]:
+        """Filter tasks to only those whose labels contain a label with a matching title.
+
+        Args:
+            tasks: List of task dictionaries from Vikunja
+            tag_name: Tag title to filter by (case-insensitive)
+
+        Returns:
+            List of tasks that have the specified tag
+        """
+        tag_lower = tag_name.lower()
+        filtered = []
+        for task in tasks:
+            labels = task.get("labels") or []
+            label_titles = [label.get("title", "").lower() for label in labels]
+            if tag_lower in label_titles:
+                filtered.append(task)
+            else:
+                self.logger.info(f"Skipping task #{task.get('id')} '{task.get('title')}': missing tag '{tag_name}'")
+        return filtered
+
+    def _has_no_open_dependencies(self, task_id: int) -> bool:
+        """Check if a task has no open dependencies.
+
+        Args:
+            task_id: The Vikunja task ID
+
+        Returns:
+            True if all blocking tasks are closed (or there are none), False otherwise
+        """
+        try:
+            return verify_blocking_closed(task_id)
+        except Exception as e:
+            self.logger.warning(f"Failed to verify blocking tasks for task {task_id}: {e}")
+            return False
 
     def _log_completion_summary(self, results: Dict[str, Any]) -> None:
         """Log completion summary."""
