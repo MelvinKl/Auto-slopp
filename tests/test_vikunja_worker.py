@@ -229,6 +229,84 @@ class TestVikunjaWorkerRun:
                 assert result["task_results"] == []
                 mock_process.assert_not_called()
 
+    def test_run_with_dry_run_mode_processes_tasks(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+
+            ai_label = [{"title": "ai"}]
+            tasks = [
+                {
+                    "id": 1,
+                    "title": "Task 1",
+                    "description": "First task",
+                    "priority": 1,
+                    "labels": ai_label,
+                },
+                {
+                    "id": 2,
+                    "title": "Task 2",
+                    "description": "Second task",
+                    "priority": 2,
+                    "labels": ai_label,
+                },
+            ]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_has_no_open_dependencies", return_value=True),
+                patch.object(VikunjaWorker, "_process_single_task") as mock_process,
+            ):
+                mock_checkout.return_value = True
+                mock_project.return_value = {"id": 1, "title": repo_path.name}
+                mock_tasks.return_value = tasks
+                mock_process.return_value = {
+                    "success": True,
+                    "openagent_executed": True,
+                    "openagent_executions": 1,
+                    "tasks_completed": 1,
+                }
+
+                worker = VikunjaWorker(dry_run=True)
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                assert result["dry_run"] is True
+                assert result["tasks_processed"] == 2
+                assert len(result["task_results"]) == 2
+                assert result["openagent_executions"] == 2
+                assert result["tasks_completed"] == 2
+                assert len(result["errors"]) == 0
+
+                processed_ids = [call.args[1]["id"] for call in mock_process.call_args_list]
+                assert processed_ids == [2, 1]
+
+    def test_run_with_dry_run_mode_skips_checkout(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+
+            tasks = [{"id": 1, "title": "Task 1", "labels": [{"title": "ai"}], "priority": 0}]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_has_no_open_dependencies", return_value=True),
+                patch.object(VikunjaWorker, "_process_single_task") as mock_process,
+            ):
+                mock_project.return_value = {"id": 1, "title": repo_path.name}
+                mock_tasks.return_value = tasks
+                mock_process.return_value = {
+                    "success": True,
+                    "openagent_executed": True,
+                }
+
+                worker = VikunjaWorker(dry_run=True)
+                worker.run(repo_path)
+
+                mock_checkout.assert_not_called()
+
 
 class TestFilterTasksByTag:
     """Tests for VikunjaWorker._filter_tasks_by_tag."""
