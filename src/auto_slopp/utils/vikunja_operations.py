@@ -7,7 +7,7 @@ used across different workers.
 import json
 import logging
 import subprocess
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -204,14 +204,16 @@ def create_task(
 
 
 def get_tasks(
-    task_filter: Optional[str] = None,
+    task_filter: Optional[Union[str, List[str]]] = None,
     sort_by: Optional[str] = None,
     order_by: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Get list of tasks from Vikunja.
 
     Args:
-        task_filter: Optional filter string (e.g., "done=false", "assignee_id=1")
+        task_filter: Optional filter string or list of filter strings.
+            Each filter is passed as a separate -task-filter argument
+            (e.g., ["project_id=5", "done=false"]).
         sort_by: Optional sort field (e.g., "id", "title", "priority")
         order_by: Optional order direction ("asc" or "desc")
 
@@ -224,7 +226,9 @@ def get_tasks(
     try:
         cmd_args = ["-list-tasks"]
         if task_filter:
-            cmd_args.extend(["-task-filter", task_filter])
+            filters = [task_filter] if isinstance(task_filter, str) else task_filter
+            for f in filters:
+                cmd_args.extend(["-task-filter", f])
         if sort_by:
             cmd_args.extend(["-task-sort-by", sort_by])
         if order_by:
@@ -504,7 +508,7 @@ def get_open_tasks_by_project(project_id: int) -> List[Dict[str, Any]]:
     Returns:
         List of open task dictionaries for the project.
     """
-    return get_tasks(task_filter=f"project_id={project_id},done=false")
+    return get_tasks(task_filter=[f"project_id={project_id}", "done=false"])
 
 
 def get_task_by_identifier(identifier: str) -> Optional[Dict[str, Any]]:
