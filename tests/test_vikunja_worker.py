@@ -427,7 +427,7 @@ class TestProcessSingleTask:
             assert result["task_title"] == "Test Task"
 
     def test_dry_run_mode_skips_external_operations(self):
-        """Test that dry_run mode skips external operations after initial setup."""
+        """Test that dry_run mode skips external operations."""
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_path = Path(temp_dir)
             worker = VikunjaWorker(dry_run=True)
@@ -448,8 +448,8 @@ class TestProcessSingleTask:
                 assert result["task_id"] == 1
                 assert result["task_title"] == "Test Task"
 
-                mock_status.assert_called_once_with(1, "in_progress")
-                mock_comment.assert_called_once()
+                mock_status.assert_not_called()
+                mock_comment.assert_not_called()
                 mock_branch.assert_not_called()
                 mock_exec.assert_not_called()
                 mock_branch_name.assert_not_called()
