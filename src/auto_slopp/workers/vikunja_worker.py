@@ -379,7 +379,22 @@ class VikunjaWorker(Worker):
                             f"Found existing PR for branch '{current_branch}': {existing_pr.get('url', 'N/A')}"
                         )
                     else:
-                        self.logger.warning(f"Failed to create PR for task #{task_id}")
+                        result["error"] = "Failed to create pull request"
+
+                        failure_comment = (
+                            f"⚠️ **Task Failed: PR Creation Error**\n\n"
+                            f"Failed to create pull request for branch '{current_branch}'.\n\n"
+                            f"**Task:** {task_title}\n\n"
+                            f"Changes have been pushed but could not create a pull request.\n\n"
+                            f"This task will not be processed again automatically."
+                        )
+                        comment_success = comment_on_task(task_id, failure_comment)
+                        result["task_commented"] = comment_success
+
+                        update_task_status(task_id, "failed")
+                        result["task_failed"] = True
+
+                        return result
 
             status_success = update_task_status(task_id, "done")
             result["task_completed"] = status_success
