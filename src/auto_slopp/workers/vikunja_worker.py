@@ -152,6 +152,11 @@ class VikunjaWorker(Worker):
                 results["tasks_processed"] += 1
                 results["openagent_executions"] += task_result.get("openagent_executions", 0)
                 results["tasks_completed"] += task_result.get("tasks_completed", 0)
+                if task_result.get("subtasks_created"):
+                    results["subtasks_created"] += 1
+                results["subtasks_count"] += task_result.get("subtasks_count", 0)
+                if task_result.get("pr_created"):
+                    results["prs_created"] += 1
             else:
                 self.logger.warning(
                     f"Failed to process task #{task.get('id')}: {task_result.get('error', 'Unknown error')}"
@@ -194,6 +199,9 @@ class VikunjaWorker(Worker):
             "tasks_processed": 0,
             "openagent_executions": 0,
             "tasks_completed": 0,
+            "subtasks_created": 0,
+            "subtasks_count": 0,
+            "prs_created": 0,
             "task_results": [],
             "success": True,
             "errors": [],
@@ -505,6 +513,9 @@ Plan:
             "tasks_processed": 0,
             "openagent_executions": 0,
             "tasks_completed": 0,
+            "subtasks_created": 0,
+            "subtasks_count": 0,
+            "prs_created": 0,
             "task_results": [],
             "errors": [error_msg],
         }
@@ -561,5 +572,8 @@ Plan:
             f"{results['tasks_processed']}, "
             f"{cli_tool} executions: {results['openagent_executions']}, "
             f"Tasks completed: {results['tasks_completed']}, "
+            f"Subtasks created: {results['subtasks_created']}, "
+            f"Total subtasks: {results['subtasks_count']}, "
+            f"PRs created: {results['prs_created']}, "
             f"Errors: {len(results.get('errors', []))}"
         )
