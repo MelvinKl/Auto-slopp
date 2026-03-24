@@ -25,6 +25,7 @@ from auto_slopp.utils.git_operations import (
     sanitize_branch_name,
 )
 from auto_slopp.utils.vikunja_operations import (
+    analyze_task,
     comment_on_task,
     find_or_create_project,
     get_open_tasks_by_project,
@@ -223,6 +224,8 @@ class VikunjaWorker(Worker):
             "tasks_closed": 0,
             "task_failed": False,
             "error": None,
+            "subtasks_created": False,
+            "subtasks_count": 0,
         }
 
         try:
@@ -235,6 +238,12 @@ class VikunjaWorker(Worker):
                 return result
 
             update_task_status(task_id, "in_progress")
+
+            subtasks = analyze_task(task_id)
+            if subtasks:
+                result["subtasks_created"] = True
+                result["subtasks_count"] = len(subtasks)
+                self.logger.info(f"Created {len(subtasks)} subtasks for task {task_id}")
 
             start_comment = (
                 f"🚀 **Worker Started Processing**\n\n"
