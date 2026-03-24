@@ -549,6 +549,9 @@ class TestProcessSingleTask:
                 patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
                 patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
                 patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.get_pr_for_branch") as mock_get_pr,
+                patch("auto_slopp.workers.vikunja_worker.create_pull_request") as mock_create_pr,
+                patch("auto_slopp.workers.vikunja_worker.analyze_task") as mock_analyze,
             ):
                 mock_branch.return_value = True
                 mock_exec.return_value = {"success": True}
@@ -556,15 +559,24 @@ class TestProcessSingleTask:
                 mock_push.return_value = (True, "pushed")
                 mock_status.return_value = True
                 mock_comment.return_value = True
+                mock_get_pr.return_value = None
+                mock_create_pr.return_value = {
+                    "url": "https://github.com/test/repo/pull/1",
+                    "number": 1,
+                }
+                mock_analyze.return_value = None
 
                 result = worker._process_single_task(repo_path, task)
 
                 assert result["success"] is True
                 assert result["openagent_executed"] is True
                 assert result["openagent_executions"] == 1
+                assert result["pr_created"] is True
+                assert result["pr_url"] == "https://github.com/test/repo/pull/1"
                 mock_status.assert_any_call(1, "in_progress")
                 mock_status.assert_any_call(1, "done")
                 assert mock_comment.call_count == 2
+                mock_create_pr.assert_called_once()
 
     def test_push_failure(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -632,6 +644,244 @@ class TestProcessSingleTask:
                 assert mock_comment.call_count == 2
                 mock_status.assert_any_call(1, "in_progress")
                 mock_status.assert_any_call(1, "failed")
+
+    def test_subtask_creation_success(self):
+        """Test that subtasks are created when analyze_task returns subtasks."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            worker = VikunjaWorker(dry_run=False)
+            task = self._make_task()
+
+            subtasks = [
+                {"id": 10, "title": "Subtask 1"},
+                {"id": 11, "title": "Subtask 2"},
+                {"id": 12, "title": "Subtask 3"},
+            ]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_branch_name,
+                patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.analyze_task") as mock_analyze,
+            ):
+                mock_branch.return_value = True
+                mock_exec.return_value = {"success": True}
+                mock_branch_name.return_value = "ai/task-1-test-task"
+                mock_push.return_value = (True, "pushed")
+                mock_status.return_value = True
+                mock_comment.return_value = True
+                mock_analyze.return_value = subtasks
+
+                result = worker._process_single_task(repo_path, task)
+
+                assert result["subtasks_created"] is True
+                assert result["subtasks_count"] == 3
+                mock_analyze.assert_called_once_with(1)
+
+    def test_subtask_creation_no_subtasks(self):
+        """Test that subtask tracking handles when analyze_task returns None."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            worker = VikunjaWorker(dry_run=False)
+            task = self._make_task()
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_branch_name,
+                patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.analyze_task") as mock_analyze,
+            ):
+                mock_branch.return_value = True
+                mock_exec.return_value = {"success": True}
+                mock_branch_name.return_value = "ai/task-1-test-task"
+                mock_push.return_value = (True, "pushed")
+                mock_status.return_value = True
+                mock_comment.return_value = True
+                mock_analyze.return_value = None
+
+                result = worker._process_single_task(repo_path, task)
+
+                assert result["subtasks_created"] is False
+                assert result["subtasks_count"] == 0
+                mock_analyze.assert_called_once_with(1)
+
+    def test_subtask_creation_empty_list(self):
+        """Test that subtask tracking handles when analyze_task returns empty list."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            worker = VikunjaWorker(dry_run=False)
+            task = self._make_task()
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_branch_name,
+                patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.analyze_task") as mock_analyze,
+            ):
+                mock_branch.return_value = True
+                mock_exec.return_value = {"success": True}
+                mock_branch_name.return_value = "ai/task-1-test-task"
+                mock_push.return_value = (True, "pushed")
+                mock_status.return_value = True
+                mock_comment.return_value = True
+                mock_analyze.return_value = []
+
+                result = worker._process_single_task(repo_path, task)
+
+                assert result["subtasks_created"] is False
+                assert result["subtasks_count"] == 0
+                mock_analyze.assert_called_once_with(1)
+
+    def test_subtask_creation_on_branch_creation_failure(self):
+        """Test that subtask creation still happens even if branch creation fails."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            worker = VikunjaWorker(dry_run=False)
+            task = self._make_task()
+
+            subtasks = [
+                {"id": 10, "title": "Subtask 1"},
+                {"id": 11, "title": "Subtask 2"},
+            ]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.analyze_task") as mock_analyze,
+            ):
+                mock_branch.return_value = False
+                mock_status.return_value = True
+                mock_comment.return_value = True
+                mock_analyze.return_value = subtasks
+
+                result = worker._process_single_task(repo_path, task)
+
+                assert result["subtasks_created"] is True
+                assert result["subtasks_count"] == 2
+                assert result["success"] is False
+                mock_analyze.assert_called_once_with(1)
+
+    def test_subtask_creation_on_cli_failure(self):
+        """Test that subtask creation happens before CLI execution."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            worker = VikunjaWorker(dry_run=False)
+            task = self._make_task()
+
+            subtasks = [
+                {"id": 10, "title": "Subtask 1"},
+            ]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.vikunja_worker.get_active_cli_command") as mock_cli,
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.analyze_task") as mock_analyze,
+            ):
+                mock_branch.return_value = True
+                mock_exec.return_value = {"success": False, "error": "CLI failed"}
+                mock_cli.return_value = "slopmachine"
+                mock_status.return_value = True
+                mock_comment.return_value = True
+                mock_analyze.return_value = subtasks
+
+                result = worker._process_single_task(repo_path, task)
+
+                assert result["subtasks_created"] is True
+                assert result["subtasks_count"] == 1
+                assert result["success"] is False
+                mock_analyze.assert_called_once_with(1)
+
+    def test_pr_creation_failure(self):
+        """Test that PR creation failure is handled correctly."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            worker = VikunjaWorker(dry_run=False)
+            task = self._make_task()
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_branch_name,
+                patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.get_pr_for_branch") as mock_get_pr,
+                patch("auto_slopp.workers.vikunja_worker.create_pull_request") as mock_create_pr,
+                patch("auto_slopp.workers.vikunja_worker.analyze_task") as mock_analyze,
+            ):
+                mock_branch.return_value = True
+                mock_exec.return_value = {"success": True}
+                mock_branch_name.return_value = "ai/task-1-test-task"
+                mock_push.return_value = (True, "pushed")
+                mock_status.return_value = True
+                mock_comment.return_value = True
+                mock_get_pr.return_value = None
+                mock_create_pr.return_value = None
+                mock_analyze.return_value = None
+
+                result = worker._process_single_task(repo_path, task)
+
+                assert result["success"] is False
+                assert result["error"] == "Failed to create pull request"
+                assert result["pr_created"] is False
+                assert result["task_failed"] is True
+                assert result["task_commented"] is True
+                mock_create_pr.assert_called_once()
+                mock_status.assert_any_call(1, "in_progress")
+                mock_status.assert_any_call(1, "failed")
+                assert mock_comment.call_count >= 2
+
+    def test_pr_already_exists(self):
+        """Test that existing PR is reused when found."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            worker = VikunjaWorker(dry_run=False)
+            task = self._make_task()
+
+            existing_pr = {
+                "url": "https://github.com/test/repo/pull/123",
+                "number": 123,
+                "state": "OPEN",
+            }
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_branch_name,
+                patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.get_pr_for_branch") as mock_get_pr,
+                patch("auto_slopp.workers.vikunja_worker.analyze_task") as mock_analyze,
+            ):
+                mock_branch.return_value = True
+                mock_exec.return_value = {"success": True}
+                mock_branch_name.return_value = "ai/task-1-test-task"
+                mock_push.return_value = (True, "pushed")
+                mock_status.return_value = True
+                mock_comment.return_value = True
+                mock_get_pr.return_value = existing_pr
+                mock_analyze.return_value = None
+
+                result = worker._process_single_task(repo_path, task)
+
+                assert result["success"] is True
+                assert result["pr_created"] is True
+                assert result["pr_url"] == "https://github.com/test/repo/pull/123"
+                mock_get_pr.assert_called_once()
 
 
 class TestHasNoOpenDependencies:
@@ -975,17 +1225,27 @@ class TestBranchCreationAndCheckout:
                 patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
                 patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_get_branch,
                 patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
+                patch("auto_slopp.workers.vikunja_worker.get_pr_for_branch") as mock_get_pr,
+                patch("auto_slopp.workers.vikunja_worker.create_pull_request") as mock_create_pr,
+                patch("auto_slopp.workers.vikunja_worker.analyze_task") as mock_analyze,
             ):
                 mock_status.return_value = True
                 mock_comment.return_value = True
                 mock_exec.return_value = {"success": True}
                 mock_get_branch.return_value = "ai/task-1-test-task"
                 mock_push.return_value = (True, "pushed")
+                mock_get_pr.return_value = None
+                mock_create_pr.return_value = {
+                    "url": "https://github.com/test/repo/pull/1",
+                    "number": 1,
+                }
+                mock_analyze.return_value = None
 
                 result = worker._process_single_task(repo_path, task)
 
                 assert result["success"] is True
                 assert result["openagent_executed"] is True
+                assert result["pr_created"] is True
 
     def test_vikunja_worker_branch_name_sanitization(self):
         """Test that branch names are properly sanitized."""
@@ -1004,17 +1264,27 @@ class TestBranchCreationAndCheckout:
                 patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
                 patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_get_branch,
                 patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
+                patch("auto_slopp.workers.vikunja_worker.get_pr_for_branch") as mock_get_pr,
+                patch("auto_slopp.workers.vikunja_worker.create_pull_request") as mock_create_pr,
+                patch("auto_slopp.workers.vikunja_worker.analyze_task") as mock_analyze,
             ):
                 mock_status.return_value = True
                 mock_comment.return_value = True
                 mock_exec.return_value = {"success": True}
                 mock_get_branch.return_value = "ai/task-42-a-very-long-task-title-that"
                 mock_push.return_value = (True, "pushed")
+                mock_get_pr.return_value = None
+                mock_create_pr.return_value = {
+                    "url": "https://github.com/test/repo/pull/42",
+                    "number": 42,
+                }
+                mock_analyze.return_value = None
 
                 result = worker._process_single_task(repo_path, task)
 
                 assert result["success"] is True
                 assert result["openagent_executed"] is True
+                assert result["pr_created"] is True
 
 
 class TestGracefulFailureHandling:

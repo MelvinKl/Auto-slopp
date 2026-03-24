@@ -870,12 +870,12 @@ from auto_slopp.workers import StaleBranchCleanupWorker
 ```
 
 ### VikunjaWorker
-Processes Vikunja tasks as instructions. Searches open tasks in a Vikunja project (creating it if needed), filters tasks to only those tagged with "ai" and having no open dependencies, uses task title/description as instructions for the configured CLI tool, creates a new branch, executes the instructions, and updates the task status. Works on tasks indiscriminately regardless of assignment or creator.
+Processes Vikunja tasks as instructions. Searches open tasks in a Vikunja project (creating it if needed), filters tasks to only those tagged with "ai" and having no open dependencies, uses task title/description as instructions for the configured CLI tool, creates a new branch, executes the instructions, and updates the task status. Works on tasks indiscriminately regardless of assignment or creator. Additionally creates subtasks in Vikunja and pull requests in GitHub based on processing results.
 ```python
 from auto_slopp.workers import VikunjaWorker
 
 # Disable in AUTO_SLOPP_WORKERS_DISABLED
-# Returns: task processing results, branch information, task status updates
+# Returns: task processing results, branch information, task status updates, subtask creation results, PR creation results
 ```
 
 ## API Reference
