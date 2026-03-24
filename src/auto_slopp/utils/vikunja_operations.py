@@ -109,9 +109,14 @@ def create_project(project_name: str, project_identifier: Optional[str] = None) 
         Dictionary containing project information or None if failed.
     """
     if project_identifier is None:
-        project_identifier = project_name.lower().replace(" ", "-")
-        # Truncate to 10 characters (Vikunja limit)
-        project_identifier = project_identifier[:10]
+        # Generate identifier from project name
+        identifier_base = project_name.strip().lower().replace(" ", "-")
+        # Ensure identifier is exactly 10 characters as per Vikunja requirements (runelength(0|10))
+        # Take first 10 chars and pad with hyphens if shorter
+        if len(identifier_base) >= 10:
+            project_identifier = identifier_base[:10]
+        else:
+            project_identifier = identifier_base.ljust(10, "-")
 
     try:
         cmd_args = [
