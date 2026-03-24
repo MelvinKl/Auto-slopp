@@ -24,6 +24,10 @@ from auto_slopp.utils.git_operations import (
     push_to_remote,
     sanitize_branch_name,
 )
+from auto_slopp.utils.github_operations import (
+    create_pull_request,
+    get_pr_for_branch,
+)
 from auto_slopp.utils.vikunja_operations import (
     analyze_task,
     comment_on_task,
@@ -226,6 +230,8 @@ class VikunjaWorker(Worker):
             "error": None,
             "subtasks_created": False,
             "subtasks_count": 0,
+            "pr_created": False,
+            "pr_url": "",
         }
 
         try:
@@ -345,16 +351,47 @@ class VikunjaWorker(Worker):
 
                 return result
 
+            existing_pr = get_pr_for_branch(repo_dir, current_branch)
+            if existing_pr and existing_pr.get("state") == "OPEN":
+                result["pr_created"] = True
+                result["pr_url"] = existing_pr.get("url", "")
+                self.logger.info(f"PR already exists for branch '{current_branch}': {existing_pr.get('url', 'N/A')}")
+            else:
+                pr_body = f"Vikunja Task #{task_id}: {task_title}\n\n{task_description}"
+                pr_result = create_pull_request(
+                    repo_dir,
+                    title=task_title,
+                    body=pr_body,
+                    head=current_branch,
+                    base="main",
+                )
+
+                if pr_result:
+                    result["pr_created"] = True
+                    result["pr_url"] = pr_result.get("url", "")
+                    self.logger.info(f"Created PR for task #{task_id}: {pr_result.get('url', 'N/A')}")
+                else:
+                    existing_pr = get_pr_for_branch(repo_dir, current_branch)
+                    if existing_pr:
+                        result["pr_created"] = True
+                        result["pr_url"] = existing_pr.get("url", "")
+                        self.logger.info(
+                            f"Found existing PR for branch '{current_branch}': {existing_pr.get('url', 'N/A')}"
+                        )
+                    else:
+                        self.logger.warning(f"Failed to create PR for task #{task_id}")
+
             status_success = update_task_status(task_id, "done")
             result["task_completed"] = status_success
             result["tasks_completed"] = 1 if status_success else 0
 
             if status_success:
+                pr_info = f"\n\n**Pull Request:** {result.get('pr_url', 'N/A')}" if result.get("pr_url") else ""
                 success_comment = (
                     f"✅ **Task Completed Successfully**\n\n"
                     f"**Task:** {task_title}\n\n"
                     f"The task has been implemented and pushed to branch `{current_branch}`.\n\n"
-                    f"**Branch:** {current_branch}\n\n"
+                    f"**Branch:** {current_branch}{pr_info}\n\n"
                     f"Changes have been committed and pushed. The task is ready for review."
                 )
                 comment_success = comment_on_task(task_id, success_comment)
