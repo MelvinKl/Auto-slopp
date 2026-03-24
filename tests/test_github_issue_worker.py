@@ -866,12 +866,12 @@ class TestGitHubIssueWorker:
                     2,
                 ),
                 patch.object(
-                    worker,
+                    worker.ralph_executor,
                     "_execute_step",
                     return_value={"success": False, "error": "retry needed"},
                 ),
             ):
-                result = worker._run_refined_task_loop(
+                result = worker.ralph_executor._run_refined_task_loop(
                     repo_dir=repo_path,
                     task_path=task_path,
                     issue_title="Issue",
