@@ -24,7 +24,12 @@ from auto_slopp.utils.git_operations import (
     push_to_remote,
     sanitize_branch_name,
 )
+from auto_slopp.utils.github_operations import (
+    create_pull_request,
+    get_pr_for_branch,
+)
 from auto_slopp.utils.vikunja_operations import (
+    analyze_task,
     comment_on_task,
     find_or_create_project,
     get_open_tasks_by_project,
@@ -147,6 +152,11 @@ class VikunjaWorker(Worker):
                 results["tasks_processed"] += 1
                 results["openagent_executions"] += task_result.get("openagent_executions", 0)
                 results["tasks_completed"] += task_result.get("tasks_completed", 0)
+                if task_result.get("subtasks_created"):
+                    results["subtasks_created"] += 1
+                results["subtasks_count"] += task_result.get("subtasks_count", 0)
+                if task_result.get("pr_created"):
+                    results["prs_created"] += 1
             else:
                 self.logger.warning(
                     f"Failed to process task #{task.get('id')}: {task_result.get('error', 'Unknown error')}"
@@ -189,6 +199,9 @@ class VikunjaWorker(Worker):
             "tasks_processed": 0,
             "openagent_executions": 0,
             "tasks_completed": 0,
+            "subtasks_created": 0,
+            "subtasks_count": 0,
+            "prs_created": 0,
             "task_results": [],
             "success": True,
             "errors": [],
@@ -223,6 +236,10 @@ class VikunjaWorker(Worker):
             "tasks_closed": 0,
             "task_failed": False,
             "error": None,
+            "subtasks_created": False,
+            "subtasks_count": 0,
+            "pr_created": False,
+            "pr_url": "",
         }
 
         try:
@@ -235,6 +252,12 @@ class VikunjaWorker(Worker):
                 return result
 
             update_task_status(task_id, "in_progress")
+
+            subtasks = analyze_task(task_id)
+            if subtasks:
+                result["subtasks_created"] = True
+                result["subtasks_count"] = len(subtasks)
+                self.logger.info(f"Created {len(subtasks)} subtasks for task {task_id}")
 
             start_comment = (
                 f"🚀 **Worker Started Processing**\n\n"
@@ -336,16 +359,62 @@ class VikunjaWorker(Worker):
 
                 return result
 
+            existing_pr = get_pr_for_branch(repo_dir, current_branch)
+            if existing_pr and existing_pr.get("state") == "OPEN":
+                result["pr_created"] = True
+                result["pr_url"] = existing_pr.get("url", "")
+                self.logger.info(f"PR already exists for branch '{current_branch}': {existing_pr.get('url', 'N/A')}")
+            else:
+                pr_body = f"Vikunja Task #{task_id}: {task_title}\n\n{task_description}"
+                pr_result = create_pull_request(
+                    repo_dir,
+                    title=task_title,
+                    body=pr_body,
+                    head=current_branch,
+                    base="main",
+                )
+
+                if pr_result:
+                    result["pr_created"] = True
+                    result["pr_url"] = pr_result.get("url", "")
+                    self.logger.info(f"Created PR for task #{task_id}: {pr_result.get('url', 'N/A')}")
+                else:
+                    existing_pr = get_pr_for_branch(repo_dir, current_branch)
+                    if existing_pr:
+                        result["pr_created"] = True
+                        result["pr_url"] = existing_pr.get("url", "")
+                        self.logger.info(
+                            f"Found existing PR for branch '{current_branch}': {existing_pr.get('url', 'N/A')}"
+                        )
+                    else:
+                        result["error"] = "Failed to create pull request"
+
+                        failure_comment = (
+                            f"⚠️ **Task Failed: PR Creation Error**\n\n"
+                            f"Failed to create pull request for branch '{current_branch}'.\n\n"
+                            f"**Task:** {task_title}\n\n"
+                            f"Changes have been pushed but could not create a pull request.\n\n"
+                            f"This task will not be processed again automatically."
+                        )
+                        comment_success = comment_on_task(task_id, failure_comment)
+                        result["task_commented"] = comment_success
+
+                        update_task_status(task_id, "failed")
+                        result["task_failed"] = True
+
+                        return result
+
             status_success = update_task_status(task_id, "done")
             result["task_completed"] = status_success
             result["tasks_completed"] = 1 if status_success else 0
 
             if status_success:
+                pr_info = f"\n\n**Pull Request:** {result.get('pr_url', 'N/A')}" if result.get("pr_url") else ""
                 success_comment = (
                     f"✅ **Task Completed Successfully**\n\n"
                     f"**Task:** {task_title}\n\n"
                     f"The task has been implemented and pushed to branch `{current_branch}`.\n\n"
-                    f"**Branch:** {current_branch}\n\n"
+                    f"**Branch:** {current_branch}{pr_info}\n\n"
                     f"Changes have been committed and pushed. The task is ready for review."
                 )
                 comment_success = comment_on_task(task_id, success_comment)
@@ -444,6 +513,9 @@ Plan:
             "tasks_processed": 0,
             "openagent_executions": 0,
             "tasks_completed": 0,
+            "subtasks_created": 0,
+            "subtasks_count": 0,
+            "prs_created": 0,
             "task_results": [],
             "errors": [error_msg],
         }
@@ -500,5 +572,8 @@ Plan:
             f"{results['tasks_processed']}, "
             f"{cli_tool} executions: {results['openagent_executions']}, "
             f"Tasks completed: {results['tasks_completed']}, "
+            f"Subtasks created: {results['subtasks_created']}, "
+            f"Total subtasks: {results['subtasks_count']}, "
+            f"PRs created: {results['prs_created']}, "
             f"Errors: {len(results.get('errors', []))}"
         )
