@@ -1,10 +1,13 @@
 """Tests for git operations utilities."""
 
+import subprocess
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
+    create_and_checkout_branch,
+    get_current_branch,
     merge_main_into_branch,
 )
 
@@ -94,26 +97,110 @@ class TestCheckoutBranchResilient:
         assert result is True
         assert mock_subprocess_run.call_count == 3
 
-    @patch("auto_slopp.utils.git_operations.subprocess.run")
-    def test_checkout_success_after_reset(self, mock_subprocess_run):
-        """Test successful checkout after reset on first failure."""
+
+class TestCreateAndCheckoutBranch:
+    """Test cases for create_and_checkout_branch function."""
+
+    def _create_test_repo(self, repo_path: Path) -> None:
+        """Create a test git repository with main branch."""
+        subprocess.run(["git", "init"], cwd=repo_path, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+
+        test_file = repo_path / "README.md"
+        test_file.write_text("# Test Repository")
+
+        subprocess.run(["git", "add", "."], cwd=repo_path, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+
+        subprocess.run(
+            ["git", "branch", "-M", "main"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+
+    def test_create_new_branch_from_main(self):
+        """Test creating a new branch from main."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo(repo_path)
+
+            result = create_and_checkout_branch(repo_path, "test-branch", base_branch="main")
+
+            assert result is True
+            current_branch = get_current_branch(repo_path)
+            assert current_branch == "test-branch"
+
+    def test_checkout_existing_branch(self):
+        """Test checking out an existing branch."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo(repo_path)
+
+            branch_name = "existing-branch"
+            create_and_checkout_branch(repo_path, branch_name, base_branch="main")
+
+            create_and_checkout_branch(repo_path, "main", base_branch="main")
+
+            current_branch = get_current_branch(repo_path)
+            assert current_branch == "main"
+
+            result = create_and_checkout_branch(repo_path, branch_name, base_branch="main")
+
+            assert result is True
+            current_branch = get_current_branch(repo_path)
+            assert current_branch == branch_name
+
+    def test_create_branch_with_special_characters(self):
+        """Test creating a branch with special characters."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo(repo_path)
+
+            branch_name = "ai/task-123-test-task-with-special-chars"
+            result = create_and_checkout_branch(repo_path, branch_name, base_branch="main")
+
+            assert result is True
+            current_branch = get_current_branch(repo_path)
+            assert current_branch == branch_name
+
+    @patch("auto_slopp.utils.git_operations.checkout_branch_resilient")
+    @patch("auto_slopp.utils.git_operations._run_git_command")
+    def test_create_branch_failure(self, mock_run_git, mock_checkout):
+        """Test branch creation failure."""
         repo_dir = Path("/tmp/test_repo")
-        branch = "feature/test"
 
-        # Mock git commands: first checkout fails, then reset works, retry checkout succeeds
-        mock_subprocess_run.side_effect = [
-            Mock(returncode=0, stderr=""),  # git fetch
-            Mock(returncode=1, stderr="checkout failed"),  # git checkout (fails)
-            Mock(returncode=0, stderr=""),  # git reset --hard
-            Mock(returncode=0, stderr=""),  # git clean
-            Mock(returncode=0, stderr=""),  # git checkout (succeeds)
-            Mock(returncode=0, stderr=""),  # git pull
-        ]
+        mock_result = Mock()
+        mock_result.returncode = 1
+        mock_result.stderr = "branch already exists"
+        mock_result.stdout = ""
+        mock_run_git.return_value = mock_result
 
-        result = checkout_branch_resilient(repo_dir, branch)
+        result = create_and_checkout_branch(repo_dir, "test-branch", base_branch="main")
 
-        assert result is True
-        assert mock_subprocess_run.call_count == 6
+        assert result is False
 
     @patch("auto_slopp.utils.git_operations.subprocess.run")
     @patch("auto_slopp.utils.git_operations.run_cli_executor")

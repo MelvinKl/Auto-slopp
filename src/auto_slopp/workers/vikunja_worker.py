@@ -125,7 +125,7 @@ class VikunjaWorker(Worker):
 
         dep_filtered = []
         for t in tasks:
-            if self._has_no_open_dependencies(t["id"]):
+            if self.dry_run or self._has_no_open_dependencies(t["id"]):
                 dep_filtered.append(t)
             else:
                 self.logger.info(f"Skipping task #{t['id']} '{t.get('title')}': has open dependencies")
@@ -228,6 +228,12 @@ class VikunjaWorker(Worker):
         try:
             branch_name = f"ai/task-{task_id}-{sanitize_branch_name(task_title[:30].lower())}"
 
+            if self.dry_run:
+                self.logger.info(f"DRY RUN: Would create branch {branch_name} and execute instructions")
+                result["openagent_executed"] = True
+                result["success"] = True
+                return result
+
             update_task_status(task_id, "in_progress")
 
             start_comment = (
@@ -236,12 +242,6 @@ class VikunjaWorker(Worker):
                 f"The worker has started processing this task."
             )
             comment_on_task(task_id, start_comment)
-
-            if self.dry_run:
-                self.logger.info(f"DRY RUN: Would create branch {branch_name} and execute instructions")
-                result["openagent_executed"] = True
-                result["success"] = True
-                return result
 
             branch_created = create_and_checkout_branch(repo_dir, branch_name, base_branch="main")
             if not branch_created:

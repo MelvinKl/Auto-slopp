@@ -1,9 +1,14 @@
 """Tests for VikunjaWorker._process_single_task."""
 
+import subprocess
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+from auto_slopp.utils.git_operations import (
+    create_and_checkout_branch,
+    get_current_branch,
+)
 from auto_slopp.workers.vikunja_worker import VikunjaWorker
 from settings.main import settings
 
@@ -15,12 +20,63 @@ class TestVikunjaWorkerInit:
         worker = VikunjaWorker()
         assert worker.agent_args == []
         assert worker.dry_run is False
+        assert worker.timeout == settings.slop_timeout
+        assert worker.logger is not None
 
     def test_initialization_custom(self):
         worker = VikunjaWorker(timeout=3600, agent_args=["--verbose"], dry_run=True)
         assert worker.timeout == 3600
         assert worker.agent_args == ["--verbose"]
         assert worker.dry_run is True
+
+    def test_timeout_defaults_from_settings(self):
+        worker = VikunjaWorker()
+        assert worker.timeout == settings.slop_timeout
+
+    def test_logger_initialized(self):
+        worker = VikunjaWorker()
+        assert worker.logger is not None
+        assert worker.logger.name == "auto_slopp.workers.VikunjaWorker"
+
+    def test_worker_inherits_from_worker_base_class(self):
+        from auto_slopp.worker import Worker
+
+        worker = VikunjaWorker()
+        assert isinstance(worker, Worker)
+        assert hasattr(worker, "run")
+        assert callable(worker.run)
+
+    def test_worker_has_required_methods(self):
+        worker = VikunjaWorker()
+        required_methods = [
+            "run",
+            "_process_single_task",
+            "_build_instructions",
+            "_filter_tasks_by_tag",
+            "_has_no_open_dependencies",
+            "_checkout_main_branch",
+            "_create_results_dict",
+            "_create_error_result",
+        ]
+        for method_name in required_methods:
+            assert hasattr(worker, method_name), f"Missing method: {method_name}"
+            method = getattr(worker, method_name)
+            assert callable(method), f"Method {method_name} is not callable"
+
+    def test_worker_respects_dry_run_mode(self):
+        worker = VikunjaWorker(dry_run=True)
+        assert worker.dry_run is True
+
+        worker2 = VikunjaWorker(dry_run=False)
+        assert worker2.dry_run is False
+
+    def test_worker_agent_args_are_stored(self):
+        worker = VikunjaWorker(agent_args=["--verbose", "--debug"])
+        assert worker.agent_args == ["--verbose", "--debug"]
+
+    def test_worker_can_be_created_with_none_timeout(self):
+        worker = VikunjaWorker(timeout=None)
+        assert worker.timeout == settings.slop_timeout
 
 
 class TestVikunjaWorkerRun:
@@ -130,7 +186,7 @@ class TestVikunjaWorkerRun:
                 patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
                 patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
                 patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
-                patch.object(VikunjaWorker, "_filter_tasks_by_tag", return_value=[]),
+                patch.object(VikunjaWorker, "_filter_tasks_by_tag", return_value=[]) as mock_filter,
                 patch.object(VikunjaWorker, "_process_single_task") as mock_process,
             ):
                 mock_checkout.return_value = True
@@ -143,9 +199,7 @@ class TestVikunjaWorkerRun:
                 assert result["success"] is True
                 assert result["tasks_processed"] == 0
                 assert result["task_results"] == []
-                VikunjaWorker._filter_tasks_by_tag.assert_called_once_with(
-                    tasks, settings.github_issue_worker_required_label
-                )
+                mock_filter.assert_called_once_with(tasks, settings.github_issue_worker_required_label)
                 mock_process.assert_not_called()
 
     def test_run_empty_after_dependency_filtering(self):
@@ -174,6 +228,84 @@ class TestVikunjaWorkerRun:
                 assert result["tasks_processed"] == 0
                 assert result["task_results"] == []
                 mock_process.assert_not_called()
+
+    def test_run_with_dry_run_mode_processes_tasks(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+
+            ai_label = [{"title": "ai"}]
+            tasks = [
+                {
+                    "id": 1,
+                    "title": "Task 1",
+                    "description": "First task",
+                    "priority": 1,
+                    "labels": ai_label,
+                },
+                {
+                    "id": 2,
+                    "title": "Task 2",
+                    "description": "Second task",
+                    "priority": 2,
+                    "labels": ai_label,
+                },
+            ]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_has_no_open_dependencies", return_value=True),
+                patch.object(VikunjaWorker, "_process_single_task") as mock_process,
+            ):
+                mock_checkout.return_value = True
+                mock_project.return_value = {"id": 1, "title": repo_path.name}
+                mock_tasks.return_value = tasks
+                mock_process.return_value = {
+                    "success": True,
+                    "openagent_executed": True,
+                    "openagent_executions": 1,
+                    "tasks_completed": 1,
+                }
+
+                worker = VikunjaWorker(dry_run=True)
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                assert result["dry_run"] is True
+                assert result["tasks_processed"] == 2
+                assert len(result["task_results"]) == 2
+                assert result["openagent_executions"] == 2
+                assert result["tasks_completed"] == 2
+                assert len(result["errors"]) == 0
+
+                processed_ids = [call.args[1]["id"] for call in mock_process.call_args_list]
+                assert processed_ids == [2, 1]
+
+    def test_run_with_dry_run_mode_skips_checkout(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+
+            tasks = [{"id": 1, "title": "Task 1", "labels": [{"title": "ai"}], "priority": 0}]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_has_no_open_dependencies", return_value=True),
+                patch.object(VikunjaWorker, "_process_single_task") as mock_process,
+            ):
+                mock_project.return_value = {"id": 1, "title": repo_path.name}
+                mock_tasks.return_value = tasks
+                mock_process.return_value = {
+                    "success": True,
+                    "openagent_executed": True,
+                }
+
+                worker = VikunjaWorker(dry_run=True)
+                worker.run(repo_path)
+
+                mock_checkout.assert_not_called()
 
 
 class TestFilterTasksByTag:
@@ -219,6 +351,56 @@ class TestFilterTasksByTag:
         result = worker._filter_tasks_by_tag(tasks, "ai")
         assert [t["id"] for t in result] == [1, 3]
 
+    def test_empty_task_list(self):
+        worker = VikunjaWorker()
+        tasks = []
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert result == []
+
+    def test_empty_labels_list(self):
+        worker = VikunjaWorker()
+        tasks = [{"id": 1, "title": "T1", "labels": []}]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert result == []
+
+    def test_label_with_empty_string_title(self):
+        worker = VikunjaWorker()
+        tasks = [{"id": 1, "title": "T1", "labels": [{"title": ""}]}]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert result == []
+
+    def test_multiple_labels_with_different_cases(self):
+        worker = VikunjaWorker()
+        tasks = [
+            {"id": 1, "title": "T1", "labels": [{"title": "AI"}, {"title": "Bug"}]},
+            {"id": 2, "title": "T2", "labels": [{"title": "ai"}, {"title": "Feature"}]},
+            {"id": 3, "title": "T3", "labels": [{"title": "Ai"}]},
+        ]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert [t["id"] for t in result] == [1, 2, 3]
+
+    def test_tag_name_with_different_cases(self):
+        worker = VikunjaWorker()
+        tasks = [
+            {"id": 1, "title": "T1", "labels": [{"title": "ai"}]},
+            {"id": 2, "title": "T2", "labels": [{"title": "AI"}]},
+            {"id": 3, "title": "T3", "labels": [{"title": "Ai"}]},
+        ]
+        result = worker._filter_tasks_by_tag(tasks, "AI")
+        assert [t["id"] for t in result] == [1, 2, 3]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert [t["id"] for t in result] == [1, 2, 3]
+
+    def test_preserves_task_order(self):
+        worker = VikunjaWorker()
+        tasks = [
+            {"id": 3, "title": "T3", "labels": [{"title": "ai"}]},
+            {"id": 1, "title": "T1", "labels": [{"title": "ai"}]},
+            {"id": 2, "title": "T2", "labels": [{"title": "ai"}]},
+        ]
+        result = worker._filter_tasks_by_tag(tasks, "ai")
+        assert [t["id"] for t in result] == [3, 1, 2]
+
 
 class TestProcessSingleTask:
     """Tests for VikunjaWorker._process_single_task."""
@@ -243,6 +425,35 @@ class TestProcessSingleTask:
             assert result["openagent_executed"] is True
             assert result["task_id"] == 1
             assert result["task_title"] == "Test Task"
+
+    def test_dry_run_mode_skips_external_operations(self):
+        """Test that dry_run mode skips external operations."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            worker = VikunjaWorker(dry_run=True)
+            task = self._make_task()
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.create_and_checkout_branch") as mock_branch,
+                patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_branch_name,
+                patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
+            ):
+                result = worker._process_single_task(repo_path, task)
+
+                assert result["success"] is True
+                assert result["openagent_executed"] is True
+                assert result["task_id"] == 1
+                assert result["task_title"] == "Test Task"
+
+                mock_status.assert_not_called()
+                mock_comment.assert_not_called()
+                mock_branch.assert_not_called()
+                mock_exec.assert_not_called()
+                mock_branch_name.assert_not_called()
+                mock_push.assert_not_called()
 
     def test_branch_creation_failure(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -568,3 +779,636 @@ class TestBuildInstructions:
         assert "Plan:" in instructions
         assert "make test" in instructions
         assert "make lint" in instructions
+
+    def test_complete_instruction_structure(self):
+        worker = VikunjaWorker()
+        instructions = worker._build_instructions("Test Title", "Test Description", branch_name="ai/task-1")
+        assert "Create a new branch" not in instructions
+        assert "already on branch 'ai/task-1'" in instructions
+        assert "Implement the following:" in instructions
+        assert "Title: Test Title" in instructions
+        assert "Description:" in instructions
+        assert "Test Description" in instructions
+        assert "Plan:" in instructions
+
+    def test_instructions_contain_all_plan_steps(self):
+        worker = VikunjaWorker()
+        instructions = worker._build_instructions("Task", "desc")
+        assert "1. Understand the requirements" in instructions
+        assert "2. Explore the codebase" in instructions
+        assert "3. Identify components" in instructions
+        assert "4. Design a solution" in instructions
+        assert "5. Write or update tests" in instructions
+        assert "6. Implement the solution" in instructions
+        assert "7. Run 'make lint'" in instructions
+        assert "8. Run 'make test'" in instructions
+        assert "9. Commit the changes" in instructions
+        assert "10. Push the changes" in instructions
+
+    def test_instructions_include_final_guidance(self):
+        worker = VikunjaWorker()
+        instructions = worker._build_instructions("Task", "desc")
+        assert "Keep your implementation simple" in instructions
+        assert "Only implement what is required" in instructions
+        assert "Check if there are components you can reuse" in instructions
+        assert "Ensure that 'make test' runs successful" in instructions
+        assert "Only push if ALL tests are successful" in instructions
+        assert "Check if you need to update the README.md" in instructions
+
+    def test_multiline_description(self):
+        worker = VikunjaWorker()
+        description = """First line
+Second line
+Third line"""
+        instructions = worker._build_instructions("Task", description)
+        assert "First line" in instructions
+        assert "Second line" in instructions
+        assert "Third line" in instructions
+
+    def test_long_description(self):
+        worker = VikunjaWorker()
+        description = "A" * 1000
+        instructions = worker._build_instructions("Task", description)
+        assert "A" * 100 in instructions
+        assert len(instructions) > 1000
+
+    def test_special_characters_in_title(self):
+        worker = VikunjaWorker()
+        title = "Fix: API endpoint returns 500 error (with special chars: <>&\"')"
+        instructions = worker._build_instructions(title, "desc")
+        assert title in instructions
+
+    def test_empty_title(self):
+        worker = VikunjaWorker()
+        instructions = worker._build_instructions("", "desc")
+        assert "Title:" in instructions
+
+    def test_branch_instruction_without_branch_name(self):
+        worker = VikunjaWorker()
+        instructions = worker._build_instructions("Task", "desc")
+        assert "Create a new branch that starts with ai/" in instructions
+        assert "from base origin/main" in instructions
+        assert "Work on this branch, implement the changes, commit them, and push" in instructions
+
+    def test_description_with_markdown(self):
+        worker = VikunjaWorker()
+        description = """# Header
+- Item 1
+- Item 2
+
+**Bold text** and *italic*"""
+        instructions = worker._build_instructions("Task", description)
+        assert "# Header" in instructions
+        assert "- Item 1" in instructions
+        assert "**Bold text**" in instructions
+
+    def test_instructions_are_string(self):
+        worker = VikunjaWorker()
+        instructions = worker._build_instructions("Task", "desc")
+        assert isinstance(instructions, str)
+        assert len(instructions) > 0
+
+    def test_consistent_formatting(self):
+        worker = VikunjaWorker()
+        instructions1 = worker._build_instructions("Task 1", "desc1", branch_name="ai/branch1")
+        instructions2 = worker._build_instructions("Task 2", "desc2", branch_name="ai/branch2")
+        assert "already on branch 'ai/branch1'" in instructions1
+        assert "already on branch 'ai/branch2'" in instructions2
+        assert "Title: Task 1" in instructions1
+        assert "Title: Task 2" in instructions2
+
+
+class TestBranchCreationAndCheckout:
+    """Integration tests for branch creation and checkout functionality."""
+
+    def _create_test_repo(self, repo_path: Path) -> None:
+        """Create a test git repository with main branch."""
+        subprocess.run(["git", "init"], cwd=repo_path, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+
+        test_file = repo_path / "README.md"
+        test_file.write_text("# Test Repository")
+
+        subprocess.run(["git", "add", "."], cwd=repo_path, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+
+        subprocess.run(
+            ["git", "branch", "-M", "main"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+
+    def test_create_new_branch_from_main(self):
+        """Test creating a new branch from main."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo(repo_path)
+
+            result = create_and_checkout_branch(repo_path, "test-branch", base_branch="main")
+
+            assert result is True
+            current_branch = get_current_branch(repo_path)
+            assert current_branch == "test-branch"
+
+    def test_create_branch_with_ai_prefix(self):
+        """Test creating a branch with ai/ prefix."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo(repo_path)
+
+            branch_name = "ai/task-123-test-task"
+            result = create_and_checkout_branch(repo_path, branch_name, base_branch="main")
+
+            assert result is True
+            current_branch = get_current_branch(repo_path)
+            assert current_branch == branch_name
+
+    def test_checkout_existing_branch(self):
+        """Test checking out an existing branch."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo(repo_path)
+
+            branch_name = "existing-branch"
+            create_and_checkout_branch(repo_path, branch_name, base_branch="main")
+
+            create_and_checkout_branch(repo_path, "main", base_branch="main")
+
+            current_branch = get_current_branch(repo_path)
+            assert current_branch == "main"
+
+            result = create_and_checkout_branch(repo_path, branch_name, base_branch="main")
+
+            assert result is True
+            current_branch = get_current_branch(repo_path)
+            assert current_branch == branch_name
+
+    def test_vikunja_worker_branch_creation_in_process_single_task(self):
+        """Test that VikunjaWorker correctly creates and checks out branches during task processing."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo(repo_path)
+
+            worker = VikunjaWorker(dry_run=False)
+            task = {"id": 1, "title": "Test Task", "description": "Test description"}
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_get_branch,
+                patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
+            ):
+                mock_status.return_value = True
+                mock_comment.return_value = True
+                mock_exec.return_value = {"success": True}
+                mock_get_branch.return_value = "ai/task-1-test-task"
+                mock_push.return_value = (True, "pushed")
+
+                result = worker._process_single_task(repo_path, task)
+
+                assert result["success"] is True
+                assert result["openagent_executed"] is True
+
+    def test_vikunja_worker_branch_name_sanitization(self):
+        """Test that branch names are properly sanitized."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo(repo_path)
+
+            worker = VikunjaWorker(dry_run=False)
+
+            long_title = "A very long task title that should be truncated to a reasonable length for the branch name"
+            task = {"id": 42, "title": long_title, "description": ""}
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.update_task_status") as mock_status,
+                patch("auto_slopp.workers.vikunja_worker.comment_on_task") as mock_comment,
+                patch("auto_slopp.workers.vikunja_worker.execute_with_instructions") as mock_exec,
+                patch("auto_slopp.workers.vikunja_worker.get_current_branch") as mock_get_branch,
+                patch("auto_slopp.workers.vikunja_worker.push_to_remote") as mock_push,
+            ):
+                mock_status.return_value = True
+                mock_comment.return_value = True
+                mock_exec.return_value = {"success": True}
+                mock_get_branch.return_value = "ai/task-42-a-very-long-task-title-that"
+                mock_push.return_value = (True, "pushed")
+
+                result = worker._process_single_task(repo_path, task)
+
+                assert result["success"] is True
+                assert result["openagent_executed"] is True
+
+
+class TestGracefulFailureHandling:
+    """Tests for graceful failure handling in VikunjaWorker.run."""
+
+    def _make_task(
+        self,
+        task_id=1,
+        title="Test Task",
+        description="Test description",
+        priority=0,
+        labels=None,
+    ):
+        """Helper to create a task dictionary."""
+        if labels is None:
+            labels = [{"title": "ai"}]
+        return {
+            "id": task_id,
+            "title": title,
+            "description": description,
+            "priority": priority,
+            "labels": labels,
+        }
+
+    def test_continues_after_task_failure(self):
+        """Test that worker continues processing tasks after one task fails."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            worker = VikunjaWorker(dry_run=False)
+
+            tasks = [
+                self._make_task(1, "Task 1", "First task", 5),
+                self._make_task(2, "Task 2", "Second task", 3),
+                self._make_task(3, "Task 3", "Third task", 1),
+            ]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_has_no_open_dependencies", return_value=True),
+                patch.object(VikunjaWorker, "_process_single_task") as mock_process,
+            ):
+                mock_checkout.return_value = True
+                mock_project.return_value = {"id": 1, "title": repo_path.name}
+                mock_tasks.return_value = tasks
+
+                def process_side_effect(repo_dir, task):
+                    return {
+                        "success": task["id"] != 2,
+                        "task_id": task["id"],
+                        "task_title": task["title"],
+                        "openagent_executed": True,
+                        "error": None if task["id"] != 2 else "Simulated failure",
+                    }
+
+                mock_process.side_effect = process_side_effect
+
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                assert result["tasks_processed"] == 2
+                assert len(result["task_results"]) == 3
+                assert result["task_results"][0]["success"] is True
+                assert result["task_results"][1]["success"] is False
+                assert result["task_results"][2]["success"] is True
+                assert mock_process.call_count == 3
+
+    def test_mixed_success_and_failure_results(self):
+        """Test that worker correctly reports mixed success/failure results."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            worker = VikunjaWorker(dry_run=False)
+
+            tasks = [
+                self._make_task(1, "Success Task", "Will succeed", 5),
+                self._make_task(2, "Failed Task", "Will fail", 3),
+                self._make_task(3, "Another Success", "Will also succeed", 1),
+            ]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_has_no_open_dependencies", return_value=True),
+                patch.object(VikunjaWorker, "_process_single_task") as mock_process,
+            ):
+                mock_checkout.return_value = True
+                mock_project.return_value = {"id": 1, "title": repo_path.name}
+                mock_tasks.return_value = tasks
+
+                def process_side_effect(repo_dir, task):
+                    if task["id"] == 2:
+                        return {
+                            "success": False,
+                            "task_id": task["id"],
+                            "task_title": task["title"],
+                            "openagent_executed": True,
+                            "error": "Simulated failure",
+                        }
+                    return {
+                        "success": True,
+                        "task_id": task["id"],
+                        "task_title": task["title"],
+                        "openagent_executed": True,
+                        "openagent_executions": 1,
+                        "tasks_completed": 1,
+                        "error": None,
+                    }
+
+                mock_process.side_effect = process_side_effect
+
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                assert result["tasks_processed"] == 2
+                assert result["openagent_executions"] == 2
+                assert result["tasks_completed"] == 2
+                assert len(result["task_results"]) == 3
+
+                successful_tasks = [r for r in result["task_results"] if r["success"]]
+                failed_tasks = [r for r in result["task_results"] if not r["success"]]
+
+                assert len(successful_tasks) == 2
+                assert len(failed_tasks) == 1
+                assert failed_tasks[0]["task_id"] == 2
+
+    def test_accumulates_errors_from_multiple_failures(self):
+        """Test that worker accumulates errors from multiple failed tasks."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            worker = VikunjaWorker(dry_run=False)
+
+            tasks = [
+                self._make_task(1, "Task 1", "Will fail", 5),
+                self._make_task(2, "Task 2", "Will also fail", 3),
+                self._make_task(3, "Task 3", "Will succeed", 1),
+            ]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_has_no_open_dependencies", return_value=True),
+                patch.object(VikunjaWorker, "_process_single_task") as mock_process,
+            ):
+                mock_checkout.return_value = True
+                mock_project.return_value = {"id": 1, "title": repo_path.name}
+                mock_tasks.return_value = tasks
+
+                def process_side_effect(repo_dir, task):
+                    if task["id"] == 3:
+                        return {
+                            "success": True,
+                            "task_id": task["id"],
+                            "task_title": task["title"],
+                            "openagent_executed": True,
+                            "openagent_executions": 1,
+                            "tasks_completed": 1,
+                            "error": None,
+                        }
+                    return {
+                        "success": False,
+                        "task_id": task["id"],
+                        "task_title": task["title"],
+                        "openagent_executed": False,
+                        "error": f"Error in task {task['id']}",
+                    }
+
+                mock_process.side_effect = process_side_effect
+
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                assert result["tasks_processed"] == 1
+                assert len(result["task_results"]) == 3
+
+                failed_tasks = [r for r in result["task_results"] if not r["success"]]
+                assert len(failed_tasks) == 2
+
+                errors = [r["error"] for r in failed_tasks]
+                assert "Error in task 1" in errors
+                assert "Error in task 2" in errors
+
+    def test_all_tasks_fail_gracefully(self):
+        """Test that worker handles all tasks failing gracefully."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            worker = VikunjaWorker(dry_run=False)
+
+            tasks = [
+                self._make_task(1, "Task 1", "Will fail", 3),
+                self._make_task(2, "Task 2", "Will also fail", 2),
+                self._make_task(3, "Task 3", "Will fail too", 1),
+            ]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_has_no_open_dependencies", return_value=True),
+                patch.object(VikunjaWorker, "_process_single_task") as mock_process,
+            ):
+                mock_checkout.return_value = True
+                mock_project.return_value = {"id": 1, "title": repo_path.name}
+                mock_tasks.return_value = tasks
+
+                def process_side_effect(repo_dir, task):
+                    return {
+                        "success": False,
+                        "task_id": task["id"],
+                        "task_title": task["title"],
+                        "openagent_executed": False,
+                        "error": f"Failed to process task {task['id']}",
+                    }
+
+                mock_process.side_effect = process_side_effect
+
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                assert result["tasks_processed"] == 0
+                assert result["openagent_executions"] == 0
+                assert result["tasks_completed"] == 0
+                assert len(result["task_results"]) == 3
+
+                for task_result in result["task_results"]:
+                    assert task_result["success"] is False
+                    assert task_result["openagent_executed"] is False
+
+    def test_logs_warnings_for_failed_tasks(self):
+        """Test that worker logs warnings for failed tasks."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            worker = VikunjaWorker(dry_run=False)
+
+            tasks = [
+                self._make_task(1, "Success Task", "Will succeed", 3),
+                self._make_task(2, "Failed Task", "Will fail", 2),
+            ]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_has_no_open_dependencies", return_value=True),
+                patch.object(VikunjaWorker, "_process_single_task") as mock_process,
+            ):
+                mock_checkout.return_value = True
+                mock_project.return_value = {"id": 1, "title": repo_path.name}
+                mock_tasks.return_value = tasks
+
+                def process_side_effect(repo_dir, task):
+                    if task["id"] == 1:
+                        return {
+                            "success": True,
+                            "task_id": task["id"],
+                            "task_title": task["title"],
+                            "openagent_executed": True,
+                            "openagent_executions": 1,
+                            "tasks_completed": 1,
+                            "error": None,
+                        }
+                    return {
+                        "success": False,
+                        "task_id": task["id"],
+                        "task_title": task["title"],
+                        "openagent_executed": False,
+                        "error": "Simulated failure",
+                    }
+
+                mock_process.side_effect = process_side_effect
+
+                with patch.object(worker.logger, "warning") as mock_warning:
+                    result = worker.run(repo_path)
+
+                    assert result["success"] is True
+                    assert result["tasks_processed"] == 1
+
+                    assert mock_warning.call_count == 1
+                    warning_msg = mock_warning.call_args[0][0]
+                    assert "Failed to process task #2" in warning_msg
+                    assert "Simulated failure" in warning_msg
+
+    def test_failure_does_not_crash_worker(self):
+        """Test that task failures don't cause the worker to crash."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            worker = VikunjaWorker(dry_run=False)
+
+            tasks = [
+                self._make_task(1, "Task 1", "Will succeed", 3),
+                self._make_task(2, "Task 2", "Will crash", 2),
+                self._make_task(3, "Task 3", "Will succeed", 1),
+            ]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_has_no_open_dependencies", return_value=True),
+                patch.object(VikunjaWorker, "_process_single_task") as mock_process,
+            ):
+                mock_checkout.return_value = True
+                mock_project.return_value = {"id": 1, "title": repo_path.name}
+                mock_tasks.return_value = tasks
+
+                def process_side_effect(repo_dir, task):
+                    if task["id"] == 2:
+                        return {
+                            "success": False,
+                            "task_id": task["id"],
+                            "task_title": task["title"],
+                            "openagent_executed": False,
+                            "error": "Critical error in task 2",
+                        }
+                    return {
+                        "success": True,
+                        "task_id": task["id"],
+                        "task_title": task["title"],
+                        "openagent_executed": True,
+                        "openagent_executions": 1,
+                        "tasks_completed": 1,
+                        "error": None,
+                    }
+
+                mock_process.side_effect = process_side_effect
+
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                assert result["tasks_processed"] == 2
+                assert result["openagent_executions"] == 2
+                assert result["tasks_completed"] == 2
+                assert len(result["task_results"]) == 3
+
+                assert mock_process.call_count == 3
+
+    def test_maintains_statistics_with_failures(self):
+        """Test that worker maintains accurate statistics when tasks fail."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            worker = VikunjaWorker(dry_run=False)
+
+            tasks = [
+                self._make_task(1, "Success Task 1", "Will succeed", 5),
+                self._make_task(2, "Failed Task", "Will fail", 4),
+                self._make_task(3, "Success Task 2", "Will succeed", 3),
+                self._make_task(4, "Another Failed", "Will fail", 2),
+                self._make_task(5, "Success Task 3", "Will succeed", 1),
+            ]
+
+            with (
+                patch("auto_slopp.workers.vikunja_worker.checkout_branch_resilient") as mock_checkout,
+                patch("auto_slopp.workers.vikunja_worker.find_or_create_project") as mock_project,
+                patch("auto_slopp.workers.vikunja_worker.get_open_tasks_by_project") as mock_tasks,
+                patch.object(VikunjaWorker, "_has_no_open_dependencies", return_value=True),
+                patch.object(VikunjaWorker, "_process_single_task") as mock_process,
+            ):
+                mock_checkout.return_value = True
+                mock_project.return_value = {"id": 1, "title": repo_path.name}
+                mock_tasks.return_value = tasks
+
+                def process_side_effect(repo_dir, task):
+                    if task["id"] in [1, 3, 5]:
+                        return {
+                            "success": True,
+                            "task_id": task["id"],
+                            "task_title": task["title"],
+                            "openagent_executed": True,
+                            "openagent_executions": 1,
+                            "tasks_completed": 1,
+                            "error": None,
+                        }
+                    return {
+                        "success": False,
+                        "task_id": task["id"],
+                        "task_title": task["title"],
+                        "openagent_executed": False,
+                        "error": f"Task {task['id']} failed",
+                    }
+
+                mock_process.side_effect = process_side_effect
+
+                result = worker.run(repo_path)
+
+                assert result["success"] is True
+                assert result["tasks_processed"] == 3
+                assert result["openagent_executions"] == 3
+                assert result["tasks_completed"] == 3
+                assert len(result["task_results"]) == 5
+
+                successful_count = sum(1 for r in result["task_results"] if r["success"])
+                failed_count = sum(1 for r in result["task_results"] if not r["success"])
+
+                assert successful_count == 3
+                assert failed_count == 2
