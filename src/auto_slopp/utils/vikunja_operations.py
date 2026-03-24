@@ -110,6 +110,8 @@ def create_project(project_name: str, project_identifier: Optional[str] = None) 
     """
     if project_identifier is None:
         project_identifier = project_name.lower().replace(" ", "-")
+        # Truncate to 10 characters (Vikunja limit)
+        project_identifier = project_identifier[:10]
 
     try:
         cmd_args = [
@@ -462,7 +464,7 @@ def verify_blocking_closed(task_id: int) -> bool:
     """Verify if all blocking dependencies for a task are closed.
 
     Args:
-        task_id: ID of the task to verify
+        task_id: ID of task to verify
 
     Returns:
         True if all blocking tasks are closed, False otherwise.
@@ -484,7 +486,24 @@ def verify_blocking_closed(task_id: int) -> bool:
         if isinstance(data, dict):
             if data.get("error"):
                 return False
-            return data.get("all_blocking_closed", False)
+            if "data" in data and isinstance(data["data"], dict):
+                nested_data = data["data"]
+                if nested_data.get("error"):
+                    return False
+                all_closed = nested_data.get("all_closed")
+                all_blocking_closed = nested_data.get("all_blocking_closed")
+                if all_closed is not None:
+                    return bool(all_closed)
+                if all_blocking_closed is not None:
+                    return bool(all_blocking_closed)
+                return False
+            all_closed = data.get("all_closed")
+            all_blocking_closed = data.get("all_blocking_closed")
+            if all_closed is not None:
+                return bool(all_closed)
+            if all_blocking_closed is not None:
+                return bool(all_blocking_closed)
+            return False
 
         return False
 
