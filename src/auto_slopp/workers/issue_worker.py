@@ -405,7 +405,7 @@ Plan:
         task: Task,
     ) -> str:
         """Generate PR description from the refined task file using slopmachine."""
-        task_path = RalphExecutor._get_issue_task_path(repo_dir, task.id)
+        task_path = self.ralph_executor._get_issue_task_path(repo_dir, task.id)
         default_body = self.task_source.get_default_pr_body(task)
 
         if not task_path.exists():
