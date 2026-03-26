@@ -116,6 +116,16 @@ class Settings(BaseSettings):
                 cli_command="claude",
                 cli_args=[
                     "--model",
+                    "opus",
+                    "-p",
+                ],
+                capability=10,
+                name="claude opus",
+            ),
+            CLIConfiguration(
+                cli_command="claude",
+                cli_args=[
+                    "--model",
                     "sonnet",
                     "-p",
                 ],
@@ -223,6 +233,7 @@ class Settings(BaseSettings):
     task_difficulties: Dict[str, TaskRating] = Field(
         default={
             "github_issue": TaskRating(min_rating=7, max_rating=10, recommended_rating=10),
+            "vikunja_task": TaskRating(min_rating=5, max_rating=10, recommended_rating=8),
             "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),  # fix tests
             "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2),  # merge conflict
             "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),

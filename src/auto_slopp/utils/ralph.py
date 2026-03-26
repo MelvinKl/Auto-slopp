@@ -229,6 +229,8 @@ class RalphExecutor:
         has_changes_fn: Callable[[Path], bool],
         commit_fn: Callable[[Path, str, bool], Tuple[bool, Optional[bool]]],
         max_iterations: int,
+        file_prefix: str = "github",
+        task_name: str = "github_issue",
     ):
         """Initialize the RalphExecutor.
 
@@ -242,6 +244,8 @@ class RalphExecutor:
             commit_fn: Callable that commits (and optionally pushes) changes.
                 Signature: ``(repo_dir, commit_message, push_if_remote) -> (commit_ok, push_ok)``.
             max_iterations: Maximum number of iterations for the task loop.
+            file_prefix: Prefix for task file naming (default: "github").
+            task_name: Task name for CLI executor mapping (default: "github_issue").
         """
         self.logger = logger
         self.agent_args = agent_args
@@ -250,11 +254,12 @@ class RalphExecutor:
         self.has_changes_fn = has_changes_fn
         self.commit_fn = commit_fn
         self.max_iterations = max_iterations
+        self.file_prefix = file_prefix
+        self.task_name = task_name
 
-    @staticmethod
-    def _get_issue_task_path(repo_dir: Path, issue_number: int) -> Path:
-        """Get the canonical task file path for a GitHub issue."""
-        return repo_dir / ".ralph" / f"github-{issue_number}.md"
+    def _get_issue_task_path(self, repo_dir: Path, issue_number: int) -> Path:
+        """Get the canonical task file path for a task."""
+        return repo_dir / ".ralph" / f"{self.file_prefix}-{issue_number}.md"
 
     def _create_issue_task_file(
         self,
@@ -271,8 +276,8 @@ class RalphExecutor:
             comments_text = "Comments:\n" + "\n".join(f"- {comment}" for comment in comment_texts if comment) + "\n\n"
 
         content = (
-            f"# GitHub Issue Task: {issue_title}\n\n"
-            f"Issue Number: {issue_number}\n"
+            f"# Task: {issue_title}\n\n"
+            f"Task Number: {issue_number}\n"
             f"Branch: {branch_name}\n\n"
             f"## Required Task\n\n"
             f"{issue_body}\n\n"
@@ -334,7 +339,7 @@ class RalphExecutor:
             repo_dir,
             self.agent_args,
             self.timeout,
-            task_name="github_issue",
+            task_name=self.task_name,
         )
 
         if not result.get("success", False):
@@ -381,7 +386,7 @@ class RalphExecutor:
             repo_dir,
             self.agent_args,
             self.timeout,
-            task_name="github_issue",
+            task_name=self.task_name,
         )
 
         if not result.get("success", False):
@@ -475,7 +480,7 @@ class RalphExecutor:
             repo_dir,
             self.agent_args,
             self.timeout,
-            task_name="github_issue",
+            task_name=self.task_name,
         )
 
         if result.get("success", False):
@@ -520,7 +525,7 @@ class RalphExecutor:
             repo_dir,
             self.agent_args,
             self.timeout,
-            task_name="github_issue",
+            task_name=self.task_name,
         )
 
         if not result.get("success", False):
@@ -573,7 +578,7 @@ class RalphExecutor:
             repo_dir,
             self.agent_args,
             self.timeout,
-            task_name="github_issue",
+            task_name=self.task_name,
         )
         if not result.get("success", False):
             return {
@@ -851,6 +856,7 @@ class RalphExecutor:
             "success": False,
             "loops_executed": 0,
             "steps_completed": 0,
+            "total_steps": 0,
             "max_loops_reached": False,
         }
 
@@ -863,9 +869,11 @@ class RalphExecutor:
                     "error": f"Failed to parse task file during iteration: {str(e)}",
                     "loops_executed": iteration,
                     "steps_completed": result["steps_completed"],
+                    "total_steps": 0,
                     "max_loops_reached": False,
                 }
 
+            result["total_steps"] = len(plan.steps)
             next_step = plan.get_next_open_step()
             if not next_step:
                 result["success"] = True
@@ -937,6 +945,7 @@ class RalphExecutor:
                         "error": f"Failed to commit changes for step {next_step.number}",
                         "loops_executed": iteration,
                         "steps_completed": result["steps_completed"],
+                        "total_steps": result["total_steps"],
                         "max_loops_reached": False,
                     }
 

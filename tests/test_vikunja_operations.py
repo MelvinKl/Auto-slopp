@@ -838,6 +838,7 @@ class TestAnalyzeTask:
 class TestAutoSloppProjectExists:
     """Tests for verifying the Auto-slopp project exists in Vikunja."""
 
+    @pytest.mark.integration
     def test_auto_slopp_project_exists(self):
         """Test that the Auto-slopp project can be found in Vikunja."""
         project = find_project("Auto-slopp")
@@ -849,6 +850,7 @@ class TestAutoSloppProjectExists:
         assert isinstance(project["identifier"], str)
         assert len(project["identifier"]) > 0
 
+    @pytest.mark.integration
     def test_auto_slopp_project_by_identifier(self):
         """Test that the Auto-slopp project can be found by identifier."""
         project = find_project("auto-slopp")
