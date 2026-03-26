@@ -229,6 +229,8 @@ class RalphExecutor:
         has_changes_fn: Callable[[Path], bool],
         commit_fn: Callable[[Path, str, bool], Tuple[bool, Optional[bool]]],
         max_iterations: int,
+        file_prefix: str = "github",
+        task_name: str = "github_issue",
     ):
         """Initialize the RalphExecutor.
 
@@ -242,6 +244,8 @@ class RalphExecutor:
             commit_fn: Callable that commits (and optionally pushes) changes.
                 Signature: ``(repo_dir, commit_message, push_if_remote) -> (commit_ok, push_ok)``.
             max_iterations: Maximum number of iterations for the task loop.
+            file_prefix: Prefix for task file naming (default: "github").
+            task_name: Task name for CLI executor mapping (default: "github_issue").
         """
         self.logger = logger
         self.agent_args = agent_args
@@ -250,11 +254,12 @@ class RalphExecutor:
         self.has_changes_fn = has_changes_fn
         self.commit_fn = commit_fn
         self.max_iterations = max_iterations
+        self.file_prefix = file_prefix
+        self.task_name = task_name
 
-    @staticmethod
-    def _get_issue_task_path(repo_dir: Path, issue_number: int) -> Path:
-        """Get the canonical task file path for a GitHub issue."""
-        return repo_dir / ".ralph" / f"github-{issue_number}.md"
+    def _get_issue_task_path(self, repo_dir: Path, issue_number: int) -> Path:
+        """Get the canonical task file path for a task."""
+        return repo_dir / ".ralph" / f"{self.file_prefix}-{issue_number}.md"
 
     def _create_issue_task_file(
         self,
@@ -475,7 +480,7 @@ class RalphExecutor:
             repo_dir,
             self.agent_args,
             self.timeout,
-            task_name="github_issue",
+            task_name=self.task_name,
         )
 
         if result.get("success", False):
