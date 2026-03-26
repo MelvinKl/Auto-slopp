@@ -2,7 +2,7 @@
 
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from auto_slopp.workers.github_issue_worker import GitHubIssueWorker
 from auto_slopp.workers.github_task_source import GitHubTaskSource
