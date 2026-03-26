@@ -81,6 +81,74 @@ The system is designed around a pluggable worker architecture:
 
 ## Core Components
 
+### 0. TaskSource Abstraction (workers/task_source.py)
+
+The TaskSource abstract base class provides a unified interface for loading tasks from different sources:
+
+```python
+@dataclass
+class Task:
+    """Normalized task representation from any source."""
+    id: int
+    title: str
+    body: str
+    comments: List[str] = field(default_factory=list)
+    raw: Dict[str, Any] = field(default_factory=dict)
+
+class TaskSource(ABC):
+    """Abstract base class for loading tasks from different sources."""
+
+    @abstractmethod
+    def get_tasks(self, repo_path: Path) -> List[Task]:
+        """Fetch and filter tasks from the source."""
+
+    @abstractmethod
+    def get_branch_name(self, task: Task) -> str:
+        """Generate the branch name for a task."""
+
+    @abstractmethod
+    def get_ralph_file_prefix(self) -> str:
+        """Return the prefix for ralph task files."""
+
+    @abstractmethod
+    def get_task_difficulty_name(self) -> str:
+        """Return the task difficulty name for CLI executor mapping."""
+
+    @abstractmethod
+    def get_default_pr_body(self, task: Task) -> str:
+        """Generate the default PR body for a task."""
+
+    @abstractmethod
+    def on_task_start(self, task: Task, branch_name: str) -> None:
+        """Called when task processing begins."""
+
+    @abstractmethod
+    def on_task_complete(self, task: Task, branch_name: str, pr_url: str) -> None:
+        """Called when a task completes successfully."""
+
+    @abstractmethod
+    def on_task_failure(self, task: Task, error: str) -> None:
+        """Called when a task fails."""
+
+    @abstractmethod
+    def on_no_changes(self, task: Task) -> None:
+        """Called when no changes were needed for a task."""
+
+    @abstractmethod
+    def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
+        """Called when the ralph loop reaches max iterations without completing."""
+```
+
+**Implementations:**
+- **GitHubTaskSource**: Loads tasks from GitHub Issues
+- **VikunjaTaskSource**: Loads tasks from Vikunja
+
+**Design Benefits:**
+- **Code Reuse**: Unified IssueWorker can process tasks from any source
+- **Separation of Concerns**: Task loading logic is isolated from processing logic
+- **Extensibility**: Easy to add new task sources (e.g., Jira, GitLab)
+- **Testability**: Each TaskSource can be tested independently
+
 ### 1. Main Entry Point (main.py)
 
 The main module serves as the application's entry point and orchestrates initialization:
@@ -152,7 +220,88 @@ class Worker(ABC):
 - Flexible return types for different use cases
 - Abstract base class enforcement
 
-### 4. Settings Management (settings/main.py)
+### 4. Unified IssueWorker (workers/issue_worker.py)
+
+The IssueWorker provides a common implementation for processing tasks from various sources using the Ralph loop:
+
+```python
+class IssueWorker(Worker):
+    """Unified worker for processing tasks from different sources using Ralph loop."""
+
+    def __init__(
+        self,
+        task_source: TaskSource,
+        timeout: int | None = None,
+        agent_args: Optional[List[str]] = None,
+        dry_run: bool = False,
+    ):
+        """Initialize the IssueWorker with a TaskSource implementation."""
+        self.task_source = task_source
+        self.ralph_executor = RalphExecutor(
+            file_prefix=task_source.get_ralph_file_prefix(),
+            task_name=task_source.get_task_difficulty_name(),
+            # ... other params
+        )
+
+    def run(self, repo_path: Path) -> Dict[str, Any]:
+        """Execute task processing workflow for a single repository."""
+        tasks = self.task_source.get_tasks(repo_path)
+        for task in tasks:
+            # Process task using Ralph loop
+            result = self._process_single_task(repo_path, task)
+```
+
+**Integration with TaskSource:**
+- Delegates task loading to `task_source.get_tasks()`
+- Uses source-specific configuration via `task_source` methods
+- Calls lifecycle hooks: `on_task_start`, `on_task_complete`, `on_task_failure`, etc.
+- Supports Ralph loop for step-based task execution
+
+**Benefits:**
+- Single implementation for all task processing logic
+- Task sources only need to implement TaskSource interface
+- Ralph loop logic is shared across GitHub and Vikunja workers
+
+### 5. Thin Worker Wrappers
+
+**GitHubIssueWorker** and **VikunjaWorker** now act as thin wrappers that instantiate IssueWorker with the appropriate TaskSource:
+
+```python
+class GitHubIssueWorker(Worker):
+    """Thin wrapper for GitHub Issue processing."""
+
+    def __init__(self, timeout: int | None = None, agent_args: Optional[List[str]] = None, dry_run: bool = False):
+        self._worker = IssueWorker(
+            task_source=GitHubTaskSource(),
+            timeout=timeout,
+            agent_args=agent_args,
+            dry_run=dry_run,
+        )
+
+    def run(self, repo_path: Path) -> Dict[str, Any]:
+        return self._worker.run(repo_path)
+
+class VikunjaWorker(Worker):
+    """Thin wrapper for Vikunja task processing."""
+
+    def __init__(self, timeout: int | None = None, agent_args: Optional[List[str]] = None, dry_run: bool = False):
+        self._worker = IssueWorker(
+            task_source=VikunjaTaskSource(),
+            timeout=timeout,
+            agent_args=agent_args,
+            dry_run=dry_run,
+        )
+
+    def run(self, repo_path: Path) -> Dict[str, Any]:
+        return self._worker.run(repo_path)
+```
+
+**Benefits:**
+- Maintains backward compatibility with existing worker interface
+- Zero code duplication between GitHub and Vikunja workers
+- Easy to understand and maintain
+
+### 6. Settings Management (settings/main.py)
 
 Configuration management using Pydantic:
 
