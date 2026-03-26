@@ -276,8 +276,8 @@ class RalphExecutor:
             comments_text = "Comments:\n" + "\n".join(f"- {comment}" for comment in comment_texts if comment) + "\n\n"
 
         content = (
-            f"# GitHub Issue Task: {issue_title}\n\n"
-            f"Issue Number: {issue_number}\n"
+            f"# Task: {issue_title}\n\n"
+            f"Task Number: {issue_number}\n"
             f"Branch: {branch_name}\n\n"
             f"## Required Task\n\n"
             f"{issue_body}\n\n"
