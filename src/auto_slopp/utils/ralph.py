@@ -339,7 +339,7 @@ class RalphExecutor:
             repo_dir,
             self.agent_args,
             self.timeout,
-            task_name="github_issue",
+            task_name=self.task_name,
         )
 
         if not result.get("success", False):
@@ -386,7 +386,7 @@ class RalphExecutor:
             repo_dir,
             self.agent_args,
             self.timeout,
-            task_name="github_issue",
+            task_name=self.task_name,
         )
 
         if not result.get("success", False):
@@ -525,7 +525,7 @@ class RalphExecutor:
             repo_dir,
             self.agent_args,
             self.timeout,
-            task_name="github_issue",
+            task_name=self.task_name,
         )
 
         if not result.get("success", False):
@@ -578,7 +578,7 @@ class RalphExecutor:
             repo_dir,
             self.agent_args,
             self.timeout,
-            task_name="github_issue",
+            task_name=self.task_name,
         )
         if not result.get("success", False):
             return {
