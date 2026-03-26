@@ -71,6 +71,7 @@ AUTO_SLOPP_CLI_CONFIGURATIONS='[
 # Each task specifies min/max/recommended capability requirements
 AUTO_SLOPP_TASK_DIFFICULTIES='{
   "github_issue": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
+  "vikunja_task": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
   "pr_review": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
   "git_checkout": { "min_rating": 0, "max_rating": 10, "recommended_rating": 2 },
   "default": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 }
@@ -597,6 +598,7 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
 # Task difficulty ratings (optional)
 AUTO_SLOPP_TASK_DIFFICULTIES='{
   "github_issue": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
+  "vikunja_task": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
   "pr_review": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
   "git_checkout": { "min_rating": 0, "max_rating": 10, "recommended_rating": 2 },
   "default": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 }
