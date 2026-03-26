@@ -71,6 +71,7 @@ AUTO_SLOPP_CLI_CONFIGURATIONS='[
 # Each task specifies min/max/recommended capability requirements
 AUTO_SLOPP_TASK_DIFFICULTIES='{
   "github_issue": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
+  "vikunja_task": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
   "pr_review": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
   "git_checkout": { "min_rating": 0, "max_rating": 10, "recommended_rating": 2 },
   "default": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 }
@@ -597,6 +598,7 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
 # Task difficulty ratings (optional)
 AUTO_SLOPP_TASK_DIFFICULTIES='{
   "github_issue": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
+  "vikunja_task": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
   "pr_review": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 },
   "git_checkout": { "min_rating": 0, "max_rating": 10, "recommended_rating": 2 },
   "default": { "min_rating": 0, "max_rating": 10, "recommended_rating": 5 }
@@ -717,8 +719,21 @@ from auto_slopp.workers import PRWorker
 # Returns: PR status, merge results, branch information
 ```
 
+### IssueWorker
+A unified worker class that processes tasks/issues using the Ralph execution logic. It accepts a TaskSource (base class) that abstracts the task loading mechanism, allowing it to work with different task sources (GitHub issues, Vikunja tasks, etc.).
+```python
+from auto_slopp.workers import IssueWorker
+from auto_slopp.workers import GitHubTaskSource, VikunjaTaskSource
+
+# Create with GitHub task source
+github_worker = IssueWorker(task_source=GitHubTaskSource())
+
+# Create with Vikunja task source
+vikunja_worker = IssueWorker(task_source=VikunjaTaskSource())
+```
+
 ### GitHubIssueWorker
-Handles GitHub issue operations.
+Convenience wrapper around IssueWorker configured with GitHubTaskSource. Handles GitHub issue operations.
 ```python
 from auto_slopp.workers import GitHubIssueWorker
 
@@ -736,13 +751,19 @@ from auto_slopp.workers import StaleBranchCleanupWorker
 ```
 
 ### VikunjaWorker
-Processes Vikunja tasks as instructions. Searches open tasks in a Vikunja project (creating it if needed), filters tasks to only those tagged with "ai" and having no open dependencies, uses task title/description as instructions for the configured CLI tool, creates a new branch, executes the instructions, and updates the task status. Works on tasks indiscriminately regardless of assignment or creator. Additionally creates subtasks in Vikunja and pull requests in GitHub based on processing results.
+Convenience wrapper around IssueWorker configured with VikunjaTaskSource. Processes Vikunja tasks as instructions. Searches open tasks in a Vikunja project (creating it if needed), filters tasks to only those tagged with "ai" and having no open dependencies, uses task title/description as instructions for the configured CLI tool, creates a new branch, executes the instructions, and updates the task status. Works on tasks indiscriminately regardless of assignment or creator. Additionally creates subtasks in Vikunja and pull requests in GitHub based on processing results.
 ```python
 from auto_slopp.workers import VikunjaWorker
 
 # Disable in AUTO_SLOPP_WORKERS_DISABLED
 # Returns: task processing results, branch information, task status updates, subtask creation results, PR creation results
 ```
+
+### TaskSource Classes
+Base class and implementations for loading tasks from different sources:
+- `TaskSource`: Abstract base class for task loading
+- `GitHubTaskSource`: Loads tasks from GitHub issues
+- `VikunjaTaskSource`: Loads tasks from Vikunja project
 
 ## API Reference
 
@@ -845,7 +866,8 @@ Auto-slopp/
 ├── src/                          # Source code
 │   ├── auto_slopp/               # Main package with core modules and workers
 │   │   ├── utils/                # Utility modules (git, github operations)
-│   │   └── workers/              # Worker implementations (PR, GitHub issue, StaleBranchCleanup, Vikunja)
+│   │   └── workers/              # Worker implementations (IssueWorker, PR, StaleBranchCleanup)
+│   │       # TaskSource implementations: GitHubTaskSource, VikunjaTaskSource
 │   └── settings/                 # Configuration management with Pydantic settings
 └── tests/                        # Test suite with pytest tests
 ```

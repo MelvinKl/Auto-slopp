@@ -298,6 +298,8 @@ class TestRalphExecutor:
             has_changes_fn=mock_has_changes_fn,
             commit_fn=mock_commit_fn,
             max_iterations=10,
+            file_prefix="github",
+            task_name="github_issue",
         )
 
     def test_initialization(self, ralph_executor, logger):
@@ -308,11 +310,82 @@ class TestRalphExecutor:
         assert ralph_executor.max_iterations == 10
 
     def test_get_issue_task_path(self):
-        """Test static method _get_issue_task_path."""
+        """Test instance method _get_issue_task_path."""
         repo_dir = Path("/test/repo")
-        task_path = RalphExecutor._get_issue_task_path(repo_dir, 123)
+        ralph_executor = RalphExecutor(
+            logger=logging.getLogger(__name__),
+            agent_args=[],
+            timeout=60,
+            execute_fn=lambda *args, **kwargs: {"success": True},
+            has_changes_fn=lambda x: False,
+            commit_fn=lambda x, y, z: (True, True),
+            max_iterations=5,
+            file_prefix="github",
+            task_name="github_issue",
+        )
+        task_path = ralph_executor._get_issue_task_path(repo_dir, 123)
         expected = Path("/test/repo/.ralph/github-123.md")
         assert task_path == expected
+
+    def test_configurable_file_prefix(self):
+        """Test that file_prefix configures task file naming."""
+        repo_dir = Path("/test/repo")
+
+        github_executor = RalphExecutor(
+            logger=logging.getLogger(__name__),
+            agent_args=[],
+            timeout=60,
+            execute_fn=lambda *args, **kwargs: {"success": True},
+            has_changes_fn=lambda x: False,
+            commit_fn=lambda x, y, z: (True, True),
+            max_iterations=5,
+            file_prefix="github",
+            task_name="github_issue",
+        )
+        github_path = github_executor._get_issue_task_path(repo_dir, 123)
+        assert github_path == Path("/test/repo/.ralph/github-123.md")
+
+        vikunja_executor = RalphExecutor(
+            logger=logging.getLogger(__name__),
+            agent_args=[],
+            timeout=60,
+            execute_fn=lambda *args, **kwargs: {"success": True},
+            has_changes_fn=lambda x: False,
+            commit_fn=lambda x, y, z: (True, True),
+            max_iterations=5,
+            file_prefix="vikunja",
+            task_name="vikunja_task",
+        )
+        vikunja_path = vikunja_executor._get_issue_task_path(repo_dir, 456)
+        assert vikunja_path == Path("/test/repo/.ralph/vikunja-456.md")
+
+    def test_configurable_task_name(self):
+        """Test that task_name configures task difficulty."""
+        github_executor = RalphExecutor(
+            logger=logging.getLogger(__name__),
+            agent_args=[],
+            timeout=60,
+            execute_fn=lambda *args, **kwargs: {"success": True},
+            has_changes_fn=lambda x: False,
+            commit_fn=lambda x, y, z: (True, True),
+            max_iterations=5,
+            file_prefix="github",
+            task_name="github_issue",
+        )
+        assert github_executor.task_name == "github_issue"
+
+        vikunja_executor = RalphExecutor(
+            logger=logging.getLogger(__name__),
+            agent_args=[],
+            timeout=60,
+            execute_fn=lambda *args, **kwargs: {"success": True},
+            has_changes_fn=lambda x: False,
+            commit_fn=lambda x, y, z: (True, True),
+            max_iterations=5,
+            file_prefix="vikunja",
+            task_name="vikunja_task",
+        )
+        assert vikunja_executor.task_name == "vikunja_task"
 
     def test_create_issue_task_file(self, ralph_executor):
         """Test creating an issue task file."""
