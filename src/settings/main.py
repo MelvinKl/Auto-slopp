@@ -116,6 +116,16 @@ class Settings(BaseSettings):
                 cli_command="claude",
                 cli_args=[
                     "--model",
+                    "opus",
+                    "-p",
+                ],
+                capability=10,
+                name="claude opus",
+            ),
+            CLIConfiguration(
+                cli_command="claude",
+                cli_args=[
+                    "--model",
                     "sonnet",
                     "-p",
                 ],

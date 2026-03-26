@@ -841,7 +841,50 @@ class TestGitHubIssueWorker:
             assert result["success"] is False
             assert result["max_loops_reached"] is True
             assert result["loops_executed"] == 2
+            assert result["total_steps"] == 1
             assert "maximum iterations (2)" in result["error"].lower()
+
+    def test_run_refined_task_loop_total_steps_nonzero_when_steps_completed(self):
+        """Regression test: total_steps must not be 0 when steps were completed.
+
+        Previously the failure message showed nonsensical "Steps completed: 4/0"
+        because total_steps was never populated in the returned result dict.
+        """
+        worker = GitHubIssueWorker(dry_run=True)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            task_path = repo_path / "task.md"
+            # Step 1 is already done, steps 2 and 3 are open
+            task_path.write_text(
+                "# Task\n\n## Steps\n\n" "- [x] 1. Already done\n" "- [ ] 2. Needs work\n" "- [ ] 3. Also needs work\n"
+            )
+
+            with (
+                patch(
+                    "auto_slopp.workers.github_issue_worker.settings.github_issue_step_max_iterations",
+                    2,
+                ),
+                patch.object(
+                    worker.ralph_executor,
+                    "_execute_step",
+                    return_value={"success": False, "error": "retry needed"},
+                ),
+            ):
+                result = worker.ralph_executor._run_refined_task_loop(
+                    repo_dir=repo_path,
+                    task_path=task_path,
+                    issue_title="Issue",
+                    issue_body="Body",
+                    comment_texts=[],
+                    branch_name="ai/issue-1",
+                )
+
+        assert result["success"] is False
+        assert result["max_loops_reached"] is True
+        # total_steps must reflect actual plan size, never 0 when a plan was parsed
+        assert result["total_steps"] == 3
+        assert result["total_steps"] > 0
 
     def test_run_refined_task_loop_commits_on_successful_step(self):
         """Test successful step completion triggers per-step commit."""
@@ -899,6 +942,7 @@ class TestGitHubIssueWorker:
             assert result["success"] is True
             assert result["loops_executed"] == 1
             assert result["steps_completed"] == 1
+            assert result["total_steps"] == 1
             mock_commit.assert_called_once()
             assert mock_commit.call_args[0][2] is False
             assert "Complete issue step 1" in mock_commit.call_args[0][1]
