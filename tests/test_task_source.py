@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from auto_slopp.workers.github_task_source import GitHubTaskSource
 from auto_slopp.workers.task_source import Task, TaskSource
+from auto_slopp.workers.vikunja_task_source import VikunjaTaskSource
 
 
 class ConcreteTaskSource(TaskSource):
@@ -288,3 +289,201 @@ class TestGitHubTaskSource:
         source.on_max_iterations_reached(task, steps_completed=5, total_steps=10, error="Timeout")
         mock_comment.assert_called_once()
         mock_remove_label.assert_called_once_with("/tmp", 42, "ai")
+
+
+class TestVikunjaTaskSource:
+    """Tests for the VikunjaTaskSource implementation."""
+
+    def test_vikunja_task_source_initialization(self):
+        """Test that VikunjaTaskSource can be instantiated."""
+        source = VikunjaTaskSource()
+        assert isinstance(source, TaskSource)
+
+    @patch("auto_slopp.workers.vikunja_task_source.find_or_create_project")
+    @patch("auto_slopp.workers.vikunja_task_source.get_open_tasks_by_project")
+    def test_get_tasks_returns_empty_list_when_no_project(self, mock_get_tasks, mock_find_project):
+        """Test that get_tasks returns empty list when no project found."""
+        mock_find_project.return_value = None
+        source = VikunjaTaskSource()
+        tasks = source.get_tasks(Path("/tmp"))
+        assert len(tasks) == 0
+        mock_find_project.assert_called_once_with("tmp")
+
+    @patch("auto_slopp.workers.vikunja_task_source.find_or_create_project")
+    @patch("auto_slopp.workers.vikunja_task_source.get_open_tasks_by_project")
+    def test_get_tasks_returns_empty_list_when_no_tasks(self, mock_get_tasks, mock_find_project):
+        """Test that get_tasks returns empty list when no tasks found."""
+        mock_find_project.return_value = {"id": 1, "title": "Test Project"}
+        mock_get_tasks.return_value = []
+        source = VikunjaTaskSource()
+        tasks = source.get_tasks(Path("/tmp"))
+        assert len(tasks) == 0
+
+    @patch("auto_slopp.workers.vikunja_task_source.find_or_create_project")
+    @patch("auto_slopp.workers.vikunja_task_source.get_open_tasks_by_project")
+    @patch("auto_slopp.workers.vikunja_task_source.verify_blocking_closed")
+    @patch("auto_slopp.workers.vikunja_task_source.settings")
+    def test_get_tasks_filters_by_tag(self, mock_settings, mock_verify_blocking, mock_get_tasks, mock_find_project):
+        """Test that get_tasks filters by required tag."""
+        mock_settings.github_issue_worker_required_label = "ai"
+        mock_find_project.return_value = {"id": 1, "title": "Test Project"}
+        mock_get_tasks.return_value = [
+            {
+                "id": 1,
+                "title": "Valid Task",
+                "description": "Description",
+                "labels": [{"title": "ai"}],
+            },
+            {
+                "id": 2,
+                "title": "Invalid Task",
+                "description": "Description",
+                "labels": [{"title": "other"}],
+            },
+        ]
+        mock_verify_blocking.return_value = True
+        source = VikunjaTaskSource()
+        tasks = source.get_tasks(Path("/tmp"))
+        assert len(tasks) == 1
+        assert tasks[0].id == 1
+
+    @patch("auto_slopp.workers.vikunja_task_source.find_or_create_project")
+    @patch("auto_slopp.workers.vikunja_task_source.get_open_tasks_by_project")
+    @patch("auto_slopp.workers.vikunja_task_source.verify_blocking_closed")
+    @patch("auto_slopp.workers.vikunja_task_source.settings")
+    def test_get_tasks_filters_by_dependencies(
+        self, mock_settings, mock_verify_blocking, mock_get_tasks, mock_find_project
+    ):
+        """Test that get_tasks filters out tasks with open dependencies."""
+        mock_settings.github_issue_worker_required_label = "ai"
+        mock_find_project.return_value = {"id": 1, "title": "Test Project"}
+        mock_get_tasks.return_value = [
+            {
+                "id": 1,
+                "title": "Task with no deps",
+                "description": "Description",
+                "labels": [{"title": "ai"}],
+            },
+            {
+                "id": 2,
+                "title": "Task with open deps",
+                "description": "Description",
+                "labels": [{"title": "ai"}],
+            },
+        ]
+        mock_verify_blocking.side_effect = [True, False]
+        mock_verify_blocking.return_value = True
+        source = VikunjaTaskSource()
+        tasks = source.get_tasks(Path("/tmp"))
+        assert len(tasks) == 1
+        assert tasks[0].id == 1
+
+    @patch("auto_slopp.workers.vikunja_task_source.find_or_create_project")
+    @patch("auto_slopp.workers.vikunja_task_source.get_open_tasks_by_project")
+    @patch("auto_slopp.workers.vikunja_task_source.verify_blocking_closed")
+    @patch("auto_slopp.workers.vikunja_task_source.settings")
+    def test_get_tasks_returns_correct_task_objects(
+        self, mock_settings, mock_verify_blocking, mock_get_tasks, mock_find_project
+    ):
+        """Test that get_tasks returns properly structured Task objects."""
+        mock_settings.github_issue_worker_required_label = "ai"
+        mock_find_project.return_value = {"id": 1, "title": "Test Project"}
+        mock_get_tasks.return_value = [
+            {
+                "id": 42,
+                "title": "Test Task",
+                "description": "Test Description",
+                "labels": [{"title": "ai"}],
+            },
+        ]
+        mock_verify_blocking.return_value = True
+        source = VikunjaTaskSource()
+        tasks = source.get_tasks(Path("/tmp"))
+        assert len(tasks) == 1
+        assert tasks[0].id == 42
+        assert tasks[0].title == "Test Task"
+        assert tasks[0].body == "Test Description"
+        assert tasks[0].comments == []
+        assert tasks[0].raw["id"] == 42
+
+    def test_get_branch_name_generates_correct_format(self):
+        """Test that get_branch_name generates correct branch name."""
+        source = VikunjaTaskSource()
+        task = Task(id=42, title="Fix a Bug in the Code", body="")
+        branch_name = source.get_branch_name(task)
+        assert branch_name == "ai/task-42-fix-a-bug-in-the-code"
+
+    def test_get_ralph_file_prefix(self):
+        """Test that get_ralph_file_prefix returns 'vikunja'."""
+        source = VikunjaTaskSource()
+        assert source.get_ralph_file_prefix() == "vikunja"
+
+    def test_get_task_difficulty_name(self):
+        """Test that get_task_difficulty_name returns 'vikunja_task'."""
+        source = VikunjaTaskSource()
+        assert source.get_task_difficulty_name() == "vikunja_task"
+
+    def test_get_default_pr_body(self):
+        """Test that get_default_pr_body generates correct PR body."""
+        source = VikunjaTaskSource()
+        task = Task(id=42, title="Fix Bug", body="This is the task body")
+        pr_body = source.get_default_pr_body(task)
+        assert pr_body == "Vikunja Task #42: Fix Bug\n\nThis is the task body"
+
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
+    @patch("auto_slopp.workers.vikunja_task_source.analyze_task")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_on_task_start_updates_status_and_adds_comment(self, mock_comment, mock_analyze, mock_update_status):
+        """Test that on_task_start updates status and adds start comment."""
+        mock_update_status.return_value = True
+        mock_analyze.return_value = []
+        source = VikunjaTaskSource()
+        task = Task(id=42, title="Test", body="")
+        source.on_task_start(task, "ai/task-42")
+        mock_update_status.assert_called_once_with(42, "in_progress")
+        mock_comment.assert_called_once()
+        mock_analyze.assert_called_once_with(42)
+
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_on_task_complete_updates_status_and_adds_comment(self, mock_comment, mock_update_status):
+        """Test that on_task_complete updates status and adds PR comment."""
+        mock_update_status.return_value = True
+        source = VikunjaTaskSource()
+        task = Task(id=42, title="Test", body="")
+        source.on_task_complete(task, "ai/task-42", "https://github.com/test/pr/1")
+        mock_update_status.assert_called_once_with(42, "done")
+        mock_comment.assert_called_once()
+
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_on_task_failure_updates_status_and_adds_comment(self, mock_comment, mock_update_status):
+        """Test that on_task_failure updates status and adds failure comment."""
+        mock_update_status.return_value = True
+        source = VikunjaTaskSource()
+        task = Task(id=42, title="Test", body="")
+        source.on_task_failure(task, "Test error")
+        mock_update_status.assert_called_once_with(42, "failed")
+        mock_comment.assert_called_once()
+
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_on_no_changes_updates_status_and_adds_comment(self, mock_comment, mock_update_status):
+        """Test that on_no_changes updates status and adds no-changes comment."""
+        mock_update_status.return_value = True
+        source = VikunjaTaskSource()
+        task = Task(id=42, title="Test", body="")
+        source.on_no_changes(task)
+        mock_update_status.assert_called_once_with(42, "done")
+        mock_comment.assert_called_once()
+
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_on_max_iterations_reached_updates_status_and_adds_comment(self, mock_comment, mock_update_status):
+        """Test that on_max_iterations_reached updates status and adds failure comment."""
+        mock_update_status.return_value = True
+        source = VikunjaTaskSource()
+        task = Task(id=42, title="Test", body="")
+        source.on_max_iterations_reached(task, steps_completed=5, total_steps=10, error="Timeout")
+        mock_update_status.assert_called_once_with(42, "failed")
+        mock_comment.assert_called_once()
