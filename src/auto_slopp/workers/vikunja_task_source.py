@@ -10,6 +10,7 @@ from typing import List
 
 from auto_slopp.utils.git_operations import sanitize_branch_name
 from auto_slopp.utils.vikunja_operations import (
+    analyze_task,
     comment_on_task,
     find_or_create_project,
     get_open_tasks_by_project,
@@ -127,19 +128,25 @@ class VikunjaTaskSource(TaskSource):
     def on_task_start(self, task: Task, branch_name: str) -> None:
         """Called when task processing begins.
 
-        For Vikunja tasks, this adds a start comment and updates status.
+        Updates task status to in_progress, analyzes task for subtasks,
+        and adds a start comment.
 
         Args:
             task: The task being started
             branch_name: The branch created for this task
         """
+        update_task_status(task.id, "in_progress")
+
+        subtasks = analyze_task(task.id)
+        if subtasks:
+            logger.info(f"Created {len(subtasks)} subtasks for task {task.id}")
+
         start_comment = (
             f"🚀 **Worker Started Processing**\n\n"
             f"Branch: {branch_name}\n\n"
             f"The worker has started processing this task."
         )
         comment_on_task(task.id, start_comment)
-        update_task_status(task.id, "in_progress")
 
     def on_task_complete(self, task: Task, branch_name: str, pr_url: str) -> None:
         """Called when a task completes successfully.
@@ -171,14 +178,22 @@ class VikunjaTaskSource(TaskSource):
     def on_task_failure(self, task: Task, error: str) -> None:
         """Called when a task fails.
 
-        For Vikunja tasks, this is a no-op. Error handling is managed
-        by the worker's execution flow.
+        Updates task status to failed and adds a failure comment.
 
         Args:
             task: The failed task
             error: Error description
         """
-        pass
+        failure_comment = (
+            f"⚠️ **Task Failed: Unexpected Error**\n\n"
+            f"An unexpected error occurred while processing the task.\n\n"
+            f"**Error:** {error}\n\n"
+            f"**Task:** {task.title}\n\n"
+            f"This task will not be processed again automatically."
+        )
+        comment_on_task(task.id, failure_comment)
+
+        update_task_status(task.id, "failed")
 
     def on_no_changes(self, task: Task) -> None:
         """Called when no changes were needed for a task.
