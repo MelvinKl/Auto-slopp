@@ -60,7 +60,7 @@ class GitHubTaskSource(TaskSource):
                 title=issue_title,
                 body=issue_body,
                 comments=comment_texts,
-                raw=issue,
+                raw={"_repo_path": repo_path, **issue},
             )
             tasks.append(task)
 
