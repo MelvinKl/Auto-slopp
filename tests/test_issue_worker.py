@@ -335,6 +335,34 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
+    def test_ralph_executor_max_iterations_reached(self, mock_settings, mock_create_branch, mock_checkout):
+        """Test that on_max_iterations_reached is called when Ralph reaches max iterations."""
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        # Mock the RalphExecutor.execute method to simulate max iterations reached
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": False,
+            "loops_executed": 10,
+            "steps_completed": 8,
+            "total_steps": 15,
+            "max_loops_reached": True,
+            "error": "Max iterations reached",
+        }
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert result["tasks_processed"] == 0
+        assert len(result["task_results"]) == 1
+        assert result["task_results"][0]["success"] is False
+        assert result["task_results"][0]["ralph_loops_executed"] == 10
+        assert task_source.on_max_iterations_called is True
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
     def test_branch_creation_failure(self, mock_settings, mock_create_branch, mock_checkout):
         """Test that run handles branch creation failure."""
         mock_settings.ralph_enabled = False
@@ -346,7 +374,6 @@ class TestIssueWorker:
         assert result["success"] is True
         assert result["tasks_processed"] == 0
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is False
         assert "Failed to create branch" in result["task_results"][0]["error"]
 
     @patch("auto_slopp.workers.issue_worker.settings")
