@@ -1,7 +1,7 @@
 {
-  "pid": 36991,
-  "parent_pid": 36976,
+  "pid": 38931,
+  "parent_pid": 38916,
   "database": "/root/git/managed/Auto-slopp/.beads/beads.db",
   "version": "0.49.1",
-  "started_at": "2026-03-26T17:43:04.954146196Z"
+  "started_at": "2026-03-26T17:48:31.120611914Z"
 }
