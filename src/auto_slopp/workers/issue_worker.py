@@ -307,7 +307,7 @@ class IssueWorker(Worker):
             else:
                 pr_result = create_pull_request(
                     repo_dir,
-                    title=task_title,
+                    title=f"Vikunja Task #{task.id}: {task_title}",
                     body=pr_body,
                     head=current_branch,
                     base="main",
