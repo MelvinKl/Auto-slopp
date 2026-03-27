@@ -299,7 +299,6 @@ class TestRalphExecutor:
             commit_fn=mock_commit_fn,
             max_iterations=10,
             file_prefix="github",
-            task_name="github_issue",
         )
 
     def test_initialization(self, ralph_executor, logger):
@@ -321,7 +320,6 @@ class TestRalphExecutor:
             commit_fn=lambda x, y, z: (True, True),
             max_iterations=5,
             file_prefix="github",
-            task_name="github_issue",
         )
         task_path = ralph_executor._get_issue_task_path(repo_dir, 123)
         expected = Path("/test/repo/.ralph/github-123.md")
@@ -340,7 +338,6 @@ class TestRalphExecutor:
             commit_fn=lambda x, y, z: (True, True),
             max_iterations=5,
             file_prefix="github",
-            task_name="github_issue",
         )
         github_path = github_executor._get_issue_task_path(repo_dir, 123)
         assert github_path == Path("/test/repo/.ralph/github-123.md")
@@ -354,14 +351,13 @@ class TestRalphExecutor:
             commit_fn=lambda x, y, z: (True, True),
             max_iterations=5,
             file_prefix="vikunja",
-            task_name="vikunja_task",
         )
         vikunja_path = vikunja_executor._get_issue_task_path(repo_dir, 456)
         assert vikunja_path == Path("/test/repo/.ralph/vikunja-456.md")
 
-    def test_configurable_task_name(self):
-        """Test that task_name configures task difficulty."""
-        github_executor = RalphExecutor(
+    def test_configurable_phase_names(self):
+        """Test that per-phase task difficulty names are configurable."""
+        executor = RalphExecutor(
             logger=logging.getLogger(__name__),
             agent_args=[],
             timeout=60,
@@ -370,11 +366,19 @@ class TestRalphExecutor:
             commit_fn=lambda x, y, z: (True, True),
             max_iterations=5,
             file_prefix="github",
-            task_name="github_issue",
+            task_planning_name="custom_planning",
+            implementation_name="custom_impl",
+            validation_name="custom_validation",
+            remaining_steps_update_name="custom_update",
         )
-        assert github_executor.task_name == "github_issue"
+        assert executor.task_planning_name == "custom_planning"
+        assert executor.implementation_name == "custom_impl"
+        assert executor.validation_name == "custom_validation"
+        assert executor.remaining_steps_update_name == "custom_update"
 
-        vikunja_executor = RalphExecutor(
+    def test_default_phase_names(self):
+        """Test that default phase names match settings keys."""
+        executor = RalphExecutor(
             logger=logging.getLogger(__name__),
             agent_args=[],
             timeout=60,
@@ -382,10 +386,11 @@ class TestRalphExecutor:
             has_changes_fn=lambda x: False,
             commit_fn=lambda x, y, z: (True, True),
             max_iterations=5,
-            file_prefix="vikunja",
-            task_name="vikunja_task",
         )
-        assert vikunja_executor.task_name == "vikunja_task"
+        assert executor.task_planning_name == "task_planning"
+        assert executor.implementation_name == "implementation"
+        assert executor.validation_name == "task_implementation_validation"
+        assert executor.remaining_steps_update_name == "remaining_steps_update"
 
     def test_create_issue_task_file(self, ralph_executor):
         """Test creating an issue task file."""
