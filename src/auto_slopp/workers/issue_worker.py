@@ -72,6 +72,10 @@ class IssueWorker(Worker):
             commit_fn=commit_and_push_changes,
             max_iterations=max_iterations,
             file_prefix=task_source.get_ralph_file_prefix(),
+            task_planning_name="task_planning",
+            implementation_name="implementation",
+            validation_name="task_implementation_validation",
+            remaining_steps_update_name="remaining_steps_update",
         )
 
     def run(self, repo_path: Path) -> Dict[str, Any]:
