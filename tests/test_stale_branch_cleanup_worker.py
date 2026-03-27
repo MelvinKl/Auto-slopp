@@ -229,3 +229,79 @@ class TestStaleBranchCleanupWorker:
             worker = executor._instantiate_worker(StaleBranchCleanupWorker)
 
         assert worker.days_threshold == 14
+
+    def test_threshold_boundary_newer_not_stale(self):
+        """Test that a branch newer than the threshold is not considered stale."""
+        worker = StaleBranchCleanupWorker(days_threshold=5)
+
+        # Branch is 4 days old (newer than threshold of 5) — should NOT be stale
+        newer_date = datetime.now(timezone.utc) - timedelta(days=4)
+
+        local_branches = [
+            {"name": "newer-branch", "last_commit_date": newer_date},
+        ]
+        remote_branches = {"main"}
+
+        stale = worker._identify_stale_branches(local_branches, remote_branches)
+        assert len(stale) == 0
+
+    def test_threshold_boundary_older_is_stale(self):
+        """Test that a branch older than the threshold is considered stale."""
+        worker = StaleBranchCleanupWorker(days_threshold=5)
+
+        # Branch is 6 days old (older than threshold of 5) — should be stale
+        older_date = datetime.now(timezone.utc) - timedelta(days=6)
+
+        local_branches = [
+            {"name": "old-branch", "last_commit_date": older_date},
+        ]
+        remote_branches = {"main"}
+
+        stale = worker._identify_stale_branches(local_branches, remote_branches)
+        assert len(stale) == 1
+        assert stale[0]["name"] == "old-branch"
+
+    def test_threshold_zero_all_non_remote_stale(self):
+        """Test that threshold=0 treats all non-remote branches as stale."""
+        worker = StaleBranchCleanupWorker(days_threshold=0)
+
+        # Even a very recent branch (1 hour old) should be stale with threshold=0
+        recent_date = datetime.now(timezone.utc) - timedelta(hours=1)
+
+        local_branches = [
+            {"name": "recent-branch", "last_commit_date": recent_date},
+            {"name": "remote-branch", "last_commit_date": recent_date},
+        ]
+        remote_branches = {"main", "remote-branch"}
+
+        stale = worker._identify_stale_branches(local_branches, remote_branches)
+        assert len(stale) == 1
+        assert stale[0]["name"] == "recent-branch"
+
+    def test_threshold_changes_stale_classification(self):
+        """Test that changing the threshold changes which branches are stale."""
+        branch_date = datetime.now(timezone.utc) - timedelta(days=7)
+
+        local_branches = [
+            {"name": "test-branch", "last_commit_date": branch_date},
+        ]
+        remote_branches = {"main"}
+
+        # With threshold=10, the 7-day-old branch is NOT stale
+        worker_high = StaleBranchCleanupWorker(days_threshold=10)
+        stale_high = worker_high._identify_stale_branches(local_branches, remote_branches)
+        assert len(stale_high) == 0
+
+        # With threshold=5, the 7-day-old branch IS stale
+        worker_low = StaleBranchCleanupWorker(days_threshold=5)
+        stale_low = worker_low._identify_stale_branches(local_branches, remote_branches)
+        assert len(stale_low) == 1
+
+    def test_result_contains_configured_threshold(self):
+        """Test that the worker result includes the configured days_threshold."""
+        worker = StaleBranchCleanupWorker(days_threshold=30)
+
+        non_existent_path = Path("/tmp/non-existent-dir-threshold-test")
+        result = worker.run(non_existent_path)
+
+        assert result["days_threshold"] == 30
