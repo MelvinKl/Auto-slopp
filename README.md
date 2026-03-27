@@ -923,6 +923,9 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
 
 # Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
 export AUTO_SLOPP_SLOP_TIMEOUT=7200
+
+# Days after which a local branch without remote is considered stale and deleted (default: 1)
+export AUTO_SLOPP_STALE_BRANCH_DAYS_THRESHOLD=1
 ```
 
 ### .env File
@@ -964,6 +967,9 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
 
 # Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
 export AUTO_SLOPP_SLOP_TIMEOUT=7200
+
+# Days after which a local branch without remote is considered stale and deleted (default: 1)
+AUTO_SLOPP_STALE_BRANCH_DAYS_THRESHOLD=1
 
 # Telegram settings
 AUTO_SLOPP_TELEGRAM_ENABLED=true
