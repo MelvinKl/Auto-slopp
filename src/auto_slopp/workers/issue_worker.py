@@ -283,14 +283,14 @@ class IssueWorker(Worker):
                 result["no_changes"] = True
                 return result
 
-            if settings.ralph_enabled:
-                push_success, push_message = push_to_remote(repo_dir, remote="origin", branch=current_branch)
-                if not push_success:
-                    error_msg = f"Failed to push branch '{current_branch}': {push_message}"
-                    result["error"] = error_msg
-                    self.task_source.on_task_failure(task, error_msg)
-                    return result
+            push_success, push_message = push_to_remote(repo_dir, remote="origin", branch=current_branch)
+            if not push_success:
+                error_msg = f"Failed to push branch '{current_branch}': {push_message}"
+                result["error"] = error_msg
+                self.task_source.on_task_failure(task, error_msg)
+                return result
 
+            if settings.ralph_enabled:
                 pr_body = self._generate_pr_body_from_task_file(
                     repo_dir=repo_dir,
                     task=task,
