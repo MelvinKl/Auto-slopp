@@ -234,7 +234,7 @@ class Settings(BaseSettings):
         default={
             "task_planning": TaskRating(min_rating=0, max_rating=10, recommended_rating=6),
             "implementation": TaskRating(min_rating=5, max_rating=10, recommended_rating=10),
-            "task_implementation_validation": TaskRating(min_rating=0, max_rating=10, recommended_rating=76,
+            "task_implementation_validation": TaskRating(min_rating=0, max_rating=10, recommended_rating=6),
             "remaining_steps_update": TaskRating(min_rating=0, max_rating=10, recommended_rating=4),
             "pr_description": TaskRating(min_rating=0, max_rating=10, recommended_rating=1),
             "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
