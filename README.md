@@ -567,6 +567,9 @@ AUTO_SLOPP_DEBUG=false
 AUTO_SLOPP_WORKERS_DISABLED='[]'
 # Example: AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker"]'
 
+# Stale branch cleanup: days before a local-only branch is deleted (default: 1)
+AUTO_SLOPP_STALE_BRANCH_DAYS_THRESHOLD=1
+
 # CLI configuration (optional)
 export AUTO_SLOPP_CLI_CONFIGURATIONS='[
   {

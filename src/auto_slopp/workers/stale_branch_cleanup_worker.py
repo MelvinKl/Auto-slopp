@@ -1,7 +1,7 @@
 """Stale branch cleanup worker for removing old local branches.
 
 This worker identifies local branches that don't exist on the remote
-and deletes them if their last commit is older than 5 days.
+and deletes them if their last commit is older than the configured threshold.
 """
 
 import logging
@@ -22,10 +22,10 @@ class StaleBranchCleanupWorker(Worker):
     """Worker for cleaning up stale local branches.
 
     Identifies local branches that are not present on the remote repository
-    and deletes them if their last commit is older than 5 days.
+    and deletes them if their last commit is older than the configured threshold.
     """
 
-    def __init__(self, days_threshold: int = 5, dry_run: bool = False):
+    def __init__(self, days_threshold: int = 1, dry_run: bool = False):
         """Initialize the stale branch cleanup worker.
 
         Args:

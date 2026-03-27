@@ -33,7 +33,7 @@ class TestStaleBranchCleanupWorker:
     def test_worker_initialization(self):
         """Test worker initialization with different parameters."""
         worker = StaleBranchCleanupWorker()
-        assert worker.days_threshold == 5
+        assert worker.days_threshold == 1
         assert worker.dry_run is False
 
         worker = StaleBranchCleanupWorker(days_threshold=10, dry_run=True)
