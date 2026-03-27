@@ -261,6 +261,12 @@ class Settings(BaseSettings):
         description="Enable Ralph loop-based step execution for GitHub issues",
     )
 
+    stale_branch_days_threshold: int = Field(
+        default=1,
+        ge=0,
+        description="Days after which a local branch without remote is considered stale and deleted (default: 1)",
+    )
+
     auto_update_reboot_delay: int = Field(
         default=300,
         ge=0,
