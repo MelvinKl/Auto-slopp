@@ -217,7 +217,8 @@ class IssueWorker(Worker):
 
             branch_created = create_and_checkout_branch(repo_dir, branch_name, base_branch="main")
             if not branch_created:
-                error_msg = f"Failed to create branch {branch_name}"
+                error_msg = f"Failed to create branch '{branch_name}' for task #{task_id}"
+                self.logger.error(error_msg)
                 result["error"] = error_msg
                 self.task_source.on_task_failure(task, error_msg)
                 return result
@@ -285,7 +286,8 @@ class IssueWorker(Worker):
 
             push_success, push_message = push_to_remote(repo_dir, remote="origin", branch=current_branch)
             if not push_success:
-                error_msg = f"Failed to push branch '{current_branch}': {push_message}"
+                error_msg = f"Failed to push branch '{current_branch}' for task #{task_id}: {push_message}"
+                self.logger.error(error_msg)
                 result["error"] = error_msg
                 self.task_source.on_task_failure(task, error_msg)
                 return result
@@ -328,14 +330,16 @@ class IssueWorker(Worker):
                             f"Using existing PR for branch '{current_branch}': {existing_pr.get('url', 'N/A')}"
                         )
                     else:
-                        error_msg = "Failed to create pull request"
+                        error_msg = f"Failed to create pull request for task #{task_id} on branch '{current_branch}'"
+                        self.logger.error(error_msg)
                         result["error"] = error_msg
                         self.task_source.on_task_failure(task, error_msg)
                         return result
 
             pr_url = result.get("pr_url", "")
             if not pr_url:
-                error_msg = f"Task processed but no PR URL available for branch '{current_branch}'"
+                error_msg = f"Task #{task_id} processed but no PR URL available for branch '{current_branch}'"
+                self.logger.error(error_msg)
                 result["error"] = error_msg
                 self.task_source.on_task_failure(task, error_msg)
                 return result

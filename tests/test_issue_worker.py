@@ -372,6 +372,7 @@ class TestIssueWorker:
         assert result["tasks_processed"] == 0
         assert len(result["task_results"]) == 1
         assert "Failed to create branch" in result["task_results"][0]["error"]
+        assert "task #1" in result["task_results"][0]["error"]
         assert task_source.on_task_failure_called is True
 
     @patch("auto_slopp.workers.issue_worker.settings")
@@ -432,6 +433,7 @@ class TestIssueWorker:
         result = worker.run(Path("/tmp"))
         assert result["tasks_processed"] == 0
         assert "Failed to push" in result["task_results"][0]["error"]
+        assert "task #1" in result["task_results"][0]["error"]
         assert task_source.on_task_failure_called is True
 
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
@@ -523,5 +525,6 @@ class TestIssueWorker:
         result = worker.run(Path("/tmp"))
         assert result["task_results"][0]["success"] is False
         assert "no PR URL available" in result["task_results"][0]["error"]
+        assert "Task #1" in result["task_results"][0]["error"]
         assert task_source.on_task_failure_called is True
         assert task_source.on_task_complete_called is False

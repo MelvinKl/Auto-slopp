@@ -239,17 +239,6 @@ def delete_branch(repo_dir: Path, branch_name: str) -> bool:
         logger.error(f"Failed to delete branch '{branch_name}': {e}")
         return False
 
-        logger.info(f"Successfully deleted branch '{branch_name}'")
-        return True
-
-    except subprocess.CalledProcessError as e:
-        # Check both stdout and stderr for error messages
-        error_output = (e.stderr.strip() or e.stdout.strip()) if e.stderr or e.stdout else str(e)
-        error_msg = f"Failed to delete branch '{branch_name}': {error_output}"
-        logger.error(f"Failed to delete branch '{branch_name}': {error_output}")
-        _handle_git_operation_failure("delete_branch", repo_dir, error_msg)
-        return False
-
 
 def has_changes(repo_dir: Path) -> bool:
     """Check if there are uncommitted changes in the repository.
@@ -650,6 +639,7 @@ def push_to_remote(repo_dir: Path, remote: str = "origin", branch: Optional[str]
         return True, "Push successful"
 
     error_msg = result.stderr.strip() or result.stdout.strip()
+    logger.error(f"Failed to push branch '{branch}' to {remote} in {repo_dir.name}: {error_msg}")
     return False, error_msg
 
 

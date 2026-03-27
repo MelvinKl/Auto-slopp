@@ -183,9 +183,13 @@ class VikunjaTaskSource(TaskSource):
             f"**Task:** {task.title}\n\n"
             f"This task will not be processed again automatically."
         )
-        comment_on_task(task.id, failure_comment)
+        comment_success = comment_on_task(task.id, failure_comment)
+        status_success = update_task_status(task.id, "failed")
 
-        update_task_status(task.id, "failed")
+        if not comment_success:
+            logger.warning(f"Failed to add failure comment to task {task.id}")
+        if not status_success:
+            logger.warning(f"Failed to update status to 'failed' for task {task.id}")
 
     def on_no_changes(self, task: Task) -> None:
         """Called when no changes were needed for a task.
