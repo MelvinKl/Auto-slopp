@@ -314,7 +314,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     def test_task_execution_failure(self, mock_cli, mock_execute, mock_settings, mock_create_branch, mock_checkout):
-        """Test that run handles task execution failure."""
+        """Test that run handles task execution failure and calls on_task_failure."""
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_checkout.return_value = True
@@ -327,6 +327,7 @@ class TestIssueWorker:
         assert result["tasks_processed"] == 0
         assert len(result["task_results"]) == 1
         assert result["task_results"][0]["success"] is False
+        assert task_source.on_task_failure_called is True
 
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
@@ -360,7 +361,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
     def test_branch_creation_failure(self, mock_settings, mock_create_branch, mock_checkout):
-        """Test that run handles branch creation failure."""
+        """Test that run handles branch creation failure and calls on_task_failure."""
         mock_settings.ralph_enabled = False
         mock_checkout.return_value = True
         mock_create_branch.return_value = False
@@ -371,6 +372,7 @@ class TestIssueWorker:
         assert result["tasks_processed"] == 0
         assert len(result["task_results"]) == 1
         assert "Failed to create branch" in result["task_results"][0]["error"]
+        assert task_source.on_task_failure_called is True
 
     @patch("auto_slopp.workers.issue_worker.settings")
     def test_create_results_dict(self, mock_settings):
@@ -395,3 +397,131 @@ class TestIssueWorker:
         assert result["error"] == "Test error"
         assert result["repositories_with_errors"] == 1
         assert result["repositories_processed"] == 0
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    def test_push_failure_calls_on_task_failure(
+        self,
+        mock_cli,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_create_branch,
+        mock_checkout,
+    ):
+        """Test that push failure calls on_task_failure."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_current_branch.return_value = "ai/task-1"
+        mock_push.return_value = (False, "Push rejected")
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": True,
+            "loops_executed": 1,
+            "steps_completed": 3,
+            "total_steps": 3,
+        }
+        result = worker.run(Path("/tmp"))
+        assert result["tasks_processed"] == 0
+        assert "Failed to push" in result["task_results"][0]["error"]
+        assert task_source.on_task_failure_called is True
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_exception_calls_on_task_failure(self, mock_settings, mock_create_branch, mock_checkout):
+        """Test that unexpected exceptions call on_task_failure."""
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.side_effect = Exception("Unexpected error")
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        result = worker.run(Path("/tmp"))
+        assert result["tasks_processed"] == 0
+        assert result["task_results"][0]["error"] == "Unexpected error"
+        assert task_source.on_task_failure_called is True
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    def test_pr_creation_failure_calls_on_task_failure(
+        self,
+        mock_cli,
+        mock_execute,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_create_branch,
+        mock_checkout,
+    ):
+        """Test that PR creation failure calls on_task_failure."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_execute.return_value = {"success": True}
+        mock_current_branch.return_value = "ai/task-1"
+        mock_push.return_value = (True, "")
+        mock_get_pr.return_value = None
+        mock_create_pr.return_value = None
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        result = worker.run(Path("/tmp"))
+        assert result["tasks_processed"] == 0
+        assert result["task_results"][0]["success"] is False
+        assert task_source.on_task_failure_called is True
+        assert task_source.on_task_complete_called is False
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    def test_empty_pr_url_calls_on_task_failure(
+        self,
+        mock_cli,
+        mock_execute,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_create_branch,
+        mock_checkout,
+    ):
+        """Test that empty PR URL prevents marking task as complete."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_execute.return_value = {"success": True}
+        mock_current_branch.return_value = "ai/task-1"
+        mock_push.return_value = (True, "")
+        mock_get_pr.return_value = {"state": "OPEN", "url": ""}
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        result = worker.run(Path("/tmp"))
+        assert result["task_results"][0]["success"] is False
+        assert "no PR URL available" in result["task_results"][0]["error"]
+        assert task_source.on_task_failure_called is True
+        assert task_source.on_task_complete_called is False

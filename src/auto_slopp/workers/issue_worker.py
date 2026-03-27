@@ -266,7 +266,9 @@ class IssueWorker(Worker):
 
                 if not openagent_result["success"]:
                     cli_tool = get_active_cli_command()
-                    result["error"] = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
+                    error_msg = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
+                    result["error"] = error_msg
+                    self.task_source.on_task_failure(task, error_msg)
                     return result
 
             current_branch = get_current_branch(repo_dir)
@@ -284,7 +286,9 @@ class IssueWorker(Worker):
             if settings.ralph_enabled:
                 push_success, push_message = push_to_remote(repo_dir, remote="origin", branch=current_branch)
                 if not push_success:
-                    result["error"] = f"Failed to push branch '{current_branch}': {push_message}"
+                    error_msg = f"Failed to push branch '{current_branch}': {push_message}"
+                    result["error"] = error_msg
+                    self.task_source.on_task_failure(task, error_msg)
                     return result
 
                 pr_body = self._generate_pr_body_from_task_file(
@@ -330,6 +334,12 @@ class IssueWorker(Worker):
                         return result
 
             pr_url = result.get("pr_url", "")
+            if not pr_url:
+                error_msg = f"Task processed but no PR URL available for branch '{current_branch}'"
+                result["error"] = error_msg
+                self.task_source.on_task_failure(task, error_msg)
+                return result
+
             self.task_source.on_task_complete(task, current_branch, pr_url)
             result["task_completed"] = True
             result["tasks_completed"] = 1
@@ -339,6 +349,7 @@ class IssueWorker(Worker):
         except Exception as e:
             self.logger.error(f"Error processing task #{task_id}: {str(e)}")
             result["error"] = str(e)
+            self.task_source.on_task_failure(task, str(e))
 
         return result
 
