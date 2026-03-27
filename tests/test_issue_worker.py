@@ -28,9 +28,6 @@ class MockTaskSource(TaskSource):
     def get_ralph_file_prefix(self) -> str:
         return "test"
 
-    def get_task_difficulty_name(self) -> str:
-        return "test_task"
-
     def get_default_pr_body(self, task: Task) -> str:
         return f"PR for {task.title}"
 

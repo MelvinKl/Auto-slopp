@@ -260,12 +260,6 @@ class TestGitHubTaskSource:
 
         assert task_source.get_ralph_file_prefix() == "github"
 
-    def test_get_task_difficulty_name(self):
-        """Test that get_task_difficulty_name returns 'github_issue'."""
-        task_source = GitHubTaskSource()
-
-        assert task_source.get_task_difficulty_name() == "github_issue"
-
     def test_get_default_pr_body(self):
         """Test that get_default_pr_body returns correct format."""
         task_source = GitHubTaskSource()
