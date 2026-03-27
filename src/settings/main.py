@@ -232,9 +232,11 @@ class Settings(BaseSettings):
 
     task_difficulties: Dict[str, TaskRating] = Field(
         default={
-            "task_planning": TaskRating(min_rating=5, max_rating=10, recommended_rating=8),
+            "task_planning": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
             "implementation": TaskRating(min_rating=7, max_rating=10, recommended_rating=10),
-            "task_validation": TaskRating(min_rating=5, max_rating=10, recommended_rating=8),
+            "task_implementation_validation": TaskRating(min_rating=0, max_rating=10, recommended_rating=7),
+            "remaining_steps_update": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
+            "pr_description": TaskRating(min_rating=0, max_rating=10, recommended_rating=3),
             "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
             "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2),
             "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
