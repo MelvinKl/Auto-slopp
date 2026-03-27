@@ -15,8 +15,8 @@ class TestSettings:
 
     def test_default_settings_values(self):
         """Test that default settings values are correctly set when no env vars are set."""
-        env_vars_to_keep = {k: v for k, v in os.environ.items() if not k.startswith("AUTO_SLOPP_")}
-        with patch.dict(os.environ, env_vars_to_keep, clear=True):
+        # Clear all environment variables and prevent loading the real .env file
+        with patch.dict(os.environ, {}, clear=True):
             with patch("dotenv.load_dotenv", return_value=None):
                 test_settings = Settings()
 
@@ -26,7 +26,10 @@ class TestSettings:
         assert test_settings.telegram_enabled is False
         assert test_settings.telegram_bot_token is None
         assert test_settings.telegram_chat_id is None
-        assert test_settings.telegram_api_url == "https://api.telegram.org/bot{token}/sendMessage"
+        assert (
+            test_settings.telegram_api_url
+            == "https://api.telegram.org/bot{token}/sendMessage"
+        )
         assert test_settings.telegram_timeout == 30.0
         assert test_settings.telegram_retry_attempts == 3
         assert test_settings.telegram_retry_delay == 1.0
@@ -36,7 +39,9 @@ class TestSettings:
 
     def test_telegram_api_url_template(self):
         """Test that telegram_api_url contains token placeholder."""
-        env_vars_to_clear = {k: v for k, v in os.environ.items() if k.startswith("AUTO_SLOPP_")}
+        env_vars_to_clear = {
+            k: v for k, v in os.environ.items() if k.startswith("AUTO_SLOPP_")
+        }
         with patch.dict(os.environ, env_vars_to_clear, clear=True):
             with patch("dotenv.load_dotenv", return_value=None):
                 test_settings = Settings()
@@ -65,7 +70,9 @@ class TestSettings:
 
     def test_optional_telegram_fields(self):
         """Test optional telegram fields use configured values."""
-        env_vars_to_keep = {k: v for k, v in os.environ.items() if not k.startswith("AUTO_SLOPP_")}
+        env_vars_to_keep = {
+            k: v for k, v in os.environ.items() if not k.startswith("AUTO_SLOPP_")
+        }
         with patch.dict(os.environ, env_vars_to_keep, clear=True):
             with patch("dotenv.load_dotenv", return_value=None):
                 test_settings = Settings()
