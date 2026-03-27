@@ -230,7 +230,10 @@ class RalphExecutor:
         commit_fn: Callable[[Path, str, bool], Tuple[bool, Optional[bool]]],
         max_iterations: int,
         file_prefix: str = "github",
-        task_name: str = "github_issue",
+        task_planning_name: str = "task_planning",
+        implementation_name: str = "implementation",
+        validation_name: str = "task_implementation_validation",
+        remaining_steps_update_name: str = "remaining_steps_update",
     ):
         """Initialize the RalphExecutor.
 
@@ -245,7 +248,10 @@ class RalphExecutor:
                 Signature: ``(repo_dir, commit_message, push_if_remote) -> (commit_ok, push_ok)``.
             max_iterations: Maximum number of iterations for the task loop.
             file_prefix: Prefix for task file naming (default: "github").
-            task_name: Task name for CLI executor mapping (default: "github_issue").
+            task_planning_name: Task difficulty name for planning/refinement phase.
+            implementation_name: Task difficulty name for step implementation phase.
+            validation_name: Task difficulty name for acceptance validation phase.
+            remaining_steps_update_name: Task difficulty name for updating remaining steps.
         """
         self.logger = logger
         self.agent_args = agent_args
@@ -255,7 +261,10 @@ class RalphExecutor:
         self.commit_fn = commit_fn
         self.max_iterations = max_iterations
         self.file_prefix = file_prefix
-        self.task_name = task_name
+        self.task_planning_name = task_planning_name
+        self.implementation_name = implementation_name
+        self.validation_name = validation_name
+        self.remaining_steps_update_name = remaining_steps_update_name
 
     def _get_issue_task_path(self, repo_dir: Path, issue_number: int) -> Path:
         """Get the canonical task file path for a task."""
@@ -339,7 +348,7 @@ class RalphExecutor:
             repo_dir,
             self.agent_args,
             self.timeout,
-            task_name=self.task_name,
+            task_name=self.task_planning_name,
         )
 
         if not result.get("success", False):
@@ -386,7 +395,7 @@ class RalphExecutor:
             repo_dir,
             self.agent_args,
             self.timeout,
-            task_name=self.task_name,
+            task_name=self.task_planning_name,
         )
 
         if not result.get("success", False):
@@ -480,7 +489,7 @@ class RalphExecutor:
             repo_dir,
             self.agent_args,
             self.timeout,
-            task_name=self.task_name,
+            task_name=self.implementation_name,
         )
 
         if result.get("success", False):
@@ -525,7 +534,7 @@ class RalphExecutor:
             repo_dir,
             self.agent_args,
             self.timeout,
-            task_name=self.task_name,
+            task_name=self.validation_name,
         )
 
         if not result.get("success", False):
@@ -578,7 +587,7 @@ class RalphExecutor:
             repo_dir,
             self.agent_args,
             self.timeout,
-            task_name=self.task_name,
+            task_name=self.remaining_steps_update_name,
         )
         if not result.get("success", False):
             return {

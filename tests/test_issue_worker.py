@@ -28,9 +28,6 @@ class MockTaskSource(TaskSource):
     def get_ralph_file_prefix(self) -> str:
         return "test"
 
-    def get_task_difficulty_name(self) -> str:
-        return "test_task"
-
     def get_default_pr_body(self, task: Task) -> str:
         return f"PR for {task.title}"
 
@@ -85,7 +82,6 @@ class TestIssueWorker:
         worker = IssueWorker(task_source=task_source)
         assert worker.ralph_executor is not None
         assert worker.ralph_executor.file_prefix == "test"
-        assert worker.ralph_executor.task_name == "test_task"
 
     def test_run_with_nonexistent_path(self):
         """Test that run handles non-existent repository path."""

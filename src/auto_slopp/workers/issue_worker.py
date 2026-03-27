@@ -72,7 +72,10 @@ class IssueWorker(Worker):
             commit_fn=commit_and_push_changes,
             max_iterations=max_iterations,
             file_prefix=task_source.get_ralph_file_prefix(),
-            task_name=task_source.get_task_difficulty_name(),
+            task_planning_name="task_planning",
+            implementation_name="implementation",
+            validation_name="task_implementation_validation",
+            remaining_steps_update_name="remaining_steps_update",
         )
 
     def run(self, repo_path: Path) -> Dict[str, Any]:
@@ -248,13 +251,12 @@ class IssueWorker(Worker):
             else:
                 instructions = self._build_instructions(task_title, task_body, task.comments, branch_name=branch_name)
 
-                task_difficulty_name = self.task_source.get_task_difficulty_name()
                 openagent_result = execute_with_instructions(
                     instructions,
                     repo_dir,
                     self.agent_args,
                     self.timeout,
-                    task_name=task_difficulty_name,
+                    task_name="implementation",
                 )
                 result["openagent_executed"] = openagent_result["success"]
                 if openagent_result["success"]:
@@ -417,13 +419,12 @@ Plan:
             task_content=task_content,
         )
 
-        task_difficulty_name = self.task_source.get_task_difficulty_name()
         result = execute_with_instructions(
             instructions,
             repo_dir,
             self.agent_args,
             self.timeout,
-            task_name=task_difficulty_name,
+            task_name="pr_description",
         )
         if not result.get("success", False):
             return default_body

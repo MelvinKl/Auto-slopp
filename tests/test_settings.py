@@ -212,3 +212,17 @@ class TestSettings:
         with patch.dict(os.environ, env_vars, clear=True):
             with pytest.raises(ValidationError):
                 Settings()
+
+    def test_task_difficulties_keys(self):
+        """Test that task_difficulties contains all expected phase-based keys."""
+        test_settings = Settings()
+        assert set(test_settings.task_difficulties.keys()) == {
+            "task_planning",
+            "implementation",
+            "task_implementation_validation",
+            "remaining_steps_update",
+            "pr_description",
+            "pr_review",
+            "git_checkout",
+            "default",
+        }

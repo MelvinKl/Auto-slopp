@@ -21,9 +21,6 @@ class ConcreteTaskSource(TaskSource):
     def get_ralph_file_prefix(self) -> str:
         return "test"
 
-    def get_task_difficulty_name(self) -> str:
-        return "test_task"
-
     def get_default_pr_body(self, task: Task) -> str:
         return f"PR for {task.title}"
 
@@ -98,10 +95,6 @@ class TestTaskSource:
     def test_get_ralph_file_prefix(self):
         source = ConcreteTaskSource()
         assert source.get_ralph_file_prefix() == "test"
-
-    def test_get_task_difficulty_name(self):
-        source = ConcreteTaskSource()
-        assert source.get_task_difficulty_name() == "test_task"
 
     def test_get_default_pr_body(self):
         source = ConcreteTaskSource()
@@ -242,11 +235,6 @@ class TestGitHubTaskSource:
         """Test that get_ralph_file_prefix returns 'github'."""
         source = GitHubTaskSource()
         assert source.get_ralph_file_prefix() == "github"
-
-    def test_get_task_difficulty_name(self):
-        """Test that get_task_difficulty_name returns 'github_issue'."""
-        source = GitHubTaskSource()
-        assert source.get_task_difficulty_name() == "github_issue"
 
     def test_get_default_pr_body(self):
         """Test that get_default_pr_body generates correct PR body."""
@@ -417,11 +405,6 @@ class TestVikunjaTaskSource:
         """Test that get_ralph_file_prefix returns 'vikunja'."""
         source = VikunjaTaskSource()
         assert source.get_ralph_file_prefix() == "vikunja"
-
-    def test_get_task_difficulty_name(self):
-        """Test that get_task_difficulty_name returns 'vikunja_task'."""
-        source = VikunjaTaskSource()
-        assert source.get_task_difficulty_name() == "vikunja_task"
 
     def test_get_default_pr_body(self):
         """Test that get_default_pr_body generates correct PR body."""

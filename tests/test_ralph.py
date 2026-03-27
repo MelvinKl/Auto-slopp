@@ -299,7 +299,6 @@ class TestRalphExecutor:
             commit_fn=mock_commit_fn,
             max_iterations=10,
             file_prefix="github",
-            task_name="github_issue",
         )
 
     def test_initialization(self, ralph_executor, logger):
@@ -321,7 +320,6 @@ class TestRalphExecutor:
             commit_fn=lambda x, y, z: (True, True),
             max_iterations=5,
             file_prefix="github",
-            task_name="github_issue",
         )
         task_path = ralph_executor._get_issue_task_path(repo_dir, 123)
         expected = Path("/test/repo/.ralph/github-123.md")
@@ -340,7 +338,6 @@ class TestRalphExecutor:
             commit_fn=lambda x, y, z: (True, True),
             max_iterations=5,
             file_prefix="github",
-            task_name="github_issue",
         )
         github_path = github_executor._get_issue_task_path(repo_dir, 123)
         assert github_path == Path("/test/repo/.ralph/github-123.md")
@@ -354,14 +351,13 @@ class TestRalphExecutor:
             commit_fn=lambda x, y, z: (True, True),
             max_iterations=5,
             file_prefix="vikunja",
-            task_name="vikunja_task",
         )
         vikunja_path = vikunja_executor._get_issue_task_path(repo_dir, 456)
         assert vikunja_path == Path("/test/repo/.ralph/vikunja-456.md")
 
-    def test_configurable_task_name(self):
-        """Test that task_name configures task difficulty."""
-        github_executor = RalphExecutor(
+    def test_configurable_phase_names(self):
+        """Test that per-phase task difficulty names are configurable."""
+        executor = RalphExecutor(
             logger=logging.getLogger(__name__),
             agent_args=[],
             timeout=60,
@@ -370,11 +366,19 @@ class TestRalphExecutor:
             commit_fn=lambda x, y, z: (True, True),
             max_iterations=5,
             file_prefix="github",
-            task_name="github_issue",
+            task_planning_name="custom_planning",
+            implementation_name="custom_impl",
+            validation_name="custom_validation",
+            remaining_steps_update_name="custom_update",
         )
-        assert github_executor.task_name == "github_issue"
+        assert executor.task_planning_name == "custom_planning"
+        assert executor.implementation_name == "custom_impl"
+        assert executor.validation_name == "custom_validation"
+        assert executor.remaining_steps_update_name == "custom_update"
 
-        vikunja_executor = RalphExecutor(
+    def test_default_phase_names(self):
+        """Test that default phase names match settings keys."""
+        executor = RalphExecutor(
             logger=logging.getLogger(__name__),
             agent_args=[],
             timeout=60,
@@ -382,10 +386,190 @@ class TestRalphExecutor:
             has_changes_fn=lambda x: False,
             commit_fn=lambda x, y, z: (True, True),
             max_iterations=5,
-            file_prefix="vikunja",
-            task_name="vikunja_task",
         )
-        assert vikunja_executor.task_name == "vikunja_task"
+        assert executor.task_planning_name == "task_planning"
+        assert executor.implementation_name == "implementation"
+        assert executor.validation_name == "task_implementation_validation"
+        assert executor.remaining_steps_update_name == "remaining_steps_update"
+
+    def test_update_issue_task_file_uses_task_planning_name(self):
+        """Test that _update_issue_task_file passes task_planning_name as task_name."""
+        captured = []
+
+        def spy_execute_fn(*args, **kwargs):
+            captured.append(kwargs)
+            return {"success": True, "stdout": ""}
+
+        executor = RalphExecutor(
+            logger=logging.getLogger(__name__),
+            agent_args=[],
+            timeout=60,
+            execute_fn=spy_execute_fn,
+            has_changes_fn=lambda x: False,
+            commit_fn=lambda x, y, z: (True, True),
+            max_iterations=5,
+            file_prefix="github",
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / ".ralph" / "github-1.md"
+            task_path.parent.mkdir(parents=True, exist_ok=True)
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. Step\n")
+
+            executor._update_issue_task_file(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_number=1,
+                issue_title="Test",
+                issue_body="body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+        assert captured[0]["task_name"] == "task_planning"
+
+    def test_refine_issue_task_file_uses_task_planning_name(self):
+        """Test that _refine_issue_task_file passes task_planning_name as task_name."""
+        captured = []
+
+        def spy_execute_fn(*args, **kwargs):
+            captured.append(kwargs)
+            return {"success": True, "stdout": ""}
+
+        executor = RalphExecutor(
+            logger=logging.getLogger(__name__),
+            agent_args=[],
+            timeout=60,
+            execute_fn=spy_execute_fn,
+            has_changes_fn=lambda x: False,
+            commit_fn=lambda x, y, z: (True, True),
+            max_iterations=5,
+            file_prefix="github",
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / ".ralph" / "github-1.md"
+            task_path.parent.mkdir(parents=True, exist_ok=True)
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. Step\n")
+
+            executor._refine_issue_task_file(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test",
+                issue_body="body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+        assert captured[0]["task_name"] == "task_planning"
+
+    def test_execute_step_uses_implementation_name(self):
+        """Test that _execute_step passes implementation_name as task_name."""
+        captured = []
+
+        def spy_execute_fn(*args, **kwargs):
+            captured.append(kwargs)
+            return {"success": True, "stdout": ""}
+
+        executor = RalphExecutor(
+            logger=logging.getLogger(__name__),
+            agent_args=[],
+            timeout=60,
+            execute_fn=spy_execute_fn,
+            has_changes_fn=lambda x: False,
+            commit_fn=lambda x, y, z: (True, True),
+            max_iterations=5,
+            file_prefix="github",
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            step = Step(number=1, description="Test step", is_closed=False)
+            plan = Plan(title="Test", description="", steps=[step])
+
+            executor._execute_step(
+                step=step,
+                plan=plan,
+                repo_dir=repo_dir,
+                issue_title="Test",
+                issue_body="body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+        assert captured[0]["task_name"] == "implementation"
+
+    def test_execute_step_acceptance_check_uses_validation_name(self):
+        """Test that _execute_step_acceptance_check passes validation_name as task_name."""
+        captured = []
+
+        def spy_execute_fn(*args, **kwargs):
+            captured.append(kwargs)
+            return {"success": True, "stdout": "ACCEPTANCE_STATUS: pass"}
+
+        executor = RalphExecutor(
+            logger=logging.getLogger(__name__),
+            agent_args=[],
+            timeout=60,
+            execute_fn=spy_execute_fn,
+            has_changes_fn=lambda x: False,
+            commit_fn=lambda x, y, z: (True, True),
+            max_iterations=5,
+            file_prefix="github",
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. Step\n")
+
+            executor._execute_step_acceptance_check(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                step=Step(number=1, description="Step"),
+                issue_title="Test",
+                issue_body="body",
+                branch_name="ai/branch",
+            )
+
+        assert captured[0]["task_name"] == "task_implementation_validation"
+
+    def test_update_remaining_steps_uses_remaining_steps_update_name(self):
+        """Test that _update_remaining_steps passes remaining_steps_update_name as task_name."""
+        captured = []
+
+        def spy_execute_fn(*args, **kwargs):
+            captured.append(kwargs)
+            return {"success": True, "stdout": ""}
+
+        executor = RalphExecutor(
+            logger=logging.getLogger(__name__),
+            agent_args=[],
+            timeout=60,
+            execute_fn=spy_execute_fn,
+            has_changes_fn=lambda x: False,
+            commit_fn=lambda x, y, z: (True, True),
+            max_iterations=5,
+            file_prefix="github",
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. Step\n- [ ] 2. Other\n")
+
+            executor._update_remaining_steps(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                step=Step(number=1, description="Step"),
+                issue_title="Test",
+                issue_body="body",
+                branch_name="ai/branch",
+            )
+
+        assert captured[0]["task_name"] == "remaining_steps_update"
 
     def test_create_issue_task_file(self, ralph_executor):
         """Test creating an issue task file."""

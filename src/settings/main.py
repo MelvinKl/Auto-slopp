@@ -232,13 +232,16 @@ class Settings(BaseSettings):
 
     task_difficulties: Dict[str, TaskRating] = Field(
         default={
-            "github_issue": TaskRating(min_rating=7, max_rating=10, recommended_rating=10),
-            "vikunja_task": TaskRating(min_rating=5, max_rating=10, recommended_rating=8),
-            "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),  # fix tests
-            "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2),  # merge conflict
+            "task_planning": TaskRating(min_rating=0, max_rating=10, recommended_rating=6),
+            "implementation": TaskRating(min_rating=5, max_rating=10, recommended_rating=10),
+            "task_implementation_validation": TaskRating(min_rating=0, max_rating=10, recommended_rating=76,
+            "remaining_steps_update": TaskRating(min_rating=0, max_rating=10, recommended_rating=4),
+            "pr_description": TaskRating(min_rating=0, max_rating=10, recommended_rating=1),
+            "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
+            "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2),
             "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
         },
-        description="Difficulty ratings for various tasks (0-10)",
+        description="Difficulty ratings for various task phases (0-10)",
     )
 
     ralph_max_loops: int = Field(
