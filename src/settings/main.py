@@ -3,7 +3,6 @@
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from dotenv import load_dotenv
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
 
@@ -11,9 +10,15 @@ from pydantic_settings import BaseSettings
 class TaskRating(BaseModel):
     """Rating configuration for a task type."""
 
-    min_rating: int = Field(default=0, ge=0, le=10, description="Minimum capability required")
-    max_rating: int = Field(default=10, ge=0, le=10, description="Maximum capability to use")
-    recommended_rating: int = Field(default=5, ge=0, le=10, description="Preferred capability level")
+    min_rating: int = Field(
+        default=0, ge=0, le=10, description="Minimum capability required"
+    )
+    max_rating: int = Field(
+        default=10, ge=0, le=10, description="Maximum capability to use"
+    )
+    recommended_rating: int = Field(
+        default=5, ge=0, le=10, description="Preferred capability level"
+    )
 
 
 class CLIConfiguration(BaseModel):
@@ -77,25 +82,39 @@ class Settings(BaseSettings):
         description="Sleep interval between executor iterations in seconds",
     )
 
-    debug: bool = Field(default=False, description="Enable debug mode with verbose logging")
+    debug: bool = Field(
+        default=False, description="Enable debug mode with verbose logging"
+    )
 
     # Telegram logger settings
-    telegram_enabled: bool = Field(default=False, description="Enable Telegram logging integration")
+    telegram_enabled: bool = Field(
+        default=False, description="Enable Telegram logging integration"
+    )
 
-    telegram_bot_token: Optional[str] = Field(default=None, description="Telegram bot token for API authentication")
+    telegram_bot_token: Optional[str] = Field(
+        default=None, description="Telegram bot token for API authentication"
+    )
 
-    telegram_chat_id: Optional[str] = Field(default=None, description="Telegram chat ID to send messages to")
+    telegram_chat_id: Optional[str] = Field(
+        default=None, description="Telegram chat ID to send messages to"
+    )
 
     telegram_api_url: str = Field(
         default="https://api.telegram.org/bot{token}/sendMessage",
         description="Telegram API URL for sending messages",
     )
 
-    telegram_timeout: float = Field(default=30.0, description="Timeout for Telegram API requests in seconds")
+    telegram_timeout: float = Field(
+        default=30.0, description="Timeout for Telegram API requests in seconds"
+    )
 
-    telegram_retry_attempts: int = Field(default=3, description="Number of retry attempts for failed Telegram requests")
+    telegram_retry_attempts: int = Field(
+        default=3, description="Number of retry attempts for failed Telegram requests"
+    )
 
-    telegram_retry_delay: float = Field(default=1.0, description="Delay between retry attempts in seconds")
+    telegram_retry_delay: float = Field(
+        default=1.0, description="Delay between retry attempts in seconds"
+    )
 
     telegram_parse_mode: str = Field(
         default="HTML",
@@ -206,7 +225,8 @@ class Settings(BaseSettings):
             ),
         ],
         description=(
-            "Tiered CLI configurations ordered by preference. " "Lower index entries are preferred and used first."
+            "Tiered CLI configurations ordered by preference. "
+            "Lower index entries are preferred and used first."
         ),
     )
 
@@ -232,13 +252,25 @@ class Settings(BaseSettings):
 
     task_difficulties: Dict[str, TaskRating] = Field(
         default={
-            "task_planning": TaskRating(min_rating=0, max_rating=10, recommended_rating=6),
-            "implementation": TaskRating(min_rating=5, max_rating=10, recommended_rating=10),
-            "task_implementation_validation": TaskRating(min_rating=0, max_rating=10, recommended_rating=76,
-            "remaining_steps_update": TaskRating(min_rating=0, max_rating=10, recommended_rating=4),
-            "pr_description": TaskRating(min_rating=0, max_rating=10, recommended_rating=1),
+            "task_planning": TaskRating(
+                min_rating=0, max_rating=10, recommended_rating=6
+            ),
+            "implementation": TaskRating(
+                min_rating=5, max_rating=10, recommended_rating=10
+            ),
+            "task_implementation_validation": TaskRating(
+                min_rating=0, max_rating=10, recommended_rating=7
+            ),
+            "remaining_steps_update": TaskRating(
+                min_rating=0, max_rating=10, recommended_rating=4
+            ),
+            "pr_description": TaskRating(
+                min_rating=0, max_rating=10, recommended_rating=1
+            ),
             "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
-            "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2),
+            "git_checkout": TaskRating(
+                min_rating=0, max_rating=10, recommended_rating=2
+            ),
             "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
         },
         description="Difficulty ratings for various task phases (0-10)",
@@ -269,13 +301,9 @@ class Settings(BaseSettings):
 
     model_config = {
         "env_prefix": "AUTO_SLOPP_",
-        "env_file": ".env",
         "env_file_encoding": "utf-8",
     }
 
-
-# Load .env file automatically before creating settings instance
-load_dotenv(override=True)
 
 # Global settings instance
 settings = Settings()
