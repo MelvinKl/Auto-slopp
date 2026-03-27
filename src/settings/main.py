@@ -34,10 +34,7 @@ class CLIConfiguration(BaseModel):
     """Single CLI configuration entry for tiered failover."""
 
     cli_command: str = Field(
-        description=(
-            "CLI command to execute for automation tasks "
-            "(e.g., opencode, claude, gemini)"
-        ),
+        description=("CLI command to execute for automation tasks " "(e.g., opencode, claude, gemini)"),
     )
     cli_args: List[str] = Field(
         default_factory=list,
@@ -72,8 +69,7 @@ class Settings(BaseSettings):
 
     workers_disabled: List[str] = Field(
         default_factory=list,
-        description="List of disabled worker names. "
-        "Empty list means all workers are enabled.",
+        description="List of disabled worker names. " "Empty list means all workers are enabled.",
     )
 
     @field_validator(
@@ -95,22 +91,14 @@ class Settings(BaseSettings):
         description="Sleep interval between executor iterations in seconds",
     )
 
-    debug: bool = Field(
-        default=False, description="Enable debug mode with verbose logging"
-    )
+    debug: bool = Field(default=False, description="Enable debug mode with verbose logging")
 
     # Telegram logger settings
-    telegram_enabled: bool = Field(
-        default=False, description="Enable Telegram logging integration"
-    )
+    telegram_enabled: bool = Field(default=False, description="Enable Telegram logging integration")
 
-    telegram_bot_token: Optional[str] = Field(
-        default=None, description="Telegram bot token for API authentication"
-    )
+    telegram_bot_token: Optional[str] = Field(default=None, description="Telegram bot token for API authentication")
 
-    telegram_chat_id: Optional[str] = Field(
-        default=None, description="Telegram chat ID to send messages to"
-    )
+    telegram_chat_id: Optional[str] = Field(default=None, description="Telegram chat ID to send messages to")
 
     telegram_api_url: str = Field(
         default="https://api.telegram.org/bot{token}/sendMessage",
@@ -127,9 +115,7 @@ class Settings(BaseSettings):
         description="Number of retry attempts for failed Telegram requests",
     )
 
-    telegram_retry_delay: float = Field(
-        default=1.0, description="Delay between retry attempts in seconds"
-    )
+    telegram_retry_delay: float = Field(default=1.0, description="Delay between retry attempts in seconds")
 
     telegram_parse_mode: str = Field(
         default="HTML",
@@ -239,9 +225,7 @@ class Settings(BaseSettings):
                 name="opencode glm-4.7-flash",
             ),
         ],
-        description=(
-            "List of disabled worker names. Empty list means all workers are enabled."
-        ),
+        description=("List of disabled worker names. Empty list means all workers are enabled."),
     )
 
     slop_timeout: int = Field(
@@ -266,25 +250,13 @@ class Settings(BaseSettings):
 
     task_difficulties: Dict[str, TaskRating] = Field(
         default={
-            "task_planning": TaskRating(
-                min_rating=0, max_rating=10, recommended_rating=6
-            ),
-            "implementation": TaskRating(
-                min_rating=5, max_rating=10, recommended_rating=10
-            ),
-            "task_implementation_validation": TaskRating(
-                min_rating=0, max_rating=10, recommended_rating=7
-            ),
-            "remaining_steps_update": TaskRating(
-                min_rating=0, max_rating=10, recommended_rating=4
-            ),
-            "pr_description": TaskRating(
-                min_rating=0, max_rating=10, recommended_rating=1
-            ),
+            "task_planning": TaskRating(min_rating=0, max_rating=10, recommended_rating=6),
+            "implementation": TaskRating(min_rating=5, max_rating=10, recommended_rating=10),
+            "task_implementation_validation": TaskRating(min_rating=0, max_rating=10, recommended_rating=7),
+            "remaining_steps_update": TaskRating(min_rating=0, max_rating=10, recommended_rating=4),
+            "pr_description": TaskRating(min_rating=0, max_rating=10, recommended_rating=1),
             "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
-            "git_checkout": TaskRating(
-                min_rating=0, max_rating=10, recommended_rating=2
-            ),
+            "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2),
             "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
         },
         description="Difficulty ratings for various task phases (0-10)",
