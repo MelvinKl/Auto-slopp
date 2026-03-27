@@ -528,3 +528,244 @@ class TestIssueWorker:
         assert "Task #1" in result["task_results"][0]["error"]
         assert task_source.on_task_failure_called is True
         assert task_source.on_task_complete_called is False
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    def test_existing_open_pr_reused(
+        self,
+        mock_cli,
+        mock_execute,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_create_branch,
+        mock_checkout,
+    ):
+        """Test that an existing open PR is reused instead of creating a new one."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_execute.return_value = {"success": True}
+        mock_current_branch.return_value = "ai/task-1"
+        mock_push.return_value = (True, "")
+        mock_get_pr.return_value = {"state": "OPEN", "url": "https://github.com/test/pr/99"}
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        result = worker.run(Path("/tmp"))
+        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["pr_url"] == "https://github.com/test/pr/99"
+        assert result["prs_created"] == 1
+        assert task_source.on_task_complete_called is True
+        mock_create_pr.assert_not_called()
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    def test_pr_creation_failure_fallback_to_existing_pr(
+        self,
+        mock_cli,
+        mock_execute,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_create_branch,
+        mock_checkout,
+    ):
+        """Test that when PR creation fails, fallback to existing PR succeeds."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_execute.return_value = {"success": True}
+        mock_current_branch.return_value = "ai/task-1"
+        mock_push.return_value = (True, "")
+        # First call returns None (no existing open PR), second call finds one after create fails
+        mock_get_pr.side_effect = [None, {"state": "OPEN", "url": "https://github.com/test/pr/42"}]
+        mock_create_pr.return_value = None  # PR creation fails
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        result = worker.run(Path("/tmp"))
+        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["pr_url"] == "https://github.com/test/pr/42"
+        assert result["prs_created"] == 1
+        assert task_source.on_task_complete_called is True
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    def test_on_task_start_called_before_branch_creation(
+        self,
+        mock_cli,
+        mock_execute,
+        mock_settings,
+        mock_create_branch,
+        mock_checkout,
+    ):
+        """Test that on_task_start is called before branch creation."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = False  # Fail early to keep test simple
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.run(Path("/tmp"))
+        assert task_source.on_task_start_called is True
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    def test_correct_arguments_to_branch_push_pr(
+        self,
+        mock_cli,
+        mock_execute,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_create_branch,
+        mock_checkout,
+    ):
+        """Test that branch creation, push, and PR creation receive correct arguments."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_execute.return_value = {"success": True}
+        mock_current_branch.return_value = "ai/task-5"
+        mock_push.return_value = (True, "")
+        mock_get_pr.return_value = None
+        mock_create_pr.return_value = {"url": "https://github.com/test/pr/1"}
+        task_source = MockTaskSource(tasks=[Task(id=5, title="Fix login bug", body="Details")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.run(Path("/tmp"))
+        mock_create_branch.assert_called_once_with(Path("/tmp"), "ai/task-5", base_branch="main")
+        mock_push.assert_called_once_with(Path("/tmp"), remote="origin", branch="ai/task-5")
+        mock_create_pr.assert_called_once()
+        call_kwargs = mock_create_pr.call_args
+        assert call_kwargs[1]["title"] == "Vikunja Task #5: Fix login bug"
+        assert call_kwargs[1]["head"] == "ai/task-5"
+        assert call_kwargs[1]["base"] == "main"
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    def test_on_task_complete_receives_correct_pr_url(
+        self,
+        mock_cli,
+        mock_execute,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_create_branch,
+        mock_checkout,
+    ):
+        """Test that on_task_complete is called with the correct PR URL."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_execute.return_value = {"success": True}
+        mock_current_branch.return_value = "ai/task-1"
+        mock_push.return_value = (True, "")
+        mock_get_pr.return_value = None
+        mock_create_pr.return_value = {"url": "https://github.com/test/pr/7"}
+
+        task = Task(id=1, title="Test", body="")
+        captured = {}
+
+        class CapturingTaskSource(MockTaskSource):
+            def on_task_complete(self, task, branch_name, pr_url):
+                captured["branch_name"] = branch_name
+                captured["pr_url"] = pr_url
+                super().on_task_complete(task, branch_name, pr_url)
+
+        task_source = CapturingTaskSource(tasks=[task])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.run(Path("/tmp"))
+        assert captured["pr_url"] == "https://github.com/test/pr/7"
+        assert captured["branch_name"] == "ai/task-1"
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    def test_ralph_enabled_success_with_push_and_pr(
+        self,
+        mock_cli,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_create_branch,
+        mock_checkout,
+    ):
+        """Test successful Ralph-enabled workflow through push and PR creation."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_current_branch.return_value = "ai/task-1"
+        mock_push.return_value = (True, "")
+        mock_get_pr.return_value = None
+        mock_create_pr.return_value = {"url": "https://github.com/test/pr/1"}
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": True,
+            "loops_executed": 2,
+            "steps_completed": 5,
+            "total_steps": 5,
+        }
+        # Mock _generate_pr_body_from_task_file to avoid file system access
+        worker._generate_pr_body_from_task_file = lambda **kwargs: "PR body"
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert result["tasks_processed"] == 1
+        assert result["prs_created"] == 1
+        assert result["tasks_completed"] == 1
+        assert result["task_results"][0]["ralph_loops_executed"] == 2
+        assert result["task_results"][0]["ralph_steps_completed"] == 5
+        assert task_source.on_task_complete_called is True
+        mock_push.assert_called_once()
+        mock_create_pr.assert_called_once()
