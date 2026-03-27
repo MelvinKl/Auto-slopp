@@ -217,7 +217,9 @@ class IssueWorker(Worker):
 
             branch_created = create_and_checkout_branch(repo_dir, branch_name, base_branch="main")
             if not branch_created:
-                result["error"] = f"Failed to create branch {branch_name}"
+                error_msg = f"Failed to create branch {branch_name}"
+                result["error"] = error_msg
+                self.task_source.on_task_failure(task, error_msg)
                 return result
 
             if settings.ralph_enabled:
@@ -322,7 +324,9 @@ class IssueWorker(Worker):
                             f"Using existing PR for branch '{current_branch}': {existing_pr.get('url', 'N/A')}"
                         )
                     else:
-                        result["error"] = "Failed to create pull request"
+                        error_msg = "Failed to create pull request"
+                        result["error"] = error_msg
+                        self.task_source.on_task_failure(task, error_msg)
                         return result
 
             pr_url = result.get("pr_url", "")
