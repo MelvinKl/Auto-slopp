@@ -86,6 +86,8 @@ class Executor:
         Returns:
             Instantiated worker instance
         """
+        if worker_class is StaleBranchCleanupWorker:
+            return worker_class(days_threshold=settings.stale_branch_days_threshold)
         return worker_class()
 
     def _execute_worker(self, worker_class: Type[Worker]) -> None:

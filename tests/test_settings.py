@@ -213,6 +213,43 @@ class TestSettings:
             with pytest.raises(ValidationError):
                 Settings()
 
+    def test_stale_branch_days_threshold_default(self):
+        """Test default stale_branch_days_threshold value."""
+        test_settings = Settings()
+        assert test_settings.stale_branch_days_threshold == 1
+
+    def test_stale_branch_days_threshold_custom(self):
+        """Test that stale_branch_days_threshold can be customized."""
+        env_vars = {
+            "AUTO_SLOPP_STALE_BRANCH_DAYS_THRESHOLD": "7",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            test_settings = Settings()
+
+        assert test_settings.stale_branch_days_threshold == 7
+
+    def test_stale_branch_days_threshold_validation(self):
+        """Test that stale_branch_days_threshold must be non-negative."""
+        env_vars = {
+            "AUTO_SLOPP_STALE_BRANCH_DAYS_THRESHOLD": "-1",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            with pytest.raises(ValidationError):
+                Settings()
+
+    def test_stale_branch_days_threshold_zero(self):
+        """Test that stale_branch_days_threshold can be set to zero."""
+        env_vars = {
+            "AUTO_SLOPP_STALE_BRANCH_DAYS_THRESHOLD": "0",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            test_settings = Settings()
+
+        assert test_settings.stale_branch_days_threshold == 0
+
     def test_task_difficulties_keys(self):
         """Test that task_difficulties contains all expected phase-based keys."""
         test_settings = Settings()
