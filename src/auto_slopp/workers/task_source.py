@@ -61,14 +61,6 @@ class TaskSource(ABC):
         """
 
     @abstractmethod
-    def get_task_difficulty_name(self) -> str:
-        """Return the task difficulty name for CLI executor mapping.
-
-        Returns:
-            Task name string matching settings.task_difficulties keys
-        """
-
-    @abstractmethod
     def get_default_pr_body(self, task: Task) -> str:
         """Generate the default PR body for a task.
 

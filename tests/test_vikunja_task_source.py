@@ -235,12 +235,6 @@ class TestVikunjaTaskSource:
 
         assert task_source.get_ralph_file_prefix() == "vikunja"
 
-    def test_get_task_difficulty_name(self):
-        """Test that get_task_difficulty_name returns 'vikunja_task'."""
-        task_source = VikunjaTaskSource()
-
-        assert task_source.get_task_difficulty_name() == "vikunja_task"
-
     def test_get_default_pr_body(self):
         """Test that get_default_pr_body returns correct format."""
         task_source = VikunjaTaskSource()

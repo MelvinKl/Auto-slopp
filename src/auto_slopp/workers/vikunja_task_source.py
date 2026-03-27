@@ -106,14 +106,6 @@ class VikunjaTaskSource(TaskSource):
         """
         return "vikunja"
 
-    def get_task_difficulty_name(self) -> str:
-        """Return the task difficulty name for CLI executor mapping.
-
-        Returns:
-            Task name string 'vikunja_task' matching settings.task_difficulties keys
-        """
-        return "vikunja_task"
-
     def get_default_pr_body(self, task: Task) -> str:
         """Generate the default PR body for a Vikunja task.
 

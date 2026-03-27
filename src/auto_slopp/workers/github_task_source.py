@@ -86,14 +86,6 @@ class GitHubTaskSource(TaskSource):
         """
         return "github"
 
-    def get_task_difficulty_name(self) -> str:
-        """Return the task difficulty name for CLI executor mapping.
-
-        Returns:
-            Task name string 'github_issue' matching settings.task_difficulties keys
-        """
-        return "github_issue"
-
     def get_default_pr_body(self, task: Task) -> str:
         """Generate the default PR body for a GitHub issue.
 
