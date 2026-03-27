@@ -217,3 +217,15 @@ class TestStaleBranchCleanupWorker:
         stale = worker._identify_stale_branches(local_branches, remote_branches)
 
         assert len(stale) == 0
+
+    def test_worker_uses_settings_threshold(self):
+        """Test that executor passes settings threshold to worker."""
+        from auto_slopp.executor import Executor
+
+        with patch("auto_slopp.executor.settings") as mock_settings:
+            mock_settings.stale_branch_days_threshold = 14
+            mock_settings.workers_disabled = []
+            executor = Executor.__new__(Executor)
+            worker = executor._instantiate_worker(StaleBranchCleanupWorker)
+
+        assert worker.days_threshold == 14
