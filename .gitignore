@@ -201,3 +201,28 @@ credentials.*
 
 # Ralph plan files
 .ralph/
+
+# AI/LLM tool artifacts
+.ralph/
+.cursor/
+.cursorrules
+.cursorignore
+.copilot/
+.github/copilot-instructions.md
+.aider*
+.continue/
+.codeium/
+.tabnine/
+.beads/
+beads/
+Agents.md
+AGENTS.md
+opencode.json
+.opencode/
+.claude/
+CLAUDE.md
+claude.md
+.windsurf/
+.windsurfrules
+codex.md
+.codex/
