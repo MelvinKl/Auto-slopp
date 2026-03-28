@@ -257,9 +257,10 @@ class TestGitHubTaskSource:
         pr_body = source.get_default_pr_body(task)
         assert pr_body == "Closes #42\n\nThis is the issue body"
 
+    @patch("auto_slopp.workers.github_task_source.commit")
     @patch("auto_slopp.workers.github_task_source.close_issue")
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
-    def test_on_task_complete_closes_issue_and_adds_comment(self, mock_comment, mock_close):
+    def test_on_task_complete_closes_issue_and_adds_comment(self, mock_comment, mock_close, mock_commit):
         """Test that on_task_complete closes issue and adds PR comment."""
         mock_close.return_value = True
         mock_comment.return_value = True
@@ -269,9 +270,10 @@ class TestGitHubTaskSource:
         mock_close.assert_called_once_with("/tmp", 42)
         mock_comment.assert_called_once_with("/tmp", 42, "Completed by PR: https://github.com/test/pr/1")
 
+    @patch("auto_slopp.workers.github_task_source.commit")
     @patch("auto_slopp.workers.github_task_source.close_issue")
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
-    def test_on_no_changes_closes_issue_with_comment(self, mock_comment, mock_close):
+    def test_on_no_changes_closes_issue_with_comment(self, mock_comment, mock_close, mock_commit):
         """Test that on_no_changes closes issue with no-changes comment."""
         source = GitHubTaskSource()
         task = Task(id=42, title="Test", body="", raw={"_repo_path": "/tmp"})
@@ -279,10 +281,13 @@ class TestGitHubTaskSource:
         mock_comment.assert_called_once()
         mock_close.assert_called_once_with("/tmp", 42)
 
+    @patch("auto_slopp.workers.github_task_source.commit")
     @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
     @patch("auto_slopp.workers.github_task_source.settings")
-    def test_on_max_iterations_reached_removes_label_and_comments(self, mock_settings, mock_comment, mock_remove_label):
+    def test_on_max_iterations_reached_removes_label_and_comments(
+        self, mock_settings, mock_comment, mock_remove_label, mock_commit
+    ):
         """Test that on_max_iterations_reached removes label and adds failure comment."""
         mock_settings.github_issue_worker_required_label = "ai"
         mock_remove_label.return_value = True
@@ -434,10 +439,13 @@ class TestVikunjaTaskSource:
         assert "Vikunja Task #42: Fix Bug" in pr_body
         assert "This is the task body" in pr_body
 
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.analyze_task")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_on_task_start_updates_status_and_adds_comment(self, mock_comment, mock_analyze, mock_update_status):
+    def test_on_task_start_updates_status_and_adds_comment(
+        self, mock_comment, mock_analyze, mock_update_status, mock_commit
+    ):
         """Test that on_task_start updates status and adds start comment."""
         mock_update_status.return_value = True
         mock_analyze.return_value = []
@@ -448,9 +456,10 @@ class TestVikunjaTaskSource:
         mock_comment.assert_called_once()
         mock_analyze.assert_called_once_with(42)
 
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_on_task_complete_updates_status_and_adds_comment(self, mock_comment, mock_update_status):
+    def test_on_task_complete_updates_status_and_adds_comment(self, mock_comment, mock_update_status, mock_commit):
         """Test that on_task_complete updates status and adds PR comment."""
         mock_update_status.return_value = True
         source = VikunjaTaskSource()
@@ -459,9 +468,10 @@ class TestVikunjaTaskSource:
         mock_update_status.assert_called_once_with(42, "done")
         mock_comment.assert_called_once()
 
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_on_task_failure_updates_status_and_adds_comment(self, mock_comment, mock_update_status):
+    def test_on_task_failure_updates_status_and_adds_comment(self, mock_comment, mock_update_status, mock_commit):
         """Test that on_task_failure updates status and adds failure comment."""
         mock_update_status.return_value = True
         source = VikunjaTaskSource()
@@ -470,9 +480,10 @@ class TestVikunjaTaskSource:
         mock_update_status.assert_called_once_with(42, "failed")
         mock_comment.assert_called_once()
 
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_on_no_changes_updates_status_and_adds_comment(self, mock_comment, mock_update_status):
+    def test_on_no_changes_updates_status_and_adds_comment(self, mock_comment, mock_update_status, mock_commit):
         """Test that on_no_changes updates status and adds no-changes comment."""
         mock_update_status.return_value = True
         source = VikunjaTaskSource()
@@ -481,9 +492,12 @@ class TestVikunjaTaskSource:
         mock_update_status.assert_called_once_with(42, "done")
         mock_comment.assert_called_once()
 
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_on_max_iterations_reached_updates_status_and_adds_comment(self, mock_comment, mock_update_status):
+    def test_on_max_iterations_reached_updates_status_and_adds_comment(
+        self, mock_comment, mock_update_status, mock_commit
+    ):
         """Test that on_max_iterations_reached updates status and adds failure comment."""
         mock_update_status.return_value = True
         source = VikunjaTaskSource()

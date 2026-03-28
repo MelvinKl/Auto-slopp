@@ -140,7 +140,7 @@ class VikunjaTaskSource(TaskSource):
             branch_name: The branch created for this task
         """
         update_task_status(task.id, "in_progress")
-        commit(task.raw.get("_repo_path"), f"Updated task status to 'in_progress'")
+        commit(task.raw.get("_repo_path"), "Updated task status to 'in_progress'")
 
         subtasks = analyze_task(task.id)
         if subtasks:
@@ -166,7 +166,7 @@ class VikunjaTaskSource(TaskSource):
         """
         status_success = update_task_status(task.id, "done")
         if status_success:
-            commit(task.raw.get("_repo_path"), f"Updated task status to 'done'")
+            commit(task.raw.get("_repo_path"), "Updated task status to 'done'")
 
         if status_success:
             pr_info = f"\n\n**Pull Request:** {pr_url}" if pr_url else ""
@@ -209,7 +209,7 @@ class VikunjaTaskSource(TaskSource):
 
         status_success = update_task_status(task.id, "failed")
         if status_success:
-            commit(task.raw.get("_repo_path"), f"Updated task status to 'failed'")
+            commit(task.raw.get("_repo_path"), "Updated task status to 'failed'")
         else:
             logger.warning(f"Failed to update status to 'failed' for task {task.id}")
 
@@ -235,7 +235,7 @@ class VikunjaTaskSource(TaskSource):
             logger.warning(f"Failed to add no-changes comment to task {task.id}")
         status_success = update_task_status(task.id, "done")
         if status_success:
-            commit(task.raw.get("_repo_path"), f"Updated task status to 'done'")
+            commit(task.raw.get("_repo_path"), "Updated task status to 'done'")
         else:
             logger.warning(f"Failed to update status for task {task.id}")
 
@@ -261,7 +261,7 @@ class VikunjaTaskSource(TaskSource):
         comment_on_task(task.id, failure_comment)
         commit(task.raw.get("_repo_path"), f"Added comment to task {task.id}")
         update_task_status(task.id, "failed")
-        commit(task.raw.get("_repo_path"), f"Updated task status to 'failed'")
+        commit(task.raw.get("_repo_path"), "Updated task status to 'failed'")
 
     def _filter_tasks_by_tag(self, tasks: List[dict], tag_name: str) -> List[dict]:
         """Filter tasks to only those whose labels contain a label with a matching title.

@@ -740,8 +740,10 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
     def test_vikunja_issue_worker_uses_correct_pr_title_format(
         self,
+        mock_commit,
         mock_cli,
         mock_execute,
         mock_get_pr,
