@@ -217,7 +217,10 @@ class IssueWorker(Worker):
 
             branch_created = create_and_checkout_branch(repo_dir, branch_name, base_branch="main")
             if not branch_created:
-                result["error"] = f"Failed to create branch {branch_name}"
+                error_msg = f"Failed to create branch '{branch_name}' for task #{task_id}"
+                self.logger.error(error_msg)
+                result["error"] = error_msg
+                self.task_source.on_task_failure(task, error_msg)
                 return result
 
             if settings.ralph_enabled:
@@ -264,7 +267,9 @@ class IssueWorker(Worker):
 
                 if not openagent_result["success"]:
                     cli_tool = get_active_cli_command()
-                    result["error"] = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
+                    error_msg = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
+                    result["error"] = error_msg
+                    self.task_source.on_task_failure(task, error_msg)
                     return result
 
             current_branch = get_current_branch(repo_dir)
@@ -279,12 +284,15 @@ class IssueWorker(Worker):
                 result["no_changes"] = True
                 return result
 
-            if settings.ralph_enabled:
-                push_success, push_message = push_to_remote(repo_dir, remote="origin", branch=current_branch)
-                if not push_success:
-                    result["error"] = f"Failed to push branch '{current_branch}': {push_message}"
-                    return result
+            push_success, push_message = push_to_remote(repo_dir, remote="origin", branch=current_branch)
+            if not push_success:
+                error_msg = f"Failed to push branch '{current_branch}' for task #{task_id}: {push_message}"
+                self.logger.error(error_msg)
+                result["error"] = error_msg
+                self.task_source.on_task_failure(task, error_msg)
+                return result
 
+            if settings.ralph_enabled:
                 pr_body = self._generate_pr_body_from_task_file(
                     repo_dir=repo_dir,
                     task=task,
@@ -301,7 +309,7 @@ class IssueWorker(Worker):
             else:
                 pr_result = create_pull_request(
                     repo_dir,
-                    title=task_title,
+                    title=f"Vikunja Task #{task.id}: {task_title}",
                     body=pr_body,
                     head=current_branch,
                     base="main",
@@ -322,10 +330,20 @@ class IssueWorker(Worker):
                             f"Using existing PR for branch '{current_branch}': {existing_pr.get('url', 'N/A')}"
                         )
                     else:
-                        result["error"] = "Failed to create pull request"
+                        error_msg = f"Failed to create pull request for task #{task_id} on branch '{current_branch}'"
+                        self.logger.error(error_msg)
+                        result["error"] = error_msg
+                        self.task_source.on_task_failure(task, error_msg)
                         return result
 
             pr_url = result.get("pr_url", "")
+            if not pr_url:
+                error_msg = f"Task #{task_id} processed but no PR URL available for branch '{current_branch}'"
+                self.logger.error(error_msg)
+                result["error"] = error_msg
+                self.task_source.on_task_failure(task, error_msg)
+                return result
+
             self.task_source.on_task_complete(task, current_branch, pr_url)
             result["task_completed"] = True
             result["tasks_completed"] = 1
@@ -335,6 +353,7 @@ class IssueWorker(Worker):
         except Exception as e:
             self.logger.error(f"Error processing task #{task_id}: {str(e)}")
             result["error"] = str(e)
+            self.task_source.on_task_failure(task, str(e))
 
         return result
 
