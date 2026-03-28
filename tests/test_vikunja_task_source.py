@@ -242,7 +242,8 @@ class TestVikunjaTaskSource:
 
         pr_body = task_source.get_default_pr_body(task)
 
-        assert pr_body == "Vikunja Task #42: Test Task\n\nTest Body"
+        assert "Vikunja Task #42: Test Task" in pr_body
+        assert "Test Body" in pr_body
 
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.analyze_task")

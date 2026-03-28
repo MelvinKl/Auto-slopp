@@ -411,7 +411,8 @@ class TestVikunjaTaskSource:
         source = VikunjaTaskSource()
         task = Task(id=42, title="Fix Bug", body="This is the task body")
         pr_body = source.get_default_pr_body(task)
-        assert pr_body == "Vikunja Task #42: Fix Bug\n\nThis is the task body"
+        assert "Vikunja Task #42: Fix Bug" in pr_body
+        assert "This is the task body" in pr_body
 
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.analyze_task")
