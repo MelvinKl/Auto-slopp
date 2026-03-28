@@ -264,6 +264,13 @@ class IssueWorker(Worker):
                 result["openagent_executed"] = openagent_result["success"]
                 if openagent_result["success"]:
                     result["openagent_executions"] = 1
+                    if has_changes(repo_dir):
+                        self.logger.info(f"Committing changes after execution for task #{task_id}")
+                        commit_and_push_changes(
+                            repo_dir,
+                            f"Task #{task_id}: commit changes after execution",
+                            push_if_remote=False,
+                        )
 
                 if not openagent_result["success"]:
                     cli_tool = get_active_cli_command()
