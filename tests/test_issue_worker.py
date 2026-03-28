@@ -4,8 +4,10 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+from auto_slopp.workers.github_task_source import GitHubTaskSource
 from auto_slopp.workers.issue_worker import IssueWorker
 from auto_slopp.workers.task_source import Task, TaskSource
+from auto_slopp.workers.vikunja_task_source import VikunjaTaskSource
 
 
 class MockTaskSource(TaskSource):
@@ -561,7 +563,10 @@ class TestIssueWorker:
         mock_execute.return_value = {"success": True}
         mock_current_branch.return_value = "ai/task-1"
         mock_push.return_value = (True, "")
-        mock_get_pr.return_value = {"state": "OPEN", "url": "https://github.com/test/pr/99"}
+        mock_get_pr.return_value = {
+            "state": "OPEN",
+            "url": "https://github.com/test/pr/99",
+        }
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
         result = worker.run(Path("/tmp"))
@@ -601,7 +606,10 @@ class TestIssueWorker:
         mock_current_branch.return_value = "ai/task-1"
         mock_push.return_value = (True, "")
         # First call returns None (no existing open PR), second call finds one after create fails
-        mock_get_pr.side_effect = [None, {"state": "OPEN", "url": "https://github.com/test/pr/42"}]
+        mock_get_pr.side_effect = [
+            None,
+            {"state": "OPEN", "url": "https://github.com/test/pr/42"},
+        ]
         mock_create_pr.return_value = None  # PR creation fails
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
@@ -675,6 +683,100 @@ class TestIssueWorker:
         assert call_kwargs[1]["title"] == "Task #5: Fix login bug"
         assert call_kwargs[1]["head"] == "ai/task-5"
         assert call_kwargs[1]["base"] == "main"
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    def test_github_issue_worker_uses_correct_pr_title_format(
+        self,
+        mock_cli,
+        mock_execute,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_create_branch,
+        mock_checkout,
+    ):
+        """Test that GitHubIssueWorker uses correct PR title format for GitHub tasks."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_execute.return_value = {"success": True}
+        mock_current_branch.return_value = "ai/task-1"
+        mock_push.return_value = (True, "")
+        mock_get_pr.return_value = None
+        mock_create_pr.return_value = {"url": "https://github.com/test/pr/1"}
+
+        # Create IssueWorker with GitHubTaskSource
+        task_source = GitHubTaskSource()
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+
+        # Run the worker
+        task = Task(id=123, title="Fix bug", body="")
+        task_source.get_tasks = lambda _: [task]
+        result = worker.run(Path("/tmp"))
+
+        # Verify that create_pull_request was called with correct title format
+        assert result["success"] is True
+        mock_create_pr.assert_called_once()
+        call_kwargs = mock_create_pr.call_args
+        assert call_kwargs[1]["title"] == "#123: Fix bug"
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    def test_vikunja_issue_worker_uses_correct_pr_title_format(
+        self,
+        mock_cli,
+        mock_execute,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_create_branch,
+        mock_checkout,
+    ):
+        """Test that VikunjaIssueWorker uses correct PR title format for Vikunja tasks."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_execute.return_value = {"success": True}
+        mock_current_branch.return_value = "ai/task-1"
+        mock_push.return_value = (True, "")
+        mock_get_pr.return_value = None
+        mock_create_pr.return_value = {"url": "https://github.com/test/pr/1"}
+
+        # Create IssueWorker with VikunjaTaskSource
+        task_source = VikunjaTaskSource()
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+
+        # Run the worker
+        task = Task(id=456, title="Add feature", body="")
+        task_source.get_tasks = lambda _: [task]
+        result = worker.run(Path("/tmp"))
+
+        # Verify that create_pull_request was called with correct title format
+        assert result["success"] is True
+        mock_create_pr.assert_called_once()
+        call_kwargs = mock_create_pr.call_args
+        assert call_kwargs[1]["title"] == "Vikunja Task #456: Add feature"
 
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
