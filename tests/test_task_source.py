@@ -21,6 +21,9 @@ class ConcreteTaskSource(TaskSource):
     def get_ralph_file_prefix(self) -> str:
         return "test"
 
+    def get_pr_title(self, task: Task) -> str:
+        return f"Task #{task.id}: {task.title}"
+
     def get_default_pr_body(self, task: Task) -> str:
         return f"PR for {task.title}"
 
@@ -95,6 +98,11 @@ class TestTaskSource:
     def test_get_ralph_file_prefix(self):
         source = ConcreteTaskSource()
         assert source.get_ralph_file_prefix() == "test"
+
+    def test_get_pr_title(self):
+        source = ConcreteTaskSource()
+        task = Task(id=1, title="Fix it", body="")
+        assert source.get_pr_title(task) == "Task #1: Fix it"
 
     def test_get_default_pr_body(self):
         source = ConcreteTaskSource()
@@ -235,6 +243,12 @@ class TestGitHubTaskSource:
         """Test that get_ralph_file_prefix returns 'github'."""
         source = GitHubTaskSource()
         assert source.get_ralph_file_prefix() == "github"
+
+    def test_get_pr_title(self):
+        """Test that get_pr_title generates correct PR title for GitHub issues."""
+        source = GitHubTaskSource()
+        task = Task(id=42, title="Fix Bug", body="")
+        assert source.get_pr_title(task) == "#42: Fix Bug"
 
     def test_get_default_pr_body(self):
         """Test that get_default_pr_body generates correct PR body."""
@@ -405,6 +419,12 @@ class TestVikunjaTaskSource:
         """Test that get_ralph_file_prefix returns 'vikunja'."""
         source = VikunjaTaskSource()
         assert source.get_ralph_file_prefix() == "vikunja"
+
+    def test_get_pr_title(self):
+        """Test that get_pr_title generates correct PR title for Vikunja tasks."""
+        source = VikunjaTaskSource()
+        task = Task(id=42, title="Fix Bug", body="")
+        assert source.get_pr_title(task) == "Vikunja Task #42: Fix Bug"
 
     def test_get_default_pr_body(self):
         """Test that get_default_pr_body generates correct PR body."""

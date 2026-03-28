@@ -106,6 +106,17 @@ class VikunjaTaskSource(TaskSource):
         """
         return "vikunja"
 
+    def get_pr_title(self, task: Task) -> str:
+        """Generate the PR title for a Vikunja task.
+
+        Args:
+            task: The task to generate a PR title for
+
+        Returns:
+            PR title string
+        """
+        return f"Vikunja Task #{task.id}: {task.title}"
+
     def get_default_pr_body(self, task: Task) -> str:
         """Generate the default PR body for a Vikunja task.
 

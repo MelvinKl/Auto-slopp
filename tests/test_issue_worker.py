@@ -28,6 +28,9 @@ class MockTaskSource(TaskSource):
     def get_ralph_file_prefix(self) -> str:
         return "test"
 
+    def get_pr_title(self, task: Task) -> str:
+        return f"Task #{task.id}: {task.title}"
+
     def get_default_pr_body(self, task: Task) -> str:
         return f"PR for {task.title}"
 
@@ -669,7 +672,7 @@ class TestIssueWorker:
         mock_push.assert_called_once_with(Path("/tmp"), remote="origin", branch="ai/task-5")
         mock_create_pr.assert_called_once()
         call_kwargs = mock_create_pr.call_args
-        assert call_kwargs[1]["title"] == "Vikunja Task #5: Fix login bug"
+        assert call_kwargs[1]["title"] == "Task #5: Fix login bug"
         assert call_kwargs[1]["head"] == "ai/task-5"
         assert call_kwargs[1]["base"] == "main"
 
