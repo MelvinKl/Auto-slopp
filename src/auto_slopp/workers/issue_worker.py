@@ -284,6 +284,18 @@ class IssueWorker(Worker):
                 result["no_changes"] = True
                 return result
 
+            if has_changes(repo_dir):
+                self.logger.info(f"Committing outstanding changes before push for task #{task_id}")
+                commit_success, _ = commit_and_push_changes(
+                    repo_dir, f"Task #{task_id}: commit outstanding changes before push", push_if_remote=False
+                )
+                if not commit_success:
+                    error_msg = f"Failed to commit outstanding changes for task #{task_id}"
+                    self.logger.error(error_msg)
+                    result["error"] = error_msg
+                    self.task_source.on_task_failure(task, error_msg)
+                    return result
+
             push_success, push_message = push_to_remote(repo_dir, remote="origin", branch=current_branch)
             if not push_success:
                 error_msg = f"Failed to push branch '{current_branch}' for task #{task_id}: {push_message}"
