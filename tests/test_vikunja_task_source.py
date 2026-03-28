@@ -235,6 +235,15 @@ class TestVikunjaTaskSource:
 
         assert task_source.get_ralph_file_prefix() == "vikunja"
 
+    def test_get_pr_title(self):
+        """Test that get_pr_title returns correct format for Vikunja tasks."""
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test Task", body="Test Body", comments=[], raw={})
+
+        pr_title = task_source.get_pr_title(task)
+
+        assert pr_title == "Vikunja Task #42: Test Task"
+
     def test_get_default_pr_body(self):
         """Test that get_default_pr_body returns correct format."""
         task_source = VikunjaTaskSource()
