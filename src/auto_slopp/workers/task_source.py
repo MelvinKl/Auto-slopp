@@ -61,6 +61,17 @@ class TaskSource(ABC):
         """
 
     @abstractmethod
+    def get_pr_title(self, task: Task) -> str:
+        """Generate the PR title for a task.
+
+        Args:
+            task: The task to generate a PR title for
+
+        Returns:
+            PR title string
+        """
+
+    @abstractmethod
     def get_default_pr_body(self, task: Task) -> str:
         """Generate the default PR body for a task.
 

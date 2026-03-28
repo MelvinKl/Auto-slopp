@@ -260,6 +260,15 @@ class TestGitHubTaskSource:
 
         assert task_source.get_ralph_file_prefix() == "github"
 
+    def test_get_pr_title(self):
+        """Test that get_pr_title returns correct format for GitHub issues."""
+        task_source = GitHubTaskSource()
+        task = Task(id=42, title="Test Issue", body="Test Body", comments=[], raw={})
+
+        pr_title = task_source.get_pr_title(task)
+
+        assert pr_title == "#42: Test Issue"
+
     def test_get_default_pr_body(self):
         """Test that get_default_pr_body returns correct format."""
         task_source = GitHubTaskSource()
