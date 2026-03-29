@@ -171,6 +171,7 @@ class TestIssueWorker:
         assert task_source.on_no_changes_called is True
         mock_push.assert_not_called()
 
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
@@ -193,10 +194,12 @@ class TestIssueWorker:
         mock_has_changes,
         mock_create_branch,
         mock_checkout,
+        mock_commit_push,
     ):
         """Test that run handles successful execution with PR creation."""
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute.return_value = {"success": True}
@@ -266,6 +269,7 @@ class TestIssueWorker:
         assert "Description" in instructions
         assert "Create a new branch that starts with ai/" in instructions
 
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
@@ -288,10 +292,12 @@ class TestIssueWorker:
         mock_has_changes,
         mock_create_branch,
         mock_checkout,
+        mock_commit_push,
     ):
         """Test that run processes multiple tasks correctly."""
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute.return_value = {"success": True}
@@ -404,6 +410,7 @@ class TestIssueWorker:
         assert result["repositories_with_errors"] == 1
         assert result["repositories_processed"] == 0
 
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
@@ -418,11 +425,13 @@ class TestIssueWorker:
         mock_current_branch,
         mock_create_branch,
         mock_checkout,
+        mock_commit_push,
     ):
         """Test that push failure calls on_task_failure."""
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
+        mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_current_branch.return_value = "ai/task-1"
@@ -495,6 +504,7 @@ class TestIssueWorker:
         assert task_source.on_task_failure_called is True
         assert task_source.on_task_complete_called is False
 
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
@@ -515,10 +525,12 @@ class TestIssueWorker:
         mock_current_branch,
         mock_create_branch,
         mock_checkout,
+        mock_commit_push,
     ):
         """Test that empty PR URL prevents marking task as complete."""
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute.return_value = {"success": True}
@@ -534,6 +546,7 @@ class TestIssueWorker:
         assert task_source.on_task_failure_called is True
         assert task_source.on_task_complete_called is False
 
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
@@ -554,10 +567,12 @@ class TestIssueWorker:
         mock_current_branch,
         mock_create_branch,
         mock_checkout,
+        mock_commit_push,
     ):
         """Test that an existing open PR is reused instead of creating a new one."""
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute.return_value = {"success": True}
@@ -576,6 +591,7 @@ class TestIssueWorker:
         assert task_source.on_task_complete_called is True
         mock_create_pr.assert_not_called()
 
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
@@ -596,10 +612,12 @@ class TestIssueWorker:
         mock_current_branch,
         mock_create_branch,
         mock_checkout,
+        mock_commit_push,
     ):
         """Test that when PR creation fails, fallback to existing PR succeeds."""
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute.return_value = {"success": True}
@@ -642,6 +660,7 @@ class TestIssueWorker:
         worker.run(Path("/tmp"))
         assert task_source.on_task_start_called is True
 
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
@@ -662,10 +681,12 @@ class TestIssueWorker:
         mock_current_branch,
         mock_create_branch,
         mock_checkout,
+        mock_commit_push,
     ):
         """Test that branch creation, push, and PR creation receive correct arguments."""
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute.return_value = {"success": True}
@@ -684,6 +705,7 @@ class TestIssueWorker:
         assert call_kwargs[1]["head"] == "ai/task-5"
         assert call_kwargs[1]["base"] == "main"
 
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
@@ -704,10 +726,12 @@ class TestIssueWorker:
         mock_current_branch,
         mock_create_branch,
         mock_checkout,
+        mock_commit_push,
     ):
         """Test that GitHubIssueWorker uses correct PR title format for GitHub tasks."""
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute.return_value = {"success": True}
@@ -731,6 +755,7 @@ class TestIssueWorker:
         call_kwargs = mock_create_pr.call_args
         assert call_kwargs[1]["title"] == "#123: Fix bug"
 
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
@@ -743,7 +768,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.vikunja_task_source.commit")
     def test_vikunja_issue_worker_uses_correct_pr_title_format(
         self,
-        mock_commit,
+        mock_vikunja_commit,
         mock_cli,
         mock_execute,
         mock_get_pr,
@@ -753,10 +778,12 @@ class TestIssueWorker:
         mock_current_branch,
         mock_create_branch,
         mock_checkout,
+        mock_commit_push,
     ):
         """Test that VikunjaIssueWorker uses correct PR title format for Vikunja tasks."""
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute.return_value = {"success": True}
@@ -780,6 +807,7 @@ class TestIssueWorker:
         call_kwargs = mock_create_pr.call_args
         assert call_kwargs[1]["title"] == "Vikunja Task #456: Add feature"
 
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
@@ -800,10 +828,12 @@ class TestIssueWorker:
         mock_current_branch,
         mock_create_branch,
         mock_checkout,
+        mock_commit_push,
     ):
         """Test that on_task_complete is called with the correct PR URL."""
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute.return_value = {"success": True}
@@ -827,6 +857,7 @@ class TestIssueWorker:
         assert captured["pr_url"] == "https://github.com/test/pr/7"
         assert captured["branch_name"] == "ai/task-1"
 
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
@@ -845,11 +876,13 @@ class TestIssueWorker:
         mock_current_branch,
         mock_create_branch,
         mock_checkout,
+        mock_commit_push,
     ):
         """Test successful Ralph-enabled workflow through push and PR creation."""
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
+        mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_current_branch.return_value = "ai/task-1"
