@@ -435,7 +435,7 @@ Plan:
             f"{plan_text}\n"
             f"Keep your implementation simple. Only implement what is required. "
             f"Check if there are components you can reuse. "
-            f"Ensure that 'make test' runs successful. Only push if ALL tests are successful. "
+            f"Ensure that 'make test' runs successful. Push after you are done. "
             f"Check if you need to update the README.md."
         )
 
