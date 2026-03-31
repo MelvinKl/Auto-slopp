@@ -291,7 +291,8 @@ class TestGitHubTaskSource:
 
     @patch("auto_slopp.workers.github_task_source.close_issue")
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
-    def test_on_task_complete_closes_issue_and_comments(self, mock_comment, mock_close):
+    @patch("auto_slopp.workers.github_task_source.commit")
+    def test_on_task_complete_closes_issue_and_comments(self, mock_commit, mock_comment, mock_close):
         """Test that on_task_complete closes issue and adds comment."""
         mock_close.return_value = True
         task_source = GitHubTaskSource()
@@ -301,6 +302,10 @@ class TestGitHubTaskSource:
 
         mock_close.assert_called_once_with(Path("/test"), 42)
         mock_comment.assert_called_once_with(Path("/test"), 42, "Completed by PR: https://github.com/test/pr/1")
+        # Verify commit calls were made
+        assert mock_commit.call_count == 2
+        mock_commit.assert_any_call(Path("/test"), f"Closed issue #{task.id}")
+        mock_commit.assert_any_call(Path("/test"), f"Added comment to issue #{task.id}")
 
     @patch("auto_slopp.workers.github_task_source.close_issue")
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
@@ -327,7 +332,8 @@ class TestGitHubTaskSource:
 
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
     @patch("auto_slopp.workers.github_task_source.close_issue")
-    def test_on_no_changes_comments_and_closes_issue(self, mock_close, mock_comment):
+    @patch("auto_slopp.workers.github_task_source.commit")
+    def test_on_no_changes_comments_and_closes_issue(self, mock_commit, mock_close, mock_comment):
         """Test that on_no_changes adds comment and closes issue."""
         task_source = GitHubTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
@@ -336,11 +342,18 @@ class TestGitHubTaskSource:
 
         mock_comment.assert_called_once()
         mock_close.assert_called_once_with(Path("/test"), 42)
+        # Verify commit calls were made
+        assert mock_commit.call_count == 2
+        mock_commit.assert_any_call(Path("/test"), f"Added comment to issue #{task.id}")
+        mock_commit.assert_any_call(Path("/test"), f"Closed issue #{task.id}")
 
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
     @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
     @patch("auto_slopp.workers.github_task_source.settings")
-    def test_on_max_iterations_reached_comments_and_removes_label(self, mock_settings, mock_remove, mock_comment):
+    @patch("auto_slopp.workers.github_task_source.commit")
+    def test_on_max_iterations_reached_comments_and_removes_label(
+        self, mock_commit, mock_settings, mock_remove, mock_comment
+    ):
         """Test that on_max_iterations_reached adds comment and removes label."""
         mock_settings.github_issue_worker_required_label = "test-label"
         mock_remove.return_value = True
@@ -351,6 +364,10 @@ class TestGitHubTaskSource:
 
         mock_comment.assert_called_once()
         mock_remove.assert_called_once_with(Path("/test"), 42, "test-label")
+        # Verify commit calls were made
+        assert mock_commit.call_count == 2
+        mock_commit.assert_any_call(Path("/test"), f"Added comment to issue #{task.id}")
+        mock_commit.assert_any_call(Path("/test"), f"Removed label from issue #{task.id}")
 
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
     @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")

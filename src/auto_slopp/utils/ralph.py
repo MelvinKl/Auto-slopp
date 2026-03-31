@@ -839,6 +839,26 @@ class RalphExecutor:
 
         self._ensure_last_step_is_make_test(task_path)
 
+        # Commit the task planning file before entering the step loop
+        try:
+            if self.has_changes_fn(repo_dir):
+                self.logger.info(f"Committing task planning file for issue #{issue_number}")
+                commit_success, _ = self.commit_fn(
+                    repo_dir,
+                    f"Issue #{issue_number}: add task planning file",
+                    False,
+                )
+                if not commit_success:
+                    return {
+                        "success": False,
+                        "error": "Failed to commit task planning file",
+                        "loops_executed": 0,
+                        "steps_completed": 0,
+                        "task_path": str(task_path),
+                    }
+        except Exception as e:
+            self.logger.warning(f"Could not commit task planning file: {str(e)}")
+
         execution_result = self._run_refined_task_loop(
             repo_dir=repo_dir,
             task_path=task_path,

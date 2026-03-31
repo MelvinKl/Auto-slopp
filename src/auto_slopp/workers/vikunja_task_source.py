@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 from typing import List
 
+from auto_slopp.utils.git_helper import commit
 from auto_slopp.utils.git_operations import sanitize_branch_name
 from auto_slopp.utils.vikunja_operations import (
     analyze_task,
@@ -139,6 +140,7 @@ class VikunjaTaskSource(TaskSource):
             branch_name: The branch created for this task
         """
         update_task_status(task.id, "in_progress")
+        commit(task.raw.get("_repo_path"), "Updated task status to 'in_progress'")
 
         subtasks = analyze_task(task.id)
         if subtasks:
@@ -150,6 +152,7 @@ class VikunjaTaskSource(TaskSource):
             f"The worker has started processing this task."
         )
         comment_on_task(task.id, start_comment)
+        commit(task.raw.get("_repo_path"), f"Added comment to task {task.id}")
 
     def on_task_complete(self, task: Task, branch_name: str, pr_url: str) -> None:
         """Called when a task completes successfully.
@@ -162,6 +165,8 @@ class VikunjaTaskSource(TaskSource):
             pr_url: URL of the created pull request
         """
         status_success = update_task_status(task.id, "done")
+        if status_success:
+            commit(task.raw.get("_repo_path"), "Updated task status to 'done'")
 
         if status_success:
             pr_info = f"\n\n**Pull Request:** {pr_url}" if pr_url else ""
@@ -173,7 +178,9 @@ class VikunjaTaskSource(TaskSource):
                 f"Changes have been committed and pushed. The task is ready for review."
             )
             comment_success = comment_on_task(task.id, success_comment)
-            if not comment_success:
+            if comment_success:
+                commit(task.raw.get("_repo_path"), f"Added comment to task {task.id}")
+            else:
                 logger.warning(f"Failed to add comment to task {task.id}")
         else:
             logger.warning(f"Failed to update status for task {task.id}")
@@ -195,11 +202,15 @@ class VikunjaTaskSource(TaskSource):
             f"This task will not be processed again automatically."
         )
         comment_success = comment_on_task(task.id, failure_comment)
-        status_success = update_task_status(task.id, "failed")
-
-        if not comment_success:
+        if comment_success:
+            commit(task.raw.get("_repo_path"), f"Added comment to task {task.id}")
+        else:
             logger.warning(f"Failed to add failure comment to task {task.id}")
-        if not status_success:
+
+        status_success = update_task_status(task.id, "failed")
+        if status_success:
+            commit(task.raw.get("_repo_path"), "Updated task status to 'failed'")
+        else:
             logger.warning(f"Failed to update status to 'failed' for task {task.id}")
 
     def on_no_changes(self, task: Task) -> None:
@@ -218,11 +229,14 @@ class VikunjaTaskSource(TaskSource):
             f"the task was determined to be already complete or not applicable."
         )
         comment_success = comment_on_task(task.id, no_changes_comment)
-        status_success = update_task_status(task.id, "done")
-
-        if not comment_success:
+        if comment_success:
+            commit(task.raw.get("_repo_path"), f"Added comment to task {task.id}")
+        else:
             logger.warning(f"Failed to add no-changes comment to task {task.id}")
-        if not status_success:
+        status_success = update_task_status(task.id, "done")
+        if status_success:
+            commit(task.raw.get("_repo_path"), "Updated task status to 'done'")
+        else:
             logger.warning(f"Failed to update status for task {task.id}")
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
@@ -245,7 +259,9 @@ class VikunjaTaskSource(TaskSource):
             f"This task will not be processed again automatically."
         )
         comment_on_task(task.id, failure_comment)
+        commit(task.raw.get("_repo_path"), f"Added comment to task {task.id}")
         update_task_status(task.id, "failed")
+        commit(task.raw.get("_repo_path"), "Updated task status to 'failed'")
 
     def _filter_tasks_by_tag(self, tasks: List[dict], tag_name: str) -> List[dict]:
         """Filter tasks to only those whose labels contain a label with a matching title.

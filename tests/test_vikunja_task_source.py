@@ -254,10 +254,11 @@ class TestVikunjaTaskSource:
         assert "Vikunja Task #42: Test Task" in pr_body
         assert "Test Body" in pr_body
 
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.analyze_task")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_on_task_start_updates_status_and_comments(self, mock_comment, mock_analyze, mock_update):
+    def test_on_task_start_updates_status_and_comments(self, mock_comment, mock_analyze, mock_update, mock_commit):
         """Test that on_task_start updates status and adds comment."""
         mock_analyze.return_value = [{"id": 1}]
         task_source = VikunjaTaskSource()
@@ -272,9 +273,10 @@ class TestVikunjaTaskSource:
         assert comment_args[0] == 42
         assert "ai/task-42-test" in comment_args[1]
 
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_on_task_complete_updates_status_and_comments(self, mock_comment, mock_update):
+    def test_on_task_complete_updates_status_and_comments(self, mock_comment, mock_update, mock_commit):
         """Test that on_task_complete updates status and adds comment."""
         task_source = VikunjaTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={})
@@ -288,9 +290,10 @@ class TestVikunjaTaskSource:
         assert "ai/task-42-test" in comment_args[1]
         assert "https://github.com/test/pr/1" in comment_args[1]
 
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_on_task_failure_updates_status_and_comments(self, mock_comment, mock_update):
+    def test_on_task_failure_updates_status_and_comments(self, mock_comment, mock_update, mock_commit):
         """Test that on_task_failure updates status and adds comment."""
         task_source = VikunjaTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={})
@@ -303,9 +306,10 @@ class TestVikunjaTaskSource:
         assert comment_args[0] == 42
         assert "Test error" in comment_args[1]
 
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_on_no_changes_updates_status_and_comments(self, mock_comment, mock_update):
+    def test_on_no_changes_updates_status_and_comments(self, mock_comment, mock_update, mock_commit):
         """Test that on_no_changes updates status and adds comment."""
         task_source = VikunjaTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={})
@@ -318,9 +322,10 @@ class TestVikunjaTaskSource:
         assert comment_args[0] == 42
         assert "No Changes Required" in comment_args[1]
 
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_on_max_iterations_reached_updates_status_and_comments(self, mock_comment, mock_update):
+    def test_on_max_iterations_reached_updates_status_and_comments(self, mock_comment, mock_update, mock_commit):
         """Test that on_max_iterations_reached updates status and adds comment."""
         task_source = VikunjaTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={})
