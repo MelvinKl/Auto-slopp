@@ -49,11 +49,102 @@ class TestPRWorker:
             ),
             patch.object(worker, "_fix_tests_with_cli", return_value={"success": True}),
             patch.object(worker, "_push_branch", return_value=True) as mock_push_branch,
+            patch("auto_slopp.workers.pr_worker.has_changes", return_value=True),
+            patch("auto_slopp.workers.pr_worker.commit_and_push_changes", return_value=(True, None)),
         ):
             result = worker._process_repository(repo_dir)
 
         assert result["success"] is True
         assert mock_push_branch.call_count == 1
+
+    def test_commits_changes_after_cli_test_fix(self):
+        """Test that PRWorker commits changes after CLI tool fixes tests."""
+        worker = PRWorker()
+        repo_dir = Path("/tmp/repo")
+
+        with (
+            patch.object(worker, "_get_open_pr_branches", return_value=["feature"]),
+            patch.object(worker, "_checkout_branch", return_value=True),
+            patch.object(worker, "_update_branch_with_main", return_value=True),
+            patch.object(
+                worker,
+                "_run_tests",
+                side_effect=[
+                    {"success": False, "output": "", "error": "failed"},
+                    {"success": True, "output": "", "error": None},
+                ],
+            ),
+            patch.object(worker, "_fix_tests_with_cli", return_value={"success": True}),
+            patch.object(worker, "_push_branch", return_value=True),
+            patch("auto_slopp.workers.pr_worker.has_changes", return_value=True) as mock_has_changes,
+            patch("auto_slopp.workers.pr_worker.commit_and_push_changes", return_value=(True, None)) as mock_commit,
+        ):
+            worker._process_repository(repo_dir)
+
+        mock_has_changes.assert_called_once_with(repo_dir)
+        mock_commit.assert_called_once_with(
+            repo_dir,
+            "fix: commit changes after CLI test fix for feature",
+            push_if_remote=False,
+        )
+
+    def test_no_commit_when_no_changes_after_cli_test_fix(self):
+        """Test that PRWorker skips commit when CLI tool made no changes."""
+        worker = PRWorker()
+        repo_dir = Path("/tmp/repo")
+
+        with (
+            patch.object(worker, "_get_open_pr_branches", return_value=["feature"]),
+            patch.object(worker, "_checkout_branch", return_value=True),
+            patch.object(worker, "_update_branch_with_main", return_value=True),
+            patch.object(
+                worker,
+                "_run_tests",
+                side_effect=[
+                    {"success": False, "output": "", "error": "failed"},
+                    {"success": True, "output": "", "error": None},
+                ],
+            ),
+            patch.object(worker, "_fix_tests_with_cli", return_value={"success": True}),
+            patch.object(worker, "_push_branch", return_value=True),
+            patch("auto_slopp.workers.pr_worker.has_changes", return_value=False),
+            patch("auto_slopp.workers.pr_worker.commit_and_push_changes", return_value=(True, None)) as mock_commit,
+        ):
+            worker._process_repository(repo_dir)
+
+        mock_commit.assert_not_called()
+
+    def test_commits_changes_after_cli_merge_fix(self):
+        """Test that PRWorker commits changes after CLI tool fixes merge conflicts."""
+        worker = PRWorker()
+        repo_dir = Path("/tmp/repo")
+
+        with (
+            patch.object(worker, "_get_open_pr_branches", return_value=["feature"]),
+            patch.object(worker, "_checkout_branch", return_value=True),
+            patch.object(
+                worker,
+                "_update_branch_with_main",
+                side_effect=[False, True],
+            ),
+            patch.object(
+                worker,
+                "_run_tests",
+                return_value={"success": True, "output": "", "error": None},
+            ),
+            patch.object(worker, "_fix_merge_with_cli", return_value={"success": True}),
+            patch.object(worker, "_push_branch", return_value=True),
+            patch("auto_slopp.workers.pr_worker.has_changes", return_value=True) as mock_has_changes,
+            patch("auto_slopp.workers.pr_worker.commit_and_push_changes", return_value=(True, None)) as mock_commit,
+        ):
+            worker._process_repository(repo_dir)
+
+        mock_has_changes.assert_called_once_with(repo_dir)
+        mock_commit.assert_called_once_with(
+            repo_dir,
+            "fix: commit changes after CLI merge fix for feature",
+            push_if_remote=False,
+        )
 
     def test_filters_prs_by_allowed_creator(self):
         """Test that PRWorker only processes PRs from allowed creator."""
