@@ -12,6 +12,8 @@ from typing import Any, Dict, List
 from auto_slopp.utils.cli_executor import get_active_cli_command, run_cli_executor
 from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
+    commit_and_push_changes,
+    has_changes,
     merge_main_into_branch,
     push_branch,
 )
@@ -145,6 +147,13 @@ class PRWorker(Worker):
                     self.logger.info(f"Merge failed for {branch} in {repo_dir.name}, using {cli_tool} to fix")
                     fix_result = self._fix_merge_with_cli(repo_dir)
                     if fix_result["success"]:
+                        if has_changes(repo_dir):
+                            self.logger.info(f"Committing changes after CLI merge fix for {branch} in {repo_dir.name}")
+                            commit_and_push_changes(
+                                repo_dir,
+                                f"fix: commit changes after CLI merge fix for {branch}",
+                                push_if_remote=False,
+                            )
                         if not self._update_branch_with_main(repo_dir, branch):
                             result["error"] = f"Failed to update branch {branch} with main after fix attempt"
                             continue
@@ -169,6 +178,13 @@ class PRWorker(Worker):
                     self.logger.info(f"Tests failed for {branch} in {repo_dir.name}, using {cli_tool} to fix")
                     fix_result = self._fix_tests_with_cli(repo_dir)
                     if fix_result["success"]:
+                        if has_changes(repo_dir):
+                            self.logger.info(f"Committing changes after CLI fix for {branch} in {repo_dir.name}")
+                            commit_and_push_changes(
+                                repo_dir,
+                                f"fix: commit changes after CLI test fix for {branch}",
+                                push_if_remote=False,
+                            )
                         result["tests_fixed"] = True
                         verify_result = self._run_tests(repo_dir)
                         tests_successful = verify_result["success"]
