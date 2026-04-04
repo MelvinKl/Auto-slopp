@@ -156,6 +156,11 @@ def find_or_create_project(project_name: str, project_identifier: Optional[str] 
     Returns:
         Dictionary containing project information or None if failed.
     """
+    if project_identifier:
+        project = find_project(project_identifier)
+        if project is not None:
+            return project
+
     project = find_project(project_name)
     if project is not None:
         return project
