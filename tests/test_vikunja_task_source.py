@@ -21,7 +21,13 @@ class TestVikunjaTaskSource:
         tasks = task_source.get_tasks(Path("/test/repo"))
 
         assert tasks == []
-        mock_find_project.assert_called_once_with("repo")
+        # Check that find_or_create_project was called with correct arguments
+        # First argument is project name, second is generated identifier
+        mock_find_project.assert_called_once()
+        args, kwargs = mock_find_project.call_args
+        assert args[0] == "repo"  # project name
+        assert len(args[1]) == 10  # identifier should be 10 chars
+        assert args[1].startswith("rep-")  # identifier should start with rep-
 
     @patch("auto_slopp.workers.vikunja_task_source.get_open_tasks_by_project")
     @patch("auto_slopp.workers.vikunja_task_source.find_or_create_project")
@@ -338,3 +344,98 @@ class TestVikunjaTaskSource:
         assert comment_args[0] == 42
         assert "8/15" in comment_args[1]
         assert "Max iterations reached" in comment_args[1]
+
+    @patch("auto_slopp.workers.vikunja_task_source.find_or_create_project")
+    @patch("auto_slopp.workers.vikunja_task_source.get_open_tasks_by_project")
+    @patch("auto_slopp.workers.vikunja_task_source.verify_blocking_closed")
+    @patch("auto_slopp.workers.vikunja_task_source.settings")
+    def test_get_tasks_generates_consistent_project_identifier(
+        self, mock_settings, mock_verify, mock_get_tasks, mock_find_project
+    ):
+        """Test that get_tasks generates consistent project identifiers for the same repository."""
+        mock_settings.github_issue_worker_required_label = "test-tag"
+        mock_verify.return_value = True
+        mock_find_project.return_value = {"id": 1, "title": "Test Project"}
+        mock_get_tasks.return_value = []
+
+        task_source = VikunjaTaskSource()
+
+        # Call get_tasks twice with the same path
+        task_source.get_tasks(Path("/some/path/to/my-repo"))
+        first_call_args = mock_find_project.call_args
+
+        mock_find_project.reset_mock()
+        task_source.get_tasks(Path("/some/path/to/my-repo"))
+        second_call_args = mock_find_project.call_args
+
+        # Both calls should use the same project identifier
+        assert first_call_args == second_call_args
+        # The identifier should be derived from the repo name and a hash of the path
+        assert first_call_args[0][0] == "my-repo"  # project_name
+        assert len(first_call_args[0][1]) == 10  # project_identifier should be exactly 10 chars
+
+    @patch("auto_slopp.workers.vikunja_task_source.find_or_create_project")
+    @patch("auto_slopp.workers.vikunja_task_source.get_open_tasks_by_project")
+    @patch("auto_slopp.workers.vikunja_task_source.verify_blocking_closed")
+    @patch("auto_slopp.workers.vikunja_task_source.settings")
+    def test_get_tasks_generates_different_identifiers_for_different_repos(
+        self, mock_settings, mock_verify, mock_get_tasks, mock_find_project
+    ):
+        """Test that get_tasks generates different project identifiers for different repositories."""
+        mock_settings.github_issue_worker_required_label = "test-tag"
+        mock_verify.return_value = True
+        mock_find_project.return_value = {"id": 1, "title": "Test Project"}
+        mock_get_tasks.return_value = []
+
+        task_source = VikunjaTaskSource()
+
+        # Call get_tasks for two different paths with same repo name
+        task_source.get_tasks(Path("/path/to/my-repo"))
+        first_call_args = mock_find_project.call_args
+
+        mock_find_project.reset_mock()
+        task_source.get_tasks(Path("/different/path/to/my-repo"))
+        second_call_args = mock_find_project.call_args
+
+        # Both calls should use the same project name but different identifiers
+        assert first_call_args[0][0] == second_call_args[0][0] == "my-repo"  # same project_name
+        assert first_call_args[0][1] != second_call_args[0][1]  # different identifiers
+        assert len(first_call_args[0][1]) == len(second_call_args[0][1]) == 10  # both exactly 10 chars
+
+    @patch("auto_slopp.workers.vikunja_task_source.find_or_create_project")
+    @patch("auto_slopp.workers.vikunja_task_source.get_open_tasks_by_project")
+    @patch("auto_slopp.workers.vikunja_task_source.verify_blocking_closed")
+    @patch("auto_slopp.workers.vikunja_task_source.settings")
+    def test_get_tasks_identifier_length_and_format(
+        self, mock_settings, mock_verify, mock_get_tasks, mock_find_project
+    ):
+        """Test that get_tasks generates identifiers with correct length and format."""
+        mock_settings.github_issue_worker_required_label = "test-tag"
+        mock_verify.return_value = True
+        mock_find_project.return_value = {"id": 1, "title": "Test Project"}
+        mock_get_tasks.return_value = []
+
+        task_source = VikunjaTaskSource()
+
+        # Test with various path lengths
+        test_paths = [
+            Path("/a/b"),  # short path
+            Path("/very/long/path/with/many/components/that/might/cause/issues"),  # long path
+            Path("/repo-with-dashes_and_underscores"),  # special chars
+        ]
+
+        for test_path in test_paths:
+            mock_find_project.reset_mock()
+            task_source.get_tasks(test_path)
+            call_args = mock_find_project.call_args
+
+            # Identifier should always be exactly 10 characters
+            assert len(call_args[0][1]) == 10, f"Identifier length incorrect for path {test_path}"
+            # Identifier should only contain lowercase letters, numbers, and hyphens
+            identifier = call_args[0][1]
+            assert all(c.isalnum() or c == "-" for c in identifier), f"Invalid characters in identifier {identifier}"
+            # Should start with repo name prefix (first 3 chars of repo name)
+            expected_prefix = test_path.name[:3].lower()
+            assert identifier.startswith(
+                expected_prefix
+            ), f"Identifier {identifier} doesn't start with prefix {expected_prefix}"
