@@ -314,7 +314,13 @@ class TestVikunjaTaskSource:
         source = VikunjaTaskSource()
         tasks = source.get_tasks(Path("/tmp"))
         assert len(tasks) == 0
-        mock_find_project.assert_called_once_with("tmp")
+        # Check that find_or_create_project was called with correct arguments
+        # First argument is project name, second is generated identifier
+        mock_find_project.assert_called_once()
+        args, kwargs = mock_find_project.call_args
+        assert args[0] == "tmp"  # project name
+        assert len(args[1]) == 10  # identifier should be 10 chars
+        assert args[1].startswith("tmp-")  # identifier should start with tmp-
 
     @patch("auto_slopp.workers.vikunja_task_source.find_or_create_project")
     @patch("auto_slopp.workers.vikunja_task_source.get_open_tasks_by_project")

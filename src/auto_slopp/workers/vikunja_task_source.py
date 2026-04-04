@@ -37,8 +37,19 @@ class VikunjaTaskSource(TaskSource):
             List of normalized Task objects ready for processing
         """
         project_name = repo_path.name
+        # Create a unique project identifier based on the full path to avoid conflicts
+        # between repositories with the same name in different locations
+        import hashlib
 
-        project = find_or_create_project(project_name)
+        path_hash = hashlib.md5(str(repo_path.absolute()).encode(), usedforsecurity=False).hexdigest()[:6]
+        project_identifier = f"{project_name[:3]}-{path_hash}".lower()
+        # Ensure identifier is exactly 10 characters as per Vikunja requirements
+        if len(project_identifier) > 10:
+            project_identifier = project_identifier[:10]
+        else:
+            project_identifier = project_identifier.ljust(10, "-")
+
+        project = find_or_create_project(project_name, project_identifier)
         if not project:
             logger.error(f"Failed to find or create Vikunja project: {project_name}")
             return []
