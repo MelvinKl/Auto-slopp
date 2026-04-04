@@ -918,6 +918,7 @@ class TestAnalyzeTask:
             assert result is None
 
 
+@pytest.mark.integration
 class TestAutoSloppProjectExists:
     """Tests for verifying the Auto-slopp project exists in Vikunja."""
 
