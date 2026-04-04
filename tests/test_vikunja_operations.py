@@ -731,6 +731,90 @@ class TestFindOrCreateProject:
 
             assert result is None
 
+    def test_find_by_identifier_first(self):
+        """Test that find_or_create_project searches by identifier before project name."""
+        with patch("auto_slopp.utils.vikunja_operations.find_project") as mock_find:
+            mock_find.return_value = {
+                "id": 1,
+                "title": "my-repo",
+                "identifier": "rep-abc123",
+            }
+
+            result = find_or_create_project("my-repo", "rep-abc123")
+
+            assert result is not None
+            assert result["id"] == 1
+            assert result["identifier"] == "rep-abc123"
+            mock_find.assert_called_once_with("rep-abc123")
+
+    def test_fallback_to_project_name_when_identifier_not_found(self):
+        """Test that find_or_create_project falls back to project name when identifier not found."""
+        with (
+            patch("auto_slopp.utils.vikunja_operations.find_project") as mock_find,
+            patch("auto_slopp.utils.vikunja_operations.create_project") as mock_create,
+        ):
+            mock_find.side_effect = [
+                None,
+                {"id": 2, "title": "my-repo", "identifier": "my-repo"},
+            ]
+            mock_create.return_value = None
+
+            result = find_or_create_project("my-repo", "rep-abc123")
+
+            assert result is not None
+            assert result["id"] == 2
+            assert mock_find.call_count == 2
+            assert mock_find.call_args_list[0][0][0] == "rep-abc123"
+            assert mock_find.call_args_list[1][0][0] == "my-repo"
+            mock_create.assert_not_called()
+
+    def test_create_project_when_both_identifier_and_name_not_found(self):
+        """Test that find_or_create_project creates a new project when both identifier and name not found."""
+        with (
+            patch("auto_slopp.utils.vikunja_operations.find_project") as mock_find,
+            patch("auto_slopp.utils.vikunja_operations.create_project") as mock_create,
+        ):
+            mock_find.return_value = None
+            mock_create.return_value = {
+                "id": 3,
+                "title": "my-repo",
+                "identifier": "rep-abc123",
+            }
+
+            result = find_or_create_project("my-repo", "rep-abc123")
+
+            assert result is not None
+            assert result["id"] == 3
+            assert result["identifier"] == "rep-abc123"
+            assert mock_find.call_count == 2
+            mock_create.assert_called_once_with("my-repo", "rep-abc123")
+
+    def test_different_repos_with_same_name_use_different_identifiers(self):
+        """Test that repositories with the same name but different paths use different identifiers."""
+        with patch("auto_slopp.utils.vikunja_operations.find_project") as mock_find:
+            mock_find.return_value = {
+                "id": 1,
+                "title": "my-repo",
+                "identifier": "rep-abc123",
+            }
+
+            result1 = find_or_create_project("my-repo", "rep-abc123")
+            mock_find.assert_called_once_with("rep-abc123")
+
+            mock_find.reset_mock()
+            mock_find.return_value = {
+                "id": 2,
+                "title": "my-repo",
+                "identifier": "rep-def456",
+            }
+
+            result2 = find_or_create_project("my-repo", "rep-def456")
+            mock_find.assert_called_once_with("rep-def456")
+
+            assert result1["id"] != result2["id"]
+            assert result1["identifier"] == "rep-abc123"
+            assert result2["identifier"] == "rep-def456"
+
 
 class TestCreateTask:
     """Tests for create_task function."""
