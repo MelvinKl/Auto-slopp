@@ -317,11 +317,15 @@ class IssueWorker(Worker):
             behind_count, ahead_count = get_ahead_behind(repo_dir, remote="origin", branch=current_branch)
             if ahead_count == 0:
                 self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue with comment")
+<<<<<<< HEAD
                 comment = "No changes were implemented as there was nothing to do."
                 if comment_on_issue(repo_dir, task.id, comment):
                     self.task_source.on_task_complete(task, current_branch, "")
                 else:
                     self.logger.warning(f"Failed to comment on issue #{task.id}")
+=======
+                self.task_source.on_no_changes(task)
+>>>>>>> 5e38da8e6825e3eb12fcf1a03530c2329ae1d2aa
                 result["task_completed"] = True
                 result["tasks_completed"] = 1
                 result["success"] = True
