@@ -111,37 +111,7 @@ class Settings(BaseSettings):
     )
 
     cli_configurations: List[CLIConfiguration] = Field(
-        default_factory=lambda: [
-            CLIConfiguration(
-                cli_command="claude",
-                cli_args=[
-                    "--model",
-                    "opus",
-                    "-p",
-                ],
-                capability=10,
-                name="claude opus",
-            ),
-            CLIConfiguration(
-                cli_command="claude",
-                cli_args=[
-                    "--model",
-                    "sonnet",
-                    "-p",
-                ],
-                capability=8,
-                name="claude sonnet",
-            ),
-            CLIConfiguration(
-                cli_command="claude",
-                cli_args=[
-                    "--model",
-                    "haiku",
-                    "-p",
-                ],
-                capability=4,
-                name="claude haiku",
-            ),
+        default_factory=lambda: [          
             CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[
@@ -161,13 +131,7 @@ class Settings(BaseSettings):
                 ],
                 capability=8,
                 name="opencode glm-4.7",
-            ),
-            CLIConfiguration(
-                cli_command="gemini",
-                cli_args=["--yolo", "--model", "gemini-3.1-pro-preview", "-p"],
-                capability=5,
-                name="gemini gemini-3.1-pro-preview",
-            ),
+            ),           
             CLIConfiguration(
                 cli_command="codex",
                 cli_args=["--dangerously-bypass-approvals-and-sandbox", "exec"],
