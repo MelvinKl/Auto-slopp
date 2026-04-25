@@ -111,61 +111,26 @@ class Settings(BaseSettings):
     )
 
     cli_configurations: List[CLIConfiguration] = Field(
-        default_factory=lambda: [          
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "nvidia/private/nvidia/nemotron-3-super-120b-a12b",
-                    "run",
-                ],
-                capability=7,
-                name="opencode nvidia nemotron 3",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "zai-coding-plan/glm-4.7",
-                    "run",
-                ],
-                capability=8,
-                name="opencode glm-4.7",
-            ),           
+        default_factory=lambda: [
+            CLIConfiguration(cli_command="claude", cli_args=[], capability=8, name="claude 1"),
+            CLIConfiguration(cli_command="claude", cli_args=[], capability=8, name="claude 2"),
+            CLIConfiguration(cli_command="claude", cli_args=[], capability=8, name="claude 3"),
+            CLIConfiguration(cli_command="opencode", cli_args=["--model", "model1"], capability=8, name="opencode 1"),
+            CLIConfiguration(cli_command="opencode", cli_args=["--model", "model2"], capability=8, name="opencode 2"),
+            CLIConfiguration(cli_command="gemini", cli_args=[], capability=8, name="gemini"),
             CLIConfiguration(
                 cli_command="codex",
                 cli_args=["--dangerously-bypass-approvals-and-sandbox", "exec"],
                 capability=8,
                 name="codex",
             ),
+            CLIConfiguration(cli_command="opencode", cli_args=["--model", "model3"], capability=8, name="opencode 3"),
+            CLIConfiguration(cli_command="opencode", cli_args=["--model", "model4"], capability=8, name="opencode 4"),
             CLIConfiguration(
                 cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "opencode/big-pickle",
-                    "run",
-                ],
-                capability=5,
-                name="opencode big pickle",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "opencode/nemotron-3-super-free",
-                    "run",
-                ],
-                capability=7,
-                name="opencode nemotron-3-super-free",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "zai-coding-plan/glm-4.7-flash",
-                    "run",
-                ],
+                cli_args=["--model", "zai-coding-plan/glm-4.7-flash", "run"],
                 capability=1,
+                cooldown_seconds=3600,
                 name="opencode glm-4.7-flash",
             ),
         ],
