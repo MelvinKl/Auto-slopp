@@ -24,6 +24,7 @@ from auto_slopp.utils.git_operations import (
     push_to_remote,
 )
 from auto_slopp.utils.github_operations import (
+    comment_on_issue,
     create_pull_request,
     get_pr_for_branch,
 )
@@ -317,7 +318,7 @@ class IssueWorker(Worker):
             if ahead_count == 0:
                 self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue with comment")
                 comment = "No changes were implemented as there was nothing to do."
-                if self.comment_on_issue(repo_dir, task.id, comment):
+                if comment_on_issue(repo_dir, task.id, comment):
                     self.task_source.on_task_complete(task, current_branch, "")
                 else:
                     self.logger.warning(f"Failed to comment on issue #{task.id}")
