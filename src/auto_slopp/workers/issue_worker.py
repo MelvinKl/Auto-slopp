@@ -18,6 +18,7 @@ from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     commit_and_push_changes,
     create_and_checkout_branch,
+    get_ahead_behind,
     get_current_branch,
     has_changes,
     push_to_remote,
@@ -309,6 +310,21 @@ class IssueWorker(Worker):
                 self.logger.error(error_msg)
                 result["error"] = error_msg
                 self.task_source.on_task_failure(task, error_msg)
+                return result
+
+            # Check if there are any commits ahead of main
+            behind_count, ahead_count = get_ahead_behind(repo_dir, remote="origin", branch=current_branch)
+            if ahead_count == 0:
+                self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue with comment")
+                comment = "No changes were implemented as there was nothing to do."
+                if self.comment_on_issue(repo_dir, task.id, comment):
+                    self.task_source.on_task_complete(task, current_branch, "")
+                else:
+                    self.logger.warning(f"Failed to comment on issue #{task.id}")
+                result["task_completed"] = True
+                result["tasks_completed"] = 1
+                result["success"] = True
+                result["no_changes"] = True
                 return result
 
             if settings.ralph_enabled:
