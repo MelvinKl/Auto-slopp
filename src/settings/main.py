@@ -116,16 +116,6 @@ class Settings(BaseSettings):
                 cli_command="opencode",
                 cli_args=[
                     "--model",
-                    "nvidia/private/nvidia/nemotron-3-super-120b-a12b",
-                    "run",
-                ],
-                capability=7,
-                name="opencode nvidia nemotron 3",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
                     "zai-coding-plan/glm-4.7",
                     "run",
                 ],
