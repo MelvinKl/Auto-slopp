@@ -111,6 +111,7 @@ class Settings(BaseSettings):
     )
 
     cli_configurations: List[CLIConfiguration] = Field(
+<<<<<<< HEAD
         default_factory=lambda: [
             CLIConfiguration(cli_command="claude", cli_args=[], capability=8, name="claude 1"),
             CLIConfiguration(cli_command="claude", cli_args=[], capability=8, name="claude 2"),
@@ -118,6 +119,19 @@ class Settings(BaseSettings):
             CLIConfiguration(cli_command="opencode", cli_args=["--model", "model1"], capability=8, name="opencode 1"),
             CLIConfiguration(cli_command="opencode", cli_args=["--model", "model2"], capability=8, name="opencode 2"),
             CLIConfiguration(cli_command="gemini", cli_args=[], capability=8, name="gemini"),
+=======
+        default_factory=lambda: [          
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "zai-coding-plan/glm-4.7",
+                    "run",
+                ],
+                capability=8,
+                name="opencode glm-4.7",
+            ),           
+>>>>>>> 21231ae327c23e48d1b378449ad0eec2ce4daa61
             CLIConfiguration(
                 cli_command="codex",
                 cli_args=["--dangerously-bypass-approvals-and-sandbox", "exec"],
