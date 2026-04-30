@@ -607,8 +607,6 @@ registry.load_plugins(Path("plugins/"))
 
 ### 3. Cloud-Native Features
 
-- **Containerization**: Docker containerization for deployment
-- **Kubernetes**: Kubernetes orchestration for scaling
 - **Auto-scaling**: Automatic scaling based on load
 - **Health Checks**: Comprehensive health check endpoints
 

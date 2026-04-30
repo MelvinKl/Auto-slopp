@@ -199,10 +199,7 @@ The project includes comprehensive CI/CD workflows in `.github/workflows/`:
 You can simulate the CI environment locally:
 
 ```bash
-# Run the full CI test matrix
-docker-compose -f .github/docker-compose.test.yml up
-
-# Or manually run the CI steps
+# Run the CI steps manually
 uv venv
 source .venv/bin/activate
 uv pip install -e .[dev]

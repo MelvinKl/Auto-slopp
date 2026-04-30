@@ -188,10 +188,9 @@ uv run python -m pytest -m integration -v
 ```
 
 Results:
-- Integration tests run: 10
-- Integration tests passed: 10 ✅
-- (7 VikunjaWorker end-to-end tests + 3 Docker tests)
-- Note: Docker tests have unrelated environment permission issues
+- Integration tests run: 7
+- Integration tests passed: 7 ✅
+- (7 VikunjaWorker end-to-end tests)
 
 #### 7. Mock Strategy
 

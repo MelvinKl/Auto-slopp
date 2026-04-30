@@ -111,7 +111,7 @@ class Settings(BaseSettings):
     )
 
     cli_configurations: List[CLIConfiguration] = Field(
-        default_factory=lambda: [          
+        default_factory=lambda: [
             CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[
@@ -121,7 +121,7 @@ class Settings(BaseSettings):
                 ],
                 capability=8,
                 name="opencode glm-4.7",
-            ),           
+            ),
             CLIConfiguration(
                 cli_command="codex",
                 cli_args=["--dangerously-bypass-approvals-and-sandbox", "exec"],
