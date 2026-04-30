@@ -340,7 +340,7 @@ class RalphExecutor:
             "- Keep the '## Steps' section and the existing file format.\n"
             "- Keep step numbering sequential and stable.\n"
             "- The last step must always verify that `make test` succeeds.\n"
-            "- Do not commit, do not push, and do not create a PR.\n"
+            "- Do commit, do push.\n"
         )
 
         result = self.execute_fn(
