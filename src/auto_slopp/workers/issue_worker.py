@@ -18,7 +18,6 @@ from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     commit_and_push_changes,
     create_and_checkout_branch,
-    get_ahead_behind,
     get_current_branch,
     has_changes,
     push_to_remote,
@@ -27,6 +26,7 @@ from auto_slopp.utils.github_operations import (
     create_pull_request,
     get_pr_for_branch,
 )
+from auto_slopp.utils.git_operations import get_commits_ahead_of_branch
 from auto_slopp.utils.ralph import RalphExecutor
 from auto_slopp.worker import Worker
 from auto_slopp.workers.task_source import Task, TaskSource
@@ -313,7 +313,7 @@ class IssueWorker(Worker):
                 return result
 
             # Check if there are any commits ahead of main
-            behind_count, ahead_count = get_ahead_behind(repo_dir, remote="origin", branch=current_branch)
+            ahead_count = get_commits_ahead_of_branch(repo_dir, base_branch="main")
             if ahead_count == 0:
                 self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue with comment")
                 self.task_source.on_no_changes(task)

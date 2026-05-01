@@ -619,6 +619,32 @@ def get_ahead_behind(repo_dir: Path, remote: str = "origin", branch: Optional[st
     return 0, 0
 
 
+def get_commits_ahead_of_branch(repo_dir: Path, base_branch: str = "main") -> int:
+    """Get the number of commits the current branch is ahead of the specified base branch.
+
+    Args:
+        repo_dir: Path to the git repository
+        base_branch: Base branch to compare against (default: "main")
+
+    Returns:
+        Number of commits the current branch is ahead of base_branch.
+        Returns 0 if the comparison fails or if not ahead.
+    """
+    try:
+        result = _run_git_command(
+            repo_dir,
+            "rev-list",
+            "--count",
+            f"{base_branch}..HEAD",
+            check=False,
+        )
+        if result.returncode == 0:
+            return int(result.stdout.strip())
+    except Exception:
+        pass
+    return 0
+
+
 def push_to_remote(repo_dir: Path, remote: str = "origin", branch: Optional[str] = None) -> Tuple[bool, str]:
     """Push changes to a remote branch.
 
