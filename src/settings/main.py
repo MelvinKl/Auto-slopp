@@ -138,6 +138,46 @@ class Settings(BaseSettings):
             CLIConfiguration(cli_command="opencode", cli_args=["--model", "model4"], capability=8, name="opencode 4"),
             CLIConfiguration(
                 cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "opencode/nemotron-3-super-free",
+                    "run",
+                ],
+                capability=6,
+                name="opencode nemotron3-free",
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "opencode/hy3-preview-free",
+                    "run",
+                ],
+                capability=6,
+                name="opencode hy3-free",
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "opencode/big-pickle",
+                    "run",
+                ],
+                capability=5,
+                name="opencode big pickle",
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "opencode/nemotron-3-super-free",
+                    "run",
+                ],
+                capability=7,
+                name="opencode nemotron-3-super-free",
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
                 cli_args=["--model", "zai-coding-plan/glm-4.7-flash", "run"],
                 capability=1,
                 cooldown_seconds=3600,
