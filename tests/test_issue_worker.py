@@ -174,7 +174,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.get_ahead_behind")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
@@ -204,7 +204,7 @@ class TestIssueWorker:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
-        mock_ahead_behind.return_value = (1, 1)  # 1 behind, 1 ahead - so we'll proceed to create PR
+        mock_ahead_behind.return_value = 1  # 1 behind, 1 ahead - so we'll proceed to create PR
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -278,7 +278,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.get_ahead_behind")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
@@ -308,7 +308,7 @@ class TestIssueWorker:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
-        mock_ahead_behind.return_value = (1, 1)
+        mock_ahead_behind.return_value = 1
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -522,7 +522,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.get_ahead_behind")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
@@ -552,7 +552,7 @@ class TestIssueWorker:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
-        mock_ahead_behind.return_value = (1, 1)
+        mock_ahead_behind.return_value = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -573,7 +573,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.get_ahead_behind")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
@@ -603,7 +603,7 @@ class TestIssueWorker:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
-        mock_ahead_behind.return_value = (1, 1)
+        mock_ahead_behind.return_value = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -627,7 +627,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.get_ahead_behind")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
@@ -657,7 +657,7 @@ class TestIssueWorker:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
-        mock_ahead_behind.return_value = (1, 1)
+        mock_ahead_behind.return_value = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -705,7 +705,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.get_ahead_behind")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
@@ -735,7 +735,7 @@ class TestIssueWorker:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
-        mock_ahead_behind.return_value = (1, 1)
+        mock_ahead_behind.return_value = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -759,7 +759,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.get_ahead_behind")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
@@ -789,7 +789,7 @@ class TestIssueWorker:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
-        mock_ahead_behind.return_value = (1, 1)
+        mock_ahead_behind.return_value = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -818,7 +818,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.get_ahead_behind")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
@@ -850,7 +850,7 @@ class TestIssueWorker:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
-        mock_ahead_behind.return_value = (1, 1)
+        mock_ahead_behind.return_value = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -887,7 +887,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
-    @patch("auto_slopp.workers.issue_worker.get_ahead_behind")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.comment_on_issue")
     def test_on_task_complete_receives_correct_pr_url(
         self,
@@ -909,7 +909,7 @@ class TestIssueWorker:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
-        mock_ahead_behind.return_value = (1, 1)
+        mock_ahead_behind.return_value = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -945,7 +945,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.create_pull_request")
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
-    @patch("auto_slopp.workers.issue_worker.get_ahead_behind")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.comment_on_issue")
     def test_ralph_enabled_success_with_push_and_pr(
         self,
@@ -967,7 +967,7 @@ class TestIssueWorker:
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
         mock_comment.return_value = True
-        mock_ahead_behind.return_value = (1, 1)
+        mock_ahead_behind.return_value = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
