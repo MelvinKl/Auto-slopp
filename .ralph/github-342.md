@@ -68,4 +68,4 @@ Remove docker/kubernetes AS this is currently Not working
      - `make test` exits with code 0.
      - No test failures related to removed Docker functionality.
      - All remaining tests pass.
-   - Process Note: Ran `make test` - linting (black, isort, flake8) passed. `make test` fails due to: (1) security vulnerabilities in upstream dependencies (safety check), and (2) 10 pre-existing test failures in `test_issue_worker.py` unrelated to Docker removal (vikunja-cli-helper not found, PR creation tests). No Docker-related test failures remain. All Docker/kubernetes removal steps (1-9) are complete. Grepped for remaining Docker references - none found outside `.venv/`.
+   - Process Note: Ran `make test` - linting (black, isort, flake8) passed. Safety check fails due to upstream vulnerabilities (nltk, pygments, etc.) and `test_issue_worker.py` has 10 pre-existing failures unrelated to Docker removal. No Docker-related failures remain. All Docker/kubernetes removal steps (1-9) complete. Grepped for remaining Docker references - none found outside `.venv/`. Branch ai/issue-342-remove-docker is committed and pushed.
