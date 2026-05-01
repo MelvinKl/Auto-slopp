@@ -168,16 +168,6 @@ class Settings(BaseSettings):
                 capability=7,
                 name="opencode nemotron-3-super-free",
             ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "zai-coding-plan/glm-4.7-flash",
-                    "run",
-                ],
-                capability=1,
-                name="opencode glm-4.7-flash",
-            ),
         ],
         description=(
             "Tiered CLI configurations ordered by preference. " "Lower index entries are preferred and used first."
