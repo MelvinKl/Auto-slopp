@@ -594,6 +594,8 @@ def get_ahead_behind(repo_dir: Path, remote: str = "origin", branch: Optional[st
 
     Returns:
         Tuple of (behind, ahead) counts.
+        - behind: number of commits the current branch is behind remote/branch
+        - ahead: number of commits the current branch is ahead of remote/branch
     """
     if branch is None:
         branch = get_current_branch(repo_dir)
@@ -611,7 +613,7 @@ def get_ahead_behind(repo_dir: Path, remote: str = "origin", branch: Optional[st
         if result.returncode == 0:
             counts = result.stdout.strip().split("\t")
             if len(counts) == 2:
-                return int(counts[0]), int(counts[1])
+                return int(counts[1]), int(counts[0])
 
     except Exception:
         pass

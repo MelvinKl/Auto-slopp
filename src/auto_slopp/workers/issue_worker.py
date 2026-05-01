@@ -314,7 +314,7 @@ class IssueWorker(Worker):
                 return result
 
             # Check if there are any commits ahead of main
-            behind_count, ahead_count = get_ahead_behind(repo_dir, remote="origin", branch=current_branch)
+            behind_count, ahead_count = get_ahead_behind(repo_dir, remote="origin", branch="main")
             if ahead_count == 0:
                 self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue with comment")
                 comment = "No changes were implemented as there was nothing to do."
