@@ -18,6 +18,7 @@ from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     commit_and_push_changes,
     create_and_checkout_branch,
+    get_commits_ahead_of_branch,
     get_current_branch,
     has_changes,
     push_to_remote,
@@ -26,7 +27,6 @@ from auto_slopp.utils.github_operations import (
     create_pull_request,
     get_pr_for_branch,
 )
-from auto_slopp.utils.git_operations import get_commits_ahead_of_branch
 from auto_slopp.utils.ralph import RalphExecutor
 from auto_slopp.worker import Worker
 from auto_slopp.workers.task_source import Task, TaskSource
