@@ -147,7 +147,7 @@ class TestSettings:
     def test_cli_configurations_default(self):
         """Test default tiered CLI configurations."""
         test_settings = Settings()
-        assert len(test_settings.cli_configurations) == 15
+        assert len(test_settings.cli_configurations) == 14
         assert test_settings.cli_configurations[0].cli_command == "claude"
         assert test_settings.cli_configurations[1].cli_command == "claude"
         assert test_settings.cli_configurations[2].cli_command == "claude"
@@ -158,12 +158,10 @@ class TestSettings:
         assert test_settings.cli_configurations[7].cli_command == "codex"
         assert test_settings.cli_configurations[8].cli_command == "opencode"
         assert test_settings.cli_configurations[9].cli_command == "opencode"
-        assert test_settings.cli_configurations[10].cli_command == "opencode"
-        assert "nemotron-3-super-free" in str(test_settings.cli_configurations[10].cli_args)
-        assert "hy3-preview-free" in str(test_settings.cli_configurations[11].cli_args)
-        assert "big-pickle" in str(test_settings.cli_configurations[12].cli_args)
-        assert "nemotron-3-super-free" in str(test_settings.cli_configurations[13].cli_args)
-        assert "glm-4.7-flash" in str(test_settings.cli_configurations[14].cli_args)
+        assert "hy3-preview-free" in str(test_settings.cli_configurations[10].cli_args)
+        assert "big-pickle" in str(test_settings.cli_configurations[11].cli_args)
+        assert "nemotron-3-super-free" in str(test_settings.cli_configurations[12].cli_args)
+        assert "glm-4.7-flash" in str(test_settings.cli_configurations[13].cli_args)
 
     def test_cli_configurations_env_override(self):
         """Test overriding CLI configurations via environment variable."""
