@@ -140,11 +140,11 @@ class Settings(BaseSettings):
                 cli_command="opencode",
                 cli_args=[
                     "--model",
-                    "opencode/hy3-preview-free",
+                    "opencode/nemotron-3-super-free",
                     "run",
                 ],
                 capability=6,
-                name="opencode hy3-free",
+                name="opencode nemotron3-free",
             ),
             CLIConfiguration(
                 cli_command="opencode",
