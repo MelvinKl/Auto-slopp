@@ -258,15 +258,15 @@ class TestSettings:
             for key in env_vars_to_clear:
                 if key in os.environ:
                     del os.environ[key]
-        
+
             test_settings = Settings()
-            
+
             # Should load configurations from the default file
             assert len(test_settings.cli_configurations) == 10
             assert test_settings.cli_configurations[0].cli_command == "claude"
             assert test_settings.cli_configurations[0].capability == 10
             assert test_settings.cli_configurations[0].name == "claude opus"
-            
+
             assert test_settings.cli_configurations[1].cli_command == "claude"
             assert test_settings.cli_configurations[1].capability == 8
             assert test_settings.cli_configurations[1].name == "claude sonnet"
