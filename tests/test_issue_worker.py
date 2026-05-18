@@ -207,7 +207,7 @@ class TestIssueWorker:
         mock_create_branch.return_value = True
         mock_execute.return_value = {"success": True}
         mock_has_changes.return_value = True
-        mock_current_branch.return_value = "ai/task-1"
+        mock_get_current_branch.return_value = "ai/task-1"
         mock_push.return_value = (True, "")
         mock_get_pr.return_value = None
         mock_create_pr.return_value = {"url": "https://github.com/test/pr/1"}
