@@ -5,7 +5,6 @@ from auto_slopp.workers.issue_worker import IssueWorker
 from auto_slopp.workers.task_source import Task
 from tests.test_github_task_source import GitHubTaskSource
 from tests.test_task_source import ConcreteTaskSource as BaseMockTaskSource
-from tests.test_vikunja_task_source import VikunjaTaskSource
 
 
 class MockTaskSource(BaseMockTaskSource):
@@ -142,9 +141,9 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
-    def test_existing_open_pr_reused(
+    def test_vikunja_task_pr_title_format(
         self,
-        mock_cli,
+        mock_get_active_cli_command,
         mock_execute_with_instructions,
         mock_get_commits_ahead_of_branch,
         mock_get_pr_for_branch,
@@ -155,17 +154,18 @@ class TestIssueWorker:
         mock_has_changes,
         mock_create_and_checkout_branch,
         mock_checkout_branch_resilient,
-        mock_commit_push,
+        mock_commit_and_push_changes,
     ):
-        """Test that GitHubIssueWorker uses correct PR title format for GitHub tasks."""
-        mock_cli.return_value = "opencode"
+        """Test that VikunjaIssueWorker uses correct PR title format for Vikunja tasks."""
+        mock_get_active_cli_command.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_has_changes.return_value = True
-        mock_commit_push.return_value = (True, None)
+        mock_commit_and_push_changes.return_value = (True, None)
         mock_checkout_branch_resilient.return_value = True
         mock_create_and_checkout_branch.return_value = True
         mock_execute_with_instructions.return_value = {"success": True}
         mock_get_current_branch.return_value = "ai/task-1"
+        mock_get_commits_ahead_of_branch.return_value = 1
         mock_push_to_remote.return_value = (True, "")
         mock_get_pr_for_branch.return_value = None
         mock_create_pull_request.return_value = {"url": "https://github.com/test/pr/1"}
@@ -200,18 +200,18 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     def test_vikunja_task_pr_title_format(
         self,
-        mock_commit_and_push_changes,
-        mock_checkout_branch_resilient,
-        mock_create_and_checkout_branch,
-        mock_has_changes,
-        mock_get_current_branch,
-        mock_settings,
-        mock_push_to_remote,
-        mock_create_pull_request,
-        mock_get_pr_for_branch,
-        mock_get_commits_ahead_of_branch,
-        mock_execute_with_instructions,
         mock_get_active_cli_command,
+        mock_execute_with_instructions,
+        mock_get_commits_ahead_of_branch,
+        mock_get_pr_for_branch,
+        mock_create_pull_request,
+        mock_push_to_remote,
+        mock_settings,
+        mock_get_current_branch,
+        mock_has_changes,
+        mock_create_and_checkout_branch,
+        mock_checkout_branch_resilient,
+        mock_commit_and_push_changes,
     ):
         """Test that VikunjaIssueWorker uses correct PR title format for Vikunja tasks."""
         mock_get_active_cli_command.return_value = "opencode"
@@ -223,16 +223,50 @@ class TestIssueWorker:
         mock_execute_with_instructions.return_value = {"success": True}
         mock_get_current_branch.return_value = "ai/task-1"
         mock_push_to_remote.return_value = (True, "")
+        mock_get_commits_ahead_of_branch.return_value = 1
         mock_get_pr_for_branch.return_value = None
         mock_create_pull_request.return_value = {"url": "https://github.com/test/pr/1"}
 
-        # Create IssueWorker with VikunjaTaskSource
-        task_source = VikunjaTaskSource()
+        # Create a mock VikunjaTaskSource that prevents calling the missing vikunja-cli-helper
+        class MockVikunjaTaskSource:
+            def __init__(self):
+                self.on_task_start_called = False
+                self.on_task_complete_called = False
+                self.on_task_failure_called = False
+                self.on_no_changes_called = False
+
+            def get_tasks(self, repo_path):
+                return [Task(id=456, title="Add feature", body="")]
+
+            def get_branch_name(self, task):
+                return f"ai/task-{task.id}"
+
+            def on_task_start(self, task, branch_name):
+                self.on_task_start_called = True
+
+            def on_task_complete(self, task, branch_name, pr_url):
+                self.on_task_complete_called = True
+
+            def on_task_failure(self, task, error):
+                self.on_task_failure_called = True
+
+            def on_no_changes(self, task):
+                self.on_no_changes_called = True
+
+            def get_default_pr_body(self, task):
+                return f"Default PR body for task {task.id}"
+
+            def get_pr_title(self, task):
+                return f"Vikunja Task #{task.id}: {task.title}"
+
+            def get_ralph_file_prefix(self):
+                return "vikunja"
+
+        # Create IssueWorker with our mock VikunjaTaskSource
+        task_source = MockVikunjaTaskSource()
         worker = IssueWorker(task_source=task_source, dry_run=False)
 
         # Run the worker
-        task = Task(id=456, title="Add feature", body="")
-        task_source.get_tasks = lambda _: [task]
         result = worker.run(Path("/tmp"))
 
         # Verify that create_pull_request was called with correct title format
@@ -255,18 +289,18 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     def test_on_task_complete_receives_correct_pr_url(
         self,
-        mock_commit_and_push_changes,
-        mock_checkout_branch_resilient,
-        mock_create_and_checkout_branch,
-        mock_has_changes,
-        mock_get_current_branch,
-        mock_settings,
-        mock_push_to_remote,
-        mock_create_pull_request,
-        mock_get_pr_for_branch,
-        mock_get_commits_ahead_of_branch,
-        mock_execute_with_instructions,
         mock_get_active_cli_command,
+        mock_execute_with_instructions,
+        mock_get_commits_ahead_of_branch,
+        mock_get_pr_for_branch,
+        mock_create_pull_request,
+        mock_push_to_remote,
+        mock_settings,
+        mock_get_current_branch,
+        mock_has_changes,
+        mock_create_and_checkout_branch,
+        mock_checkout_branch_resilient,
+        mock_commit_and_push_changes,
     ):
         """Test that on_task_complete is called with the correct PR URL."""
         mock_get_active_cli_command.return_value = "opencode"
