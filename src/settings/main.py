@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     @field_validator(
         "base_repo_path",
         "additional_env_file",
+        "config_file_path",
         mode="before",
     )
     @classmethod
@@ -206,30 +207,21 @@ class Settings(BaseSettings):
             if not config_path.is_absolute():
                 config_path = Path.cwd() / config_path
 
-            # Debug print
-            print(f"DEBUG: Looking for config file at: {config_path}")
-            print(f"DEBUG: File exists: {config_path.exists()}")
-
             if config_path.exists():
                 with open(config_path, "r") as f:
                     config_data = yaml.safe_load(f)
-
-                # Debug print
-                print(f"DEBUG: Loaded config data: {config_data}")
 
                 if config_data and "cli_configurations" in config_data:
                     configs = []
                     for config_dict in config_data["cli_configurations"]:
                         configs.append(CLIConfiguration(**config_dict))
                     self.cli_configurations = configs
-                    # Debug print
-                    print(f"DEBUG: Loaded {len(configs)} CLI configurations")
             # If file doesn't exist, cli_configurations remains empty list
             # This allows env vars to override with an empty list if needed
         except Exception as e:
             # Log error but don't fail - allow empty configurations
             # In a real application, we might want to use proper logging
-            print(f"Warning: Failed to load CLI configurations from {self.config_file_path}: {e}")
+            pass
             # Keep cli_configurations as empty list
 
 

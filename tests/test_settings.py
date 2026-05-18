@@ -290,17 +290,29 @@ cli_configurations:
             temp_file_path = f.name
 
         try:
+            print(
+                f"DEBUG: Original environment has AUTO_SLOPP_CONFIG_FILE_PATH: {os.environ.get('AUTO_SLOPP_CONFIG_FILE_PATH')}"
+            )
+
             env_vars = {
-                "AUTO_SLOPP_CONFIG_FILE": temp_file_path,
+                "AUTO_SLOPP_CONFIG_FILE_PATH": temp_file_path,
             }
-            with patch.dict(os.environ, env_vars, clear=False):
-                # Clear any CLI config env vars to ensure we load from file
-                env_vars_to_clear = {k: v for k, v in os.environ.items() if k.startswith("AUTO_SLOPP_") and "CLI" in k}
-                for key in env_vars_to_clear:
-                    if key in os.environ:
-                        del os.environ[key]
+            print(f"DEBUG: Setting environment variable AUTO_SLOPP_CONFIG_FILE_PATH={temp_file_path}")
+
+            # Clear all environment variables and set only the ones we need
+            with patch.dict(os.environ, env_vars, clear=True):
+                print(
+                    f"DEBUG: After patch.dict, environment has AUTO_SLOPP_CONFIG_FILE_PATH: {os.environ.get('AUTO_SLOPP_CONFIG_FILE_PATH')}"
+                )
 
                 test_settings = Settings()
+
+                # Debug: Print the actual config_file_path value
+                print(f"DEBUG: test_settings.config_file_path = {test_settings.config_file_path}")
+                print(f"DEBUG: Expected: {temp_file_path}")
+                print(
+                    f"DEBUG: Types - actual: {type(test_settings.config_file_path)}, expected: {type(temp_file_path)}"
+                )
 
                 # Should load configurations from the custom file
                 assert len(test_settings.cli_configurations) == 1
@@ -316,10 +328,16 @@ cli_configurations:
     def test_cli_configurations_env_override_takes_precedence(self):
         """Test that environment variable override takes precedence over file configuration."""
         env_vars = {
-            "AUTO_SLOPP_CLI_CONFIGURATIONS": '[{"cli_command": "env-override", "cli_args": ["--env-arg"], "capacity": 3}]',
+            "AUTO_SLOPP_CLI_CONFIGURATIONS": '[{"cli_command": "env-override", "cli_args": ["--env-arg"], "capability": 3}]',
         }
         with patch.dict(os.environ, env_vars, clear=False):
             test_settings = Settings()
+
+            # Debug: Print what we actually got
+            print(f"DEBUG: Got cli_configurations length: {len(test_settings.cli_configurations)}")
+            if len(test_settings.cli_configurations) > 0:
+                print(f"DEBUG: First config: {test_settings.cli_configurations[0]}")
+                print(f"DEBUG: First config capability: {test_settings.cli_configurations[0].capability}")
 
             # Should use env var override, not file config
             assert len(test_settings.cli_configurations) == 1
@@ -330,7 +348,7 @@ cli_configurations:
     def test_cli_configurations_file_not_found(self):
         """Test graceful handling when config file is not found."""
         env_vars = {
-            "AUTO_SLOPP_CONFIG_FILE": "/non/existent/path/config.yaml",
+            "AUTO_SLOPP_CONFIG_FILE_PATH": "/non/existent/path/config.yaml",
         }
         with patch.dict(os.environ, env_vars, clear=False):
             # Clear any CLI config env vars to ensure we try to load from file
@@ -356,7 +374,7 @@ cli_configurations:
 
         try:
             env_vars = {
-                "AUTO_SLOPP_CONFIG_FILE": temp_file_path,
+                "AUTO_SLOPP_CONFIG_FILE_PATH": temp_file_path,
             }
             with patch.dict(os.environ, env_vars, clear=False):
                 # Clear any CLI config env vars to ensure we try to load from file

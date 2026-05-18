@@ -37,6 +37,56 @@ Auto-slopp supports configurable CLI tools for automation. By default, it uses [
 
 Auto-slopp supports a tiered CLI configuration system with capability-based task matching. Each CLI tool has a capability rating (0-10), and tasks specify their requirements (min/max/recommended capabilities). The system automatically selects the most appropriate CLI tool for each task.
 
+For complex configurations that are not easily set by environment variables, you can use an external YAML configuration file:
+
+- `AUTO_SLOPP_CONFIG_FILE_PATH`: Path to the YAML configuration file (default: "config/default.yaml")
+
+Example usage:
+```bash
+# Use custom configuration file path
+AUTO_SLOPP_CONFIG_FILE_PATH=/path/to/custom/config.yaml
+
+# Combined with CLI configurations (env vars take precedence over file)
+AUTO_SLOPP_CLI_CONFIGURATIONS='[
+  {
+    "cli_command": "gemini",
+    "cli_args": ["--yolo", "-p"],
+    "capability": 8,
+    "cooldown_seconds": 300
+  }
+]'
+```
+
+#### Environment Variables for CLI Configuration
+
+Auto-slopp supports a tiered CLI configuration system with capability-based task matching. Each CLI tool has a capability rating (0-10), and tasks specify their requirements (min/max/recommended capabilities). The system automatically selects the most appropriate CLI tool for each task.
+
+For complex configurations that are not easily set by environment variables, you can use an external YAML configuration file:
+
+- `AUTO_SLOPP_CONFIG_FILE_PATH`: Path to the YAML configuration file (default: "config/default.yaml")
+
+Example usage:
+```bash
+# Use custom configuration file path
+AUTO_SLOPP_CONFIG_FILE_PATH=/path/to/custom/config.yaml
+
+# Combined with CLI configurations (env vars take precedence over file)
+AUTO_SLOPP_CLI_CONFIGURATIONS='[
+  {
+    "cli_command": "gemini",
+    "cli_args": ["--yolo", "-p"],
+    "capability": 8,
+    "cooldown_seconds": 300
+  }
+]'
+```
+
+### External Configuration File
+
+For complex configurations that are not easily set by environment variables, Auto-slopp supports loading configurations from an external YAML file. The path to this file can be customized using the `AUTO_SLOPP_CONFIG_FILE_PATH` environment variable.
+
+By default, Auto-slopp looks for a configuration file at `config/default.yaml` relative to the project root. This file should contain a `cli_configurations` section with the tiered CLI tool configurations.
+
 ```bash
 # Tiered CLI configurations (JSON array of objects)
 # Each tool has a capability rating (0-10) indicating its sophistication level
