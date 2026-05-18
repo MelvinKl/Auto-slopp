@@ -279,6 +279,8 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.push_to_remote")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
@@ -287,12 +289,12 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.create_pull_request")
     @patch("auto_slopp.workers.issue_worker.settings")
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
-    def test_multiple_tasks_processing(
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    def test_existing_open_pr_reused(
         self,
-        mock_commit_push_changes,
         mock_checkout_branch_resilient,
+        mock_commit_push_changes,
         mock_settings,
         mock_create_pull_request,
         mock_get_active_cli_command,
@@ -539,22 +541,41 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.create_pull_request")
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     def test_pr_creation_failure_fallback_to_existing_pr(
         self,
-        mock_cli,
-        mock_execute,
-        mock_get_pr,
+        mock_checkout_branch_resilient,
+        mock_commit_push_changes,
+        mock_settings,
+        mock_create_pull_request,
+        mock_get_active_cli_command,
+        mock_execute_with_instructions,
+        mock_get_commits_ahead_of_branch,
+        mock_get_pr_for_branch,
+        mock_create_and_checkout_branch,
+        mock_has_changes,
+        mock_get_current_branch,
+        mock_push_to_remote,
         mock_create_pr,
         mock_push,
-        mock_settings,
-        mock_current_branch,
-        mock_has_changes,
-        mock_create_branch,
-        mock_checkout,
-        mock_commit_push,
+        mock_get_pr,
+        mock_execute,
+        mock_cli,
         mock_get_commits_ahead,
+        mock_checkout,
+        mock_create_branch,
+        mock_commit_push,
     ):
         """Test that when PR creation fails, fallback to existing PR succeeds."""
         mock_cli.return_value = "opencode"
