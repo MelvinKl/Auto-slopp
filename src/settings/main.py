@@ -147,7 +147,7 @@ class Settings(BaseSettings):
                 ],
                 capability=7,
                 name="opencode nemotron3-free",
-            ),            
+            ),
             CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[
