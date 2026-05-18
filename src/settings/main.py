@@ -142,6 +142,16 @@ class Settings(BaseSettings):
                 cli_command="opencode",
                 cli_args=[
                     "--model",
+                    "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+                    "run",
+                ],
+                capability=7,
+                name="opencode nemotron3-free",
+            ),            
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
                     "opencode/big-pickle",
                     "run",
                 ],
