@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Union
 
 import yaml
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, AliasChoices
 from pydantic_settings import BaseSettings
 
 
@@ -115,6 +115,7 @@ class Settings(BaseSettings):
     config_file_path: Union[str, Path] = Field(
         default="config/default.yaml",
         description="Path to the configuration file for complex settings like cli_configurations",
+        validation_alias=AliasChoices("AUTO_SLOPP_CONFIG_FILE_PATH", "AUTO_SLOPP_CONFIG_FILE"),
     )
 
     cli_configurations: List[CLIConfiguration] = Field(
