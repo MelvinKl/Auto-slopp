@@ -447,7 +447,7 @@ class TestIssueWorker:
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
         mock_has_changes.return_value = True
-        mock_commit_push.return_value = (True, None)
+        mock_commit_and_push_changes.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_current_branch.return_value = "ai/task-1"
@@ -520,7 +520,7 @@ class TestIssueWorker:
         mock_get_active_cli_command.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_has_changes.return_value = True
-        mock_commit_and_push_changes.return_value = (True, None)
+        mock_commit_push_changes.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute_with_instructions.return_value = {"success": True}
@@ -819,7 +819,7 @@ class TestIssueWorker:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_has_changes.return_value = True
-        mock_commit_push.return_value = (True, None)
+        mock_commit_and_push_changes.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute.return_value = {"success": True}
