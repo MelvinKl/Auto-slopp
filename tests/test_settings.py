@@ -158,9 +158,9 @@ class TestSettings:
         assert test_settings.cli_configurations[7].cli_command == "codex"
         assert test_settings.cli_configurations[8].cli_command == "opencode"
         assert test_settings.cli_configurations[9].cli_command == "opencode"
-        assert "nemotron-3-super-free" in str(test_settings.cli_configurations[10].cli_args)
+        assert "openrouter/nvidia/nemotron-3-super-120b-a12b:free" in str(test_settings.cli_configurations[10].cli_args)
         assert "big-pickle" in str(test_settings.cli_configurations[11].cli_args)
-        assert "nemotron-3-super-free" in str(test_settings.cli_configurations[12].cli_args)
+        assert "opencode/nemotron-3-super-free" in str(test_settings.cli_configurations[12].cli_args)
         assert "glm-4.7-flash" in str(test_settings.cli_configurations[13].cli_args)
 
     def test_cli_configurations_env_override(self):
