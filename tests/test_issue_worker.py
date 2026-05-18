@@ -520,7 +520,7 @@ class TestIssueWorker:
         mock_get_active_cli_command.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_has_changes.return_value = True
-        mock_commit_push_changes.return_value = (True, None)
+        mock_commit_and_push_changes.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute_with_instructions.return_value = {"success": True}
@@ -802,7 +802,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     def test_on_task_complete_receives_correct_pr_url(
         self,
-        mock_commit_push,
+        mock_commit_and_push_changes,
         mock_checkout,
         mock_create_branch,
         mock_has_changes,
@@ -875,7 +875,7 @@ class TestIssueWorker:
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
         mock_has_changes.return_value = True
-        mock_commit_push.return_value = (True, None)
+        mock_commit_and_push_changes.return_value = (True, None)
         mock_checkout_branch_resilient.return_value = True
         mock_create_and_checkout_branch.return_value = True
         mock_get_current_branch.return_value = "ai/task-1"
