@@ -487,18 +487,24 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
     @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
     @patch("auto_slopp.workers.issue_worker.create_pull_request")
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.create_branch")
     def test_existing_open_pr_reused(
         self,
-        mock_checkout,
         mock_create_branch,
-        mock_has_changes,
         mock_get_current_branch,
+        mock_has_changes,
         mock_settings,
         mock_push_to_remote,
         mock_create_pull_request,
@@ -507,6 +513,8 @@ class TestIssueWorker:
         mock_execute_with_instructions,
         mock_get_active_cli_command,
         mock_commit_push_changes,
+        mock_checkout,
+        mock_create_and_checkout_branch,
     ):
         """Test that an existing open PR is reused instead of creating a new one."""
         mock_get_active_cli_command.return_value = "opencode"
@@ -555,44 +563,41 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     def test_pr_creation_failure_fallback_to_existing_pr(
         self,
-        mock_checkout_branch_resilient,
-        mock_commit_push_changes,
-        mock_settings,
-        mock_create_pull_request,
-        mock_get_active_cli_command,
+        mock_cli,
         mock_execute_with_instructions,
-        mock_get_commits_ahead_of_branch,
-        mock_get_pr_for_branch,
+        mock_get_pr_for_branch_1,
+        mock_get_commits_ahead_of_branch_1,
+        mock_create_pull_request_1,
+        mock_get_current_branch_1,
+        mock_settings_1,
+        mock_push_to_remote_1,
+        mock_get_pr_for_branch_2,
+        mock_get_commits_ahead_of_branch_2,
         mock_create_and_checkout_branch,
         mock_has_changes,
-        mock_get_current_branch,
-        mock_push_to_remote,
-        mock_create_pr,
-        mock_push,
-        mock_get_pr,
-        mock_execute,
-        mock_cli,
-        mock_get_commits_ahead,
-        mock_checkout,
-        mock_create_branch,
-        mock_commit_push,
+        mock_get_current_branch_2,
+        mock_push_to_remote_2,
+        mock_create_pull_request_2,
+        mock_settings_2,
+        mock_checkout_branch_resilient,
+        mock_commit_push_changes,
     ):
         """Test that when PR creation fails, fallback to existing PR succeeds."""
         mock_cli.return_value = "opencode"
-        mock_settings.ralph_enabled = False
+        mock_settings_2.ralph_enabled = False
         mock_has_changes.return_value = True
-        mock_commit_push.return_value = (True, None)
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        mock_execute.return_value = {"success": True}
-        mock_current_branch.return_value = "ai/task-1"
-        mock_push.return_value = (True, "")
+        mock_commit_push_changes.return_value = (True, None)
+        mock_checkout_branch_resilient.return_value = True
+        mock_create_and_checkout_branch.return_value = True
+        mock_execute_with_instructions.return_value = {"success": True}
+        mock_get_current_branch_2.return_value = "ai/task-1"
+        mock_push_to_remote_2.return_value = (True, "")
         # First call returns None (no existing open PR), second call finds one after create fails
-        mock_get_pr.side_effect = [
+        mock_get_pr_for_branch_2.side_effect = [
             None,
             {"state": "OPEN", "url": "https://github.com/test/pr/42"},
         ]
-        mock_create_pr.return_value = None  # PR creation fails
+        mock_create_pull_request_2.return_value = None  # PR creation fails
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
         result = worker.run(Path("/tmp"))
@@ -787,6 +792,14 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
@@ -798,18 +811,18 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     def test_on_task_complete_receives_correct_pr_url(
         self,
-        mock_cli,
-        mock_execute,
-        mock_get_pr,
-        mock_create_pr,
-        mock_push,
-        mock_settings,
-        mock_current_branch,
-        mock_has_changes,
-        mock_create_branch,
-        mock_checkout,
         mock_commit_push,
+        mock_checkout,
+        mock_create_branch,
+        mock_has_changes,
+        mock_get_current_branch,
+        mock_settings,
+        mock_push,
+        mock_cli,
+        mock_create_pr,
+        mock_get_pr,
         mock_get_commits_ahead,
+        mock_execute,
     ):
         """Test that on_task_complete is called with the correct PR URL."""
         mock_cli.return_value = "opencode"
@@ -819,7 +832,7 @@ class TestIssueWorker:
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute.return_value = {"success": True}
-        mock_current_branch.return_value = "ai/task-1"
+        mock_get_current_branch.return_value = "ai/task-1"
         mock_push.return_value = (True, "")
         mock_get_pr.return_value = None
         mock_create_pr.return_value = {"url": "https://github.com/test/pr/7"}
