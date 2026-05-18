@@ -180,20 +180,23 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.settings")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     def test_branch_creation_push_pr_arguments(
         self,
-        mock_push_to_remote,
-        mock_create_pull_request,
-        mock_get_pr_for_branch,
-        mock_get_commits_ahead_of_branch,
         mock_execute_with_instructions,
+        mock_get_commits_ahead_of_branch,
+        mock_get_pr_for_branch,
         mock_get_active_cli_command,
-        mock_commit_and_push_changes,
-        mock_checkout_branch_resilient,
-        mock_create_and_checkout_branch,
-        mock_has_changes,
         mock_get_current_branch,
         mock_settings,
+        mock_push_to_remote,
+        mock_create_pull_request,
+        mock_has_changes,
+        mock_create_and_checkout_branch,
+        mock_checkout_branch_resilient,
+        mock_commit_and_push_changes,
     ):
         mock_get_active_cli_command.return_value = "opencode"
         mock_settings.github_issue_step_max_iterations = 10
@@ -269,47 +272,52 @@ class TestIssueWorker:
         assert "Description" in instructions
         assert "Create a new branch that starts with ai/" in instructions
 
-    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.has_changes")
-    @patch("auto_slopp.workers.issue_worker.get_current_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
     @patch("auto_slopp.workers.issue_worker.push_to_remote")
-    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     def test_multiple_tasks_processing(
         self,
-        mock_cli,
-        mock_execute,
-        mock_get_pr,
-        mock_create_pr,
-        mock_push,
+        mock_commit_push_changes,
+        mock_checkout_branch_resilient,
         mock_settings,
-        mock_current_branch,
+        mock_create_pull_request,
+        mock_get_active_cli_command,
+        mock_execute_with_instructions,
+        mock_get_commits_ahead_of_branch,
+        mock_get_pr_for_branch,
+        mock_create_and_checkout_branch,
         mock_has_changes,
-        mock_create_branch,
-        mock_checkout,
-        mock_commit_push,
-        mock_get_commits_ahead,
+        mock_get_current_branch,
+        mock_push_to_remote,
     ):
         """Test that run processes multiple tasks correctly."""
-        mock_cli.return_value = "opencode"
+        mock_get_active_cli_command.return_value = "opencode"
         mock_settings.ralph_enabled = False
-        mock_commit_push.return_value = (True, None)
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        mock_execute.return_value = {"success": True}
+        mock_commit_push_changes.return_value = (True, None)
+        mock_checkout_branch_resilient.return_value = True
+        mock_create_and_checkout_branch.return_value = True
+        mock_execute_with_instructions.return_value = {"success": True}
         mock_has_changes.return_value = True
         # Return task branch instead of main so PR can be created
-        mock_current_branch.return_value = "ai/task-1"
-        mock_push.return_value = (True, "")
-        mock_get_pr.return_value = None
-        mock_create_pr.return_value = {"url": "https://github.com/test/pr/1"}
-        mock_get_commits_ahead.return_value = 1
+        mock_get_current_branch.return_value = "ai/task-1"
+        mock_push_to_remote.return_value = (True, "")
+        mock_get_pr_for_branch.return_value = None
+        mock_create_pull_request.return_value = {"url": "https://github.com/test/pr/1"}
+        mock_get_commits_ahead_of_branch.return_value = 1
         task_source = MockTaskSource(
             tasks=[
                 Task(id=1, title="Task 1", body=""),
@@ -576,14 +584,18 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.settings")
     @patch("auto_slopp.workers.issue_worker.push_to_remote")
     @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
-    @patch("auto_slopp.workers.issue_worker.has_changes")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     def test_github_task_pr_title_format(
         self,
         mock_commit_and_push_changes,
@@ -636,24 +648,36 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.push_to_remote")
     @patch("auto_slopp.workers.issue_worker.settings")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
-    @patch("auto_slopp.workers.issue_worker.has_changes")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     def test_github_task_pr_title_format(
         self,
-        mock_commit_and_push_changes,
-        mock_checkout_branch_resilient,
-        mock_create_and_checkout_branch,
-        mock_has_changes,
-        mock_get_current_branch,
-        mock_settings,
-        mock_push_to_remote,
+        mock_get_active_cli_command,
+        mock_execute_with_instructions,
+        mock_get_commits_ahead_of_branch,
         mock_get_pr_for_branch,
         mock_create_pull_request,
-        mock_get_commits_ahead_of_branch,
-        mock_execute_with_instructions,
-        mock_get_active_cli_command,
+        mock_push_to_remote,
+        mock_settings,
+        mock_get_current_branch,
+        mock_has_changes,
+        mock_create_and_checkout_branch,
+        mock_checkout_branch_resilient,
+        mock_commit_and_push_changes,
     ):
         """Test that GitHubIssueWorker uses correct PR title format for GitHub tasks."""
         mock_get_active_cli_command.return_value = "opencode"
