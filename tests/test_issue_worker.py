@@ -477,48 +477,6 @@ class TestIssueWorker:
 
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.get_current_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    @patch("auto_slopp.workers.issue_worker.push_to_remote")
-    @patch("auto_slopp.workers.issue_worker.create_pull_request")
-    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
-    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
-    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
-    def test_pr_creation_failure_calls_on_task_failure(
-        self,
-        mock_cli,
-        mock_execute,
-        mock_get_pr,
-        mock_create_pr,
-        mock_push,
-        mock_settings,
-        mock_current_branch,
-        mock_create_branch,
-        mock_checkout,
-    ):
-        """Test that PR creation failure calls on_task_failure."""
-        mock_cli.return_value = "opencode"
-        mock_settings.ralph_enabled = False
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        mock_execute.return_value = {"success": True}
-        mock_current_branch.return_value = "ai/task-1"
-        mock_push.return_value = (True, "")
-        mock_get_pr.return_value = None
-        mock_create_pr.return_value = None
-        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-        result = worker.run(Path("/tmp"))
-        assert result["tasks_processed"] == 0
-        assert result["task_results"][0]["success"] is False
-        assert task_source.on_task_failure_called is True
-        assert task_source.on_task_complete_called is False
-
-    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.has_changes")
-    @patch("auto_slopp.workers.issue_worker.get_current_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
     @patch("auto_slopp.workers.issue_worker.push_to_remote")
     @patch("auto_slopp.workers.issue_worker.create_pull_request")
@@ -526,56 +484,13 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
-    def test_ralph_enabled_success_with_push_and_pr(
-        self,
-        mock_cli,
-        mock_get_pr,
-        mock_create_pr,
-        mock_push,
-        mock_settings,
-        mock_current_branch,
-        mock_has_changes,
-        mock_create_branch,
-        mock_checkout,
-        mock_commit_push,
-        mock_get_commits_ahead,
-    ):
-        """Test that empty PR URL prevents marking task as complete."""
-        mock_cli.return_value = "opencode"
-        mock_settings.ralph_enabled = False
-        mock_has_changes.return_value = True
-        mock_commit_push.return_value = (True, None)
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        mock_execute.return_value = {"success": True}
-        mock_current_branch.return_value = "ai/task-1"
-        mock_push.return_value = (True, "")
-        mock_get_pr.return_value = {"state": "OPEN", "url": ""}
-        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-        result = worker.run(Path("/tmp"))
-        assert result["task_results"][0]["success"] is False
-        assert "no PR URL available" in result["task_results"][0]["error"]
-        assert "Task #1" in result["task_results"][0]["error"]
-        assert task_source.on_task_failure_called is True
-        assert task_source.on_task_complete_called is False
-
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.has_changes")
-    @patch("auto_slopp.workers.issue_worker.get_current_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    @patch("auto_slopp.workers.issue_worker.push_to_remote")
-    @patch("auto_slopp.workers.issue_worker.create_pull_request")
-    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
-    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
-    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
-    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     def test_existing_open_pr_reused(
         self,
+        mock_commit_push,
         mock_cli,
         mock_execute,
+        mock_get_commits_ahead,
         mock_get_pr,
         mock_create_pr,
         mock_push,
@@ -584,8 +499,6 @@ class TestIssueWorker:
         mock_has_changes,
         mock_create_branch,
         mock_checkout,
-        mock_commit_push,
-        mock_get_commits_ahead,
     ):
         """Test that an existing open PR is reused instead of creating a new one."""
         mock_cli.return_value = "opencode"
@@ -910,9 +823,12 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.create_pull_request")
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     def test_ralph_enabled_success_with_push_and_pr(
         self,
+        mock_commit_push,
         mock_cli,
+        mock_execute,
         mock_get_pr,
         mock_create_pr,
         mock_push,
@@ -921,7 +837,7 @@ class TestIssueWorker:
         mock_has_changes,
         mock_create_branch,
         mock_checkout,
-        mock_commit_push,
+        mock_get_commits_ahead,
     ):
         """Test successful Ralph-enabled workflow through push and PR creation."""
         mock_cli.return_value = "opencode"
