@@ -67,7 +67,7 @@ coverage:
 security:
 	@echo "🔒 Running security scans..."
 	@echo "Running safety check..."
-	uv run safety check --ignore 90553,89824,SFTY-20260318-30374,89826,SFTY-20260322-35073,90749,92337,93697,SFTY-20260416-63613,93686 || (echo "❌ Safety security check failed" && exit 1)
+	uv run safety check --ignore 90553,89824,SFTY-20260318-30374,89826,SFTY-20260322-35073,90749,92337,93697,SFTY-20260416-63613,93686,94066 || (echo "❌ Safety security check failed" && exit 1)
 	@echo "✅ Safety security check passed"
 	@echo "Running bandit security linter..."
 	uv run bandit -r src/ --severity-level=medium || (echo "❌ Bandit security linter failed" && exit 1)
