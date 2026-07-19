@@ -110,7 +110,7 @@ class Settings(BaseSettings):
         default=False, description="Disable notification sound for Telegram messages"
     )
 
-    cli_configurations: List[CLIConfiguration] = Field(
+cli_configurations: List[CLIConfiguration] = Field(
         default_factory=lambda: [          
             CLIConfiguration(
                 cli_command="codex",
@@ -137,7 +137,7 @@ class Settings(BaseSettings):
                 ],
                 capability=7,
                 name="opencode nemotron3-free",
-            ),            
+            ),
             CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[
@@ -157,6 +157,53 @@ class Settings(BaseSettings):
                 ],
                 capability=7,
                 name="opencode nemotron-3-super-free",
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "opencode/boneless",
+                    "run",
+                ],
+                capability=4,
+                name="opencode boneless",
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "opencode/nemotron-3-super",
+                    "run",
+                ],
+                capability=8,
+                name="opencode nemotron3-super",
+            ),
+            CLIConfiguration(
+                cli_command="gemini",
+                cli_args=[
+                    "--model",
+                    "models/gemini-pro",
+                ],
+                capability=6,
+                name="gemini pro",
+            ),
+            CLIConfiguration(
+                cli_command="claude",
+                cli_args=[
+                    "--model",
+                    "claude-3-sonnet-20240229",
+                ],
+                capability=7,
+                name="claude 3 sonnet",
+            ),
+            CLIConfiguration(
+                cli_command="gemini",
+                cli_args=[
+                    "--model",
+                    "models/gemini-ultra",
+                ],
+                capability=9,
+                name="gemini ultra",
             ),
         ],
         description=(
@@ -179,6 +226,23 @@ class Settings(BaseSettings):
         description="Allowed GitHub username for GitHubIssueWorker to process issues",
     )
 
+    pr_review_worker_required_label: str = Field(
+        default="AI Review",
+        description="Required label for PrReviewWorker to process a PR",
+    )
+    pr_review_worker_min_comments: int = Field(
+        default=3,
+        ge=1,
+        le=20,
+        description="Minimum number of review comments per PR",
+    )
+    pr_review_worker_max_comments: int = Field(
+        default=9,
+        ge=1,
+        le=20,
+        description="Maximum number of review comments per PR",
+    )
+
     additional_env_file: Optional[Path] = Field(
         default=None,
         description="Path to an additional .env file to be appended to subprocess calls for github_operations",
@@ -195,7 +259,7 @@ class Settings(BaseSettings):
             "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2),
             "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
         },
-        description="Difficulty ratings for various task phases (0-10)",
+        description="Difficulty ratings for various task phases (0-10)"
     )
 
     ralph_max_loops: int = Field(
