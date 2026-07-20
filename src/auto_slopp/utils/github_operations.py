@@ -556,12 +556,12 @@ def get_pr_files(repo_dir: Path, pr_number: int) -> str:
             str(pr_number),
             check=False,
         )
-        
+
         if result.returncode != 0:
             error_msg = result.stderr.strip() or result.stdout.strip()
             logger.error(f"Failed to get diff for PR #{pr_number} in {repo_dir.name}: {error_msg}")
             raise GitHubOperationError(f"Failed to get PR diff: {error_msg}")
-            
+
         return result.stdout
 
     except GitHubOperationError:
@@ -591,136 +591,7 @@ def submit_pr_review(repo_dir: Path, pr_number: int, body: str, event: str = "CO
             event_flag = "--request-changes"
         else:  # Default to COMMENT
             event_flag = "--comment"
-            
-        result = _run_gh_command(
-            repo_dir,
-            "pr",
-            "review",
-            str(pr_number),
-            event_flag,
-            "--body",
-            body,
-            check=False,
-        )
-        return result.returncode == 0
 
-    except GitHubOperationError as e:
-        logger.error(f"Error submitting review for PR #{pr_number} in {repo_dir.name}: {str(e)}")
-        return False
-    except Exception as e:
-        logger.error(f"Unexpected error submitting review for PR #{pr_number} in {repo_dir.name}: {str(e)}")
-        return False
-    except Exception as e:
-        logger.error(f"Unexpected error submitting review for PR #{pr_number} in {repo_dir.name}: {str(e)}")
-        return False
-
-
-def get_open_prs_with_label(repo_dir: Path, label: str) -> List[Dict]:
-    """Get list of open PRs in the repository filtered by label.
-
-    Args:
-        repo_dir: Path to the git repository
-        label: Label to filter PRs by
-
-    Returns:
-        List of dictionaries containing PR information (number, title, body, headRefName, author, labels).
-
-    Raises:
-        GitHubOperationError: If gh command fails
-    """
-    try:
-        result = _run_gh_command(
-            repo_dir,
-            "pr",
-            "list",
-            "--state=open",
-            f"--label={label}",
-            "--json=number,title,body,headRefName,author,labels",
-            check=False,
-        )
-
-        if result.returncode != 0:
-            pr_error = result.stderr.strip() or result.stdout.strip()
-            if "Could not resolve to a Repository" in pr_error:
-                logger.warning(
-                    f"Cannot access repository {repo_dir.name}: likely permission denied or repository not found. "
-                    f"Verify the GitHub token has access to this repository."
-                )
-            else:
-                logger.error(f"Failed to list PRs with label '{label}' in {repo_dir.name}: {pr_error}")
-            return []
-
-        prs = json.loads(result.stdout)
-        return prs
-
-    except GitHubOperationError as e:
-        logger.error(f"Error getting PRs with label '{label}' from {repo_dir.name}: {str(e)}")
-        return []
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse PR list JSON from {repo_dir.name}: {str(e)}")
-        return []
-    except Exception as e:
-        logger.error(f"Unexpected error getting PRs with label '{label}' from {repo_dir.name}: {str(e)}")
-        return []
-
-
-def get_pr_files(repo_dir: Path, pr_number: int) -> str:
-    """Get the full diff text for a pull request.
-
-    Args:
-        repo_dir: Path to the git repository
-        pr_number: Pull request number to get files for
-
-    Returns:
-        The diff text string for the PR.
-
-    Raises:
-        GitHubOperationError: If gh command fails
-    """
-    try:
-        result = _run_gh_command(
-            repo_dir,
-            "pr",
-            "diff",
-            str(pr_number),
-            check=False,
-        )
-        
-        if result.returncode != 0:
-            error_msg = result.stderr.strip() or result.stdout.strip()
-            logger.error(f"Failed to get diff for PR #{pr_number} in {repo_dir.name}: {error_msg}")
-            raise GitHubOperationError(f"Failed to get PR diff: {error_msg}")
-            
-        return result.stdout
-
-    except GitHubOperationError:
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error getting diff for PR #{pr_number} in {repo_dir.name}: {str(e)}")
-        raise GitHubOperationError(f"Unexpected error getting PR diff: {str(e)}")
-
-
-def submit_pr_review(repo_dir: Path, pr_number: int, body: str, event: str = "COMMENT") -> bool:
-    """Submit a review for a pull request.
-
-    Args:
-        repo_dir: Path to the git repository
-        pr_number: Pull request number to review
-        body: Review body text
-        event: Review event type (COMMENT, APPROVE, REQUEST_CHANGES)
-
-    Returns:
-        True if successful, False otherwise.
-    """
-    try:
-        # Map event to gh pr review flags
-        if event.upper() == "APPROVE":
-            event_flag = "--approve"
-        elif event.upper() == "REQUEST_CHANGES":
-            event_flag = "--request-changes"
-        else:  # Default to COMMENT
-            event_flag = "--comment"
-            
         result = _run_gh_command(
             repo_dir,
             "pr",

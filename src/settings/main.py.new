@@ -210,96 +210,183 @@ class Settings(BaseSettings):
             "Tiered CLI configurations ordered by preference. " "Lower index entries are preferred and used first."
         ),
     )
-
-    slop_timeout: int = Field(
-        default=7200,
-        description="Timeout for slopmachine execution in seconds (default: 2 hours)",
-    )
-
-    github_issue_worker_required_label: str = Field(
-        default="ai",
-        description="Required label for GitHubIssueWorker to process an issue",
-    )
-
-    github_issue_worker_allowed_creator: str = Field(
-        default="MelvinKl",
-        description="Allowed GitHub username for GitHubIssueWorker to process issues",
-    )
-
-    pr_review_worker_required_label: str = Field(
-        default="AI Review",
-        description="Required label for PrReviewWorker to process a PR",
-    )
-    pr_review_worker_min_comments: int = Field(
-        default=3,
-        ge=1,
-        le=20,
-        description="Minimum number of review comments per PR",
-    )
-    pr_review_worker_max_comments: int = Field(
-        default=9,
-        ge=1,
-        le=20,
-        description="Maximum number of review comments per PR",
-    )
-
-    additional_env_file: Optional[Path] = Field(
-        default=None,
-        description="Path to an additional .env file to be appended to subprocess calls for github_operations",
-    )
-
-    task_difficulties: Dict[str, TaskRating] = Field(
-        default={
-            "task_planning": TaskRating(min_rating=0, max_rating=10, recommended_rating=6),
-            "implementation": TaskRating(min_rating=5, max_rating=10, recommended_rating=10),
-            "task_implementation_validation": TaskRating(min_rating=0, max_rating=10, recommended_rating=6),
-            "remaining_steps_update": TaskRating(min_rating=0, max_rating=10, recommended_rating=4),
-            "pr_description": TaskRating(min_rating=0, max_rating=10, recommended_rating=1),
-            "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
-            "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2),
-            "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
-        },
-        description="Difficulty ratings for various task phases (0-10)",
-    )
-
-    ralph_max_loops: int = Field(
-        default=50,
-        ge=1,
-        description="Maximum number of loops for Ralph step execution (default: 20)",
-    )
-
-    github_issue_step_max_iterations: int = Field(
-        default=50,
-        ge=1,
-        description="Maximum step-iteration attempts for GitHub issue Ralph execution (default: 25)",
-    )
-
-    ralph_enabled: bool = Field(
-        default=True,
-        description="Enable Ralph loop-based step execution for GitHub issues",
-    )
-
-    stale_branch_days_threshold: int = Field(
-        default=1,
-        ge=0,
-        description="Days after which a local branch without remote is considered stale and deleted (default: 1)",
-    )
-
-    auto_update_reboot_delay: int = Field(
-        default=300,
-        ge=0,
-        description="Delay in seconds before reboot after auto-update (default: 5 minutes)",
-    )
-
-    model_config = {
-        "env_prefix": "AUTO_SLOPP_",
-        "env_file": ".env",
-        "env_file_encoding": "utf-8",
-    }
-
-
-# Load .env file automatically before creating settings instance
-load_dotenv(override=True)
-
-# Global settings instance
-settings = Settings()
+                        "run",
+                    ],
+                    capability=6,
+                    name="opencode nemotron3-free",
+                ),
+                CLIConfiguration(
+                    cli_command="opencode",
+                    cli_args=[
+                        "--model",
+                        "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+                        "run",
+                    ],
+                    capability=7,
+                    name="opencode nemotron3-free",
+                ),
+                CLIConfiguration(
+                    cli_command="opencode",
+                    cli_args=[
+                        "--model",
+                        "opencode/big-pickle",
+                        "run",
+                    ],
+                    capability=5,
+                    name="opencode big pickle",
+                ),
+                CLIConfiguration(
+                    cli_command="opencode",
+                    cli_args=[
+                        "--model",
+                        "opencode/nemotron-3-super-free",
+                        "run",
+                    ],
+                    capability=7,
+                    name="opencode nemotron-3-super-free",
+                ),
+                CLIConfiguration(
+                    cli_command="opencode",
+                    cli_args=[
+                        "--model",
+                        "opencode/boneless",
+                        "run",
+                    ],
+                    capability=4,
+                    name="opencode boneless",
+                ),
+                CLIConfiguration(
+                    cli_command="opencode",
+                    cli_args=[
+                        "--model",
+                        "opencode/nemotron-3-super",
+                        "run",
+                    ],
+                    capability=8,
+                    name="opencode nemotron3-super",
+                ),
+                CLIConfiguration(
+                    cli_command="gemini",
+                    cli_args=[
+                        "--model",
+                        "models/gemini-pro",
+                    ],
+                    capability=6,
+                    name="gemini pro",
+                ),
+                CLIConfiguration(
+                    cli_command="claude",
+                    cli_args=[
+                        "--model",
+                        "claude-3-sonnet-20240229",
+                    ],
+                    capability=7,
+                    name="claude 3 sonnet",
+                ),
+                CLIConfiguration(
+                    cli_command="gemini",
+                    cli_args=[
+                        "--model",
+                        "models/gemini-ultra",
+                    ],
+                    capability=9,
+                    name="gemini ultra",
+                ),
+            ],
+            description=(
+                "Tiered CLI configurations ordered by preference. " "Lower index entries are preferred and used first."
+            ),
+        )
+    
+        slop_timeout: int = Field(
+            default=7200,
+            description="Timeout for slopmachine execution in seconds (default: 2 hours)",
+        )
+    
+        github_issue_worker_required_label: str = Field(
+            default="ai",
+            description="Required label for GitHubIssueWorker to process an issue",
+        )
+    
+        github_issue_worker_allowed_creator: str = Field(
+            default="MelvinKl",
+            description="Allowed GitHub username for GitHubIssueWorker to process issues",
+        )
+    
+        pr_review_worker_required_label: str = Field(
+            default="AI Review",
+            description="Required label for PrReviewWorker to process a PR",
+        )
+        pr_review_worker_min_comments: int = Field(
+            default=3,
+            ge=1,
+            le=20,
+            description="Minimum number of review comments per PR",
+        )
+        pr_review_worker_max_comments: int = Field(
+            default=9,
+            ge=1,
+            le=20,
+            description="Maximum number of review comments per PR",
+        )
+    
+        additional_env_file: Optional[Path] = Field(
+            default=None,
+            description="Path to an additional .env file to be appended to subprocess calls for github_operations",
+        )
+    
+        task_difficulties: Dict[str, TaskRating] = Field(
+            default={
+                "task_planning": TaskRating(min_rating=0, max_rating=10, recommended_rating=6),
+                "implementation": TaskRating(min_rating=5, max_rating=10, recommended_rating=10),
+                "task_implementation_validation": TaskRating(min_rating=0, max_rating=10, recommended_rating=6),
+                "remaining_steps_update": TaskRating(min_rating=0, max_rating=10, recommended_rating=4),
+                "pr_description": TaskRating(min_rating=0, max_rating=10, recommended_rating=1),
+                "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
+                "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2),
+                "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
+            },
+            description="Difficulty ratings for various task phases (0-10)"
+        )
+    
+        ralph_max_loops: int = Field(
+            default=50,
+            ge=1,
+            description="Maximum number of loops for Ralph step execution (default: 20)",
+        )
+    
+        github_issue_step_max_iterations: int = Field(
+            default=50,
+            ge=1,
+            description="Maximum step-iteration attempts for GitHub issue Ralph execution (default: 25)",
+        )
+    
+        ralph_enabled: bool = Field(
+            default=True,
+            description="Enable Ralph loop-based step execution for GitHub issues",
+        )
+    
+        stale_branch_days_threshold: int = Field(
+            default=1,
+            ge=0,
+            description="Days after which a local branch without remote is considered stale and deleted (default: 1)",
+        )
+    
+        auto_update_reboot_delay: int = Field(
+            default=300,
+            ge=0,
+            description="Delay in seconds before reboot after auto-update (default: 5 minutes)",
+        )
+    
+        model_config = {
+            "env_prefix": "AUTO_SLOPP_",
+            "env_file": ".env",
+            "env_file_encoding": "utf-8",
+        }
+    
+    
+    # Load .env file automatically before creating settings instance
+    load_dotenv(override=True)
+    
+    # Global settings instance
+    settings = Settings()

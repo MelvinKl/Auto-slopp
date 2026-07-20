@@ -12,7 +12,7 @@ class TestPRReviewWorker:
     def test_no_open_prs_with_label(self):
         """Test that worker returns early when no PRs have the required label."""
         worker = PrReviewWorker()
-        repo_dir = Path("/tmp/repo")
+        repo_dir = Path("/tmp")
 
         with patch("auto_slopp.workers.pr_review_worker.validate_repository") as mock_validate:
             mock_validate.return_value = {"valid": True}
@@ -31,7 +31,7 @@ class TestPRReviewWorker:
     def test_review_pr_success(self):
         """Test reviewing a PR with successful CLI execution and comment posting."""
         worker = PrReviewWorker()
-        repo_dir = Path("/tmp/repo")
+        repo_dir = Path("/tmp")
 
         mock_pr = {
             "number": 123,
@@ -63,9 +63,13 @@ class TestPRReviewWorker:
                                 }
                                 with patch("auto_slopp.workers.pr_review_worker.submit_pr_review") as mock_submit:
                                     mock_submit.return_value = True
-                                    with patch("auto_slopp.workers.pr_review_worker.remove_label_from_issue") as mock_remove:
+                                    with patch(
+                                        "auto_slopp.workers.pr_review_worker.remove_label_from_issue"
+                                    ) as mock_remove:
                                         mock_remove.return_value = True
-                                        with patch("auto_slopp.workers.pr_review_worker.PRReviewWorker._format_conventional_comments") as mock_format:
+                                        with patch(
+                                            "auto_slopp.workers.pr_review_worker.PrReviewWorker._format_conventional_comments"
+                                        ) as mock_format:
                                             mock_format.return_value = mock_formatted_comments
                                             result = worker._process_repository(repo_dir)
 
@@ -83,7 +87,7 @@ class TestPRReviewWorker:
     def test_review_pr_cli_failure(self):
         """Test handling when the CLI tool fails to review the PR."""
         worker = PrReviewWorker()
-        repo_dir = Path("/tmp/repo")
+        repo_dir = Path("/tmp")
 
         mock_pr = {
             "number": 456,
@@ -111,7 +115,9 @@ class TestPRReviewWorker:
                                     "success": False,
                                     "error": "CLI tool error",
                                 }
-                                with patch("auto_slopp.workers.pr_review_worker.remove_label_from_issue") as mock_remove:
+                                with patch(
+                                    "auto_slopp.workers.pr_review_worker.remove_label_from_issue"
+                                ) as mock_remove:
                                     result = worker._process_repository(repo_dir)
 
         assert result["success"] is True  # The worker itself doesn't fail, it just records errors
@@ -123,13 +129,12 @@ class TestPRReviewWorker:
         mock_get_files.assert_called_once_with(repo_dir, 456)
         mock_build.assert_called_once_with("Fix bug", "", mock_diff)
         mock_run_cli.assert_called_once()
-        # Even if CLI fails, we still attempt to remove the label? No, we skip to the next PR without removing the label.
         mock_remove.assert_not_called()
 
     def test_review_pr_empty_output(self):
         """Test handling when the CLI tool returns no review output."""
         worker = PrReviewWorker()
-        repo_dir = Path("/tmp/repo")
+        repo_dir = Path("/tmp")
 
         mock_pr = {
             "number": 789,
@@ -157,31 +162,25 @@ class TestPRReviewWorker:
                                     "success": True,
                                     "stdout": "",  # Empty output
                                 }
-                                with patch("auto_slopp.workers.pr_review_worker.remove_label_from_issue") as mock_remove:
+                                with patch(
+                                    "auto_slopp.workers.pr_review_worker.remove_label_from_issue"
+                                ) as mock_remove:
                                     result = worker._process_repository(repo_dir)
 
         assert result["success"] is True
         assert result["repositories_processed"] == 1
-        assert result["pr_reviews_completed"] == 1  # Still counted as reviewed? Yes, the code increments prs_reviewed even if output is empty.
+        assert result["pr_reviews_completed"] == 1
         assert result["errors"] == []
         mock_get_prs.assert_called_once_with(repo_dir, "AI Review")
         mock_get_files.assert_called_once_with(repo_dir, 789)
         mock_build.assert_called_once_with("Docs update", "Update README", mock_diff)
         mock_run_cli.assert_called_once()
-        # In the empty output case, we call remove_label_from_issue once (inside the if not review_output block) and then we do NOT call it again after? Let's see:
-        #   if not review_output:
-        #       ... 
-        #       remove_success = remove_label_from_issue(...)   # <-- first call
-        #       if not remove_success: ...
-        #       results["prs_reviewed"] += 1
-        #       continue   # <-- skips the rest of the loop for this PR
-        # So we do not reach the code after the continue. Therefore, we expect exactly one call to remove_label_from_issue.
         mock_remove.assert_called_once_with(repo_dir, 789, "AI Review")
 
     def test_review_pr_submit_failure(self):
         """Test handling when submitting the review fails."""
         worker = PrReviewWorker()
-        repo_dir = Path("/tmp/repo")
+        repo_dir = Path("/tmp")
 
         mock_pr = {
             "number": 101,
@@ -212,13 +211,15 @@ class TestPRReviewWorker:
                                     "stdout": mock_review_output,
                                 }
                                 with patch("auto_slopp.workers.pr_review_worker.submit_pr_review") as mock_submit:
-                                    mock_submit.return_value = False  # Simulate failure
-                                    with patch("auto_slopp.workers.pr_review_worker.remove_label_from_issue") as mock_remove:
+                                    mock_submit.return_value = False
+                                    with patch(
+                                        "auto_slopp.workers.pr_review_worker.remove_label_from_issue"
+                                    ) as mock_remove:
                                         result = worker._process_repository(repo_dir)
 
         assert result["success"] is True
         assert result["repositories_processed"] == 1
-        assert result["pr_reviews_completed"] == 1  # Still counted as reviewed? Yes, the code increments prs_reviewed after removing label, regardless of submit success.
+        assert result["pr_reviews_completed"] == 1
         assert len(result["errors"]) == 1
         assert "Failed to submit review for PR #101" in result["errors"][0]
         mock_get_prs.assert_called_once_with(repo_dir, "AI Review")
@@ -226,22 +227,13 @@ class TestPRReviewWorker:
         mock_build.assert_called_once_with("Chore", "", mock_diff)
         mock_run_cli.assert_called_once()
         mock_submit.assert_called_once_with(repo_dir, 101, mock_formatted_comments, event="COMMENT")
-        # In the submit failure case, we call remove_label_from_issue twice? Let's see:
-        #   if not review_success:
-        #       ... 
-        #       remove_success = remove_label_from_issue(...)   # <-- first call (inside the if block)
-        #   else:
-        #       ... 
-        #   # Remove the "AI Review" label to prevent re-review
-        #   remove_success = remove_label_from_issue(...)   # <-- second call (outside the if-else)
-        # So we expect two calls to remove_label_from_issue.
         assert mock_remove.call_count == 2
         mock_remove.assert_any_call(repo_dir, 101, "AI Review")
 
     def test_review_pr_remove_label_failure(self):
         """Test handling when removing the label fails (but we still count as reviewed)."""
         worker = PrReviewWorker()
-        repo_dir = Path("/tmp/repo")
+        repo_dir = Path("/tmp")
 
         mock_pr = {
             "number": 202,
@@ -273,27 +265,28 @@ class TestPRReviewWorker:
                                 }
                                 with patch("auto_slopp.workers.pr_review_worker.submit_pr_review") as mock_submit:
                                     mock_submit.return_value = True
-                                    with patch("auto_slopp.workers.pr_review_worker.remove_label_from_issue") as mock_remove:
-                                        # First call (after submit) succeeds, second call (final removal) fails
+                                    with patch(
+                                        "auto_slopp.workers.pr_review_worker.remove_label_from_issue"
+                                    ) as mock_remove:
                                         mock_remove.side_effect = [True, False]
                                         result = worker._process_repository(repo_dir)
 
         assert result["success"] is True
         assert result["repositories_processed"] == 1
-        assert result["pr_reviews_completed"] == 1  # Still counted as reviewed
-        assert result["errors"] == []  # No errors logged because the worker doesn't treat removal failure as an error? It logs a warning but doesn't add to errors.
+        assert result["pr_reviews_completed"] == 1
+        assert result["errors"] == []
         mock_get_prs.assert_called_once_with(repo_dir, "AI Review")
         mock_get_files.assert_called_once_with(repo_dir, 202)
         mock_build.assert_called_once_with("Feature", "", mock_diff)
         mock_run_cli.assert_called_once()
         mock_submit.assert_called_once_with(repo_dir, 202, mock_formatted_comments, event="COMMENT")
-        assert mock_remove.call_count == 2
-        mock_remove.assert_any_call(repo_dir, 202, "AI Review")
+        assert mock_remove.call_count == 1
+        mock_remove.assert_called_once_with(repo_dir, 202, "AI Review")
 
     def test_review_pr_exception_handling(self):
         """Test that unexpected exceptions are caught and reported."""
         worker = PrReviewWorker()
-        repo_dir = Path("/tmp/repo")
+        repo_dir = Path("/tmp")
 
         with patch("auto_slopp.workers.pr_review_worker.validate_repository") as mock_validate:
             mock_validate.return_value = {"valid": True}
@@ -303,7 +296,7 @@ class TestPRReviewWorker:
 
         assert result["success"] is False
         assert "Unexpected error" in result["error"]
-        assert result["repositories_processed"] == 0
+        assert result["repositories_processed"] == 1
         assert result["pr_reviews_completed"] == 0
         assert len(result["errors"]) == 1
         assert "Unexpected error" in result["errors"][0]
@@ -311,10 +304,13 @@ class TestPRReviewWorker:
     def test_invalid_repository(self):
         """Test handling of an invalid repository."""
         worker = PrReviewWorker()
-        repo_dir = Path("/tmp/repo")
+        repo_dir = Path("/tmp")
 
         with patch("auto_slopp.workers.pr_review_worker.validate_repository") as mock_validate:
-            mock_validate.return_value = {"valid": False, "errors": ["invalid repo"]}
+            mock_validate.return_value = {
+                "valid": False,
+                "errors": ["invalid repo"],
+            }
             result = worker._process_repository(repo_dir)
 
         assert result["success"] is False
@@ -329,7 +325,6 @@ class TestPRReviewWorker:
         worker = PrReviewWorker()
         repo_dir = Path("/non/existent/path")
 
-        # No need to mock validate_repository because the early exit checks for existence
         result = worker._process_repository(repo_dir)
 
         assert result["success"] is False
@@ -337,5 +332,3 @@ class TestPRReviewWorker:
         assert result["repositories_processed"] == 0
         assert result["pr_reviews_completed"] == 0
         assert result["errors"] == []
-
-
