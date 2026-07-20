@@ -110,7 +110,7 @@ class Settings(BaseSettings):
         default=False, description="Disable notification sound for Telegram messages"
     )
 
-cli_configurations: List[CLIConfiguration] = Field(
+    cli_configurations: List[CLIConfiguration] = Field(
         default_factory=lambda: [
             CLIConfiguration(cli_command="claude", cli_args=[], capability=8, name="claude 1"),
             CLIConfiguration(cli_command="claude", cli_args=[], capability=8, name="claude 2"),

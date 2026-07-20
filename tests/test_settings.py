@@ -147,7 +147,7 @@ class TestSettings:
     def test_cli_configurations_default(self):
         """Test default tiered CLI configurations."""
         test_settings = Settings()
-        assert len(test_settings.cli_configurations) == 16
+        assert len(test_settings.cli_configurations) == 12
         assert test_settings.cli_configurations[0].cli_command == "claude"
         assert test_settings.cli_configurations[1].cli_command == "claude"
         assert test_settings.cli_configurations[2].cli_command == "claude"
@@ -155,15 +155,11 @@ class TestSettings:
         assert test_settings.cli_configurations[4].cli_command == "opencode"
         assert test_settings.cli_configurations[5].cli_command == "gemini"
         assert "glm-4.7" in str(test_settings.cli_configurations[6].cli_args)
-        assert test_settings.cli_configurations[7].cli_command == "codex"
-        assert test_settings.cli_configurations[8].cli_command == "opencode"
-        assert test_settings.cli_configurations[9].cli_command == "opencode"
-        assert "openrouter/nvidia/nemotron-3-super-120b-a12b:free" in str(test_settings.cli_configurations[10].cli_args)
-        assert "big-pickle" in str(test_settings.cli_configurations[11].cli_args)
-        assert "opencode/nemotron-3-super-free" in str(test_settings.cli_configurations[12].cli_args)
-        assert "glm-4.7-flash" in str(test_settings.cli_configurations[13].cli_args)
-        assert "opencode/boneless" in str(test_settings.cli_configurations[14].cli_args)
-        assert "opencode/nemotron-3-super" in str(test_settings.cli_configurations[15].cli_args)
+        assert "big-pickle" in str(test_settings.cli_configurations[7].cli_args)
+        assert "opencode/nemotron-3-super-free" in str(test_settings.cli_configurations[8].cli_args)
+        assert "glm-4.7-flash" in str(test_settings.cli_configurations[9].cli_args)
+        assert "opencode/boneless" in str(test_settings.cli_configurations[10].cli_args)
+        assert "opencode/nemotron-3-super" in str(test_settings.cli_configurations[11].cli_args)
 
     def test_cli_configurations_env_override(self):
         """Test overriding CLI configurations via environment variable."""
