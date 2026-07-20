@@ -113,12 +113,6 @@ class Settings(BaseSettings):
     cli_configurations: List[CLIConfiguration] = Field(
         default_factory=lambda: [
             CLIConfiguration(
-                cli_command="codex",
-                cli_args=["--dangerously-bypass-approvals-and-sandbox", "exec"],
-                capability=8,
-                name="codex",
-            ),
-            CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[
                     "--model",
@@ -177,34 +171,7 @@ class Settings(BaseSettings):
                 ],
                 capability=8,
                 name="opencode nemotron3-super",
-            ),
-            CLIConfiguration(
-                cli_command="gemini",
-                cli_args=[
-                    "--model",
-                    "models/gemini-pro",
-                ],
-                capability=6,
-                name="gemini pro",
-            ),
-            CLIConfiguration(
-                cli_command="claude",
-                cli_args=[
-                    "--model",
-                    "claude-3-sonnet-20240229",
-                ],
-                capability=7,
-                name="claude 3 sonnet",
-            ),
-            CLIConfiguration(
-                cli_command="gemini",
-                cli_args=[
-                    "--model",
-                    "models/gemini-ultra",
-                ],
-                capability=9,
-                name="gemini ultra",
-            ),
+            ),          
         ],
         description=(
             "Tiered CLI configurations ordered by preference. " "Lower index entries are preferred and used first."
