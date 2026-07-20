@@ -66,9 +66,9 @@ coverage:
 # Run security vulnerability scans
 security:
 	@echo "🔒 Running security scans..."
-	@echo "Running safety check..."
-	uv run safety check --ignore 89028,90749,92337,93697,93686,94066,SFTY-20260416-63613,SFTY-20260322-35073,91326,91321,91320,93004,93392,93393,SFTY-20260327-04621,SFTY-20260408-76846,SFTY-20260415-68235,SFTY-20260506-35099,SFTY-20260511-47957,96886,SFTY-20260513-43304,98479,99546,SFTY-20260608-26298,SFTY-20260615-88836,SFTY-20260615-85895,SFTY-20260615-82927,SFTY-20260615-02573,SFTY-20260615-71642,SFTY-20260615-96125,SFTY-20260615-86547,SFTY-20260615-29344,SFTY-20260615-38625,SFTY-20260615-09692,SFTY-20260615-86827,SFTY-20260615-22503,SFTY-20260615-83407,SFTY-20260615-32787,SFTY-20260616-58930 || (echo "❌ Safety security check failed" && exit 1)
-	@echo "✅ Safety security check passed"
+	@echo "Running pip-audit..."
+	uv run pip-audit --ignore-vuln PYSEC-2026-25 --ignore-vuln PYSEC-2026-188 --ignore-vuln PYSEC-2026-2119 --ignore-vuln PYSEC-2026-2121 --ignore-vuln PYSEC-2026-2120 --ignore-vuln PYSEC-2026-2132 --ignore-vuln PYSEC-2026-35 --ignore-vuln PYSEC-2026-36 --ignore-vuln GHSA-537c-gmf6-5ccf --ignore-vuln PYSEC-2026-2475 --ignore-vuln PYSEC-2026-2476 --ignore-vuln PYSEC-2026-215 --ignore-vuln CVE-2026-52870 --ignore-vuln CVE-2026-52869 --ignore-vuln CVE-2026-59950 --ignore-vuln GHSA-4xgf-cpjx-pc3j --ignore-vuln PYSEC-2026-2987 --ignore-vuln PYSEC-2026-120 --ignore-vuln PYSEC-2026-179 --ignore-vuln PYSEC-2026-175 --ignore-vuln PYSEC-2026-178 --ignore-vuln PYSEC-2026-176 --ignore-vuln PYSEC-2026-177 --ignore-vuln PYSEC-2026-1845 --ignore-vuln PYSEC-2026-2270 --ignore-vuln PYSEC-2026-3038 --ignore-vuln PYSEC-2026-3037 --ignore-vuln PYSEC-2026-3036 --ignore-vuln PYSEC-2026-3040 --ignore-vuln PYSEC-2026-3039 --ignore-vuln PYSEC-2026-2275 --ignore-vuln PYSEC-2026-3447 --ignore-vuln PYSEC-2026-161 --ignore-vuln PYSEC-2026-248 --ignore-vuln PYSEC-2026-249 --ignore-vuln PYSEC-2026-2281 --ignore-vuln PYSEC-2026-2280 --ignore-vuln PYSEC-2026-142 --ignore-vuln PYSEC-2026-141 || (echo "❌ pip-audit security check failed" && exit 1)
+	@echo "✅ pip-audit security check passed"
 	@echo "Running bandit security linter..."
 	uv run bandit -r src/ --severity-level=medium || (echo "❌ Bandit security linter failed" && exit 1)
 	@echo "✅ Bandit security linter passed"
