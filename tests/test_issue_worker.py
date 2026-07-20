@@ -183,10 +183,18 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+<<<<<<< HEAD
     @patch("auto_slopp.workers.issue_worker.comment_on_issue")
     def test_run_with_successful_execution(
         self,
         mock_comment,
+=======
+@patch("auto_slopp.workers.issue_worker.comment_on_issue")
+@patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    def test_run_with_successful_execution(
+        self,
+        mock_comment,
+        mock_commits_ahead,
         mock_cli,
         mock_execute,
         mock_get_pr,
@@ -201,6 +209,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that run handles successful execution with PR creation."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
@@ -287,10 +296,18 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+<<<<<<< HEAD
     @patch("auto_slopp.workers.issue_worker.comment_on_issue")
     def test_multiple_tasks_processing(
         self,
         mock_comment,
+=======
+@patch("auto_slopp.workers.issue_worker.comment_on_issue")
+@patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    def test_multiple_tasks_processing(
+        self,
+        mock_comment,
+        mock_commits_ahead,
         mock_cli,
         mock_execute,
         mock_get_pr,
@@ -305,6 +322,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that run processes multiple tasks correctly."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
@@ -531,10 +549,18 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+<<<<<<< HEAD
     @patch("auto_slopp.workers.issue_worker.comment_on_issue")
     def test_empty_pr_url_calls_on_task_failure(
         self,
         mock_comment,
+=======
+@patch("auto_slopp.workers.issue_worker.comment_on_issue")
+@patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    def test_empty_pr_url_calls_on_task_failure(
+        self,
+        mock_comment,
+        mock_commits_ahead,
         mock_cli,
         mock_execute,
         mock_get_pr,
@@ -549,6 +575,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that empty PR URL prevents marking task as complete."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
@@ -582,10 +609,18 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+<<<<<<< HEAD
     @patch("auto_slopp.workers.issue_worker.comment_on_issue")
     def test_existing_open_pr_reused(
         self,
         mock_comment,
+=======
+@patch("auto_slopp.workers.issue_worker.comment_on_issue")
+@patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    def test_existing_open_pr_reused(
+        self,
+        mock_comment,
+        mock_commits_ahead,
         mock_cli,
         mock_execute,
         mock_get_pr,
@@ -600,6 +635,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that an existing open PR is reused instead of creating a new one."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
@@ -636,10 +672,19 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+<<<<<<< HEAD
     @patch("auto_slopp.workers.issue_worker.comment_on_issue")
     def test_pr_creation_failure_fallback_to_existing_pr(
         self,
         mock_comment,
+=======
+@patch("auto_slopp.workers.issue_worker.comment_on_issue")
+@patch("auto_slopp.workers.issue_worker.comment_on_issue")
+@patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    def test_pr_creation_failure_fallback_to_existing_pr(
+        self,
+        mock_comment,
+        mock_commits_ahead,
         mock_cli,
         mock_execute,
         mock_get_pr,
@@ -654,6 +699,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that when PR creation fails, fallback to existing PR succeeds."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
@@ -714,10 +760,19 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+<<<<<<< HEAD
     @patch("auto_slopp.workers.issue_worker.comment_on_issue")
     def test_correct_arguments_to_branch_push_pr(
         self,
         mock_comment,
+=======
+@patch("auto_slopp.workers.issue_worker.comment_on_issue")
+@patch("auto_slopp.workers.issue_worker.comment_on_issue")
+@patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    def test_correct_arguments_to_branch_push_pr(
+        self,
+        mock_comment,
+        mock_commits_ahead,
         mock_cli,
         mock_execute,
         mock_get_pr,
@@ -732,6 +787,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that branch creation, push, and PR creation receive correct arguments."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
@@ -768,10 +824,21 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+<<<<<<< HEAD
     @patch("auto_slopp.workers.issue_worker.comment_on_issue")
     def test_github_issue_worker_uses_correct_pr_title_format(
         self,
         mock_comment,
+=======
+@patch("auto_slopp.workers.issue_worker.comment_on_issue")
+@patch("auto_slopp.workers.issue_worker.comment_on_issue")
+@patch("auto_slopp.workers.issue_worker.comment_on_issue")
+@patch("auto_slopp.workers.issue_worker.comment_on_issue")
+@patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    def test_vikunja_issue_worker_uses_correct_pr_title_format(
+        self,
+        mock_comment,
+        mock_vikunja_commit,
         mock_cli,
         mock_execute,
         mock_get_pr,
@@ -786,6 +853,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that GitHubIssueWorker uses correct PR title format for GitHub tasks."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
@@ -827,12 +895,20 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+<<<<<<< HEAD
     @patch("auto_slopp.workers.issue_worker.comment_on_issue")
+=======
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+>>>>>>> 749d28c06c4e33c79bd78be40c84e28833aefaac
     @patch("auto_slopp.workers.vikunja_task_source.commit")
     def test_vikunja_issue_worker_uses_correct_pr_title_format(
         self,
         mock_vikunja_commit,
+<<<<<<< HEAD
         mock_comment,
+=======
+        mock_commits_ahead,
+>>>>>>> 749d28c06c4e33c79bd78be40c84e28833aefaac
         mock_cli,
         mock_execute,
         mock_get_pr,
@@ -847,6 +923,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that VikunjaIssueWorker uses correct PR title format for Vikunja tasks."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
@@ -888,7 +965,10 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+<<<<<<< HEAD
     @patch("auto_slopp.workers.issue_worker.comment_on_issue")
+@patch("auto_slopp.workers.issue_worker.comment_on_issue")
+@patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     def test_on_task_complete_receives_correct_pr_url(
         self,
         mock_comment,
@@ -906,6 +986,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that on_task_complete is called with the correct PR URL."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_comment.return_value = True
@@ -946,7 +1027,10 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+<<<<<<< HEAD
     @patch("auto_slopp.workers.issue_worker.comment_on_issue")
+@patch("auto_slopp.workers.issue_worker.comment_on_issue")
+@patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     def test_ralph_enabled_success_with_push_and_pr(
         self,
         mock_comment,
@@ -963,6 +1047,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test successful Ralph-enabled workflow through push and PR creation."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10

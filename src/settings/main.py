@@ -110,7 +110,7 @@ class Settings(BaseSettings):
         default=False, description="Disable notification sound for Telegram messages"
     )
 
-    cli_configurations: List[CLIConfiguration] = Field(
+cli_configurations: List[CLIConfiguration] = Field(
         default_factory=lambda: [
             CLIConfiguration(cli_command="claude", cli_args=[], capability=8, name="claude 1"),
             CLIConfiguration(cli_command="claude", cli_args=[], capability=8, name="claude 2"),
@@ -127,24 +127,6 @@ class Settings(BaseSettings):
                 ],
                 capability=8,
                 name="opencode glm-4.7",
-            ),
-            CLIConfiguration(
-                cli_command="codex",
-                cli_args=["--dangerously-bypass-approvals-and-sandbox", "exec"],
-                capability=8,
-                name="codex",
-            ),
-            CLIConfiguration(cli_command="opencode", cli_args=["--model", "model3"], capability=8, name="opencode 3"),
-            CLIConfiguration(cli_command="opencode", cli_args=["--model", "model4"], capability=8, name="opencode 4"),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
-                    "run",
-                ],
-                capability=7,
-                name="opencode nemotron3-free",
             ),
             CLIConfiguration(
                 cli_command="opencode",
@@ -168,10 +150,34 @@ class Settings(BaseSettings):
             ),
             CLIConfiguration(
                 cli_command="opencode",
-                cli_args=["--model", "zai-coding-plan/glm-4.7-flash", "run"],
+                cli_args=[
+                    "--model",
+                    "zai-coding-plan/glm-4.7-flash",
+                    "run",
+                ],
                 capability=1,
                 cooldown_seconds=3600,
                 name="opencode glm-4.7-flash",
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "opencode/boneless",
+                    "run",
+                ],
+                capability=4,
+                name="opencode boneless",
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "opencode/nemotron-3-super",
+                    "run",
+                ],
+                capability=8,
+                name="opencode nemotron3-super",
             ),
         ],
         description=(
@@ -192,6 +198,23 @@ class Settings(BaseSettings):
     github_issue_worker_allowed_creator: str = Field(
         default="MelvinKl",
         description="Allowed GitHub username for GitHubIssueWorker to process issues",
+    )
+
+    pr_review_worker_required_label: str = Field(
+        default="AI",
+        description="Required label for PrReviewWorker to process a PR",
+    )
+    pr_review_worker_min_comments: int = Field(
+        default=0,
+        ge=0,
+        le=20,
+        description="Minimum number of review comments per PR",
+    )
+    pr_review_worker_max_comments: int = Field(
+        default=9,
+        ge=1,
+        le=20,
+        description="Maximum number of review comments per PR",
     )
 
     additional_env_file: Optional[Path] = Field(
