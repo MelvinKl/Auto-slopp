@@ -9,6 +9,7 @@ from typing import Optional, Type
 from auto_slopp.worker import Worker
 from auto_slopp.workers import (
     GitHubIssueWorker,
+    PrReviewWorker,
     PRWorker,
     StaleBranchCleanupWorker,
     VikunjaWorker,
@@ -20,6 +21,7 @@ ALL_WORKERS: list[Type[Worker]] = [
     PRWorker,
     StaleBranchCleanupWorker,
     VikunjaWorker,
+    PrReviewWorker,
 ]
 
 

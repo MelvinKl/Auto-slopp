@@ -3,6 +3,7 @@
 from auto_slopp.executor import ALL_WORKERS
 from auto_slopp.workers import (
     GitHubIssueWorker,
+    PrReviewWorker,
     PRWorker,
     StaleBranchCleanupWorker,
     VikunjaWorker,
@@ -34,7 +35,7 @@ class TestWorkerRegistration:
 
     def test_all_workers_count(self):
         """Test that ALL_WORKERS contains all expected workers."""
-        expected_count = 4
+        expected_count = 5
         assert len(ALL_WORKERS) == expected_count, (
             f"Expected {expected_count} workers in ALL_WORKERS, "
             f"but found {len(ALL_WORKERS)}: {[w.__name__ for w in ALL_WORKERS]}"
@@ -53,6 +54,7 @@ class TestWorkerRegistration:
             assert worker_class in [
                 GitHubIssueWorker,
                 PRWorker,
+                PrReviewWorker,
                 StaleBranchCleanupWorker,
                 VikunjaWorker,
             ], f"{worker_class.__name__} not found in workers module exports"

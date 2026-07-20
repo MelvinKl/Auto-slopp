@@ -147,7 +147,7 @@ class TestSettings:
     def test_cli_configurations_default(self):
         """Test default tiered CLI configurations."""
         test_settings = Settings()
-        assert len(test_settings.cli_configurations) == 7
+        assert len(test_settings.cli_configurations) == 9
         assert test_settings.cli_configurations[0].cli_command == "opencode"
         assert test_settings.cli_configurations[1].cli_command == "codex"
         assert test_settings.cli_configurations[2].cli_command == "opencode"
@@ -156,6 +156,10 @@ class TestSettings:
         assert test_settings.cli_configurations[5].cli_command == "opencode"
         assert test_settings.cli_configurations[6].cli_command == "opencode"
         assert "glm-4.7-flash" in str(test_settings.cli_configurations[6].cli_args)
+        assert test_settings.cli_configurations[7].cli_command == "opencode"
+        assert "boneless" in str(test_settings.cli_configurations[7].cli_args)
+        assert test_settings.cli_configurations[8].cli_command == "opencode"
+        assert "nemotron-3-super" in str(test_settings.cli_configurations[8].cli_args)
 
     def test_cli_configurations_env_override(self):
         """Test overriding CLI configurations via environment variable."""
@@ -260,3 +264,14 @@ class TestSettings:
             "git_checkout",
             "default",
         }
+
+    def test_pr_review_worker_settings_defaults(self):
+        """Test that PR review worker settings have correct defaults."""
+        env_vars_to_keep = {k: v for k, v in os.environ.items() if not k.startswith("AUTO_SLOPP_")}
+        with patch.dict(os.environ, env_vars_to_keep, clear=True):
+            with patch("dotenv.load_dotenv", return_value=None):
+                test_settings = Settings()
+
+        assert test_settings.pr_review_worker_required_label == "AI"
+        assert test_settings.pr_review_worker_min_comments == 0
+        assert test_settings.pr_review_worker_max_comments == 9

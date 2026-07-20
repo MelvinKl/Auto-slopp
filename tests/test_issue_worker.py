@@ -199,6 +199,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that run handles successful execution with PR creation."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_commits_ahead.return_value = 1
@@ -300,6 +301,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that run processes multiple tasks correctly."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_commits_ahead.return_value = 1
@@ -541,6 +543,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that empty PR URL prevents marking task as complete."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_commits_ahead.return_value = 1
@@ -589,6 +592,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that an existing open PR is reused instead of creating a new one."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_commits_ahead.return_value = 1
@@ -640,6 +644,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that when PR creation fails, fallback to existing PR succeeds."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_commits_ahead.return_value = 1
@@ -715,6 +720,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that branch creation, push, and PR creation receive correct arguments."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_commits_ahead.return_value = 1
@@ -766,6 +772,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that GitHubIssueWorker uses correct PR title format for GitHub tasks."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_commits_ahead.return_value = 1
@@ -824,6 +831,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that VikunjaIssueWorker uses correct PR title format for Vikunja tasks."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_commits_ahead.return_value = 1
@@ -880,6 +888,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test that on_task_complete is called with the correct PR URL."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
         mock_commits_ahead.return_value = 1
@@ -934,6 +943,7 @@ class TestIssueWorker:
         mock_commit_push,
     ):
         """Test successful Ralph-enabled workflow through push and PR creation."""
+        mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
