@@ -3,9 +3,14 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pytest
+
 from auto_slopp.utils.github_operations import (
     GitHubOperationError,
+    get_open_prs_with_label,
+    get_pr_files,
     remove_label_from_issue,
+    submit_pr_review,
 )
 
 
@@ -51,4 +56,64 @@ class TestRemoveLabelFromIssue:
 
         result = remove_label_from_issue(repo_dir, 42, "ai")
 
+        assert result is False
+
+
+class TestGetOpenPRsWithLabel:
+    """Test cases for get_open_prs_with_label function."""
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_open_prs_with_label_success(self, mock_run_gh):
+        """Test successful retrieval of PRs with label."""
+        mock_run_gh.return_value = Mock(returncode=0, stdout='[{"number": 1, "title": "test"}]')
+        repo_dir = Path("/tmp/test_repo")
+        result = get_open_prs_with_label(repo_dir, "test")
+        assert result == [{"number": 1, "title": "test"}]
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_open_prs_with_label_failure(self, mock_run_gh):
+        """Test get_open_prs_with_label returns empty list on failure."""
+        mock_run_gh.return_value = Mock(returncode=1, stderr="error")
+        repo_dir = Path("/tmp/test_repo")
+        result = get_open_prs_with_label(repo_dir, "test")
+        assert result == []
+
+
+class TestGetPRFiles:
+    """Test cases for get_pr_files function."""
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_pr_files_success(self, mock_run_gh):
+        """Test successful retrieval of PR files."""
+        mock_run_gh.return_value = Mock(returncode=0, stdout="diff content")
+        repo_dir = Path("/tmp/test_repo")
+        result = get_pr_files(repo_dir, 123)
+        assert result == "diff content"
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_pr_files_failure(self, mock_run_gh):
+        """Test get_pr_files raises GitHubOperationError on failure."""
+        mock_run_gh.return_value = Mock(returncode=1, stderr="error")
+        repo_dir = Path("/tmp/test_repo")
+        with pytest.raises(GitHubOperationError):
+            get_pr_files(repo_dir, 123)
+
+
+class TestSubmitPRReview:
+    """Test cases for submit_pr_review function."""
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_submit_pr_review_success(self, mock_run_gh):
+        """Test successful submission of PR review."""
+        mock_run_gh.return_value = Mock(returncode=0)
+        repo_dir = Path("/tmp/test_repo")
+        result = submit_pr_review(repo_dir, 123, "Looks good")
+        assert result is True
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_submit_pr_review_failure(self, mock_run_gh):
+        """Test submit_pr_review returns False on failure."""
+        mock_run_gh.return_value = Mock(returncode=1)
+        repo_dir = Path("/tmp/test_repo")
+        result = submit_pr_review(repo_dir, 123, "Looks good")
         assert result is False
