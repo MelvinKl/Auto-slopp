@@ -148,17 +148,16 @@ class TestSettings:
         """Test default tiered CLI configurations."""
         test_settings = Settings()
         assert len(test_settings.cli_configurations) == 10
-        assert test_settings.cli_configurations[0].cli_command == "codex"
-        assert test_settings.cli_configurations[1].cli_command == "opencode"
-        assert test_settings.cli_configurations[2].cli_command == "opencode"
+        assert test_settings.cli_configurations[0].cli_command == "claude"
+        assert test_settings.cli_configurations[1].cli_command == "claude"
+        assert test_settings.cli_configurations[2].cli_command == "claude"
         assert test_settings.cli_configurations[3].cli_command == "opencode"
         assert test_settings.cli_configurations[4].cli_command == "opencode"
-        assert test_settings.cli_configurations[5].cli_command == "opencode"
-        assert test_settings.cli_configurations[6].cli_command == "opencode"
-        assert test_settings.cli_configurations[7].cli_command == "gemini"
-        assert test_settings.cli_configurations[8].cli_command == "claude"
-        assert test_settings.cli_configurations[9].cli_command == "gemini"
-        assert "gemini-ultra" in str(test_settings.cli_configurations[9].cli_args)
+        assert test_settings.cli_configurations[5].cli_command == "gemini"
+        assert test_settings.cli_configurations[6].cli_command == "codex"
+        assert test_settings.cli_configurations[7].cli_command == "opencode"
+        assert test_settings.cli_configurations[8].cli_command == "opencode"
+        assert test_settings.cli_configurations[9].cli_command == "opencode"
 
     def test_cli_configurations_env_override(self):
         """Test overriding CLI configurations via environment variable."""
