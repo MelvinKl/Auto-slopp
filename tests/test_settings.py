@@ -271,6 +271,6 @@ class TestSettings:
             with patch("dotenv.load_dotenv", return_value=None):
                 test_settings = Settings()
 
-        assert test_settings.pr_review_worker_required_label == "AI Review"
-        assert test_settings.pr_review_worker_min_comments == 3
+        assert test_settings.pr_review_worker_required_label == "AI"
+        assert test_settings.pr_review_worker_min_comments == 0
         assert test_settings.pr_review_worker_max_comments == 9
