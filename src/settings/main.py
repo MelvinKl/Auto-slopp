@@ -111,13 +111,7 @@ class Settings(BaseSettings):
     )
 
     cli_configurations: List[CLIConfiguration] = Field(
-        default_factory=lambda: [          
-            CLIConfiguration(
-                cli_command="codex",
-                cli_args=["--dangerously-bypass-approvals-and-sandbox", "exec"],
-                capability=8,
-                name="codex",
-            ),
+        default_factory=lambda: [
             CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[
@@ -137,7 +131,7 @@ class Settings(BaseSettings):
                 ],
                 capability=7,
                 name="opencode nemotron3-free",
-            ),            
+            ),
             CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[
@@ -158,6 +152,26 @@ class Settings(BaseSettings):
                 capability=7,
                 name="opencode nemotron-3-super-free",
             ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "opencode/boneless",
+                    "run",
+                ],
+                capability=4,
+                name="opencode boneless",
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "opencode/nemotron-3-super",
+                    "run",
+                ],
+                capability=8,
+                name="opencode nemotron3-super",
+            ),          
         ],
         description=(
             "Tiered CLI configurations ordered by preference. " "Lower index entries are preferred and used first."
@@ -177,6 +191,23 @@ class Settings(BaseSettings):
     github_issue_worker_allowed_creator: str = Field(
         default="MelvinKl",
         description="Allowed GitHub username for GitHubIssueWorker to process issues",
+    )
+
+    pr_review_worker_required_label: str = Field(
+        default="AI",
+        description="Required label for PrReviewWorker to process a PR",
+    )
+    pr_review_worker_min_comments: int = Field(
+        default=0,
+        ge=0,
+        le=20,
+        description="Minimum number of review comments per PR",
+    )
+    pr_review_worker_max_comments: int = Field(
+        default=9,
+        ge=1,
+        le=20,
+        description="Maximum number of review comments per PR",
     )
 
     additional_env_file: Optional[Path] = Field(
