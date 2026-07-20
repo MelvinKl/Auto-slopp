@@ -171,7 +171,7 @@ class Settings(BaseSettings):
                 ],
                 capability=8,
                 name="opencode nemotron3-super",
-            ),          
+            ),
         ],
         description=(
             "Tiered CLI configurations ordered by preference. " "Lower index entries are preferred and used first."
