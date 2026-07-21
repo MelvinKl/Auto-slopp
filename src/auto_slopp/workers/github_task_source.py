@@ -8,8 +8,7 @@ import logging
 from pathlib import Path
 from typing import List
 
-from auto_slopp.utils.git_helper import commit
-from auto_slopp.utils.git_operations import sanitize_branch_name
+from auto_slopp.utils.git_operations import commit, sanitize_branch_name
 from auto_slopp.utils.github_operations import (
     close_issue,
     comment_on_issue,
