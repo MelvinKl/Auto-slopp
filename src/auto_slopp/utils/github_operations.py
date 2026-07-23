@@ -292,7 +292,10 @@ def create_pull_request(
         # Add the required label for PR review worker if PR was created successfully
         if pr_number is not None:
             required_label = settings.pr_review_worker_required_label
-            add_label_to_issue(repo_dir, pr_number, required_label)
+            try:
+                add_label_to_issue(repo_dir, pr_number, required_label)
+            except Exception as e:
+                logger.error(f"Failed to add label '{required_label}' to PR #{pr_number}: {e}")
 
         return {"url": pr_url, "number": pr_number}
 

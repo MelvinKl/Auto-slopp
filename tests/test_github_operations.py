@@ -14,7 +14,6 @@ from auto_slopp.utils.github_operations import (
     remove_label_from_issue,
     submit_pr_review,
 )
-from settings.main import settings
 
 
 class TestRemoveLabelFromIssue:
