@@ -289,6 +289,11 @@ def create_pull_request(
                 with suppress(ValueError, IndexError):
                     pr_number = int(parts[-1])
 
+        # Add the required label for PR review worker if PR was created successfully
+        if pr_number is not None:
+            required_label = settings.pr_review_worker_required_label
+            add_label_to_issue(repo_dir, pr_number, required_label)
+
         return {"url": pr_url, "number": pr_number}
 
     except GitHubOperationError as e:
@@ -420,6 +425,39 @@ def remove_label_from_issue(repo_dir: Path, issue_number: int, label: str) -> bo
     except Exception as e:
         logger.error(
             f"Unexpected error removing label '{label}' from issue #{issue_number} in {repo_dir.name}: {str(e)}"
+        )
+        return False
+
+
+def add_label_to_issue(repo_dir: Path, issue_number: int, label: str) -> bool:
+    """Add a label to an issue in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+        issue_number: Issue number to add label to
+        label: Label to add
+
+    Returns:
+        True if successful, False otherwise.
+    """
+    try:
+        result = _run_gh_command(
+            repo_dir,
+            "issue",
+            "edit",
+            str(issue_number),
+            "--add-label",
+            label,
+            check=False,
+        )
+        return result.returncode == 0
+
+    except GitHubOperationError as e:
+        logger.error(f"Error adding label '{label}' to issue #{issue_number} in {repo_dir.name}: {str(e)}")
+        return False
+    except Exception as e:
+        logger.error(
+            f"Unexpected error adding label '{label}' to issue #{issue_number} in {repo_dir.name}: {str(e)}"
         )
         return False
 
