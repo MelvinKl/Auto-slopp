@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 from typing import List, Optional
 
-from auto_slopp.utils.git_operations import commit, sanitize_branch_name
+from auto_slopp.utils.git_operations import sanitize_branch_name
 from auto_slopp.utils.github_operations import (
     close_issue,
     comment_on_issue,
@@ -145,9 +145,7 @@ class GitHubTaskSource(TaskSource):
             findings_text = "\n".join(findings)
             comment = f"PR review found {len(findings)} findings that need attention:\n\n{findings_text}"
             comment_success = comment_on_issue(repo_path, task.id, comment)
-            if comment_success:
-                commit(repo_path, f"Added review findings comment to issue #{task.id}")
-            else:
+            if not comment_success:
                 logger.warning(f"Failed to add review findings comment to issue #{task.id}")
             # Do NOT close the issue or remove the automatic work label
             return
@@ -155,14 +153,9 @@ class GitHubTaskSource(TaskSource):
         # No findings (or findings is None/empty): follow the original behavior
         close_success = close_issue(repo_path, task.id)
         if close_success:
-            commit(repo_path, f"Closed issue #{task.id}")
-
-        if close_success:
             comment = f"Completed by PR: {pr_url}"
             comment_success = comment_on_issue(repo_path, task.id, comment)
-            if comment_success:
-                commit(repo_path, f"Added comment to issue #{task.id}")
-            else:
+            if not comment_success:
                 logger.warning(f"Failed to add comment to issue #{task.id}")
         else:
             logger.warning(f"Failed to close issue #{task.id}")
@@ -196,9 +189,7 @@ class GitHubTaskSource(TaskSource):
             "No changes required for this issue. The task has been reviewed and no modifications are needed."
         )
         comment_on_issue(repo_path, task.id, no_changes_comment)
-        commit(repo_path, f"Added comment to issue #{task.id}")
         close_issue(repo_path, task.id)
-        commit(repo_path, f"Closed issue #{task.id}")
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.
@@ -225,7 +216,6 @@ class GitHubTaskSource(TaskSource):
             f"This issue will not be processed again automatically."
         )
         comment_on_issue(repo_path, task.id, failure_comment)
-        commit(repo_path, f"Added comment to issue #{task.id}")
 
         label_removed = remove_label_from_issue(
             repo_path,
@@ -234,7 +224,6 @@ class GitHubTaskSource(TaskSource):
         )
         if label_removed:
             logger.info(f"Removed required label '{settings.github_issue_worker_required_label}' from issue #{task.id}")
-            commit(repo_path, f"Removed label from issue #{task.id}")
         else:
             logger.warning(f"Failed to remove required label from issue #{task.id}")
 

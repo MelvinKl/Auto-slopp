@@ -17,7 +17,6 @@ from auto_slopp.utils.cli_executor import (
 )
 from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
-    commit,
     commit_and_push_changes,
     create_and_checkout_branch,
     get_commits_ahead_of_branch,
@@ -404,7 +403,6 @@ class IssueWorker(Worker):
                 comment = f"PR review found issues that need to be addressed:\n\n{review_comments}"
                 comment_success = comment_on_issue(repo_dir, task.id, comment)
                 if comment_success:
-                    commit(repo_dir, f"Added review comments to issue #{task.id}")
                     self.logger.info(f"Added review comments to issue #{task.id}")
                 else:
                     self.logger.warning(f"Failed to add review comments to issue #{task.id}")
@@ -424,7 +422,6 @@ class IssueWorker(Worker):
                 label_removed = remove_label_from_issue(repo_dir, task.id, settings.github_issue_worker_required_label)
                 if label_removed:
                     self.logger.info(f"Removed automatic work label from issue #{task.id}")
-                    commit(repo_dir, f"Removed automatic work label from issue #{task.id}")
                 else:
                     self.logger.warning(f"Failed to remove automatic work label from issue #{task.id}")
 
@@ -540,29 +537,6 @@ Plan:
 
         return generated_body
 
-    def _build_pr_description_instructions(
-        self,
-        task: Task,
-        task_content: str,
-    ) -> str:
-        """Build instructions for generating a PR description from task steps."""
-        return (
-            "Generate a pull request description in markdown.\n"
-            f"Task ID: {task.id}\n"
-            f"Task title: {task.title}\n"
-            f"Task description:\n{task.body}\n\n"
-            "Use the completed steps from this task markdown as the source of truth:\n"
-            "----- BEGIN TASK -----\n"
-            f"{task_content}\n"
-            "----- END TARGET -----\n\n"
-            "Requirements:\n"
-            "- Include a concise summary of what changed.\n"
-            "- Include completed steps that were implemented.\n"
-            "- Include test verification details.\n"
-            f"- Include `Closes #{task.id}` in the final PR description.\n"
-            "- Return markdown only. Do not modify files.\n"
-        )
-
     def _build_review_instructions(self, title: str, body: str, diff: str) -> str:
         """Build instructions for the CLI tool to review a PR.
 
@@ -655,18 +629,9 @@ Plan:
         # Parse the review output to check for actionable findings
         # Findings are comments that start with 'issue:', 'suggestion:', 'nit:', or 'chore:'
         # (excluding 'question:' and 'praise:' as per requirements)
+        finding_prefixes = ("issue:", "suggestion:", "nit:", "chore:")
         lines = [line.strip() for line in review_output.split("\n") if line.strip()]
-        finding_lines = []
-
-        for line in lines:
-            line_lower = line.lower()
-            if (
-                line_lower.startswith("issue:")
-                or line_lower.startswith("suggestion:")
-                or line_lower.startswith("nit:")
-                or line_lower.startswith("chore:")
-            ):
-                finding_lines.append(line)
+        finding_lines = [line for line in lines if any(line.lower().startswith(p) for p in finding_prefixes)]
 
         if finding_lines:
             # Format the findings for the issue comment
