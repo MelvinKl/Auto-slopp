@@ -20,6 +20,7 @@ class MockTaskSource(TaskSource):
         self.on_task_failure_called = False
         self.on_no_changes_called = False
         self.on_max_iterations_called = False
+        self.findings = None  # To store findings passed to on_task_complete
 
     def get_tasks(self, repo_path: Path) -> list[Task]:
         return self.tasks
@@ -39,8 +40,9 @@ class MockTaskSource(TaskSource):
     def on_task_start(self, task: Task, branch_name: str) -> None:
         self.on_task_start_called = True
 
-    def on_task_complete(self, task: Task, branch_name: str, pr_url: str) -> None:
+    def on_task_complete(self, task: Task, branch_name: str, pr_url: str, findings=None) -> None:
         self.on_task_complete_called = True
+        self.findings = findings
 
     def on_task_failure(self, task: Task, error: str) -> None:
         self.on_task_failure_called = True
@@ -50,6 +52,18 @@ class MockTaskSource(TaskSource):
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         self.on_max_iterations_called = True
+
+
+class CapturingTaskSourceWithFindings(MockTaskSource):
+    """Mock TaskSource that captures the findings argument passed to on_task_complete."""
+
+    def __init__(self, tasks=None):
+        super().__init__(tasks)
+        self.captured_findings = None
+
+    def on_task_complete(self, task: Task, branch_name: str, pr_url: str, findings=None) -> None:
+        super().on_task_complete(task, branch_name, pr_url, findings)
+        self.captured_findings = findings
 
 
 class TestIssueWorker:

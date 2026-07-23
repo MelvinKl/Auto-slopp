@@ -120,21 +120,39 @@ class GitHubTaskSource(TaskSource):
         """
         pass
 
-    def on_task_complete(self, task: Task, branch_name: str, pr_url: str) -> None:
+    def on_task_complete(self, task: Task, branch_name: str, pr_url: str, findings: Optional[List[str]] = None) -> None:
         """Called when a task completes successfully.
 
-        Closes GitHub issue and adds a comment with the PR URL.
+        If findings is provided and non-empty, adds a comment summarizing the findings
+        and does NOT close the issue or remove the automatic work label.
+        If findings is None or empty, closes the issue, adds a comment with the PR URL,
+        and removes the automatic work label.
 
         Args:
             task: The completed task
             branch_name: The branch used for this task
             pr_url: URL of the created pull request
+            findings: Optional list of finding strings from PR review (e.g., "issue: ...", "suggestion: ...")
         """
         repo_path = task.raw.get("_repo_path")
         if repo_path is None:
             logger.warning(f"No repo_path found in task #{task.id}, skipping completion handling")
             return
 
+        # If findings is provided and non-empty, treat as having review findings
+        if findings and len(findings) > 0:
+            # Add a comment summarizing the findings
+            findings_text = "\n".join(findings)
+            comment = f"PR review found {len(findings)} findings that need attention:\n\n{findings_text}"
+            comment_success = comment_on_issue(repo_path, task.id, comment)
+            if comment_success:
+                commit(repo_path, f"Added review findings comment to issue #{task.id}")
+            else:
+                logger.warning(f"Failed to add review findings comment to issue #{task.id}")
+            # Do NOT close the issue or remove the automatic work label
+            return
+
+        # No findings (or findings is None/empty): follow the original behavior
         close_success = close_issue(repo_path, task.id)
         if close_success:
             commit(repo_path, f"Closed issue #{task.id}")

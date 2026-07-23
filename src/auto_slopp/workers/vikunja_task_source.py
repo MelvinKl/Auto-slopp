@@ -6,7 +6,7 @@ Vikunja, following the same patterns used by VikunjaWorker.
 
 import logging
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from auto_slopp.utils.git_operations import commit, sanitize_branch_name
 from auto_slopp.utils.vikunja_operations import (
@@ -164,7 +164,7 @@ class VikunjaTaskSource(TaskSource):
         comment_on_task(task.id, start_comment)
         commit(task.raw.get("_repo_path"), f"Added comment to task {task.id}")
 
-    def on_task_complete(self, task: Task, branch_name: str, pr_url: str) -> None:
+    def on_task_complete(self, task: Task, branch_name: str, pr_url: str, findings: Optional[List[str]] = None) -> None:
         """Called when a task completes successfully.
 
         Updates Vikunja task status to done and adds a comment with the PR URL.
@@ -173,6 +173,7 @@ class VikunjaTaskSource(TaskSource):
             task: The completed task
             branch_name: The branch used for this task
             pr_url: URL of the created pull request
+            findings: Optional list of finding strings from PR review (ignored for Vikunja tasks)
         """
         status_success = update_task_status(task.id, "done")
         if status_success:
