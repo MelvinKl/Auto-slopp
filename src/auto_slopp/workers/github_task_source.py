@@ -6,7 +6,7 @@ GitHub Issues, following the same patterns used by GitHubIssueWorker.
 
 import logging
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from auto_slopp.utils.git_operations import commit, sanitize_branch_name
 from auto_slopp.utils.github_operations import (

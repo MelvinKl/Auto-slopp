@@ -17,6 +17,7 @@ from auto_slopp.utils.cli_executor import (
 )
 from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
+    commit,
     commit_and_push_changes,
     create_and_checkout_branch,
     get_commits_ahead_of_branch,
@@ -25,9 +26,11 @@ from auto_slopp.utils.git_operations import (
     push_to_remote,
 )
 from auto_slopp.utils.github_operations import (
+    comment_on_issue,
     create_pull_request,
-    get_pr_for_branch,
     get_pr_files,
+    get_pr_for_branch,
+    remove_label_from_issue,
 )
 from auto_slopp.utils.ralph import RalphExecutor
 from auto_slopp.worker import Worker
@@ -354,22 +357,13 @@ class IssueWorker(Worker):
                     result["pr_url"] = pr_result.get("url", "")
                     self.logger.info(f"Created PR for task #{task_id}: {pr_result.get('url', 'N/A')}")
                 else:
-                    existing_pr = get_pr_for_branch(repo_dir, current_branch)
-                    if existing_pr:
-                        result["pr_created"] = True
-                        result["prs_created"] = 1
-                        result["pr_url"] = existing_pr.get("url", "")
-                        self.logger.info(
-                            f"Using existing PR for branch '{current_branch}': {existing_pr.get('url', 'N/A')}"
-                        )
-                    else:
-                        error_msg = f"Failed to create pull request for task #{task_id} on branch '{current_branch}'"
-                        self.logger.error(error_msg)
-                        result["error"] = error_msg
-                        self.task_source.on_task_failure(task, error_msg)
-                        return result
+                    error_msg = f"Failed to create pull request for task #{task_id} on branch '{current_branch}'"
+                    self.logger.error(error_msg)
+                    result["error"] = error_msg
+                    self.task_source.on_task_failure(task, error_msg)
+                    return result
 
-pr_url = result.get("pr_url", "")
+            pr_url = result.get("pr_url", "")
             if not pr_url:
                 error_msg = f"Task #{task_id} processed but no PR URL available for branch '{current_branch}'"
                 self.logger.error(error_msg)
@@ -387,10 +381,8 @@ pr_url = result.get("pr_url", "")
                 return result
 
             # Perform PR review to check for findings
-            has_findings, review_comments = self._review_pull_request(
-                repo_dir, pr_url, task.title, task.body
-            )
-            
+            has_findings, review_comments = self._review_pull_request(repo_dir, pr_url, task.title, task.body)
+
             if has_findings:
                 # If there are findings (not just praise/questions), add comment to issue
                 # and do NOT complete the task (keep issue open and labeled for next iteration)
@@ -402,7 +394,7 @@ pr_url = result.get("pr_url", "")
                     self.logger.info(f"Added review comments to issue #{task.id}")
                 else:
                     self.logger.warning(f"Failed to add review comments to issue #{task.id}")
-                
+
                 # Mark as successful but not completed (so issue remains open)
                 result["task_completed"] = False
                 result["tasks_completed"] = 0
@@ -415,15 +407,13 @@ pr_url = result.get("pr_url", "")
                 self.logger.info(f"PR review completed with no actionable findings for task #{task_id}")
                 self.task_source.on_task_complete(task, current_branch, pr_url)
                 # Remove the automatic work label to prevent re-processing
-                label_removed = remove_label_from_issue(
-                    repo_dir, task.id, settings.github_issue_worker_required_label
-                )
+                label_removed = remove_label_from_issue(repo_dir, task.id, settings.github_issue_worker_required_label)
                 if label_removed:
                     self.logger.info(f"Removed automatic work label from issue #{task.id}")
                     commit(repo_dir, f"Removed automatic work label from issue #{task.id}")
                 else:
                     self.logger.warning(f"Failed to remove automatic work label from issue #{task.id}")
-                
+
                 result["task_completed"] = True
                 result["tasks_completed"] = 1
                 result["success"] = True
@@ -499,7 +489,7 @@ Plan:
             f"Check if you need to update the README.md."
         )
 
-def _generate_pr_body_from_task_file(
+    def _generate_pr_body_from_task_file(
         self,
         repo_dir: Path,
         task: Task,
@@ -561,12 +551,12 @@ def _generate_pr_body_from_task_file(
 
     def _build_review_instructions(self, title: str, body: str, diff: str) -> str:
         """Build instructions for the CLI tool to review a PR.
-        
+
         Args:
             title: PR title
             body: PR body description
             diff: PR diff content
-            
+
         Returns:
             Instructions string for the CLI tool.
         """
@@ -591,15 +581,15 @@ def _generate_pr_body_from_task_file(
             f"Only output the comments, one per line, without any additional text or explanation."
         )
 
-def _review_pull_request(self, repo_dir: Path, pr_url: str, title: str, body: str) -> tuple[List[str], str]:
+    def _review_pull_request(self, repo_dir: Path, pr_url: str, title: str, body: str) -> tuple[List[str], str]:
         """Review a pull request and check for actionable findings.
-        
+
         Args:
             repo_dir: Path to the repository directory
             pr_url: URL of the pull request to review
             title: Title of the pull request
             body: Body/description of the pull request
-            
+
         Returns:
             Tuple of (findings_list, comment_string) where:
             - findings_list: list of strings, each line that is a finding (issue:, suggestion:, nit:, chore:)
@@ -609,7 +599,7 @@ def _review_pull_request(self, repo_dir: Path, pr_url: str, title: str, body: st
             # Extract PR number from URL
             # PR URL format: https://github.com/owner/repo/pull/123
             pr_number = int(pr_url.split("/")[-1])
-        except (ValueError, IndexError):
+        except (ValueError, IndexError):  # fmt: skip
             self.logger.error(f"Could not extract PR number from URL: {pr_url}")
             return [], "Failed to extract PR number from URL."
 
@@ -621,7 +611,7 @@ def _review_pull_request(self, repo_dir: Path, pr_url: str, title: str, body: st
             return [], f"Failed to get PR diff: {str(e)}"
 
         # Check if diff is empty
-        if not doc.strip():
+        if not diff.strip():
             self.logger.warning(f"No changes found in PR #{pr_number} to review")
             return [], "No changes found in the pull request to review."
 
@@ -638,10 +628,7 @@ def _review_pull_request(self, repo_dir: Path, pr_url: str, title: str, body: st
         )
 
         if not review_result.get("success", False):
-            error_msg = (
-                f"CLI tool failed to review PR #{pr_number}: "
-                f"{review_result.get('error', 'Unknown error')}"
-            )
+            error_msg = f"CLI tool failed to review PR #{pr_number}: " f"{review_result.get('error', 'Unknown error')}"
             self.logger.error(error_msg)
             return [], error_msg
 
@@ -656,13 +643,15 @@ def _review_pull_request(self, repo_dir: Path, pr_url: str, title: str, body: st
         # (excluding 'question:' and 'praise:' as per requirements)
         lines = [line.strip() for line in review_output.split("\n") if line.strip()]
         finding_lines = []
-        
+
         for line in lines:
             line_lower = line.lower()
-            if (line_lower.startswith("issue:") or 
-                line_lower.startswith("suggestion:") or 
-                line_lower.startswith("nit:") or 
-                line_lower.startswith("chore:")):
+            if (
+                line_lower.startswith("issue:")
+                or line_lower.startswith("suggestion:")
+                or line_lower.startswith("nit:")
+                or line_lower.startswith("chore:")
+            ):
                 finding_lines.append(line)
 
         if finding_lines:
@@ -671,28 +660,11 @@ def _review_pull_request(self, repo_dir: Path, pr_url: str, title: str, body: st
             comment_string = f"PR review found the following issues that need attention:\n\n{findings_text}"
         else:
             # No actionable findings (only praise/questions or no valid comments)
-            comment_string = "PR review completed - no actionable issues found (only praise/questions or minor comments)."
-        
+            comment_string = (
+                "PR review completed - no actionable issues found (only praise/questions or minor comments)."
+            )
+
         return finding_lines, comment_string
-
-        result = execute_with_instructions(
-            instructions,
-            repo_dir,
-            self.agent_args,
-            self.timeout,
-            task_name="pr_description",
-        )
-        if not result.get("success", False):
-            return default_body
-
-        generated_body = (result.get("stdout") or "").strip()
-        if not generated_body:
-            return default_body
-
-        if f"closes #{task.id}" not in generated_body.lower():
-            generated_body = f"Closes #{task.id}\n\n{generated_body}"
-
-        return generated_body
 
     def _build_pr_description_instructions(
         self,

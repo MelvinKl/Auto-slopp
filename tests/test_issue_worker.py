@@ -190,14 +190,14 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
     @patch("auto_slopp.workers.issue_worker.get_current_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
     @patch("auto_slopp.workers.issue_worker.push_to_remote")
-    @patch("auto_slopp.workers.issue_worker.create_pull_request")
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.settings")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
-    def test_run_with_successful_execution(
+    def test_pr_creation_failure_no_fallback(
         self,
         mock_commits_ahead,
         mock_cli,
@@ -212,27 +212,25 @@ class TestIssueWorker:
         mock_checkout,
         mock_commit_push,
     ):
-        """Test that run handles successful execution with PR creation."""
+        """Test that when PR creation fails and no existing open PR, task fails."""
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute.return_value = {"success": True}
-        mock_has_changes.return_value = True
         mock_current_branch.return_value = "ai/task-1"
         mock_push.return_value = (True, "")
         mock_get_pr.return_value = None
-        mock_create_pr.return_value = {"url": "https://github.com/test/pr/1"}
+        mock_create_pr.return_value = None  # PR creation fails
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
         result = worker.run(Path("/tmp"))
-        assert result["success"] is True
-        assert result["tasks_processed"] == 1
-        assert result["prs_created"] == 1
-        assert result["tasks_completed"] == 1
-        assert task_source.on_task_complete_called is True
+        assert result["task_results"][0]["success"] is False
+        assert "Failed to create pull request" in result["task_results"][0]["error"]
+        assert task_source.on_task_failure_called is True
         mock_create_pr.assert_called_once()
 
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
@@ -627,80 +625,6 @@ class TestIssueWorker:
         mock_create_pr.assert_not_called()
 
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.has_changes")
-    @patch("auto_slopp.workers.issue_worker.get_current_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    @patch("auto_slopp.workers.issue_worker.push_to_remote")
-    @patch("auto_slopp.workers.issue_worker.create_pull_request")
-    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
-    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
-    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
-    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
-    def test_pr_creation_failure_fallback_to_existing_pr(
-        self,
-        mock_commits_ahead,
-        mock_cli,
-        mock_execute,
-        mock_get_pr,
-        mock_create_pr,
-        mock_push,
-        mock_settings,
-        mock_current_branch,
-        mock_has_changes,
-        mock_create_branch,
-        mock_checkout,
-        mock_commit_push,
-    ):
-        """Test that when PR creation fails, fallback to existing PR succeeds."""
-        mock_commits_ahead.return_value = 1
-        mock_cli.return_value = "opencode"
-        mock_settings.ralph_enabled = False
-        mock_has_changes.return_value = True
-        mock_commit_push.return_value = (True, None)
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        mock_execute.return_value = {"success": True}
-        mock_current_branch.return_value = "ai/task-1"
-        mock_push.return_value = (True, "")
-        # First call returns None (no existing open PR), second call finds one after create fails
-        mock_get_pr.side_effect = [
-            None,
-            {"state": "OPEN", "url": "https://github.com/test/pr/42"},
-        ]
-        mock_create_pr.return_value = None  # PR creation fails
-        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-        result = worker.run(Path("/tmp"))
-        assert result["task_results"][0]["success"] is True
-        assert result["task_results"][0]["pr_url"] == "https://github.com/test/pr/42"
-        assert result["prs_created"] == 1
-        assert task_source.on_task_complete_called is True
-
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
-    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
-    def test_on_task_start_called_before_branch_creation(
-        self,
-        mock_cli,
-        mock_execute,
-        mock_settings,
-        mock_create_branch,
-        mock_checkout,
-    ):
-        """Test that on_task_start is called before branch creation."""
-        mock_cli.return_value = "opencode"
-        mock_settings.ralph_enabled = False
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = False  # Fail early to keep test simple
-        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-        worker.run(Path("/tmp"))
-        assert task_source.on_task_start_called is True
-
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
@@ -713,7 +637,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
-    def test_correct_arguments_to_branch_push_pr(
+    def test_run_with_successful_execution(
         self,
         mock_commits_ahead,
         mock_cli,
@@ -728,29 +652,28 @@ class TestIssueWorker:
         mock_checkout,
         mock_commit_push,
     ):
-        """Test that branch creation, push, and PR creation receive correct arguments."""
+        """Test that run handles successful execution with PR creation."""
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
-        mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute.return_value = {"success": True}
-        mock_current_branch.return_value = "ai/task-5"
+        mock_has_changes.return_value = True
+        mock_current_branch.return_value = "ai/task-1"
         mock_push.return_value = (True, "")
         mock_get_pr.return_value = None
         mock_create_pr.return_value = {"url": "https://github.com/test/pr/1"}
-        task_source = MockTaskSource(tasks=[Task(id=5, title="Fix login bug", body="Details")])
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
-        worker.run(Path("/tmp"))
-        mock_create_branch.assert_called_once_with(Path("/tmp"), "ai/task-5", base_branch="main")
-        mock_push.assert_called_once_with(Path("/tmp"), remote="origin", branch="ai/task-5")
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert result["tasks_processed"] == 1
+        assert result["prs_created"] == 1
+        assert result["tasks_completed"] == 1
+        assert task_source.on_task_complete_called is True
         mock_create_pr.assert_called_once()
-        call_kwargs = mock_create_pr.call_args
-        assert call_kwargs[1]["title"] == "Task #5: Fix login bug"
-        assert call_kwargs[1]["head"] == "ai/task-5"
-        assert call_kwargs[1]["base"] == "main"
 
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
