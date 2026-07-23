@@ -257,10 +257,9 @@ class TestGitHubTaskSource:
         pr_body = source.get_default_pr_body(task)
         assert pr_body == "Closes #42\n\nThis is the issue body"
 
-    @patch("auto_slopp.workers.github_task_source.commit")
     @patch("auto_slopp.workers.github_task_source.close_issue")
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
-    def test_on_task_complete_closes_issue_and_adds_comment(self, mock_comment, mock_close, mock_commit):
+    def test_on_task_complete_closes_issue_and_adds_comment(self, mock_comment, mock_close):
         """Test that on_task_complete closes issue and adds PR comment."""
         mock_close.return_value = True
         mock_comment.return_value = True
@@ -270,10 +269,9 @@ class TestGitHubTaskSource:
         mock_close.assert_called_once_with("/tmp", 42)
         mock_comment.assert_called_once_with("/tmp", 42, "Completed by PR: https://github.com/test/pr/1")
 
-    @patch("auto_slopp.workers.github_task_source.commit")
     @patch("auto_slopp.workers.github_task_source.close_issue")
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
-    def test_on_no_changes_closes_issue_with_comment(self, mock_comment, mock_close, mock_commit):
+    def test_on_no_changes_closes_issue_with_comment(self, mock_comment, mock_close):
         """Test that on_no_changes closes issue with no-changes comment."""
         source = GitHubTaskSource()
         task = Task(id=42, title="Test", body="", raw={"_repo_path": "/tmp"})
@@ -281,13 +279,10 @@ class TestGitHubTaskSource:
         mock_comment.assert_called_once()
         mock_close.assert_called_once_with("/tmp", 42)
 
-    @patch("auto_slopp.workers.github_task_source.commit")
     @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
     @patch("auto_slopp.workers.github_task_source.settings")
-    def test_on_max_iterations_reached_removes_label_and_comments(
-        self, mock_settings, mock_comment, mock_remove_label, mock_commit
-    ):
+    def test_on_max_iterations_reached_removes_label_and_comments(self, mock_settings, mock_comment, mock_remove_label):
         """Test that on_max_iterations_reached removes label and adds failure comment."""
         mock_settings.github_issue_worker_required_label = "ai"
         mock_remove_label.return_value = True
