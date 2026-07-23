@@ -8,7 +8,7 @@ process them identically regardless of origin.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
@@ -92,13 +92,14 @@ class TaskSource(ABC):
         """
 
     @abstractmethod
-    def on_task_complete(self, task: Task, branch_name: str, pr_url: str) -> None:
+    def on_task_complete(self, task: Task, branch_name: str, pr_url: str, findings: Optional[List[str]] = None) -> None:
         """Called when a task completes successfully.
 
         Args:
             task: The completed task
             branch_name: The branch used for this task
             pr_url: URL of the created pull request
+            findings: Optional list of finding strings from PR review (e.g., "issue: ...", "suggestion: ...")
         """
 
     @abstractmethod
