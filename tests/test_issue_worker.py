@@ -200,12 +200,12 @@ class TestIssueWorker:
     def test_pr_creation_failure_no_fallback(
         self,
         mock_commits_ahead,
-        mock_cli,
-        mock_execute,
-        mock_get_pr,
-        mock_create_pr,
-        mock_push,
         mock_settings,
+        mock_active_cli,
+        mock_execute,
+        mock_create_pr,
+        mock_get_pr,
+        mock_push,
         mock_current_branch,
         mock_has_changes,
         mock_create_branch,
@@ -214,8 +214,8 @@ class TestIssueWorker:
     ):
         """Test that when PR creation fails and no existing open PR, task fails."""
         mock_commits_ahead.return_value = 1
-        mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_active_cli.return_value = "opencode"
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -624,7 +624,6 @@ class TestIssueWorker:
         assert task_source.on_task_complete_called is True
         mock_create_pr.assert_not_called()
 
-    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
