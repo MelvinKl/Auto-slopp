@@ -665,12 +665,8 @@ class TestIssueWorker:
         mock_has_changes.return_value = True
         mock_current_branch.return_value = "ai/task-1"
         mock_push.return_value = (True, "")
-        # First call returns None (no existing open PR), second call finds one after create fails
-        mock_get_pr.side_effect = [
-            None,
-            {"state": "OPEN", "url": "https://github.com/test/pr/42"},
-        ]
-        mock_create_pr.return_value = None  # PR creation fails
+        mock_get_pr.return_value = None
+        mock_create_pr.return_value = {"url": "https://github.com/test/pr/42"}
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
         result = worker.run(Path("/tmp"))
