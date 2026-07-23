@@ -456,9 +456,7 @@ def add_label_to_issue(repo_dir: Path, issue_number: int, label: str) -> bool:
         logger.error(f"Error adding label '{label}' to issue #{issue_number} in {repo_dir.name}: {str(e)}")
         return False
     except Exception as e:
-        logger.error(
-            f"Unexpected error adding label '{label}' to issue #{issue_number} in {repo_dir.name}: {str(e)}"
-        )
+        logger.error(f"Unexpected error adding label '{label}' to issue #{issue_number} in {repo_dir.name}: {str(e)}")
         return False
 
 

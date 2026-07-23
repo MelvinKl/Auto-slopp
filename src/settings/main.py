@@ -194,7 +194,7 @@ class Settings(BaseSettings):
     )
 
     pr_review_worker_required_label: str = Field(
-        default="AI",
+        default="AI Review",
         description="Required label for PrReviewWorker to process a PR",
     )
     pr_review_worker_min_comments: int = Field(
