@@ -31,6 +31,7 @@ from auto_slopp.utils.github_operations import (
     get_pr_files,
     get_pr_for_branch,
     remove_label_from_issue,
+    submit_pr_review,
 )
 from auto_slopp.utils.ralph import RalphExecutor
 from auto_slopp.worker import Worker
@@ -382,6 +383,19 @@ class IssueWorker(Worker):
 
             # Perform PR review to check for findings
             has_findings, review_comments = self._review_pull_request(repo_dir, pr_url, task.title, task.body)
+
+            # Submit the review to the PR itself so the PR author can see it
+            try:
+                pr_number = int(pr_url.split("/")[-1])
+                pr_review_success = submit_pr_review(repo_dir, pr_number, review_comments, event="COMMENT")
+                if pr_review_success:
+                    self.logger.info(f"Submitted PR review to PR #{pr_number}")
+                else:
+                    self.logger.warning(f"Failed to submit PR review to PR #{pr_number}")
+            except (ValueError, IndexError):  # fmt: skip
+                self.logger.warning(f"Could not extract PR number from URL: {pr_url}")
+            except Exception as e:
+                self.logger.warning(f"Failed to submit PR review: {e}")
 
             if has_findings:
                 # If there are findings (not just praise/questions), add comment to issue
