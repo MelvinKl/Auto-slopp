@@ -361,11 +361,22 @@ class IssueWorker(Worker):
                     result["pr_url"] = pr_result.get("url", "")
                     self.logger.info(f"Created PR for task #{task_id}: {pr_result.get('url', 'N/A')}")
                 else:
-                    error_msg = f"Failed to create pull request for task #{task_id} on branch '{current_branch}'"
-                    self.logger.error(error_msg)
-                    result["error"] = error_msg
-                    self.task_source.on_task_failure(task, error_msg)
-                    return result
+                    # Fallback: check if a PR already exists for this branch
+                    existing_pr_after_fail = get_pr_for_branch(repo_dir, current_branch)
+                    if existing_pr_after_fail and existing_pr_after_fail.get("state") == "OPEN":
+                        result["pr_created"] = True
+                        result["prs_created"] = 1
+                        result["pr_url"] = existing_pr_after_fail.get("url", "")
+                        self.logger.info(
+                            f"PR creation failed but found existing PR for branch '{current_branch}': "
+                            f"{existing_pr_after_fail.get('url', 'N/A')}"
+                        )
+                    else:
+                        error_msg = f"Failed to create pull request for task #{task_id} on branch '{current_branch}'"
+                        self.logger.error(error_msg)
+                        result["error"] = error_msg
+                        self.task_source.on_task_failure(task, error_msg)
+                        return result
 
             pr_url = result.get("pr_url", "")
             if not pr_url:
