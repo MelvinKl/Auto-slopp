@@ -53,6 +53,7 @@ auto-slopp = "auto_slopp.main:main"
 
 [tool.black]
 line-length = 120
+target-version = ['py314']
 exclude = '''
 (
   /(

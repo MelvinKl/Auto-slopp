@@ -648,7 +648,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
-@patch("auto_slopp.workers.issue_worker.comment_on_issue")
+    @patch("auto_slopp.workers.issue_worker.comment_on_issue")
     def test_pr_creation_failure_fallback_to_existing_pr(
         self,
         mock_comment,
