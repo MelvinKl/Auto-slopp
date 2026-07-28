@@ -271,3 +271,132 @@ class TestPRWorker:
 
         assert len(branches) == 1
         assert "feature-3" in branches
+
+
+class TestPRWorkerWorkflowRuns:
+    """Test cases for PRWorker workflow run handling."""
+
+    @patch("auto_slopp.workers.pr_worker.get_workflow_runs_for_branch")
+    def test_get_and_log_workflow_runs_all_successful(self, mock_get_workflow_runs):
+        """Test _get_and_log_workflow_runs when all workflows are successful."""
+        worker = PRWorker()
+        repo_dir = Path("/tmp/repo")
+        
+        mock_get_workflow_runs.return_value = [
+            {
+                "conclusion": "success",
+                "workflowName": "CI",
+                "headSha": "abc123",
+                "event": "pull_request",
+                "status": "completed",
+                "databaseId": 123
+            },
+            {
+                "conclusion": "success",
+                "workflowName": "Lint",
+                "headSha": "def456",
+                "event": "pull_request",
+                "status": "completed",
+                "databaseId": 124
+            }
+        ]
+        
+        result = worker._get_and_log_workflow_runs(repo_dir, "main")
+        assert result == []  # No failed workflows
+
+    @patch("auto_slopp.workers.pr_worker.get_workflow_runs_for_branch")
+    def test_get_and_log_workflow_runs_with_failure(self, mock_get_workflow_runs):
+        """Test _get_and_log_workflow_runs when some workflows have failed."""
+        worker = PRWorker()
+        repo_dir = Path("/tmp/repo")
+        
+        mock_get_workflow_runs.return_value = [
+            {
+                "conclusion": "success",
+                "workflowName": "CI",
+                "headSha": "abc123",
+                "event": "pull_request",
+                "status": "completed",
+                "databaseId": 123
+            },
+            {
+                "conclusion": "failure",
+                "workflowName": "Lint",
+                "headSha": "def456",
+                "event": "pull_request",
+                "status": "completed",
+                "databaseId": 124
+            }
+        ]
+        
+        result = worker._get_and_log_workflow_runs(repo_dir, "main")
+        assert len(result) == 1
+        assert result[0]["conclusion"] == "failure"
+        assert result[0]["workflowName"] == "Lint"
+
+    @patch("auto_slopp.workers.pr_worker.get_workflow_runs_for_branch")
+    def test_get_and_log_workflow_runs_with_in_progress(self, mock_get_workflow_runs):
+        """Test _get_and_log_workflow_runs when some workflows are in progress."""
+        worker = PRWorker()
+        repo_dir = Path("/tmp/repo")
+        
+        mock_get_workflow_runs.return_value = [
+            {
+                "conclusion": None,
+                "workflowName": "CI",
+                "headSha": "abc123",
+                "event": "pull_request",
+                "status": "in_progress",
+                "databaseId": 123
+            },
+            {
+                "conclusion": "success",
+                "workflowName": "Lint",
+                "headSha": "def456",
+                "event": "pull_request",
+                "status": "completed",
+                "databaseId": 124
+            }
+        ]
+        
+        result = worker._get_and_log_workflow_runs(repo_dir, "main")
+        assert result == []  # In-progress workflows should not be considered failures
+
+    @patch("auto_slopp.workers.pr_worker.get_workflow_runs_for_branch")
+    def test_get_and_log_workflow_runs_with_queued(self, mock_get_workflow_runs):
+        """Test _get_and_log_workflow_runs when some workflows are queued."""
+        worker = PRWorker()
+        repo_dir = Path("/tmp/repo")
+        
+        mock_get_workflow_runs.return_value = [
+            {
+                "conclusion": None,
+                "workflowName": "CI",
+                "headSha": "abc123",
+                "event": "pull_request",
+                "status": "queued",
+                "databaseId": 123
+            },
+            {
+                "conclusion": "success",
+                "workflowName": "Lint",
+                "headSha": "def456",
+                "event": "pull_request",
+                "status": "completed",
+                "databaseId": 124
+            }
+        ]
+        
+        result = worker._get_and_log_workflow_runs(repo_dir, "main")
+        assert result == []  # Queued workflows should not be considered failures
+
+    @patch("auto_slopp.workers.pr_worker.get_workflow_runs_for_branch")
+    def test_get_and_log_workflow_runs_no_runs(self, mock_get_workflow_runs):
+        """Test _get_and_log_workflow_runs when no workflow runs are returned."""
+        worker = PRWorker()
+        repo_dir = Path("/tmp/repo")
+        
+        mock_get_workflow_runs.return_value = []
+        
+        result = worker._get_and_log_workflow_runs(repo_dir, "main")
+        assert result == []  # No workflows means no failures

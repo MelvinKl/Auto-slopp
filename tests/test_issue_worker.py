@@ -977,3 +977,26 @@ class TestIssueWorker:
         assert task_source.on_task_complete_called is True
         mock_push.assert_called_once()
         mock_create_pr.assert_called_once()
+
+    def test_comment_condensation(self):
+        """Test that comments are properly condensed according to the rules."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Test case 1: No comments
+            task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="", comments=[])])
+            worker = IssueWorker(task_source=task_source, dry_run=True)
+            worker.run(Path(temp_dir))
+            assert task_source.tasks[0].comments == ["No comments provided."]
+
+            # Test case 2: One comment
+            task_source = MockTaskSource(tasks=[Task(id=2, title="Test", body="", comments=["Only comment"])])
+            worker = IssueWorker(task_source=task_source, dry_run=True)
+            worker.run(Path(temp_dir))
+            assert task_source.tasks[0].comments == ["Only one comment present; no additional comments to condense."]
+
+            # Test case 3: Multiple comments
+            comments = ["First comment", "Second comment", "Third comment"]
+            task_source = MockTaskSource(tasks=[Task(id=3, title="Test", body="", comments=comments)])
+            worker = IssueWorker(task_source=task_source, dry_run=True)
+            worker.run(Path(temp_dir))
+            expected = "Second comment\\n\\n---\\n\\nThird comment"
+            assert task_source.tasks[0].comments == [expected]
