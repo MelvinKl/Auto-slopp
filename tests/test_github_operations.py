@@ -9,6 +9,7 @@ from auto_slopp.utils.github_operations import (
     GitHubOperationError,
     get_open_prs_with_label,
     get_pr_files,
+    get_workflow_runs_for_branch,
     remove_label_from_issue,
     submit_pr_review,
 )
@@ -117,3 +118,68 @@ class TestSubmitPRReview:
         repo_dir = Path("/tmp/test_repo")
         result = submit_pr_review(repo_dir, 123, "Looks good")
         assert result is False
+
+
+class TestGetWorkflowRunsForBranch:
+    """Test cases for get_workflow_runs_for_branch function."""
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_workflow_runs_for_branch_success(self, mock_run_gh):
+        """Test successful retrieval of workflow runs for branch."""
+        mock_run_gh.return_value = Mock(
+            returncode=0,
+            stdout='[{"conclusion": "success", "workflowName": "CI", "headSha": "abc123", "event": "pull_request", "status": "completed", "databaseId": 123}]',
+        )
+        repo_dir = Path("/tmp/test_repo")
+        result = get_workflow_runs_for_branch(repo_dir, "main")
+        assert len(result) == 1
+        assert result[0]["conclusion"] == "success"
+        assert result[0]["workflowName"] == "CI"
+        assert result[0]["headSha"] == "abc123"
+        assert result[0]["event"] == "pull_request"
+        assert result[0]["status"] == "completed"
+        assert result[0]["databaseId"] == 123
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_workflow_runs_for_branch_with_event_filter(self, mock_run_gh):
+        """Test retrieval of workflow runs for branch with event filter."""
+        mock_run_gh.return_value = Mock(
+            returncode=0,
+            stdout='[{"conclusion": "success", "workflowName": "CI", "headSha": "abc123", "event": "pull_request", "status": "completed", "databaseId": 123}, {"conclusion": "failure", "workflowName": "Lint", "headSha": "def456", "event": "push", "status": "completed", "databaseId": 124}]',
+        )
+        repo_dir = Path("/tmp/test_repo")
+        result = get_workflow_runs_for_branch(repo_dir, "main", event="pull_request")
+        assert len(result) == 1
+        assert result[0]["event"] == "pull_request"
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_workflow_runs_for_branch_failure(self, mock_run_gh):
+        """Test get_workflow_runs_for_branch returns empty list on failure."""
+        mock_run_gh.return_value = Mock(returncode=1, stderr="error")
+        repo_dir = Path("/tmp/test_repo")
+        result = get_workflow_runs_for_branch(repo_dir, "main")
+        assert result == []
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_workflow_runs_for_branch_handles_github_operation_error(self, mock_run_gh):
+        """Test get_workflow_runs_for_branch handles GitHubOperationError."""
+        mock_run_gh.side_effect = GitHubOperationError("API error")
+        repo_dir = Path("/tmp/test_repo")
+        result = get_workflow_runs_for_branch(repo_dir, "main")
+        assert result == []
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_workflow_runs_for_branch_handles_unexpected_exception(self, mock_run_gh):
+        """Test get_workflow_runs_for_branch handles unexpected exceptions."""
+        mock_run_gh.side_effect = RuntimeError("Unexpected error")
+        repo_dir = Path("/tmp/test_repo")
+        result = get_workflow_runs_for_branch(repo_dir, "main")
+        assert result == []
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_workflow_runs_for_branch_handles_json_decode_error(self, mock_run_gh):
+        """Test get_workflow_runs_for_branch handles JSON decode error."""
+        mock_run_gh.return_value = Mock(returncode=0, stdout="invalid json")
+        repo_dir = Path("/tmp/test_repo")
+        result = get_workflow_runs_for_branch(repo_dir, "main")
+        assert result == []
