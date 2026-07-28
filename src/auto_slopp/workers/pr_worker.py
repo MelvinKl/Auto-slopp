@@ -17,7 +17,10 @@ from auto_slopp.utils.git_operations import (
     merge_main_into_branch,
     push_branch,
 )
-from auto_slopp.utils.github_operations import get_open_prs
+from auto_slopp.utils.github_operations import (
+    get_open_prs,
+    get_workflow_runs_for_branch,
+)
 from auto_slopp.utils.repository_utils import validate_repository
 from auto_slopp.worker import Worker
 from settings.main import settings
@@ -142,6 +145,9 @@ class PRWorker(Worker):
                     result["error"] = f"Failed to checkout branch {branch}"
                     continue
 
+                # Get and log workflow runs for the branch (as it exists on remote)
+                self._get_and_log_workflow_runs(repo_dir, branch)
+
                 if not self._update_branch_with_main(repo_dir, branch):
                     cli_tool = get_active_cli_command()
                     self.logger.info(f"Merge failed for {branch} in {repo_dir.name}, using {cli_tool} to fix")
@@ -234,6 +240,28 @@ class PRWorker(Worker):
                 )
 
         return filtered_branches
+
+    def _get_and_log_workflow_runs(self, repo_dir: Path, branch: str) -> None:
+        """Get workflow runs for a branch and log their conclusions."""
+        runs = get_workflow_runs_for_branch(repo_dir, branch)
+        if not runs:
+            self.logger.info(f"No workflow runs found for branch {branch} in {repo_dir.name}")
+            return
+
+        for run in runs:
+            conclusion = run.get("conclusion")
+            workflow_name = run.get("workflowName")
+            # The conclusion can be success, failure, cancelled, etc.
+            if conclusion:
+                self.logger.info(
+                    f"Workflow run for branch {branch}: workflow '{workflow_name}' concluded with '{conclusion}'"
+                )
+                if conclusion == "failure":
+                    self.logger.warning(f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' failed.")
+            else:
+                self.logger.info(
+                    f"Workflow run for branch {branch}: workflow '{workflow_name}' has no conclusion yet (maybe in progress or queued)"
+                )
 
     def _checkout_branch(self, repo_dir: Path, branch: str) -> bool:
         """Checkout a specific branch in the repository.
