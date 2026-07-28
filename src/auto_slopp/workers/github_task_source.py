@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 from typing import List, Optional
 
+from auto_slopp.utils.cli_executor import execute_with_instructions
 from auto_slopp.utils.git_operations import sanitize_branch_name
 from auto_slopp.utils.github_operations import (
     close_issue,
@@ -17,7 +18,6 @@ from auto_slopp.utils.github_operations import (
     get_open_issues,
     remove_label_from_issue,
 )
-from auto_slopp.utils.cli_executor import execute_with_instructions
 from auto_slopp.workers.task_source import Task, TaskSource
 from settings.main import settings
 
@@ -68,9 +68,9 @@ class GitHubTaskSource(TaskSource):
     def _condense_comments(self, repo_path: Path, issue_number: int, issue_author_login: str) -> List[str]:
         """Condense issue comments into a single summary comment.
 
-        Fetches all comments via get_issue_comments(), skipping the first comment (the issue body is not in comments; comments are separate).
-        If there are 0 or 1 comments, return them as-is (no condensing needed).
-        If there are 2+ comments, call the CLI executor with a prompt to condense/summarize all comment bodies into one,
+        Fetches all comments via get_issue_comments(), filtering to only those by the issue author.
+        If there are 0 or 1 comments from the author, return them as-is (no condensing needed).
+        If there are 2+ comments from the author, call the CLI executor with a prompt to condense/summarize all comment bodies into one,
         preserving only relevant information.
         Post the condensed summary as a single new comment via comment_on_issue().
         Delete all original comments (except the issue description) via delete_issue_comment().
@@ -79,15 +79,20 @@ class GitHubTaskSource(TaskSource):
         Args:
             repo_path: Path to the repository directory
             issue_number: Issue number to condense comments for
-            issue_author_login: Login of the issue author (used for filtering? Actually we use all comments per requirement)
+            issue_author_login: Login of the issue author (used for filtering comments)
 
         Returns:
             List of comment strings (empty, single original comment, or single condensed summary)
         """
         # Fetch all comments
-        comments = get_issue_comments(repo_path, issue_number)
-        # Extract comment bodies
-        comment_bodies = [comment.get("body", "") or "" for comment in comments]
+        all_comments = get_issue_comments(repo_path, issue_number)
+        # Filter comments by issue author for condensation
+        if issue_author_login:
+            author_comments = [comment for comment in all_comments if comment.get("author") == issue_author_login]
+        else:
+            author_comments = []
+        # Extract comment bodies from the filtered comments
+        comment_bodies = [comment.get("body", "") or "" for comment in author_comments]
 
         # If 0 or 1 comments, return as-is
         if len(comment_bodies) <= 1:
@@ -122,7 +127,7 @@ class GitHubTaskSource(TaskSource):
             logger.warning(f"Failed to post condensed comment to issue #{issue_number}")
 
         # Delete all original comments
-        for comment in comments:
+        for comment in all_comments:
             comment_id = comment.get("id")
             if comment_id is not None:
                 delete_success = delete_issue_comment(repo_path, issue_number, comment_id)

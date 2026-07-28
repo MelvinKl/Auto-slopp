@@ -19,6 +19,7 @@ from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     commit_and_push_changes,
     create_and_checkout_branch,
+    delete_branch,
     get_commits_ahead_of_branch,
     get_current_branch,
     has_changes,
@@ -313,17 +314,37 @@ class IssueWorker(Worker):
                 result["no_changes"] = True
                 return result
 
-            if has_changes(repo_dir):
-                self.logger.info(f"Committing outstanding changes before push for task #{task_id}")
-                commit_success, _ = commit_and_push_changes(
-                    repo_dir, f"Task #{task_id}: commit outstanding changes before push", push_if_remote=False
-                )
-                if not commit_success:
-                    error_msg = f"Failed to commit outstanding changes for task #{task_id}"
-                    self.logger.error(error_msg)
-                    result["error"] = error_msg
-                    self.task_source.on_task_failure(task, error_msg)
-                    return result
+            # Check if there are any changes after execution
+            changes_present = has_changes(repo_dir)
+            if not changes_present:
+                self.logger.info(f"No changes detected for task #{task_id} after execution.")
+                # Clean up the branch: checkout main and delete the branch
+                try:
+                    # Checkout main first
+                    checkout_branch_resilient(repo_dir=repo_dir, branch="main", fetch_first=False, timeout=10)
+                    # Delete the local branch
+                    delete_branch(repo_dir, branch=current_branch)
+                except Exception as e:
+                    self.logger.warning(f"Failed to clean up branch {current_branch}: {e}")
+                # Mark as no changes and return
+                self.task_source.on_no_changes(task)
+                result["task_completed"] = True
+                result["tasks_completed"] = 1
+                result["success"] = True
+                result["no_changes"] = True
+                return result
+
+            # If there are changes, commit them
+            self.logger.info(f"Committing outstanding changes before push for task #{task_id}")
+            commit_success, _ = commit_and_push_changes(
+                repo_dir, f"Task #{task_id}: commit outstanding changes before push", push_if_remote=False
+            )
+            if not commit_success:
+                error_msg = f"Failed to commit outstanding changes for task #{task_id}"
+                self.logger.error(error_msg)
+                result["error"] = error_msg
+                self.task_source.on_task_failure(task, error_msg)
+                return result
 
             push_success, push_message = push_to_remote(repo_dir, remote="origin", branch=current_branch)
             if not push_success:

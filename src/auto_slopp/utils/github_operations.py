@@ -209,7 +209,9 @@ def delete_issue_comment(repo_dir: Path, issue_number: int, comment_id: int) -> 
         logger.error(f"Error deleting comment #{comment_id} from issue #{issue_number} in {repo_dir.name}: {str(e)}")
         return False
     except Exception as e:
-        logger.error(f"Unexpected error deleting comment #{comment_id} from issue #{issue_number} in {repo_dir.name}: {str(e)}")
+        logger.error(
+            f"Unexpected error deleting comment #{comment_id} from issue #{issue_number} in {repo_dir.name}: {str(e)}"
+        )
         return False
 
 
