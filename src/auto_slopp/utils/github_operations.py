@@ -134,7 +134,7 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
         issue_number: Issue number to get comments for
 
     Returns:
-        List of dictionaries containing comment information (body, author, createdAt).
+        List of dictionaries containing comment information (id, body, author, createdAt).
 
     Raises:
         GitHubOperationError: If gh command fails
@@ -163,6 +163,7 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
         for comment in raw_comments:
             comments.append(
                 {
+                    "id": comment.get("id"),
                     "body": comment.get("body", ""),
                     "author": comment.get("author", {}).get("login") if comment.get("author") else None,
                     "createdAt": comment.get("createdAt"),
@@ -180,6 +181,38 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
     except Exception as e:
         logger.error(f"Unexpected error getting comments for issue #{issue_number} from {repo_dir.name}: {str(e)}")
         return []
+
+
+def delete_issue_comment(repo_dir: Path, issue_number: int, comment_id: int) -> bool:
+    """Delete a comment from an issue in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+        issue_number: Issue number (not used in the command but kept for consistency)
+        comment_id: ID of the comment to delete
+
+    Returns:
+        True if successful, False otherwise.
+    """
+    try:
+        result = _run_gh_command(
+            repo_dir,
+            "api",
+            f"repos/{settings.github_owner}/{settings.github_repo}/issues/comments/{comment_id}",
+            "-X",
+            "DELETE",
+            check=False,
+        )
+        return result.returncode == 0
+
+    except GitHubOperationError as e:
+        logger.error(f"Error deleting comment #{comment_id} from issue #{issue_number} in {repo_dir.name}: {str(e)}")
+        return False
+    except Exception as e:
+        logger.error(
+            f"Unexpected error deleting comment #{comment_id} from issue #{issue_number} in {repo_dir.name}: {str(e)}"
+        )
+        return False
 
 
 def close_issue(repo_dir: Path, issue_number: int) -> bool:
@@ -610,3 +643,50 @@ def submit_pr_review(repo_dir: Path, pr_number: int, body: str, event: str = "CO
     except Exception as e:
         logger.error(f"Unexpected error submitting review for PR #{pr_number} in {repo_dir.name}: {str(e)}")
         return False
+
+
+def get_workflow_runs_for_branch(repo_dir: Path, branch: str, event: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get workflow runs for a specific branch, optionally filtered by event.
+
+        Args:
+            repo_dir: Path to the git repository
+            branch: Branch name to get workflow runs for
+            event: Optional event filter (e.g., 'pull_request')
+
+        Returns:
+            List of dictionaries containing workflow run information (conclusion, workflowName, etc.)
+        """
+        try:
+            result = _run_gh_command(
+                repo_dir,
+                "run",
+                "list",
+                "--branch",
+                branch,
+                "--limit",
+                "10",
+                "--json",
+                "conclusion,workflowName,headSha,event,status,databaseId",
+                check=False,
+            )
+
+            if result.returncode != 0:
+                error_msg = result.stderr.strip() or result.stdout.strip()
+                logger.error(f"Failed to list workflow runs for branch {branch} in {repo_dir.name}: {error_msg}")
+                return []
+
+            runs = json.loads(result.stdout)
+            if event:
+                filtered_runs = [run for run in runs if run.get("event") == event]
+                return filtered_runs
+            return runs
+
+        except GitHubOperationError as e:
+            logger.error(f"Error getting workflow runs for branch {branch} from {repo_dir.name}: {str(e)}")
+            return []
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse workflow runs JSON for branch {branch} from {repo_dir.name}: {str(e)}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error getting workflow runs for branch {branch} from {repo_dir.name}: {str(e)}")
+            return []
