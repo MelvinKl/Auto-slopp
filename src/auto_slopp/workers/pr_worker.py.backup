@@ -146,10 +146,10 @@ class PRWorker(Worker):
                     continue
 
                 # Get and log workflow runs for the branch (as it exists on remote)
-                failed_workflows = self._get_and_log_workflow_runs(repo_dir, branch)
-                if failed_workflows:
+                workflows_ok = self._get_and_log_workflow_runs(repo_dir, branch)
+                if not workflows_ok:
                     self.logger.info(
-                        f"Skipping fixes for branch {branch} due to {len(failed_workflows)} non-successful GitHub Actions workflow runs"
+                        f"Skipping fixes for branch {branch} due to non-successful GitHub Actions workflow runs"
                     )
                     continue
 
@@ -246,63 +246,7 @@ class PRWorker(Worker):
 
         return filtered_branches
 
-    def _get_and_log_workflow_runs(self, repo_dir: Path, branch: str) -> List[Dict[str, Any]]:
-        """Get workflow runs for a branch and log their conclusions.
-        Returns a list of workflow runs that have failed (conclusion != 'success' and status = 'completed') 
-        and are triggered by pull_request."""
-        runs = get_workflow_runs_for_branch(repo_dir, branch, event="pull_request")
-        if not runs:
-            self.logger.info(f"No workflow runs found for branch {branch} in {repo_dir.name}")
-            # If there are no runs, there are no failed runs
-            return []
-
-        failed_runs = []
-        for run in runs:
-            conclusion = run.get("conclusion")
-            status = run.get("status")
-            workflow_name = run.get("workflowName")
-            database_id = run.get("databaseId")
-            
-            # Log the workflow run details
-            self.logger.info(
-                f"Workflow run for branch {branch}: workflow '{workflow_name}' (ID: {database_id}) "
-                f"has status '{status}' and conclusion '{conclusion}' (event: {run.get('event')})"
-            )
-            
-            # Only consider workflows that have completed (status = 'completed')
-            # and have a conclusion that is not 'success' as failures
-            if status == "completed":
-                if conclusion and conclusion != "success":
-                    failed_runs.append(run)
-                    if conclusion == "failure":
-                        self.logger.warning(f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' failed.")
-                    else:
-                        self.logger.info(
-                            f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' concluded with '{conclusion}' (not success)."
-                        )
-                # If conclusion is None for a completed workflow, treat as not success
-                elif conclusion is None:
-                    failed_runs.append(run)
-                    self.logger.warning(
-                        f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' completed but has no conclusion."
-                    )
-                # If conclusion is 'success', it's not a failure
-                else:
-                    self.logger.info(
-                        f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' succeeded."
-                    )
-            # If workflow is still in progress (queued or in_progress), don't treat as failure
-            elif status in ["queued", "in_progress"]:
-                self.logger.info(
-                    f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' is still {status}."
-                )
-            # Handle any other status values
-            else:
-                self.logger.info(
-                    f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' has unknown status '{status}'."
-                )
-
-        return failed_runs
+    def _get_and_log_workflow_runs(self, repo_dir: Path, branch: str) -> bool:
         """Check if all workflow runs for a branch have conclusion 'success'.
         Logs the conclusions and returns True if all are success, False otherwise."""
         runs = get_workflow_runs_for_branch(repo_dir, branch)
