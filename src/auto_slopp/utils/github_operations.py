@@ -134,7 +134,7 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
         issue_number: Issue number to get comments for
 
     Returns:
-        List of dictionaries containing comment information (body, author, createdAt).
+        List of dictionaries containing comment information (id, body, author, createdAt).
 
     Raises:
         GitHubOperationError: If gh command fails
@@ -163,6 +163,7 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
         for comment in raw_comments:
             comments.append(
                 {
+                    "id": comment.get("id"),
                     "body": comment.get("body", ""),
                     "author": comment.get("author", {}).get("login") if comment.get("author") else None,
                     "createdAt": comment.get("createdAt"),
@@ -180,6 +181,36 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
     except Exception as e:
         logger.error(f"Unexpected error getting comments for issue #{issue_number} from {repo_dir.name}: {str(e)}")
         return []
+
+
+def delete_issue_comment(repo_dir: Path, issue_number: int, comment_id: int) -> bool:
+    """Delete a comment from an issue in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+        issue_number: Issue number (not used in the command but kept for consistency)
+        comment_id: ID of the comment to delete
+
+    Returns:
+        True if successful, False otherwise.
+    """
+    try:
+        result = _run_gh_command(
+            repo_dir,
+            "api",
+            f"repos/{settings.github_owner}/{settings.github_repo}/issues/comments/{comment_id}",
+            "-X",
+            "DELETE",
+            check=False,
+        )
+        return result.returncode == 0
+
+    except GitHubOperationError as e:
+        logger.error(f"Error deleting comment #{comment_id} from issue #{issue_number} in {repo_dir.name}: {str(e)}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error deleting comment #{comment_id} from issue #{issue_number} in {repo_dir.name}: {str(e)}")
+        return False
 
 
 def close_issue(repo_dir: Path, issue_number: int) -> bool:

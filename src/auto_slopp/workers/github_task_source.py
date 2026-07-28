@@ -12,10 +12,12 @@ from auto_slopp.utils.git_operations import sanitize_branch_name
 from auto_slopp.utils.github_operations import (
     close_issue,
     comment_on_issue,
+    delete_issue_comment,
     get_issue_comments,
     get_open_issues,
     remove_label_from_issue,
 )
+from auto_slopp.utils.cli_executor import execute_with_instructions
 from auto_slopp.workers.task_source import Task, TaskSource
 from settings.main import settings
 
@@ -50,10 +52,7 @@ class GitHubTaskSource(TaskSource):
             issue_body = issue.get("body", "") or ""
 
             issue_author_login = issue.get("author", {}).get("login", "") if issue.get("author") else ""
-            comments = get_issue_comments(repo_path, issue_number)
-            comment_texts = [
-                comment.get("body", "") or "" for comment in comments if comment.get("author") == issue_author_login
-            ]
+            comment_texts = self._condense_comments(repo_path, issue_number, issue_author_login)
 
             task = Task(
                 id=issue_number,
@@ -65,6 +64,73 @@ class GitHubTaskSource(TaskSource):
             tasks.append(task)
 
         return tasks
+
+    def _condense_comments(self, repo_path: Path, issue_number: int, issue_author_login: str) -> List[str]:
+        """Condense issue comments into a single summary comment.
+
+        Fetches all comments via get_issue_comments(), skipping the first comment (the issue body is not in comments; comments are separate).
+        If there are 0 or 1 comments, return them as-is (no condensing needed).
+        If there are 2+ comments, call the CLI executor with a prompt to condense/summarize all comment bodies into one,
+        preserving only relevant information.
+        Post the condensed summary as a single new comment via comment_on_issue().
+        Delete all original comments (except the issue description) via delete_issue_comment().
+        Return the condensed summary as a single-element list (used as task.comments).
+
+        Args:
+            repo_path: Path to the repository directory
+            issue_number: Issue number to condense comments for
+            issue_author_login: Login of the issue author (used for filtering? Actually we use all comments per requirement)
+
+        Returns:
+            List of comment strings (empty, single original comment, or single condensed summary)
+        """
+        # Fetch all comments
+        comments = get_issue_comments(repo_path, issue_number)
+        # Extract comment bodies
+        comment_bodies = [comment.get("body", "") or "" for comment in comments]
+
+        # If 0 or 1 comments, return as-is
+        if len(comment_bodies) <= 1:
+            return comment_bodies
+
+        # For 2+ comments, condense them
+        # Prepare prompt for condensation
+        comments_text = "\n\n".join([f"Comment {i+1}: {body}" for i, body in enumerate(comment_bodies)])
+        prompt = (
+            f"You are given {len(comment_bodies)} comments from a GitHub issue. "
+            "Please condense/summarize them into a single comment, preserving only relevant information. "
+            "Do not include any extra commentary or explanation. Provide only the condensed summary.\n\n"
+            f"Comments to condense:\n{comments_text}"
+        )
+
+        # Execute the condensation via CLI executor
+        result = execute_with_instructions(
+            instructions=prompt,
+            work_dir=repo_path,
+            agent_args=[],  # No additional agent arguments
+            task_name="default",  # Use default task difficulty
+        )
+        condensed_summary = result.get("stdout", "").strip()
+        # If the command failed or produced no output, fallback to concatenation?
+        if not condensed_summary:
+            # Fallback: join the comments with a separator
+            condensed_summary = "\n\n---\n\n".join(comment_bodies)
+
+        # Post the condensed summary as a new comment
+        comment_success = comment_on_issue(repo_path, issue_number, condensed_summary)
+        if not comment_success:
+            logger.warning(f"Failed to post condensed comment to issue #{issue_number}")
+
+        # Delete all original comments
+        for comment in comments:
+            comment_id = comment.get("id")
+            if comment_id is not None:
+                delete_success = delete_issue_comment(repo_path, issue_number, comment_id)
+                if not delete_success:
+                    logger.warning(f"Failed to delete comment #{comment_id} from issue #{issue_number}")
+
+        # Return the condensed summary as a single-element list
+        return [condensed_summary]
 
     def get_branch_name(self, task: Task) -> str:
         """Generate the branch name for a GitHub issue task.
