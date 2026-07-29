@@ -281,7 +281,7 @@ class TestPRWorkerWorkflowRuns:
         """Test _get_and_log_workflow_runs when all workflows are successful."""
         worker = PRWorker()
         repo_dir = Path("/tmp/repo")
-        
+
         mock_get_workflow_runs.return_value = [
             {
                 "conclusion": "success",
@@ -289,7 +289,7 @@ class TestPRWorkerWorkflowRuns:
                 "headSha": "abc123",
                 "event": "pull_request",
                 "status": "completed",
-                "databaseId": 123
+                "databaseId": 123,
             },
             {
                 "conclusion": "success",
@@ -297,10 +297,10 @@ class TestPRWorkerWorkflowRuns:
                 "headSha": "def456",
                 "event": "pull_request",
                 "status": "completed",
-                "databaseId": 124
-            }
+                "databaseId": 124,
+            },
         ]
-        
+
         result = worker._get_and_log_workflow_runs(repo_dir, "main")
         assert result == []  # No failed workflows
 
@@ -309,7 +309,7 @@ class TestPRWorkerWorkflowRuns:
         """Test _get_and_log_workflow_runs when some workflows have failed."""
         worker = PRWorker()
         repo_dir = Path("/tmp/repo")
-        
+
         mock_get_workflow_runs.return_value = [
             {
                 "conclusion": "success",
@@ -317,7 +317,7 @@ class TestPRWorkerWorkflowRuns:
                 "headSha": "abc123",
                 "event": "pull_request",
                 "status": "completed",
-                "databaseId": 123
+                "databaseId": 123,
             },
             {
                 "conclusion": "failure",
@@ -325,10 +325,10 @@ class TestPRWorkerWorkflowRuns:
                 "headSha": "def456",
                 "event": "pull_request",
                 "status": "completed",
-                "databaseId": 124
-            }
+                "databaseId": 124,
+            },
         ]
-        
+
         result = worker._get_and_log_workflow_runs(repo_dir, "main")
         assert len(result) == 1
         assert result[0]["conclusion"] == "failure"
@@ -339,7 +339,7 @@ class TestPRWorkerWorkflowRuns:
         """Test _get_and_log_workflow_runs when some workflows are in progress."""
         worker = PRWorker()
         repo_dir = Path("/tmp/repo")
-        
+
         mock_get_workflow_runs.return_value = [
             {
                 "conclusion": None,
@@ -347,7 +347,7 @@ class TestPRWorkerWorkflowRuns:
                 "headSha": "abc123",
                 "event": "pull_request",
                 "status": "in_progress",
-                "databaseId": 123
+                "databaseId": 123,
             },
             {
                 "conclusion": "success",
@@ -355,10 +355,10 @@ class TestPRWorkerWorkflowRuns:
                 "headSha": "def456",
                 "event": "pull_request",
                 "status": "completed",
-                "databaseId": 124
-            }
+                "databaseId": 124,
+            },
         ]
-        
+
         result = worker._get_and_log_workflow_runs(repo_dir, "main")
         assert result == []  # In-progress workflows should not be considered failures
 
@@ -367,7 +367,7 @@ class TestPRWorkerWorkflowRuns:
         """Test _get_and_log_workflow_runs when some workflows are queued."""
         worker = PRWorker()
         repo_dir = Path("/tmp/repo")
-        
+
         mock_get_workflow_runs.return_value = [
             {
                 "conclusion": None,
@@ -375,7 +375,7 @@ class TestPRWorkerWorkflowRuns:
                 "headSha": "abc123",
                 "event": "pull_request",
                 "status": "queued",
-                "databaseId": 123
+                "databaseId": 123,
             },
             {
                 "conclusion": "success",
@@ -383,10 +383,10 @@ class TestPRWorkerWorkflowRuns:
                 "headSha": "def456",
                 "event": "pull_request",
                 "status": "completed",
-                "databaseId": 124
-            }
+                "databaseId": 124,
+            },
         ]
-        
+
         result = worker._get_and_log_workflow_runs(repo_dir, "main")
         assert result == []  # Queued workflows should not be considered failures
 
@@ -395,8 +395,8 @@ class TestPRWorkerWorkflowRuns:
         """Test _get_and_log_workflow_runs when no workflow runs are returned."""
         worker = PRWorker()
         repo_dir = Path("/tmp/repo")
-        
+
         mock_get_workflow_runs.return_value = []
-        
+
         result = worker._get_and_log_workflow_runs(repo_dir, "main")
         assert result == []  # No workflows means no failures

@@ -248,7 +248,7 @@ class PRWorker(Worker):
 
     def _get_and_log_workflow_runs(self, repo_dir: Path, branch: str) -> List[Dict[str, Any]]:
         """Get workflow runs for a branch and log their conclusions.
-        Returns a list of workflow runs that have failed (conclusion != 'success' and status = 'completed') 
+        Returns a list of workflow runs that have failed (conclusion != 'success' and status = 'completed')
         and are triggered by pull_request."""
         runs = get_workflow_runs_for_branch(repo_dir, branch, event="pull_request")
         if not runs:
@@ -262,13 +262,13 @@ class PRWorker(Worker):
             status = run.get("status")
             workflow_name = run.get("workflowName")
             database_id = run.get("databaseId")
-            
+
             # Log the workflow run details
             self.logger.info(
                 f"Workflow run for branch {branch}: workflow '{workflow_name}' (ID: {database_id}) "
                 f"has status '{status}' and conclusion '{conclusion}' (event: {run.get('event')})"
             )
-            
+
             # Only consider workflows that have completed (status = 'completed')
             # and have a conclusion that is not 'success' as failures
             if status == "completed":
@@ -288,14 +288,10 @@ class PRWorker(Worker):
                     )
                 # If conclusion is 'success', it's not a failure
                 else:
-                    self.logger.info(
-                        f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' succeeded."
-                    )
+                    self.logger.info(f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' succeeded.")
             # If workflow is still in progress (queued or in_progress), don't treat as failure
             elif status in ["queued", "in_progress"]:
-                self.logger.info(
-                    f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' is still {status}."
-                )
+                self.logger.info(f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' is still {status}.")
             # Handle any other status values
             else:
                 self.logger.info(
