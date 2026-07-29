@@ -646,47 +646,47 @@ def submit_pr_review(repo_dir: Path, pr_number: int, body: str, event: str = "CO
 
 
 def get_workflow_runs_for_branch(repo_dir: Path, branch: str, event: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Get workflow runs for a specific branch, optionally filtered by event.
+    """Get workflow runs for a specific branch, optionally filtered by event.
 
-        Args:
-            repo_dir: Path to the git repository
-            branch: Branch name to get workflow runs for
-            event: Optional event filter (e.g., 'pull_request')
+    Args:
+        repo_dir: Path to the git repository
+        branch: Branch name to get workflow runs for
+        event: Optional event filter (e.g., 'pull_request')
 
-        Returns:
-            List of dictionaries containing workflow run information (conclusion, workflowName, etc.)
-        """
-        try:
-            result = _run_gh_command(
-                repo_dir,
-                "run",
-                "list",
-                "--branch",
-                branch,
-                "--limit",
-                "10",
-                "--json",
-                "conclusion,workflowName,headSha,event,status,databaseId",
-                check=False,
-            )
+    Returns:
+        List of dictionaries containing workflow run information (conclusion, workflowName, etc.)
+    """
+    try:
+        result = _run_gh_command(
+            repo_dir,
+            "run",
+            "list",
+            "--branch",
+            branch,
+            "--limit",
+            "10",
+            "--json",
+            "conclusion,workflowName,headSha,event,status,databaseId",
+            check=False,
+        )
 
-            if result.returncode != 0:
-                error_msg = result.stderr.strip() or result.stdout.strip()
-                logger.error(f"Failed to list workflow runs for branch {branch} in {repo_dir.name}: {error_msg}")
-                return []
-
-            runs = json.loads(result.stdout)
-            if event:
-                filtered_runs = [run for run in runs if run.get("event") == event]
-                return filtered_runs
-            return runs
-
-        except GitHubOperationError as e:
-            logger.error(f"Error getting workflow runs for branch {branch} from {repo_dir.name}: {str(e)}")
+        if result.returncode != 0:
+            error_msg = result.stderr.strip() or result.stdout.strip()
+            logger.error(f"Failed to list workflow runs for branch {branch} in {repo_dir.name}: {error_msg}")
             return []
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse workflow runs JSON for branch {branch} from {repo_dir.name}: {str(e)}")
-            return []
-        except Exception as e:
-            logger.error(f"Unexpected error getting workflow runs for branch {branch} from {repo_dir.name}: {str(e)}")
-            return []
+
+        runs = json.loads(result.stdout)
+        if event:
+            filtered_runs = [run for run in runs if run.get("event") == event]
+            return filtered_runs
+        return runs
+
+    except GitHubOperationError as e:
+        logger.error(f"Error getting workflow runs for branch {branch} from {repo_dir.name}: {str(e)}")
+        return []
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse workflow runs JSON for branch {branch} from {repo_dir.name}: {str(e)}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error getting workflow runs for branch {branch} from {repo_dir.name}: {str(e)}")
+        return []
