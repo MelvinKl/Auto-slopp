@@ -258,6 +258,37 @@ class GitHubTaskSource(TaskSource):
         comment_on_issue(repo_path, task.id, no_changes_comment)
         close_issue(repo_path, task.id)
 
+    def on_skip(self, task: Task) -> None:
+        """Called when a task should be skipped (e.g., when LLM is unavailable).
+
+        Comments on the issue explaining the skip and removes the required label
+        so the issue can be retried later when conditions improve.
+
+        Args:
+            task: The task that should be skipped
+        """
+        repo_path = task.raw.get("_repo_path")
+        if repo_path is None:
+            logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
+            return
+
+        skip_comment = (
+            "⏭️ **Skipped: LLM Unavailable**\n\n"
+            "This issue has been skipped for this iteration because the LLM is currently unavailable. "
+            "The task will be retried when the LLM becomes available."
+        )
+        comment_on_issue(repo_path, task.id, skip_comment)
+
+        label_removed = remove_label_from_issue(
+            repo_path,
+            task.id,
+            settings.github_issue_worker_required_label,
+        )
+        if label_removed:
+            logger.info(f"Removed required label '{settings.github_issue_worker_required_label}' from issue #{task.id}")
+        else:
+            logger.warning(f"Failed to remove required label from issue #{task.id}")
+
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.
 

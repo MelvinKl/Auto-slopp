@@ -250,6 +250,27 @@ class VikunjaTaskSource(TaskSource):
         else:
             logger.warning(f"Failed to update status for task {task.id}")
 
+    def on_skip(self, task: Task) -> None:
+        """Called when a task should be skipped (e.g., when LLM is unavailable).
+
+        Comments on the task explaining the skip and keeps the task in its
+        current state so it can be retried later.
+
+        Args:
+            task: The task that should be skipped
+        """
+        skip_comment = (
+            f"⏭️ **Task Skipped: LLM Unavailable**\n\n"
+            f"This task has been skipped for this iteration because the LLM is currently unavailable. "
+            f"The task will be retried when the LLM becomes available.\n\n"
+            f"**Task:** {task.title}"
+        )
+        comment_success = comment_on_task(task.id, skip_comment)
+        if comment_success:
+            commit(task.raw.get("_repo_path"), f"Added skip comment to task {task.id}")
+        else:
+            logger.warning(f"Failed to add skip comment to task {task.id}")
+
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.
 
