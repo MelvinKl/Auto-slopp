@@ -33,7 +33,7 @@ class CLIConfiguration(BaseModel):
         description="Capability rating of this CLI tool (0-10)",
     )
     cooldown_seconds: int = Field(
-        default=3600,
+        default=60,
         description="Cooldown time in seconds if the tool encounters errors",
     )
     name: str = Field(
@@ -121,6 +121,23 @@ class Settings(BaseSettings):
                 ],
                 capability=6,
                 name="pi Qwen3.6-35B-A3B",
+            ),
+            CLIConfiguration(
+                cli_command="codex",
+                cli_args=[
+                    "--dangerously-bypass-approvals-and-sandbox",
+                    "exec",
+                ],
+                capability=6,
+                name="codex exec",
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "run",
+                ],
+                capability=6,
+                name="opencode run",
             ),
         ],
         description=(
