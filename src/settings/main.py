@@ -123,20 +123,20 @@ class Settings(BaseSettings):
                 name="pi Qwen3.6-35B-A3B",
             ),
             CLIConfiguration(
-                cli_command="codex",
+                cli_command="pi",
                 cli_args=[
-                    "--dangerously-bypass-approvals-and-sandbox",
-                    "exec",
+                    "--model",
+                    "llama-cpp/North-Mini-Code",
                 ],
-                capability=6,
-                name="codex exec",
+                capability=5,
+                name="pi North-Mini-Code",
             ),
             CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[
                     "run",
                 ],
-                capability=6,
+                capability=4,
                 name="opencode run",
             ),
         ],
