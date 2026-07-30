@@ -33,7 +33,7 @@ class CLIConfiguration(BaseModel):
         description="Capability rating of this CLI tool (0-10)",
     )
     cooldown_seconds: int = Field(
-        default=60,
+        default=3600,
         description="Cooldown time in seconds if the tool encounters errors",
     )
     name: str = Field(
@@ -73,7 +73,7 @@ class Settings(BaseSettings):
         return v
 
     executor_sleep_interval: float = Field(
-        default=60.0,
+        default=600.0,
         description="Sleep interval between executor iterations in seconds",
     )
 
@@ -146,7 +146,7 @@ class Settings(BaseSettings):
     )
 
     slop_timeout: int = Field(
-        default=7200,
+        default=10000,
         description="Timeout for slopmachine execution in seconds (default: 2 hours)",
     )
 
