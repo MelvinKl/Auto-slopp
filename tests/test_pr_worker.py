@@ -285,7 +285,7 @@ class TestPRWorkerWorkflowRuns:
         mock_get_workflow_runs.return_value = [
             {
                 "conclusion": "success",
-                "workflowName": "CI",
+                "name": "CI",
                 "headSha": "abc123",
                 "event": "pull_request",
                 "status": "completed",
@@ -293,7 +293,7 @@ class TestPRWorkerWorkflowRuns:
             },
             {
                 "conclusion": "success",
-                "workflowName": "Lint",
+                "name": "Lint",
                 "headSha": "def456",
                 "event": "pull_request",
                 "status": "completed",
@@ -313,7 +313,7 @@ class TestPRWorkerWorkflowRuns:
         mock_get_workflow_runs.return_value = [
             {
                 "conclusion": "success",
-                "workflowName": "CI",
+                "name": "CI",
                 "headSha": "abc123",
                 "event": "pull_request",
                 "status": "completed",
@@ -321,7 +321,7 @@ class TestPRWorkerWorkflowRuns:
             },
             {
                 "conclusion": "failure",
-                "workflowName": "Lint",
+                "name": "Lint",
                 "headSha": "def456",
                 "event": "pull_request",
                 "status": "completed",
@@ -332,7 +332,7 @@ class TestPRWorkerWorkflowRuns:
         result = worker._get_and_log_workflow_runs(repo_dir, "main")
         assert len(result) == 1
         assert result[0]["conclusion"] == "failure"
-        assert result[0]["workflowName"] == "Lint"
+        assert result[0]["name"] == "Lint"
 
     @patch("auto_slopp.workers.pr_worker.get_workflow_runs_for_branch")
     def test_get_and_log_workflow_runs_with_in_progress(self, mock_get_workflow_runs):
@@ -343,7 +343,7 @@ class TestPRWorkerWorkflowRuns:
         mock_get_workflow_runs.return_value = [
             {
                 "conclusion": None,
-                "workflowName": "CI",
+                "name": "CI",
                 "headSha": "abc123",
                 "event": "pull_request",
                 "status": "in_progress",
@@ -351,7 +351,7 @@ class TestPRWorkerWorkflowRuns:
             },
             {
                 "conclusion": "success",
-                "workflowName": "Lint",
+                "name": "Lint",
                 "headSha": "def456",
                 "event": "pull_request",
                 "status": "completed",
@@ -371,7 +371,7 @@ class TestPRWorkerWorkflowRuns:
         mock_get_workflow_runs.return_value = [
             {
                 "conclusion": None,
-                "workflowName": "CI",
+                "name": "CI",
                 "headSha": "abc123",
                 "event": "pull_request",
                 "status": "queued",
@@ -379,7 +379,7 @@ class TestPRWorkerWorkflowRuns:
             },
             {
                 "conclusion": "success",
-                "workflowName": "Lint",
+                "name": "Lint",
                 "headSha": "def456",
                 "event": "pull_request",
                 "status": "completed",

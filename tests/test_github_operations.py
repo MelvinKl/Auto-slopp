@@ -130,13 +130,13 @@ class TestGetWorkflowRunsForBranch:
         mock_subprocess_run.return_value = Mock(returncode=0, stdout="abc123")
         mock_run_gh.return_value = Mock(
             returncode=0,
-            stdout='[{"conclusion": "success", "workflowName": "CI", "headSha": "abc123", "event": "pull_request", "status": "completed", "databaseId": 123}]',
+            stdout='[{"conclusion": "success", "name": "CI", "headSha": "abc123", "event": "pull_request", "status": "completed", "databaseId": 123}]',
         )
         repo_dir = Path("/tmp/test_repo")
         result = get_workflow_runs_for_branch(repo_dir, "main")
         assert len(result) == 1
         assert result[0]["conclusion"] == "success"
-        assert result[0]["workflowName"] == "CI"
+        assert result[0]["name"] == "CI"
         assert result[0]["headSha"] == "abc123"
         assert result[0]["event"] == "pull_request"
         assert result[0]["status"] == "completed"
@@ -149,7 +149,7 @@ class TestGetWorkflowRunsForBranch:
         mock_subprocess_run.return_value = Mock(returncode=0, stdout="abc123")
         mock_run_gh.return_value = Mock(
             returncode=0,
-            stdout='[{"conclusion": "success", "workflowName": "CI", "headSha": "abc123", "event": "pull_request", "status": "completed", "databaseId": 123}, {"conclusion": "failure", "workflowName": "Lint", "headSha": "def456", "event": "push", "status": "completed", "databaseId": 124}]',
+            stdout='[{"conclusion": "success", "name": "CI", "headSha": "abc123", "event": "pull_request", "status": "completed", "databaseId": 123}, {"conclusion": "failure", "name": "Lint", "headSha": "def456", "event": "push", "status": "completed", "databaseId": 124}]',
         )
         repo_dir = Path("/tmp/test_repo")
         result = get_workflow_runs_for_branch(repo_dir, "main", event="pull_request")

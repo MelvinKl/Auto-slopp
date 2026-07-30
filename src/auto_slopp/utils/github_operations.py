@@ -654,7 +654,7 @@ def get_workflow_runs_for_branch(repo_dir: Path, branch: str, event: Optional[st
             event: Optional event filter (e.g., 'pull_request')
 
         Returns:
-            List of dictionaries containing workflow run information (conclusion, workflowName, etc.)
+            List of dictionaries containing workflow run information (conclusion, name, etc.)
         """
         try:
             # Get the SHA of the branch to filter by
@@ -677,7 +677,7 @@ def get_workflow_runs_for_branch(repo_dir: Path, branch: str, event: Optional[st
                 "--limit",
                 "20",
                 "--json",
-                "conclusion,workflowName,headSha,event,status,databaseId",
+                "conclusion,name,headSha,event,status,databaseId",
                 check=False,
             )
 

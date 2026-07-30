@@ -73,7 +73,7 @@ class Settings(BaseSettings):
         return v
 
     executor_sleep_interval: float = Field(
-        default=60.0,
+        default=600.0,
         description="Sleep interval between executor iterations in seconds",
     )
 
@@ -122,6 +122,23 @@ class Settings(BaseSettings):
                 capability=6,
                 name="pi Qwen3.6-35B-A3B",
             ),
+            CLIConfiguration(
+                cli_command="pi",
+                cli_args=[
+                    "--model",
+                    "llama-cpp/North-Mini-Code",
+                ],
+                capability=5,
+                name="pi North-Mini-Code",
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "run",
+                ],
+                capability=4,
+                name="opencode run",
+            ),
         ],
         description=(
             "Tiered CLI configurations ordered by preference. " "Lower index entries are preferred and used first."
@@ -129,7 +146,7 @@ class Settings(BaseSettings):
     )
 
     slop_timeout: int = Field(
-        default=7200,
+        default=10000,
         description="Timeout for slopmachine execution in seconds (default: 2 hours)",
     )
 

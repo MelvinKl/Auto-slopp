@@ -260,7 +260,7 @@ class PRWorker(Worker):
         for run in runs:
             conclusion = run.get("conclusion")
             status = run.get("status")
-            workflow_name = run.get("workflowName")
+            workflow_name = run.get("name")
             database_id = run.get("databaseId")
             
             # Log the workflow run details
@@ -314,7 +314,7 @@ class PRWorker(Worker):
         all_success = True
         for run in runs:
             conclusion = run.get("conclusion")
-            workflow_name = run.get("workflowName")
+            workflow_name = run.get("name")
             if conclusion:
                 self.logger.info(
                     f"Workflow run for branch {branch}: workflow '{workflow_name}' concluded with '{conclusion}'"
