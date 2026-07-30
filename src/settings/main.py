@@ -123,6 +123,7 @@ class Settings(BaseSettings):
                 name="opencode nemotron3-free",
             ),
             CLIConfiguration(
+                cli_command="opencode",
                 cli_args=[
                     "--model",
                     "beryllium/Qwen3.6-35B-A3B",
