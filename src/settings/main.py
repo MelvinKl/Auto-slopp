@@ -33,7 +33,7 @@ class CLIConfiguration(BaseModel):
         description="Capability rating of this CLI tool (0-10)",
     )
     cooldown_seconds: int = Field(
-        default=3600,
+        default=60,
         description="Cooldown time in seconds if the tool encounters errors",
     )
     name: str = Field(
@@ -128,7 +128,7 @@ class Settings(BaseSettings):
                     "--model",
                     "llama-cpp/North-Mini-Code",
                 ],
-                capability=5,
+                capability=6,
                 name="pi North-Mini-Code",
             ),
             CLIConfiguration(
