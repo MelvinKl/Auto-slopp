@@ -113,74 +113,14 @@ class Settings(BaseSettings):
     cli_configurations: List[CLIConfiguration] = Field(
         default_factory=lambda: [
             CLIConfiguration(
-                cli_command="opencode",
+                cli_command="pi",
                 cli_args=[
                     "--model",
-                    "opencode/nemotron-3-super-free",
-                    "run",
+                    "llama-cpp/Qwen3.6-35B-A3B",
+                    "-p",
                 ],
                 capability=6,
-                name="opencode nemotron3-free",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "beryllium/Qwen3.6-35B-A3B",
-                    "run",
-                ],
-                capability=6,
-                name="opencode nemotron3-free",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
-                    "run",
-                ],
-                capability=7,
-                name="opencode nemotron3-free",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "opencode/big-pickle",
-                    "run",
-                ],
-                capability=5,
-                name="opencode big pickle",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "opencode/nemotron-3-super-free",
-                    "run",
-                ],
-                capability=7,
-                name="opencode nemotron-3-super-free",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "opencode/boneless",
-                    "run",
-                ],
-                capability=4,
-                name="opencode boneless",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "opencode/nemotron-3-super",
-                    "run",
-                ],
-                capability=8,
-                name="opencode nemotron3-super",
+                name="pi Qwen3.6-35B-A3B",
             ),
         ],
         description=(
