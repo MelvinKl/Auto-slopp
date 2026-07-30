@@ -124,8 +124,10 @@ class TestGetWorkflowRunsForBranch:
     """Test cases for get_workflow_runs_for_branch function."""
 
     @patch("auto_slopp.utils.github_operations._run_gh_command")
-    def test_get_workflow_runs_for_branch_success(self, mock_run_gh):
+    @patch("auto_slopp.utils.github_operations.subprocess.run")
+    def test_get_workflow_runs_for_branch_success(self, mock_subprocess_run, mock_run_gh):
         """Test successful retrieval of workflow runs for branch."""
+        mock_subprocess_run.return_value = Mock(returncode=0, stdout="abc123")
         mock_run_gh.return_value = Mock(
             returncode=0,
             stdout='[{"conclusion": "success", "workflowName": "CI", "headSha": "abc123", "event": "pull_request", "status": "completed", "databaseId": 123}]',
@@ -141,8 +143,10 @@ class TestGetWorkflowRunsForBranch:
         assert result[0]["databaseId"] == 123
 
     @patch("auto_slopp.utils.github_operations._run_gh_command")
-    def test_get_workflow_runs_for_branch_with_event_filter(self, mock_run_gh):
+    @patch("auto_slopp.utils.github_operations.subprocess.run")
+    def test_get_workflow_runs_for_branch_with_event_filter(self, mock_subprocess_run, mock_run_gh):
         """Test retrieval of workflow runs for branch with event filter."""
+        mock_subprocess_run.return_value = Mock(returncode=0, stdout="abc123")
         mock_run_gh.return_value = Mock(
             returncode=0,
             stdout='[{"conclusion": "success", "workflowName": "CI", "headSha": "abc123", "event": "pull_request", "status": "completed", "databaseId": 123}, {"conclusion": "failure", "workflowName": "Lint", "headSha": "def456", "event": "push", "status": "completed", "databaseId": 124}]',
