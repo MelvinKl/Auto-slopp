@@ -177,6 +177,23 @@ class IssueWorker(Worker):
                 return False
         return True
 
+    def _is_llm_unavailable(self, error_msg: str) -> bool:
+        """Check if the error indicates LLM unavailability.
+
+        Args:
+            error_msg: The error message to check
+
+        Returns:
+            True if the error indicates LLM is unavailable, False otherwise
+        """
+        error_lower = error_msg.lower()
+        return (
+            "timed out" in error_lower
+            or "no cli configuration" in error_lower
+            or "llm" in error_lower
+            or "unavailable" in error_lower
+        )
+
     def _process_single_task(self, repo_dir: Path, task: Task) -> Dict[str, Any]:
         """Process a single task using Ralph loop.
 
@@ -260,7 +277,8 @@ class IssueWorker(Worker):
                 result["openagent_executions"] = ralph_result.get("loops_executed", 0)
 
                 if not ralph_result.get("success", False):
-                    result["error"] = f"Ralph loop failed: {ralph_result.get('error', 'Unknown error')}"
+                    ralph_error = f"Ralph loop failed: {ralph_result.get('error', 'Unknown error')}"
+                    result["error"] = ralph_error
 
                     if ralph_result.get("max_loops_reached", False):
                         self.logger.warning(f"Ralph loop reached max iterations for task #{task_id}")
@@ -270,6 +288,11 @@ class IssueWorker(Worker):
                             ralph_result.get("total_steps", 0),
                             ralph_result.get("error", "Unknown error"),
                         )
+                    elif self._is_llm_unavailable(ralph_error):
+                        self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
+                        self.task_source.on_skip(task)
+                    else:
+                        self.task_source.on_task_failure(task, ralph_error)
 
                     return result
 
@@ -299,7 +322,11 @@ class IssueWorker(Worker):
                     cli_tool = get_active_cli_command()
                     error_msg = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
                     result["error"] = error_msg
-                    self.task_source.on_task_failure(task, error_msg)
+                    if self._is_llm_unavailable(error_msg):
+                        self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
+                        self.task_source.on_skip(task)
+                    else:
+                        self.task_source.on_task_failure(task, error_msg)
                     return result
 
             current_branch = get_current_branch(repo_dir)
