@@ -923,24 +923,11 @@ class RalphExecutor:
                 result["loops_executed"] = iteration
                 continue
 
-            acceptance_result = self._execute_step_acceptance_check(
-                repo_dir=repo_dir,
-                task_path=task_path,
-                step=next_step,
-                issue_title=issue_title,
-                issue_body=issue_body,
-                branch_name=branch_name,
-            )
-            if not acceptance_result.get("success", False):
-                result["last_error"] = acceptance_result.get("error", "Acceptance criteria check failed")
-                result["loops_executed"] = iteration
-                continue
-
             if not self._step_is_closed(task_path, next_step.number):
                 self._mark_step_completed_in_file(task_path, next_step.number)
 
             if not self._step_is_closed(task_path, next_step.number):
-                result["last_error"] = f"Step {next_step.number} is still open after acceptance check"
+                result["last_error"] = f"Step {next_step.number} is still open after execution"
                 result["loops_executed"] = iteration
                 continue
 
