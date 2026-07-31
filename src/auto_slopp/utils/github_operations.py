@@ -379,6 +379,55 @@ def get_open_prs(repo_dir: Path) -> List[Dict[str, Any]]:
         return []
 
 
+def get_closed_prs(repo_dir: Path) -> List[Dict[str, Any]]:
+    """Get list of closed/merged PRs in the repository with full information.
+
+    Args:
+        repo_dir: Path to the git repository
+
+    Returns:
+        List of dictionaries containing PR information (headRefName, author, number, title).
+        Returns empty list if no closed PRs found or if query fails.
+
+    Raises:
+        GitHubOperationError: If gh command fails
+    """
+    try:
+        # gh pr list --state=closed includes both closed and merged PRs
+        result = _run_gh_command(
+            repo_dir,
+            "pr",
+            "list",
+            "--state=closed",
+            "--json=headRefName,author,number,title",
+            check=False,
+        )
+
+        if result.returncode != 0:
+            pr_error = result.stderr.strip() or result.stdout.strip()
+            if "Could not resolve to a Repository" in pr_error:
+                logger.warning(
+                    f"Cannot access repository {repo_dir.name}: likely permission denied or repository not found. "
+                    f"Verify the GitHub token has access to this repository."
+                )
+            else:
+                logger.error(f"Failed to list closed PRs in {repo_dir.name}: {pr_error}")
+            return []
+
+        prs = json.loads(result.stdout)
+        return prs if prs else []
+
+    except GitHubOperationError as e:
+        logger.error(f"Error getting closed PRs from {repo_dir.name}: {str(e)}")
+        return []
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse closed PR list JSON from {repo_dir.name}: {str(e)}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error getting closed PRs from {repo_dir.name}: {str(e)}")
+        return []
+
+
 def get_pr_for_branch(repo_dir: Path, branch: str) -> Optional[Dict[str, Any]]:
     """Get PR info for a specific branch if it exists.
 
