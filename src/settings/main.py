@@ -141,17 +141,7 @@ class Settings(BaseSettings):
                 ],
                 capability=5,
                 name="opencode big pickle",
-            ),
-            CLIConfiguration(
-                cli_command="pi",
-                cli_args=[
-                    "--model",
-                    "llama-cpp/Nanbeige",
-                    "-p",
-                ],
-                capability=4,
-                name="pi nanbeige",
-            ),            
+            ),          
             CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[
