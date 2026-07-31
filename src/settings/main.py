@@ -162,6 +162,16 @@ class Settings(BaseSettings):
                 capability=7,
                 name="opencode nemotron-3-ultra-free",
             ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "opencode/north-mini-code-free ",
+                    "run",
+                ],
+                capability=7,
+                name="opencode north-mini-code-free ",
+            ),
         ],
         description=(
             "Tiered CLI configurations ordered by preference. " "Lower index entries are preferred and used first."
