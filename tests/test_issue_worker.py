@@ -925,3 +925,31 @@ class TestIssueWorker:
             worker.run(Path(temp_dir))
             expected = "Second comment\\n\\n---\\n\\nThird comment"
             assert task_source.tasks[0].comments == [expected]
+
+    @patch("auto_slopp.workers.issue_worker.ensure_ralph_in_gitignore")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_ensure_ralph_in_gitignore_called(
+        self, mock_settings, mock_create_branch, mock_checkout, mock_ensure_gitignore
+    ):
+        """Test that ensure_ralph_in_gitignore is called after branch creation and before Ralph execution."""
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": True,
+            "loops_executed": 1,
+            "steps_completed": 3,
+            "total_steps": 3,
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            worker.run(Path(temp_dir))
+
+        # Verify ensure_ralph_in_gitignore was called
+        mock_ensure_gitignore.assert_called_once()
+        call_args = mock_ensure_gitignore.call_args
+        assert call_args[0][0] == Path(temp_dir)

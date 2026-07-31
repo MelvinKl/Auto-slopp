@@ -7,9 +7,102 @@ from unittest.mock import Mock, patch
 from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     create_and_checkout_branch,
+    ensure_ralph_in_gitignore,
     get_current_branch,
     merge_main_into_branch,
 )
+
+
+class TestEnsureRalphInGitignore:
+    """Test cases for ensure_ralph_in_gitignore function."""
+
+    def test_ensure_ralph_when_gitignore_exists_without_ralph(self):
+        """Test adding .ralph to existing .gitignore without .ralph entry."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            gitignore_path = repo_path / ".gitignore"
+            gitignore_path.write_text("*.pyc\n__pycache__/\n")
+
+            result = ensure_ralph_in_gitignore(repo_path)
+
+            assert result is True
+            content = gitignore_path.read_text()
+            assert ".ralph/" in content
+
+    def test_ensure_ralph_when_gitignore_exists_with_ralph(self):
+        """Test when .gitignore already contains .ralph entry."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            gitignore_path = repo_path / ".gitignore"
+            gitignore_path.write_text("*.pyc\n__pycache__/\n.ralph/\n")
+
+            result = ensure_ralph_in_gitignore(repo_path)
+
+            assert result is True
+            content = gitignore_path.read_text()
+            # Should not duplicate the entry
+            assert content.count(".ralph/") == 1
+
+    def test_ensure_ralph_when_gitignore_exists_with_ralph_no_slash(self):
+        """Test when .gitignore already contains .ralph entry without trailing slash."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            gitignore_path = repo_path / ".gitignore"
+            gitignore_path.write_text("*.pyc\n__pycache__/\n.ralph\n")
+
+            result = ensure_ralph_in_gitignore(repo_path)
+
+            assert result is True
+            content = gitignore_path.read_text()
+            # Should not add duplicate
+            assert content.count(".ralph") == 1
+
+    def test_ensure_ralph_when_no_gitignore(self):
+        """Test creating .gitignore with .ralph when it doesn't exist."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+
+            result = ensure_ralph_in_gitignore(repo_path)
+
+            assert result is True
+            gitignore_path = repo_path / ".gitignore"
+            assert gitignore_path.exists()
+            content = gitignore_path.read_text()
+            assert content == ".ralph/\n"
+
+    def test_ensure_ralph_handles_errors(self):
+        """Test that errors are handled gracefully."""
+        import os
+        import tempfile
+
+        # Skip if running as root (root can write to read-only files)
+        if os.getuid() == 0:
+            import pytest
+
+            pytest.skip("Skipping read-only test when running as root")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            gitignore_path = repo_path / ".gitignore"
+            gitignore_path.write_text("*.pyc\n")
+
+            # Make .gitignore read-only to cause a write error
+            gitignore_path.chmod(0o444)
+
+            try:
+                result = ensure_ralph_in_gitignore(repo_path)
+                assert result is False
+            finally:
+                # Restore permissions for cleanup
+                gitignore_path.chmod(0o644)
 
 
 class TestMergeMainIntoBranch:

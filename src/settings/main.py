@@ -141,7 +141,7 @@ class Settings(BaseSettings):
                 ],
                 capability=5,
                 name="opencode big pickle",
-            ),          
+            ),
             CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[

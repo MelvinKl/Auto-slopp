@@ -20,6 +20,7 @@ from auto_slopp.utils.git_operations import (
     commit_and_push_changes,
     create_and_checkout_branch,
     delete_branch,
+    ensure_ralph_in_gitignore,
     get_commits_ahead_of_branch,
     get_current_branch,
     has_changes,
@@ -245,6 +246,9 @@ class IssueWorker(Worker):
                 result["error"] = error_msg
                 self.task_source.on_task_failure(task, error_msg)
                 return result
+
+            # Ensure .ralph is in .gitignore before Ralph execution
+            ensure_ralph_in_gitignore(repo_dir)
 
             if settings.ralph_enabled:
                 ralph_result = self.ralph_executor.execute(
