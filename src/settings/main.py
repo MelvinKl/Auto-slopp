@@ -128,16 +128,28 @@ class Settings(BaseSettings):
                     "--model",
                     "llama-cpp/North-Mini-Code",
                 ],
-                capability=6,
+                capability=5,
                 name="pi North-Mini-Code",
             ),
             CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[
+                    "--model",
+                    "opencode/big-pickle",
                     "run",
                 ],
-                capability=4,
-                name="opencode run",
+                capability=5,
+                name="opencode big pickle",
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "opencode/nemotron-3-super-free",
+                    "run",
+                ],
+                capability=7,
+                name="opencode nemotron-3-super-free",
             ),
         ],
         description=(
