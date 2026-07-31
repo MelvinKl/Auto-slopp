@@ -931,20 +931,6 @@ class RalphExecutor:
                 result["loops_executed"] = iteration
                 continue
 
-            remaining_steps_update_result = self._update_remaining_steps(
-                repo_dir=repo_dir,
-                task_path=task_path,
-                step=next_step,
-                issue_title=issue_title,
-                issue_body=issue_body,
-                branch_name=branch_name,
-            )
-            if not remaining_steps_update_result.get("success", False):
-                self.logger.warning(
-                    "Failed to update remaining steps after step completion: "
-                    f"{remaining_steps_update_result.get('error', 'Unknown error')}"
-                )
-
             repo_has_changes = False
             try:
                 repo_has_changes = self.has_changes_fn(repo_dir)
