@@ -156,11 +156,11 @@ class Settings(BaseSettings):
                 cli_command="opencode",
                 cli_args=[
                     "--model",
-                    "opencode/nemotron-3-super-free",
+                    "opencode/nemotron-3-ultra-free",
                     "run",
                 ],
                 capability=7,
-                name="opencode nemotron-3-super-free",
+                name="opencode nemotron-3-ultra-free",
             ),
         ],
         description=(
