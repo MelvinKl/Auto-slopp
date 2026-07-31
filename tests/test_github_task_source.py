@@ -365,3 +365,49 @@ class TestGitHubTaskSource:
 
         mock_comment.assert_not_called()
         mock_remove.assert_not_called()
+
+    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_on_skip_comments_and_removes_label(self, mock_settings, mock_remove, mock_comment):
+        """Test that on_skip adds comment and removes required label."""
+        mock_settings.github_issue_worker_required_label = "test-label"
+        mock_remove.return_value = True
+        task_source = GitHubTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
+
+        task_source.on_skip(task)
+
+        mock_comment.assert_called_once()
+        comment_body = mock_comment.call_args[0][2]
+        assert "Skipped: LLM Unavailable" in comment_body
+        mock_remove.assert_called_once_with(Path("/test"), 42, "test-label")
+
+    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_on_skip_handles_missing_repo_path(self, mock_settings, mock_remove, mock_comment):
+        """Test that on_skip handles missing repo_path in task."""
+        mock_settings.github_issue_worker_required_label = "test-label"
+        task_source = GitHubTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={})
+
+        task_source.on_skip(task)
+
+        mock_comment.assert_not_called()
+        mock_remove.assert_not_called()
+
+    @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
+    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_on_skip_logs_warning_on_label_removal_failure(self, mock_settings, mock_comment, mock_remove):
+        """Test that on_skip logs a warning when label removal fails."""
+        mock_settings.github_issue_worker_required_label = "test-label"
+        mock_remove.return_value = False
+        task_source = GitHubTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
+
+        task_source.on_skip(task)
+
+        mock_comment.assert_called_once()
+        mock_remove.assert_called_once_with(Path("/test"), 42, "test-label")
