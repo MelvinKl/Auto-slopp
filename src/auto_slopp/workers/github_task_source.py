@@ -13,6 +13,7 @@ from auto_slopp.utils.cli_executor import execute_with_instructions
 from auto_slopp.utils.git_operations import sanitize_branch_name
 from auto_slopp.utils.github_operations import (
     get_open_prs,
+    get_closed_prs,
     close_issue,
     comment_on_issue,
     delete_issue_comment,
@@ -432,41 +433,61 @@ class GitHubTaskSource(TaskSource):
             return False
 
     def _has_prs(self, repo_path: Path, issue_number: int) -> bool:
-        """Check if there are any open PRs for this issue.
+        """Check if there are any open or closed PRs for this issue.
+
+        This method checks both open and closed (merged/closed) PRs to determine
+        if there's evidence of work done on the issue. A closed PR still indicates
+        that changes were made and should prevent the issue from being closed as
+        "no changes required".
 
         Args:
             repo_path: Path to the repository
             issue_number: Issue number to check
 
         Returns:
-            True if there are open PRs for this issue, False otherwise
+            True if there are open or closed PRs for this issue, False otherwise
         """
         try:
-            # Get all open PRs
-            all_prs = get_open_prs(repo_path)
-            if not all_prs:
-                return False
+            # Check for open PRs
+            open_prs = get_open_prs(repo_path)
+            if self._pr_mentions_issue(open_prs, issue_number):
+                return True
 
-            # Check if any PR mentions this issue number in its title or body
-            # or if the PR's head branch contains the issue number
-            for pr in all_prs:
-                pr_title = pr.get("title", "")
-                pr_body = pr.get("body", "")
-                pr_head_ref = pr.get("headRefName", "")
-
-                # Check if issue number is mentioned in PR title, body, or head branch
-                issue_mentions_in_title = str(issue_number) in pr_title
-                issue_mentions_in_body = str(issue_number) in pr_body
-                issue_in_branch = str(issue_number) in pr_head_ref
-
-                if issue_mentions_in_title or issue_mentions_in_body or issue_in_branch:
-                    return True
+            # Check for closed/merged PRs (evidence of work done)
+            closed_prs = get_closed_prs(repo_path)
+            if self._pr_mentions_issue(closed_prs, issue_number):
+                return True
 
             return False
 
         except Exception as e:
             logger.warning(f"Failed to check PRs for issue #{issue_number}: {str(e)}")
             return False
+
+    def _pr_mentions_issue(self, prs: List[dict], issue_number: int) -> bool:
+        """Check if any PR in the list mentions the given issue number.
+
+        Args:
+            prs: List of PR dictionaries
+            issue_number: Issue number to check for
+
+        Returns:
+            True if any PR mentions the issue number, False otherwise
+        """
+        for pr in prs:
+            pr_title = pr.get("title", "")
+            pr_body = pr.get("body", "")
+            pr_head_ref = pr.get("headRefName", "")
+
+            # Check if issue number is mentioned in PR title, body, or head branch
+            issue_mentions_in_title = str(issue_number) in pr_title
+            issue_mentions_in_body = str(issue_number) in pr_body
+            issue_in_branch = str(issue_number) in pr_head_ref
+
+            if issue_mentions_in_title or issue_mentions_in_body or issue_in_branch:
+                return True
+
+        return False
 
     def _has_recent_activity(self, repo_path: Path, issue_number: int) -> bool:
         """Check if there's recent activity on this issue (comments, PR reviews, etc.).
