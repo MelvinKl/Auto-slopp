@@ -5,12 +5,14 @@ GitHub Issues, following the same patterns used by GitHubIssueWorker.
 """
 
 import logging
+import subprocess
 from pathlib import Path
 from typing import List, Optional
 
 from auto_slopp.utils.cli_executor import execute_with_instructions
 from auto_slopp.utils.git_operations import sanitize_branch_name
 from auto_slopp.utils.github_operations import (
+    get_open_prs,
     close_issue,
     comment_on_issue,
     delete_issue_comment,
@@ -242,7 +244,10 @@ class GitHubTaskSource(TaskSource):
     def on_no_changes(self, task: Task) -> None:
         """Called when no changes were needed for a task.
 
-        Closes GitHub issue with a comment indicating no changes were needed.
+        Closes GitHub issue with a comment indicating no changes were needed,
+        but only if there's no evidence that work has been done on the issue.
+        If there's evidence of work (comments, PRs, etc.), the issue is kept open
+        to allow for future processing.
 
         Args:
             task: The task that required no changes
@@ -250,6 +255,18 @@ class GitHubTaskSource(TaskSource):
         repo_path = task.raw.get("_repo_path")
         if repo_path is None:
             logger.warning(f"No repo_path found in task #{task.id}, skipping no-changes handling")
+            return
+
+        # Check if there's evidence that work has been done on this issue
+        has_author_comments = self._has_author_comments(repo_path, task.id)
+        has_prs = self._has_prs(repo_path, task.id)
+        has_recent_activity = self._has_recent_activity(repo_path, task.id)
+
+        if has_author_comments or has_prs or has_recent_activity:
+            logger.info(
+                f"Issue #{task.id} has evidence of work (author comments: {has_author_comments}, "
+                f"PRs: {has_prs}, recent activity: {has_recent_activity}), skipping close"
+            )
             return
 
         no_changes_comment = (
@@ -375,3 +392,157 @@ class GitHubTaskSource(TaskSource):
                     f"and not created by '{settings.github_issue_worker_allowed_creator}'"
                 )
         return filtered
+
+    def _has_author_comments(self, repo_path: Path, issue_number: int) -> bool:
+        """Check if there are comments from the issue author.
+
+        Args:
+            repo_path: Path to the repository
+            issue_number: Issue number to check
+
+        Returns:
+            True if there are comments from the issue author, False otherwise
+        """
+        try:
+            all_comments = get_issue_comments(repo_path, issue_number)
+            if not all_comments:
+                return False
+
+            issue_author_login = self._get_issue_author_login(repo_path, issue_number)
+            if not issue_author_login:
+                return False
+
+            author_comments = 0
+            for comment in all_comments:
+                author = comment.get("author")
+                if isinstance(author, dict):
+                    author_login = author.get("login")
+                else:
+                    author_login = author
+                if author_login == issue_author_login:
+                    author_comments += 1
+                    # Check if comment is not the "No changes required" comment we just added
+                    if "no changes required for this issue" in comment.get("body", "").lower():
+                        author_comments -= 1
+
+            return author_comments > 0
+
+        except Exception as e:
+            logger.warning(f"Failed to check author comments for issue #{issue_number}: {str(e)}")
+            return False
+
+    def _has_prs(self, repo_path: Path, issue_number: int) -> bool:
+        """Check if there are any open PRs for this issue.
+
+        Args:
+            repo_path: Path to the repository
+            issue_number: Issue number to check
+
+        Returns:
+            True if there are open PRs for this issue, False otherwise
+        """
+        try:
+            # Get all open PRs
+            all_prs = get_open_prs(repo_path)
+            if not all_prs:
+                return False
+
+            # Check if any PR mentions this issue number in its title or body
+            # or if the PR's head branch contains the issue number
+            for pr in all_prs:
+                pr_title = pr.get("title", "")
+                pr_body = pr.get("body", "")
+                pr_head_ref = pr.get("headRefName", "")
+
+                # Check if issue number is mentioned in PR title, body, or head branch
+                issue_mentions_in_title = str(issue_number) in pr_title
+                issue_mentions_in_body = str(issue_number) in pr_body
+                issue_in_branch = str(issue_number) in pr_head_ref
+
+                if issue_mentions_in_title or issue_mentions_in_body or issue_in_branch:
+                    return True
+
+            return False
+
+        except Exception as e:
+            logger.warning(f"Failed to check PRs for issue #{issue_number}: {str(e)}")
+            return False
+
+    def _has_recent_activity(self, repo_path: Path, issue_number: int) -> bool:
+        """Check if there's recent activity on this issue (comments, PR reviews, etc.).
+
+        Args:
+            repo_path: Path to the repository
+            issue_number: Issue number to check
+
+        Returns:
+            True if there's recent activity, False otherwise
+        """
+        try:
+            # Get recent comments
+            all_comments = get_issue_comments(repo_path, issue_number)
+            if not all_comments:
+                return False
+
+            # Check for any comments that are not the standard no-changes comment
+            for comment in all_comments:
+                body = comment.get("body", "") or ""
+                # Skip the standard no-changes comment we would add
+                if "no changes required for this issue" in body.lower():
+                    continue
+
+                # Any other comment indicates recent activity
+                return True
+
+            # Check if there are any workflow runs for recent commits
+            try:
+                # Get the most recent commits to this repo
+                result = subprocess.run(
+                    ["git", "log", "--oneline", "-10"],
+                    cwd=repo_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if result.returncode == 0:
+                    recent_commits = result.stdout
+                    # Check if recent commits mention this issue
+                    if str(issue_number) in recent_commits:
+                        return True
+            except Exception:
+                pass
+
+            return False
+
+        except Exception as e:
+            logger.warning(f"Failed to check recent activity for issue #{issue_number}: {str(e)}")
+            return False
+
+    def _get_issue_author_login(self, repo_path: Path, issue_number: int) -> Optional[str]:
+        """Get the author login of an issue.
+
+        Args:
+            repo_path: Path to the repository
+            issue_number: Issue number to get author for
+
+        Returns:
+            Author login string, or None if unable to determine
+        """
+        try:
+            # Get the issue details using gh CLI
+            result = subprocess.run(
+                ["gh", "issue", "view", str(issue_number), "--json", "author"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                import json
+                data = json.loads(result.stdout)
+                if data and data.get("author") and isinstance(data["author"], dict):
+                    return data["author"].get("login")
+            return None
+        except Exception as e:
+            logger.warning(f"Failed to get issue author for issue #{issue_number}: {str(e)}")
+            return None
