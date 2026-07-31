@@ -123,16 +123,6 @@ class Settings(BaseSettings):
                 name="pi Qwen3.6-35B-A3B",
             ),
             CLIConfiguration(
-                cli_command="pi",
-                cli_args=[
-                    "--model",
-                    "llama-cpp/North-Mini-Code",
-                    "-p",
-                ],
-                capability=5,
-                name="pi North-Mini-Code",
-            ),
-            CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[
                     "--model",
