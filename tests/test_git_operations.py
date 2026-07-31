@@ -63,6 +63,46 @@ class TestEnsureRalphInGitignore:
             # Should not add duplicate
             assert content.count(".ralph") == 1
 
+    def test_ensure_ralph_when_gitignore_has_ralph_with_whitespace(self):
+        """Test when .gitignore contains .ralph entry with surrounding whitespace."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            gitignore_path = repo_path / ".gitignore"
+            gitignore_path.write_text("*.pyc\n__pycache__/\n .ralph/\n")
+
+            result = ensure_ralph_in_gitignore(repo_path)
+
+            assert result is True
+            content = gitignore_path.read_text()
+            # Should not add duplicate even with leading whitespace
+            assert content.count(".ralph/") == 1
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            gitignore_path = repo_path / ".gitignore"
+            gitignore_path.write_text("*.pyc\n__pycache__/\n.ralph/ \n")
+
+            result = ensure_ralph_in_gitignore(repo_path)
+
+            assert result is True
+            content = gitignore_path.read_text()
+            # Should not add duplicate even with trailing whitespace
+            assert content.count(".ralph/") == 1
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            gitignore_path = repo_path / ".gitignore"
+            gitignore_path.write_text("*.pyc\n__pycache__/\n .ralph \n")
+
+            result = ensure_ralph_in_gitignore(repo_path)
+
+            assert result is True
+            content = gitignore_path.read_text()
+            # Should not add duplicate even with both leading and trailing whitespace
+            assert content.count(".ralph") == 1
+
     def test_ensure_ralph_when_no_gitignore(self):
         """Test creating .gitignore with .ralph when it doesn't exist."""
         import tempfile
