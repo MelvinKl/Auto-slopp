@@ -127,6 +127,7 @@ class Settings(BaseSettings):
                 cli_args=[
                     "--model",
                     "llama-cpp/North-Mini-Code",
+                    "-p",
                 ],
                 capability=5,
                 name="pi North-Mini-Code",
@@ -141,6 +142,16 @@ class Settings(BaseSettings):
                 capability=5,
                 name="opencode big pickle",
             ),
+            CLIConfiguration(
+                cli_command="pi",
+                cli_args=[
+                    "--model",
+                    "llama-cpp/Nanbeige",
+                    "-p",
+                ],
+                capability=4,
+                name="pi nanbeige",
+            ),            
             CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[
@@ -196,12 +207,12 @@ class Settings(BaseSettings):
 
     task_difficulties: Dict[str, TaskRating] = Field(
         default={
-            "task_planning": TaskRating(min_rating=0, max_rating=10, recommended_rating=6),
+            "task_planning": TaskRating(min_rating=0, max_rating=10, recommended_rating=10),
             "implementation": TaskRating(min_rating=5, max_rating=10, recommended_rating=10),
             "task_implementation_validation": TaskRating(min_rating=0, max_rating=10, recommended_rating=6),
             "remaining_steps_update": TaskRating(min_rating=0, max_rating=10, recommended_rating=4),
             "pr_description": TaskRating(min_rating=0, max_rating=10, recommended_rating=1),
-            "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
+            "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=4),
             "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2),
             "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
         },
