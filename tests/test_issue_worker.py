@@ -436,8 +436,10 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.settings")
     @patch("auto_slopp.workers.issue_worker.push_to_remote")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     def test_push_failure_calls_on_task_failure(
         self,
+        mock_commits_ahead,
         mock_cli,
         mock_push,
         mock_settings,
@@ -457,6 +459,7 @@ class TestIssueWorker:
         mock_create_branch.return_value = True
         mock_current_branch.return_value = "ai/task-1"
         mock_push.return_value = (False, "Push rejected")
+        mock_commits_ahead.return_value = 1  # Simulate commits ahead of main
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
         worker.ralph_executor.execute = lambda *args, **kwargs: {
@@ -470,6 +473,103 @@ class TestIssueWorker:
         assert "Failed to push" in result["task_results"][0]["error"]
         assert "task #1" in result["task_results"][0]["error"]
         assert task_source.on_task_failure_called is True
+
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    def test_commits_during_ralph_loop_still_creates_pr(
+        self,
+        mock_cli,
+        mock_commits_ahead,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_has_changes,
+        mock_create_branch,
+        mock_checkout,
+        mock_commit_push,
+    ):
+        """Test that PR is created when commits are made during Ralph loop (has_changes=False but commits ahead)."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        # has_changes returns False because Ralph already committed everything
+        mock_has_changes.return_value = False
+        # But there ARE commits ahead of main (committed during Ralph loop)
+        mock_commits_ahead.return_value = 1
+        mock_commit_push.return_value = (True, None)
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_current_branch.return_value = "ai/task-1"
+        mock_push.return_value = (True, "")
+        mock_get_pr.return_value = None
+        mock_create_pr.return_value = {"url": "https://github.com/test/pr/1"}
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": True,
+            "loops_executed": 1,
+            "steps_completed": 3,
+            "total_steps": 3,
+        }
+        result = worker.run(Path("/tmp"))
+        # Should process the task and create a PR (not close as "no changes")
+        assert result["tasks_processed"] == 1
+        assert result["prs_created"] == 1
+        assert result["task_results"][0]["pr_created"] is True
+        assert task_source.on_task_complete_called is True
+        assert task_source.on_no_changes_called is False
+
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    def test_no_commits_ahead_closes_as_no_changes(
+        self,
+        mock_cli,
+        mock_commits_ahead,
+        mock_settings,
+        mock_current_branch,
+        mock_create_branch,
+        mock_checkout,
+        mock_commit_push,
+    ):
+        """Test that issue is closed as no_changes when there are no commits ahead of main."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        # No commits ahead of main - Ralph made no changes
+        mock_commits_ahead.return_value = 0
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_current_branch.return_value = "ai/task-1"
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": True,
+            "loops_executed": 1,
+            "steps_completed": 0,
+            "total_steps": 3,
+        }
+        result = worker.run(Path("/tmp"))
+        # Should close as no_changes (no commits were made)
+        assert result["tasks_processed"] == 1
+        assert result["task_results"][0]["no_changes"] is True
+        assert task_source.on_no_changes_called is True
+        assert task_source.on_task_complete_called is False
 
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
