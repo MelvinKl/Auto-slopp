@@ -34,7 +34,7 @@ class CLIConfiguration(BaseModel):
         description="Capability rating of this CLI tool (0-10)",
     )
     cooldown_seconds: int = Field(
-        default=3600,
+        default=60,
         description="Cooldown time in seconds if the tool encounters errors",
     )
     name: str = Field(
@@ -75,7 +75,7 @@ class Settings(BaseSettings):
         return v
 
     executor_sleep_interval: float = Field(
-        default=60.0,
+        default=600.0,
         description="Sleep interval between executor iterations in seconds",
     )
 
@@ -126,7 +126,7 @@ class Settings(BaseSettings):
     )
 
     slop_timeout: int = Field(
-        default=7200,
+        default=10000,
         description="Timeout for slopmachine execution in seconds (default: 2 hours)",
     )
 
@@ -164,12 +164,12 @@ class Settings(BaseSettings):
 
     task_difficulties: Dict[str, TaskRating] = Field(
         default={
-            "task_planning": TaskRating(min_rating=0, max_rating=10, recommended_rating=6),
+            "task_planning": TaskRating(min_rating=0, max_rating=10, recommended_rating=10),
             "implementation": TaskRating(min_rating=5, max_rating=10, recommended_rating=10),
             "task_implementation_validation": TaskRating(min_rating=0, max_rating=10, recommended_rating=6),
             "remaining_steps_update": TaskRating(min_rating=0, max_rating=10, recommended_rating=4),
             "pr_description": TaskRating(min_rating=0, max_rating=10, recommended_rating=1),
-            "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
+            "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=4),
             "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2),
             "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
         },

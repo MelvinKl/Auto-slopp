@@ -379,6 +379,55 @@ def get_open_prs(repo_dir: Path) -> List[Dict[str, Any]]:
         return []
 
 
+def get_closed_prs(repo_dir: Path) -> List[Dict[str, Any]]:
+    """Get list of closed/merged PRs in the repository with full information.
+
+    Args:
+        repo_dir: Path to the git repository
+
+    Returns:
+        List of dictionaries containing PR information (headRefName, author, number, title).
+        Returns empty list if no closed PRs found or if query fails.
+
+    Raises:
+        GitHubOperationError: If gh command fails
+    """
+    try:
+        # gh pr list --state=closed includes both closed and merged PRs
+        result = _run_gh_command(
+            repo_dir,
+            "pr",
+            "list",
+            "--state=closed",
+            "--json=headRefName,author,number,title",
+            check=False,
+        )
+
+        if result.returncode != 0:
+            pr_error = result.stderr.strip() or result.stdout.strip()
+            if "Could not resolve to a Repository" in pr_error:
+                logger.warning(
+                    f"Cannot access repository {repo_dir.name}: likely permission denied or repository not found. "
+                    f"Verify the GitHub token has access to this repository."
+                )
+            else:
+                logger.error(f"Failed to list closed PRs in {repo_dir.name}: {pr_error}")
+            return []
+
+        prs = json.loads(result.stdout)
+        return prs if prs else []
+
+    except GitHubOperationError as e:
+        logger.error(f"Error getting closed PRs from {repo_dir.name}: {str(e)}")
+        return []
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse closed PR list JSON from {repo_dir.name}: {str(e)}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error getting closed PRs from {repo_dir.name}: {str(e)}")
+        return []
+
+
 def get_pr_for_branch(repo_dir: Path, branch: str) -> Optional[Dict[str, Any]]:
     """Get PR info for a specific branch if it exists.
 
@@ -654,19 +703,30 @@ def get_workflow_runs_for_branch(repo_dir: Path, branch: str, event: Optional[st
         event: Optional event filter (e.g., 'pull_request')
 
     Returns:
-        List of dictionaries containing workflow run information (conclusion, workflowName, etc.)
+        List of dictionaries containing workflow run information (conclusion, name, etc.)
     """
     try:
+        # Get the SHA of the branch to filter by
+        sha_result = subprocess.run(
+            ["git", "rev-parse", f"origin/{branch}"],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if sha_result.returncode != 0:
+            logger.warning(f"Could not resolve origin/{branch} SHA for workflow run lookup")
+            return []
+        branch_sha = sha_result.stdout.strip()
+
         result = _run_gh_command(
             repo_dir,
             "run",
             "list",
-            "--branch",
-            branch,
             "--limit",
-            "10",
+            "20",
             "--json",
-            "conclusion,workflowName,headSha,event,status,databaseId",
+            "conclusion,name,headSha,event,status,databaseId",
             check=False,
         )
 
@@ -676,10 +736,11 @@ def get_workflow_runs_for_branch(repo_dir: Path, branch: str, event: Optional[st
             return []
 
         runs = json.loads(result.stdout)
+        # Filter by branch SHA since gh run list doesn't support --branch flag
+        filtered_runs = [run for run in runs if run.get("headSha") == branch_sha]
         if event:
-            filtered_runs = [run for run in runs if run.get("event") == event]
-            return filtered_runs
-        return runs
+            filtered_runs = [run for run in filtered_runs if run.get("event") == event]
+        return filtered_runs
 
     except GitHubOperationError as e:
         logger.error(f"Error getting workflow runs for branch {branch} from {repo_dir.name}: {str(e)}")
