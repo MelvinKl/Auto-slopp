@@ -411,3 +411,89 @@ class TestGitHubTaskSource:
 
         mock_comment.assert_called_once()
         mock_remove.assert_called_once_with(Path("/test"), 42, "test-label")
+
+    def test_pr_mentions_issue_in_title(self):
+        """Test that _pr_mentions_issue returns True when issue number is in PR title."""
+        task_source = GitHubTaskSource()
+        prs = [
+            {"title": "#42: Fix bug", "body": "", "headRefName": ""},
+        ]
+        assert task_source._pr_mentions_issue(prs, 42) is True
+        assert task_source._pr_mentions_issue(prs, 99) is False
+
+    def test_pr_mentions_issue_in_body(self):
+        """Test that _pr_mentions_issue returns True when issue number is in PR body."""
+        task_source = GitHubTaskSource()
+        prs = [
+            {"title": "Fix bug", "body": "Closes #42", "headRefName": ""},
+        ]
+        assert task_source._pr_mentions_issue(prs, 42) is True
+        assert task_source._pr_mentions_issue(prs, 99) is False
+
+    def test_pr_mentions_issue_in_branch(self):
+        """Test that _pr_mentions_issue returns True when issue number is in branch name."""
+        task_source = GitHubTaskSource()
+        prs = [
+            {"title": "Fix bug", "body": "", "headRefName": "ai/issue-42-fix-bug"},
+        ]
+        assert task_source._pr_mentions_issue(prs, 42) is True
+        assert task_source._pr_mentions_issue(prs, 99) is False
+
+    def test_pr_mentions_issue_empty_prs(self):
+        """Test that _pr_mentions_issue returns False for empty PR list."""
+        task_source = GitHubTaskSource()
+        assert task_source._pr_mentions_issue([], 42) is False
+
+    def test_pr_mentions_issue_no_match(self):
+        """Test that _pr_mentions_issue returns False when issue number not found."""
+        task_source = GitHubTaskSource()
+        prs = [
+            {"title": "#41: Fix bug", "body": "Closes #41", "headRefName": "ai/issue-41-fix"},
+        ]
+        assert task_source._pr_mentions_issue(prs, 42) is False
+
+    @patch("auto_slopp.workers.github_task_source.get_open_prs")
+    @patch("auto_slopp.workers.github_task_source.get_closed_prs")
+    def test_has_prs_checks_closed_prs(self, mock_get_closed, mock_get_open):
+        """Test that _has_prs also checks closed/merged PRs as evidence of work."""
+        task_source = GitHubTaskSource()
+
+        # No open PRs
+        mock_get_open.return_value = []
+
+        # But there's a closed PR that mentions the issue
+        mock_get_closed.return_value = [
+            {"title": "#42: Fix bug", "body": "", "headRefName": ""},
+        ]
+
+        # Should return True because closed PR is evidence of work
+        assert task_source._has_prs(Path("/test"), 42) is True
+
+    @patch("auto_slopp.workers.github_task_source.get_open_prs")
+    @patch("auto_slopp.workers.github_task_source.get_closed_prs")
+    def test_has_prs_open_pr_takes_precedence(self, mock_get_closed, mock_get_open):
+        """Test that _has_prs returns early when open PR mentions issue."""
+        task_source = GitHubTaskSource()
+
+        mock_get_open.return_value = [
+            {"title": "#42: Fix bug", "body": "", "headRefName": ""},
+        ]
+
+        assert task_source._has_prs(Path("/test"), 42) is True
+        # Closed PRs shouldn't be queried if open PR already found
+        mock_get_closed.assert_not_called()
+
+    @patch("auto_slopp.workers.github_task_source.get_open_prs")
+    @patch("auto_slopp.workers.github_task_source.get_closed_prs")
+    def test_has_prs_no_prs_evidence(self, mock_get_closed, mock_get_open):
+        """Test that _has_prs returns False when no PRs mention the issue."""
+        task_source = GitHubTaskSource()
+
+        mock_get_open.return_value = [
+            {"title": "#41: Fix bug", "body": "", "headRefName": ""},
+        ]
+        mock_get_closed.return_value = [
+            {"title": "#40: Another fix", "body": "", "headRefName": ""},
+        ]
+
+        assert task_source._has_prs(Path("/test"), 42) is False

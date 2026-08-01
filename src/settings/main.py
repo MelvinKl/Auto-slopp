@@ -33,7 +33,7 @@ class CLIConfiguration(BaseModel):
         description="Capability rating of this CLI tool (0-10)",
     )
     cooldown_seconds: int = Field(
-        default=3600,
+        default=60,
         description="Cooldown time in seconds if the tool encounters errors",
     )
     name: str = Field(
@@ -123,21 +123,34 @@ class Settings(BaseSettings):
                 name="pi Qwen3.6-35B-A3B",
             ),
             CLIConfiguration(
-                cli_command="pi",
+                cli_command="opencode",
                 cli_args=[
                     "--model",
-                    "llama-cpp/North-Mini-Code",
+                    "opencode/big-pickle",
+                    "run",
                 ],
                 capability=5,
-                name="pi North-Mini-Code",
+                name="opencode big pickle",
+            ),          
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "opencode/nemotron-3-ultra-free",
+                    "run",
+                ],
+                capability=7,
+                name="opencode nemotron-3-ultra-free",
             ),
             CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[
+                    "--model",
+                    "opencode/north-mini-code-free ",
                     "run",
                 ],
-                capability=4,
-                name="opencode run",
+                capability=7,
+                name="opencode north-mini-code-free ",
             ),
         ],
         description=(
@@ -184,12 +197,12 @@ class Settings(BaseSettings):
 
     task_difficulties: Dict[str, TaskRating] = Field(
         default={
-            "task_planning": TaskRating(min_rating=0, max_rating=10, recommended_rating=6),
+            "task_planning": TaskRating(min_rating=0, max_rating=10, recommended_rating=10),
             "implementation": TaskRating(min_rating=5, max_rating=10, recommended_rating=10),
             "task_implementation_validation": TaskRating(min_rating=0, max_rating=10, recommended_rating=6),
             "remaining_steps_update": TaskRating(min_rating=0, max_rating=10, recommended_rating=4),
             "pr_description": TaskRating(min_rating=0, max_rating=10, recommended_rating=1),
-            "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
+            "pr_review": TaskRating(min_rating=0, max_rating=10, recommended_rating=4),
             "git_checkout": TaskRating(min_rating=0, max_rating=10, recommended_rating=2),
             "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
         },
