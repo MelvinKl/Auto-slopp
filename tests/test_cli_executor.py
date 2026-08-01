@@ -194,3 +194,128 @@ def test_min_rating_respects_max_rating_boundary(mock_run, monkeypatch):
     called_commands = [call.args[0] for call in mock_run.call_args_list]
     assert called_commands[0][0] == "perfect-tool"
     assert "low-tool" not in called_commands[0]
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_blacklist_tasks_skips_configuration(mock_run, monkeypatch):
+    """Configuration should be skipped when task_name is in blacklist_tasks."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(
+                cli_command="blacklisted-tool",
+                cli_args=["run"],
+                capability=8,
+                blacklist_tasks=["github_issue"],
+            ),
+            CLIConfiguration(cli_command="fallback-tool", cli_args=["run"], capability=5),
+        ],
+    )
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.task_difficulties",
+        {
+            "github_issue": TaskRating(min_rating=5, max_rating=10, recommended_rating=7),
+            "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
+        },
+    )
+
+    result = run_cli_executor(
+        additional_instructions="Do work",
+        working_directory=Path.cwd(),
+        task_name="github_issue",
+    )
+
+    assert result["success"] is True
+    called_commands = [call.args[0] for call in mock_run.call_args_list]
+    assert called_commands[0][0] == "fallback-tool"
+    assert "blacklisted-tool" not in called_commands[0]
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_blacklist_tasks_does_not_affect_other_tasks(mock_run, monkeypatch):
+    """Blacklist should only affect the specific task_name, not others."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(
+                cli_command="preferred-tool",
+                cli_args=["run"],
+                capability=8,
+                blacklist_tasks=["github_issue"],
+            ),
+            CLIConfiguration(cli_command="fallback-tool", cli_args=["run"], capability=5),
+        ],
+    )
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.task_difficulties",
+        {
+            "github_issue": TaskRating(min_rating=5, max_rating=10, recommended_rating=7),
+            "other_task": TaskRating(min_rating=5, max_rating=10, recommended_rating=7),
+            "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
+        },
+    )
+
+    result = run_cli_executor(
+        additional_instructions="Do work",
+        working_directory=Path.cwd(),
+        task_name="other_task",
+    )
+
+    assert result["success"] is True
+    called_commands = [call.args[0] for call in mock_run.call_args_list]
+    assert called_commands[0][0] == "preferred-tool"
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_all_configs_blacklisted_returns_error(mock_run, monkeypatch):
+    """When all configurations are blacklisted for a task, an error should be returned."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(
+                cli_command="tool-1",
+                cli_args=["run"],
+                capability=8,
+                blacklist_tasks=["github_issue"],
+            ),
+            CLIConfiguration(
+                cli_command="tool-2",
+                cli_args=["run"],
+                capability=5,
+                blacklist_tasks=["github_issue"],
+            ),
+        ],
+    )
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.task_difficulties",
+        {
+            "github_issue": TaskRating(min_rating=5, max_rating=10, recommended_rating=7),
+            "default": TaskRating(min_rating=0, max_rating=10, recommended_rating=5),
+        },
+    )
+
+    result = run_cli_executor(
+        additional_instructions="Do work",
+        working_directory=Path.cwd(),
+        task_name="github_issue",
+    )
+
+    assert result["success"] is False
+    assert "no cli configuration meets" in result["error"].lower()
+    assert mock_run.call_count == 0
