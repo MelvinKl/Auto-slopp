@@ -1119,3 +1119,63 @@ class TestIssueWorker:
         assert worker._is_llm_unavailable("Git push failed") is False
         assert worker._is_llm_unavailable("Permission denied") is False
         assert worker._is_llm_unavailable("") is False
+
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_is_llm_unavailable_via_cli_states(self, mock_settings):
+        """Test that _is_llm_unavailable checks _cli_states against cli_configurations."""
+        import time
+
+        from auto_slopp.utils.cli_executor import _cli_states
+
+        task_source = MockTaskSource()
+        worker = IssueWorker(task_source=task_source)
+
+        num_configs = 3
+        mock_settings.cli_configurations = [type("Config", (), {"name": f"config{i}"}) for i in range(num_configs)]
+
+        # Save original _cli_states
+        original_cli_states = _cli_states.copy()
+
+        try:
+            # Test 1: All configs inactive, cooldown not expired -> True
+            now = time.time()
+            _cli_states.clear()
+            _cli_states.update({i: {"active": False, "cooldown_until": now + 3600} for i in range(num_configs)})
+            assert worker._is_llm_unavailable("") is True
+
+            # Test 2: All configs active -> False
+            _cli_states.clear()
+            _cli_states.update({i: {"active": True, "cooldown_until": 0.0} for i in range(num_configs)})
+            assert worker._is_llm_unavailable("") is False
+
+            # Test 3: One config active, others inactive -> False
+            _cli_states.clear()
+            _cli_states.update(
+                {
+                    0: {"active": True, "cooldown_until": 0.0},
+                    1: {"active": False, "cooldown_until": now + 3600},
+                    2: {"active": False, "cooldown_until": now + 3600},
+                }
+            )
+            assert worker._is_llm_unavailable("") is False
+
+            # Test 4: All inactive but one cooldown expired -> False
+            _cli_states.clear()
+            _cli_states.update(
+                {
+                    0: {"active": False, "cooldown_until": now - 3600},
+                    1: {"active": False, "cooldown_until": now + 3600},
+                    2: {"active": False, "cooldown_until": now + 3600},
+                }
+            )
+            assert worker._is_llm_unavailable("") is False
+
+            # Test 5: String matching still works alongside cli_states check
+            _cli_states.clear()
+            _cli_states.update({i: {"active": True, "cooldown_until": 0.0} for i in range(num_configs)})
+            assert worker._is_llm_unavailable("LLM timed out") is True
+            assert worker._is_llm_unavailable("Git push failed") is False
+        finally:
+            # Restore original _cli_states
+            _cli_states.clear()
+            _cli_states.update(original_cli_states)
