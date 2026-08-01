@@ -16,7 +16,7 @@ from settings.main import TaskRating, settings
 logger = logging.getLogger(__name__)
 _active_cli_configuration_index = 0
 _PROBE_INSTRUCTIONS = "are you working?"
-_PROBE_TIMEOUT_SECONDS = 60
+_PROBE_TIMEOUT_SECONDS = 600
 
 _cli_states: Dict[int, Dict[str, Any]] = {}
 
