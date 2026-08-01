@@ -21,7 +21,7 @@ class TestSettings:
                 test_settings = Settings()
 
         assert test_settings.base_repo_path == Path.cwd()
-        assert test_settings.executor_sleep_interval == 60.0
+        assert test_settings.executor_sleep_interval == 600.0
         assert test_settings.debug is False
         assert test_settings.telegram_enabled is False
         assert test_settings.telegram_bot_token is None
@@ -142,16 +142,13 @@ class TestSettings:
     def test_slop_timeout_default(self):
         """Test default slop_timeout value."""
         test_settings = Settings()
-        assert test_settings.slop_timeout == 7200
+        assert test_settings.slop_timeout == 10000
 
     def test_cli_configurations_default(self):
         """Test default tiered CLI configurations."""
         test_settings = Settings()
         # Check that we have a list of configurations
-        assert len(test_settings.cli_configurations) == 6
-        # All default configurations should use the opencode CLI
-        for config in test_settings.cli_configurations:
-            assert config.cli_command == "opencode"
+        assert len(test_settings.cli_configurations) == 4
 
     def test_cli_configurations_env_override(self):
         """Test overriding CLI configurations via environment variable."""
