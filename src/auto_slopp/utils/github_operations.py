@@ -695,59 +695,59 @@ def submit_pr_review(repo_dir: Path, pr_number: int, body: str, event: str = "CO
 
 
 def get_workflow_runs_for_branch(repo_dir: Path, branch: str, event: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Get workflow runs for a specific branch, optionally filtered by event.
+    """Get workflow runs for a specific branch, optionally filtered by event.
 
-        Args:
-            repo_dir: Path to the git repository
-            branch: Branch name to get workflow runs for
-            event: Optional event filter (e.g., 'pull_request')
+    Args:
+        repo_dir: Path to the git repository
+        branch: Branch name to get workflow runs for
+        event: Optional event filter (e.g., 'pull_request')
 
-        Returns:
-            List of dictionaries containing workflow run information (conclusion, name, etc.)
-        """
-        try:
-            # Get the SHA of the branch to filter by
-            sha_result = subprocess.run(
-                ["git", "rev-parse", f"origin/{branch}"],
-                cwd=repo_dir,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            if sha_result.returncode != 0:
-                logger.warning(f"Could not resolve origin/{branch} SHA for workflow run lookup")
-                return []
-            branch_sha = sha_result.stdout.strip()
-
-            result = _run_gh_command(
-                repo_dir,
-                "run",
-                "list",
-                "--limit",
-                "20",
-                "--json",
-                "conclusion,name,headSha,event,status,databaseId",
-                check=False,
-            )
-
-            if result.returncode != 0:
-                error_msg = result.stderr.strip() or result.stdout.strip()
-                logger.error(f"Failed to list workflow runs for branch {branch} in {repo_dir.name}: {error_msg}")
-                return []
-
-            runs = json.loads(result.stdout)
-            # Filter by branch SHA since gh run list doesn't support --branch flag
-            filtered_runs = [run for run in runs if run.get("headSha") == branch_sha]
-            if event:
-                filtered_runs = [run for run in filtered_runs if run.get("event") == event]
-            return filtered_runs
-
-        except GitHubOperationError as e:
-            logger.error(f"Error getting workflow runs for branch {branch} from {repo_dir.name}: {str(e)}")
+    Returns:
+        List of dictionaries containing workflow run information (conclusion, name, etc.)
+    """
+    try:
+        # Get the SHA of the branch to filter by
+        sha_result = subprocess.run(
+            ["git", "rev-parse", f"origin/{branch}"],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if sha_result.returncode != 0:
+            logger.warning(f"Could not resolve origin/{branch} SHA for workflow run lookup")
             return []
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse workflow runs JSON for branch {branch} from {repo_dir.name}: {str(e)}")
+        branch_sha = sha_result.stdout.strip()
+
+        result = _run_gh_command(
+            repo_dir,
+            "run",
+            "list",
+            "--limit",
+            "20",
+            "--json",
+            "conclusion,name,headSha,event,status,databaseId",
+            check=False,
+        )
+
+        if result.returncode != 0:
+            error_msg = result.stderr.strip() or result.stdout.strip()
+            logger.error(f"Failed to list workflow runs for branch {branch} in {repo_dir.name}: {error_msg}")
             return []
-        except Exception as e:
-            logger.error(f"Unexpected error getting workflow runs for branch {branch} from {repo_dir.name}: {str(e)}")
-            return []
+
+        runs = json.loads(result.stdout)
+        # Filter by branch SHA since gh run list doesn't support --branch flag
+        filtered_runs = [run for run in runs if run.get("headSha") == branch_sha]
+        if event:
+            filtered_runs = [run for run in filtered_runs if run.get("event") == event]
+        return filtered_runs
+
+    except GitHubOperationError as e:
+        logger.error(f"Error getting workflow runs for branch {branch} from {repo_dir.name}: {str(e)}")
+        return []
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse workflow runs JSON for branch {branch} from {repo_dir.name}: {str(e)}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error getting workflow runs for branch {branch} from {repo_dir.name}: {str(e)}")
+        return []
