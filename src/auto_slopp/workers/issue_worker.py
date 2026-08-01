@@ -314,19 +314,19 @@ class IssueWorker(Worker):
                 result["no_changes"] = True
                 return result
 
-            # Check if there are any changes after execution
-            changes_present = has_changes(repo_dir)
-            if not changes_present:
-                self.logger.info(f"No changes detected for task #{task_id} after execution.")
-                # Clean up the branch: checkout main and delete the branch
+            # Check if there are any commits ahead of main (regardless of uncommitted changes).
+            # This is the authoritative check: if the branch has commits ahead of main, work was done
+            # and we should proceed to push/create PR. Only uncommitted changes are checked below
+            # to ensure everything is committed before proceeding.
+            ahead_count = get_commits_ahead_of_branch(repo_dir, base_branch="main")
+            if ahead_count == 0:
+                self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue")
+                # Clean up the branch since no work was done
                 try:
-                    # Checkout main first
                     checkout_branch_resilient(repo_dir=repo_dir, branch="main", fetch_first=False, timeout=10)
-                    # Delete the local branch
-                    delete_branch(repo_dir, branch=current_branch)
+                    delete_branch(repo_dir, current_branch)
                 except Exception as e:
                     self.logger.warning(f"Failed to clean up branch {current_branch}: {e}")
-                # Mark as no changes and return
                 self.task_source.on_no_changes(task)
                 result["task_completed"] = True
                 result["tasks_completed"] = 1
@@ -334,17 +334,19 @@ class IssueWorker(Worker):
                 result["no_changes"] = True
                 return result
 
-            # If there are changes, commit them
-            self.logger.info(f"Committing outstanding changes before push for task #{task_id}")
-            commit_success, _ = commit_and_push_changes(
-                repo_dir, f"Task #{task_id}: commit outstanding changes before push", push_if_remote=False
-            )
-            if not commit_success:
-                error_msg = f"Failed to commit outstanding changes for task #{task_id}"
-                self.logger.error(error_msg)
-                result["error"] = error_msg
-                self.task_source.on_task_failure(task, error_msg)
-                return result
+            # There are commits ahead of main - commit any remaining uncommitted changes and push
+            changes_present = has_changes(repo_dir)
+            if changes_present:
+                self.logger.info(f"Committing outstanding changes before push for task #{task_id}")
+                commit_success, _ = commit_and_push_changes(
+                    repo_dir, f"Task #{task_id}: commit outstanding changes before push", push_if_remote=False
+                )
+                if not commit_success:
+                    error_msg = f"Failed to commit outstanding changes for task #{task_id}"
+                    self.logger.error(error_msg)
+                    result["error"] = error_msg
+                    self.task_source.on_task_failure(task, error_msg)
+                    return result
 
             push_success, push_message = push_to_remote(repo_dir, remote="origin", branch=current_branch)
             if not push_success:
@@ -352,21 +354,6 @@ class IssueWorker(Worker):
                 self.logger.error(error_msg)
                 result["error"] = error_msg
                 self.task_source.on_task_failure(task, error_msg)
-                return result
-
-            # Check if there are any commits ahead of main
-            ahead_count = get_commits_ahead_of_branch(repo_dir, base_branch="main")
-            if ahead_count == 0:
-                self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue with comment")
-                comment = "No changes were implemented as there was nothing to do."
-                if comment_on_issue(repo_dir, task.id, comment):
-                    self.task_source.on_task_complete(task, current_branch, "")
-                else:
-                    self.logger.warning(f"Failed to comment on issue #{task.id}")
-                result["task_completed"] = True
-                result["tasks_completed"] = 1
-                result["success"] = True
-                result["no_changes"] = True
                 return result
 
             if settings.ralph_enabled:
