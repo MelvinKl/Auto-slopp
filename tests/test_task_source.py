@@ -205,8 +205,13 @@ class TestGitHubTaskSource:
 
     @patch("auto_slopp.workers.github_task_source.get_open_issues")
     @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    @patch("auto_slopp.workers.github_task_source.execute_with_instructions")
+    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.delete_issue_comment")
     @patch("auto_slopp.workers.github_task_source.settings")
-    def test_get_tasks_returns_correct_task_objects(self, mock_settings, mock_comments, mock_issues):
+    def test_get_tasks_returns_correct_task_objects(
+        self, mock_settings, mock_delete, mock_comment, mock_execute, mock_comments, mock_issues
+    ):
         """Test that get_tasks returns properly structured Task objects."""
         mock_settings.github_issue_worker_required_label = "ai"
         mock_settings.github_issue_worker_allowed_creator = "testuser"
@@ -223,13 +228,14 @@ class TestGitHubTaskSource:
             {"author": "testuser", "body": "Comment 1"},
             {"author": "otheruser", "body": "Comment 2"},
         ]
+        mock_execute.return_value = {"stdout": "Condensed summary", "success": True}
         source = GitHubTaskSource()
         tasks = source.get_tasks(Path("/tmp"))
         assert len(tasks) == 1
         assert tasks[0].id == 42
         assert tasks[0].title == "Test Issue"
         assert tasks[0].body == "Test Body"
-        assert tasks[0].comments == ["Comment 1"]
+        assert tasks[0].comments == ["Condensed summary"]
         assert tasks[0].raw["number"] == 42
 
     def test_get_branch_name_generates_correct_format(self):
