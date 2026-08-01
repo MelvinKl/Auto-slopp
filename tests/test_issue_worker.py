@@ -572,6 +572,73 @@ class TestIssueWorker:
         assert task_source.on_no_changes_called is True
         assert task_source.on_task_complete_called is False
 
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    def test_process_single_task_passes_condensed_comments_directly(
+        self,
+        mock_commits_ahead,
+        mock_cli,
+        mock_execute,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_has_changes,
+        mock_create_branch,
+        mock_checkout,
+        mock_commit_push,
+    ):
+        """Test that _process_single_task() passes task.comments directly without re-condensing or replacing with placeholder.
+
+        When GitHubTaskSource._condense_comments() returns [condensed_summary], the worker
+        should pass this directly to the agent without modification. The old fallback logic
+        that replaced task.comments with a placeholder like
+        'Only one comment present; no additional comments to condense.' has been removed.
+        """
+        mock_commits_ahead.return_value = 1
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = False
+        mock_commit_push.return_value = (True, None)
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_execute.return_value = {"success": True}
+        mock_has_changes.return_value = True
+        mock_current_branch.return_value = "ai/task-1"
+        mock_push.return_value = (True, "")
+        mock_get_pr.return_value = None
+        mock_create_pr.return_value = {"url": "https://github.com/test/pr/1"}
+
+        # Simulate a task where comments have already been condensed by GitHubTaskSource
+        # This is what happens when _condense_comments() returns [condensed_summary]
+        condensed_comment = "Condensed summary of all comments from multiple authors"
+        task = Task(id=1, title="Test", body="Test body", comments=[condensed_comment])
+        task_source = MockTaskSource(tasks=[task])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        result = worker.run(Path("/tmp"))
+
+        assert result["success"] is True
+        assert result["tasks_processed"] == 1
+        # Verify execute_with_instructions was called
+        mock_execute.assert_called_once()
+        # Verify the instructions contain the condensed comment (not a placeholder)
+        call_args = mock_execute.call_args
+        instructions = call_args.args[0]
+        assert condensed_comment in instructions
+        # Verify no placeholder text was used
+        assert "Only one comment present" not in instructions
+        assert "no additional comments to condense" not in instructions
+
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
