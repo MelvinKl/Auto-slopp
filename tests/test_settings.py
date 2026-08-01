@@ -149,6 +149,10 @@ class TestSettings:
         test_settings = Settings()
         # Check that we have a list of configurations
         assert len(test_settings.cli_configurations) == 4
+        # First config should use pi CLI, rest should use opencode
+        assert test_settings.cli_configurations[0].cli_command == "pi"
+        for config in test_settings.cli_configurations[1:]:
+            assert config.cli_command == "opencode"
 
     def test_cli_configurations_env_override(self):
         """Test overriding CLI configurations via environment variable."""
