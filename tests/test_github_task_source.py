@@ -206,9 +206,10 @@ class TestGitHubTaskSource:
 
     @patch("auto_slopp.workers.github_task_source.get_open_issues")
     @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    @patch("auto_slopp.workers.github_task_source.execute_with_instructions")
     @patch("auto_slopp.workers.github_task_source.settings")
-    def test_get_tasks_filters_comments_by_author(self, mock_settings, mock_get_comments, mock_get_issues):
-        """Test that only author's comments are included in task comments."""
+    def test_get_tasks_condenses_all_comments(self, mock_settings, mock_execute, mock_get_comments, mock_get_issues):
+        """Test that ALL comments are condensed into a single comment."""
         mock_settings.github_issue_worker_required_label = "test-label"
         mock_settings.github_issue_worker_allowed_creator = "test-user"
 
@@ -223,8 +224,40 @@ class TestGitHubTaskSource:
         ]
         mock_get_issues.return_value = mock_issues
         mock_get_comments.return_value = [
-            {"author": "test-user", "body": "Author comment"},
-            {"author": "other-user", "body": "Other comment"},
+            {"author": "test-user", "body": "Author comment", "id": 1},
+            {"author": "other-user", "body": "Other comment", "id": 2},
+        ]
+        mock_execute.return_value = {"stdout": "Condensed summary", "success": True}
+
+        task_source = GitHubTaskSource()
+        tasks = task_source.get_tasks(Path("/test"))
+
+        assert len(tasks) == 1
+        task = tasks[0]
+        assert len(task.comments) == 1
+        assert task.comments[0] == "Condensed summary"
+        mock_execute.assert_called_once()
+
+    @patch("auto_slopp.workers.github_task_source.get_open_issues")
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_get_tasks_single_comment_no_condensing(self, mock_settings, mock_get_comments, mock_get_issues):
+        """Test that a single comment is returned as-is without condensing."""
+        mock_settings.github_issue_worker_required_label = "test-label"
+        mock_settings.github_issue_worker_allowed_creator = "test-user"
+
+        mock_issues = [
+            {
+                "number": 1,
+                "title": "Test Issue",
+                "body": "Test Body",
+                "author": {"login": "test-user"},
+                "labels": [{"name": "test-label"}],
+            }
+        ]
+        mock_get_issues.return_value = mock_issues
+        mock_get_comments.return_value = [
+            {"author": "test-user", "body": "Single comment", "id": 1},
         ]
 
         task_source = GitHubTaskSource()
@@ -233,7 +266,119 @@ class TestGitHubTaskSource:
         assert len(tasks) == 1
         task = tasks[0]
         assert len(task.comments) == 1
-        assert task.comments[0] == "Author comment"
+        assert task.comments[0] == "Single comment"
+
+    @patch("auto_slopp.workers.github_task_source.get_open_issues")
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    @patch("auto_slopp.workers.github_task_source.execute_with_instructions")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_get_tasks_empty_condensation_fallback(
+        self, mock_settings, mock_execute, mock_get_comments, mock_get_issues
+    ):
+        """Test fallback when condensation produces empty result."""
+        mock_settings.github_issue_worker_required_label = "test-label"
+        mock_settings.github_issue_worker_allowed_creator = "test-user"
+
+        mock_issues = [
+            {
+                "number": 1,
+                "title": "Test Issue",
+                "body": "Test Body",
+                "author": {"login": "test-user"},
+                "labels": [{"name": "test-label"}],
+            }
+        ]
+        mock_get_issues.return_value = mock_issues
+        mock_get_comments.return_value = [
+            {"author": "test-user", "body": "Comment 1", "id": 1},
+            {"author": "other-user", "body": "Comment 2", "id": 2},
+        ]
+        mock_execute.return_value = {"stdout": "", "success": True}
+
+        task_source = GitHubTaskSource()
+        tasks = task_source.get_tasks(Path("/test"))
+
+        assert len(tasks) == 1
+        task = tasks[0]
+        assert len(task.comments) == 1
+        assert task.comments[0] == "Comment 1\n\n---\n\nComment 2"
+
+    @patch("auto_slopp.workers.github_task_source.get_open_issues")
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    @patch("auto_slopp.workers.github_task_source.execute_with_instructions")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_get_tasks_execute_with_instructions_called_with_path(
+        self, mock_settings, mock_execute, mock_get_comments, mock_get_issues
+    ):
+        """Test that execute_with_instructions is called with Path object for work_dir."""
+        mock_settings.github_issue_worker_required_label = "test-label"
+        mock_settings.github_issue_worker_allowed_creator = "test-user"
+
+        mock_issues = [
+            {
+                "number": 1,
+                "title": "Test Issue",
+                "body": "Test Body",
+                "author": {"login": "test-user"},
+                "labels": [{"name": "test-label"}],
+            }
+        ]
+        mock_get_issues.return_value = mock_issues
+        mock_get_comments.return_value = [
+            {"author": "test-user", "body": "Comment 1", "id": 1},
+            {"author": "other-user", "body": "Comment 2", "id": 2},
+        ]
+        mock_execute.return_value = {"stdout": "Condensed summary", "success": True}
+
+        task_source = GitHubTaskSource()
+        tasks = task_source.get_tasks(Path("/test"))
+
+        assert len(tasks) == 1
+        mock_execute.assert_called_once()
+        call_args = mock_execute.call_args
+        assert call_args.kwargs["work_dir"] == Path("/test")
+        assert isinstance(call_args.kwargs["work_dir"], Path)
+
+    @patch("auto_slopp.workers.github_task_source.delete_issue_comment")
+    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.execute_with_instructions")
+    @patch("auto_slopp.workers.github_task_source.get_open_issues")
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_condense_comments_posts_summary_and_deletes_originals(
+        self, mock_settings, mock_get_comments, mock_get_issues, mock_execute, mock_comment, mock_delete
+    ):
+        """Test that _condense_comments() posts a summary to GitHub and deletes original comments."""
+        mock_settings.github_issue_worker_required_label = "test-label"
+        mock_settings.github_issue_worker_allowed_creator = "test-user"
+
+        mock_issues = [
+            {
+                "number": 1,
+                "title": "Test Issue",
+                "body": "Test Body",
+                "author": {"login": "test-user"},
+                "labels": [{"name": "test-label"}],
+            }
+        ]
+        mock_get_issues.return_value = mock_issues
+        mock_get_comments.return_value = [
+            {"author": "test-user", "body": "Comment 1", "id": 100},
+            {"author": "other-user", "body": "Comment 2", "id": 200},
+        ]
+        mock_execute.return_value = {"stdout": "Condensed summary", "success": True}
+
+        task_source = GitHubTaskSource()
+        tasks = task_source.get_tasks(Path("/test"))
+
+        assert len(tasks) == 1
+        assert tasks[0].comments == ["Condensed summary"]
+        # Verify the condensed summary was posted as a new comment
+        mock_comment.assert_called_once_with(Path("/test"), 1, "Condensed summary")
+        # Verify each original comment was deleted
+        assert mock_delete.call_count == 2
+        mock_delete.assert_any_call(Path("/test"), 1, 100)
+        mock_delete.assert_any_call(Path("/test"), 1, 200)
 
     @patch("auto_slopp.workers.github_task_source.get_open_issues")
     def test_get_tasks_returns_empty_on_no_issues(self, mock_get_issues):
