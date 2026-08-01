@@ -107,6 +107,31 @@ The capability rating system (0-10) helps match tasks with appropriate CLI tools
 4. Preference is given to tools closest to the task's recommended rating
 5. If a tool encounters errors, it enters cooldown (configurable duration)
 
+##### Task Blacklisting
+
+You can blacklist specific CLI configurations for certain task types. This is useful when a particular CLI tool is not suitable for certain types of tasks.
+
+```bash
+# Example: Blacklist gemini for PR review tasks
+AUTO_SLOPP_CLI_CONFIGURATIONS='[
+  {
+    "cli_command": "gemini",
+    "cli_args": ["--yolo", "-p"],
+    "capability": 8,
+    "cooldown_seconds": 300,
+    "blacklist_tasks": ["pr_review"]
+  },
+  {
+    "cli_command": "opencode",
+    "cli_args": ["run"],
+    "capability": 5,
+    "cooldown_seconds": 300
+  }
+]'
+```
+
+In this example, `gemini` will never be used for `pr_review` tasks, so `opencode` will be selected instead.
+
 ## Installation
 
 ### Prerequisites

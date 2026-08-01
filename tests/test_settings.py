@@ -147,20 +147,12 @@ class TestSettings:
     def test_cli_configurations_default(self):
         """Test default tiered CLI configurations."""
         test_settings = Settings()
-        assert len(test_settings.cli_configurations) == 10
-        assert test_settings.cli_configurations[0].cli_command == "opencode"
-        assert test_settings.cli_configurations[1].cli_command == "codex"
-        assert test_settings.cli_configurations[2].cli_command == "opencode"
-        assert test_settings.cli_configurations[3].cli_command == "opencode"
-        assert test_settings.cli_configurations[4].cli_command == "opencode"
-        assert test_settings.cli_configurations[5].cli_command == "opencode"
-        assert test_settings.cli_configurations[6].cli_command == "opencode"
-        assert test_settings.cli_configurations[7].cli_command == "opencode"
-        assert "glm-4.7-flash" in str(test_settings.cli_configurations[7].cli_args)
-        assert test_settings.cli_configurations[8].cli_command == "opencode"
-        assert "boneless" in str(test_settings.cli_configurations[8].cli_args)
-        assert test_settings.cli_configurations[9].cli_command == "opencode"
-        assert "nemotron-3-super" in str(test_settings.cli_configurations[9].cli_args)
+        # Check that we have a list of configurations
+        assert len(test_settings.cli_configurations) == 4
+        # First config should use pi CLI, rest should use opencode
+        assert test_settings.cli_configurations[0].cli_command == "pi"
+        for config in test_settings.cli_configurations[1:]:
+            assert config.cli_command == "opencode"
 
     def test_cli_configurations_env_override(self):
         """Test overriding CLI configurations via environment variable."""

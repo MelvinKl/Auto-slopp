@@ -40,6 +40,10 @@ class CLIConfiguration(BaseModel):
         default="",
         description="Human-readable name for this CLI configuration",
     )
+    blacklist_tasks: List[str] = Field(
+        default_factory=list,
+        description="Task names for which this CLI configuration should not be used",
+    )
 
 
 class Settings(BaseSettings):
@@ -113,50 +117,14 @@ class Settings(BaseSettings):
     cli_configurations: List[CLIConfiguration] = Field(
         default_factory=lambda: [
             CLIConfiguration(
-                cli_command="opencode",
+                cli_command="pi",
                 cli_args=[
                     "--model",
-                    "zai-coding-plan/glm-4.7",
-                    "run",
-                ],
-                capability=8,
-                name="opencode glm-4.7",
-            ),
-            CLIConfiguration(
-                cli_command="codex",
-                cli_args=["--dangerously-bypass-approvals-and-sandbox", "exec"],
-                capability=8,
-                name="codex",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "opencode/nemotron-3-super-free",
-                    "run",
+                    "llama-cpp/Qwen3.6-35B-A3B",
+                    "-p",
                 ],
                 capability=6,
-                name="opencode nemotron3-free",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "beryllium/Qwen3.6-35B-A3B",
-                    "run",
-                ],
-                capability=6,
-                name="opencode nemotron3-free",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
-                    "run",
-                ],
-                capability=7,
-                name="opencode nemotron3-free",
+                name="pi Qwen3.6-35B-A3B",
             ),
             CLIConfiguration(
                 cli_command="opencode",
@@ -172,41 +140,21 @@ class Settings(BaseSettings):
                 cli_command="opencode",
                 cli_args=[
                     "--model",
-                    "opencode/nemotron-3-super-free",
+                    "opencode/nemotron-3-ultra-free",
                     "run",
                 ],
                 capability=7,
-                name="opencode nemotron-3-super-free",
+                name="opencode nemotron-3-ultra-free",
             ),
             CLIConfiguration(
                 cli_command="opencode",
                 cli_args=[
                     "--model",
-                    "zai-coding-plan/glm-4.7-flash",
+                    "opencode/north-mini-code-free ",
                     "run",
                 ],
-                capability=8,
-                name="opencode glm-4.7-flash",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "opencode/boneless",
-                    "run",
-                ],
-                capability=4,
-                name="opencode boneless",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "opencode/nemotron-3-super",
-                    "run",
-                ],
-                capability=8,
-                name="opencode nemotron3-super",
+                capability=7,
+                name="opencode north-mini-code-free ",
             ),
         ],
         description=(
