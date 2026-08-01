@@ -1171,3 +1171,49 @@ class TestRalphExecutor:
             assert result["success"] is False
             assert result["max_loops_reached"] is True
             assert "loops_executed" in result
+
+    def test_run_refined_task_loop_no_intermediate_checks(self, ralph_executor):
+        """Test that refined task loop executes steps without intermediate checks."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text(
+                "# Test\n\n## Steps\n\n" "- [ ] 1. First step\n" "- [ ] 2. Second step\n" "- [ ] 3. Run make test\n"
+            )
+
+            ralph_executor.max_iterations = 10
+            ralph_executor.has_changes_fn = lambda path: True
+
+            call_log = []
+
+            def tracking_execute_fn(*args, **kwargs):
+                task_name = kwargs.get("task_name", "unknown")
+                call_log.append(task_name)
+                if task_name == "task_implementation_validation":
+                    return {"success": True, "stdout": "ACCEPTANCE_STATUS: pass"}
+                return {"success": True, "stdout": "Done"}
+
+            ralph_executor.execute_fn = tracking_execute_fn
+            ralph_executor.commit_fn = lambda path, msg, push: (True, None)
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is True
+            assert result["steps_completed"] == 3
+
+            implementation_calls = [c for c in call_log if c == "implementation"]
+            validation_calls = [c for c in call_log if c == "task_implementation_validation"]
+            remaining_steps_calls = [c for c in call_log if c == "remaining_steps_update"]
+
+            assert len(implementation_calls) == 3, f"Expected 3 implementation calls, got {len(implementation_calls)}"
+            assert len(validation_calls) == 1, f"Expected 1 final validation call, got {len(validation_calls)}"
+            assert (
+                len(remaining_steps_calls) == 0
+            ), f"Expected 0 remaining_steps_update calls, got {len(remaining_steps_calls)}"
