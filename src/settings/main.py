@@ -42,7 +42,7 @@ class CLIConfiguration(BaseModel):
     )
     blacklist_tasks: List[str] = Field(
         default_factory=list,
-        description="List of task names this configuration should not be used for",
+        description="Task names for which this CLI configuration should not be used",
     )
 
 
