@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from auto_slopp.utils.cli_executor import (
+    _cli_states,
     execute_with_instructions,
     get_active_cli_command,
     run_cli_executor,
@@ -187,12 +188,28 @@ class IssueWorker(Worker):
             True if the error indicates LLM is unavailable, False otherwise
         """
         error_lower = error_msg.lower()
-        return (
+        error_indicates_unavailable = (
             "timed out" in error_lower
             or "no cli configuration" in error_lower
             or "llm" in error_lower
             or "unavailable" in error_lower
         )
+        # Also check if all CLI configurations are inactive (in cooldown) and cooldown hasn't expired
+        all_clis_inactive = False
+        cli_configs = settings.cli_configurations
+        if cli_configs and _cli_states:
+            now = time.time()
+            num_configs = len(cli_configs)
+            if num_configs > 0:
+                all_clis_inactive = True
+                for i in range(num_configs):
+                    state = _cli_states.get(i, {"active": True, "cooldown_until": 0.0})
+                    # CLI is available if active, or if inactive but cooldown has expired
+                    if state.get("active", True) or now >= state.get("cooldown_until", 0.0):
+                        all_clis_inactive = False
+                        break
+
+        return error_indicates_unavailable or all_clis_inactive
 
     def _process_single_task(self, repo_dir: Path, task: Task) -> Dict[str, Any]:
         """Process a single task using Ralph loop.
