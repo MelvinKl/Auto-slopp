@@ -16,7 +16,7 @@ from settings.main import TaskRating, settings
 logger = logging.getLogger(__name__)
 _active_cli_configuration_index = 0
 _PROBE_INSTRUCTIONS = "are you working?"
-_PROBE_TIMEOUT_SECONDS = 60
+_PROBE_TIMEOUT_SECONDS = 600
 
 _cli_states: Dict[int, Dict[str, Any]] = {}
 
@@ -46,7 +46,7 @@ def _check_cooldowns(working_dir: Path) -> None:
                 state["cooldown_until"] = now + config.cooldown_seconds
 
 
-def _choose_best_config_index(task_rating: TaskRating, working_dir: Path) -> int:
+def _choose_best_config_index(task_rating: TaskRating, working_dir: Path, task_name: str = "default") -> int:
     _check_cooldowns(working_dir)
 
     best_index = -1
@@ -55,6 +55,9 @@ def _choose_best_config_index(task_rating: TaskRating, working_dir: Path) -> int
     for i, config in enumerate(settings.cli_configurations):
         state = _get_cli_state(i)
         if not state["active"]:
+            continue
+
+        if task_name in config.blacklist_tasks:
             continue
 
         capability = config.capability
@@ -285,7 +288,7 @@ def run_cli_executor(
     tried_indices = set()
 
     while True:
-        config_index = _choose_best_config_index(task_rating, working_dir)
+        config_index = _choose_best_config_index(task_rating, working_dir, task_name)
 
         if config_index == -1:
             available_capabilities = [cfg.capability for cfg in settings.cli_configurations]
