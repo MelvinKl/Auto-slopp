@@ -12,13 +12,13 @@ from typing import List, Optional
 from auto_slopp.utils.cli_executor import execute_with_instructions
 from auto_slopp.utils.git_operations import sanitize_branch_name
 from auto_slopp.utils.github_operations import (
-    get_open_prs,
-    get_closed_prs,
     close_issue,
     comment_on_issue,
     delete_issue_comment,
+    get_closed_prs,
     get_issue_comments,
     get_open_issues,
+    get_open_prs,
     remove_label_from_issue,
 )
 from auto_slopp.workers.task_source import Task, TaskSource
@@ -560,6 +560,7 @@ class GitHubTaskSource(TaskSource):
             )
             if result.returncode == 0:
                 import json
+
                 data = json.loads(result.stdout)
                 if data and data.get("author") and isinstance(data["author"], dict):
                     return data["author"].get("login")
