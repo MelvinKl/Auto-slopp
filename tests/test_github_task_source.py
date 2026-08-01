@@ -206,9 +206,10 @@ class TestGitHubTaskSource:
 
     @patch("auto_slopp.workers.github_task_source.get_open_issues")
     @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    @patch("auto_slopp.workers.github_task_source.execute_with_instructions")
     @patch("auto_slopp.workers.github_task_source.settings")
-    def test_get_tasks_filters_comments_by_author(self, mock_settings, mock_get_comments, mock_get_issues):
-        """Test that only author's comments are included in task comments."""
+    def test_get_tasks_condenses_all_comments(self, mock_settings, mock_execute, mock_get_comments, mock_get_issues):
+        """Test that ALL comments are condensed into a single comment."""
         mock_settings.github_issue_worker_required_label = "test-label"
         mock_settings.github_issue_worker_allowed_creator = "test-user"
 
@@ -223,9 +224,10 @@ class TestGitHubTaskSource:
         ]
         mock_get_issues.return_value = mock_issues
         mock_get_comments.return_value = [
-            {"author": "test-user", "body": "Author comment"},
-            {"author": "other-user", "body": "Other comment"},
+            {"author": "test-user", "body": "Author comment", "id": 1},
+            {"author": "other-user", "body": "Other comment", "id": 2},
         ]
+        mock_execute.return_value = {"stdout": "Condensed summary", "success": True}
 
         task_source = GitHubTaskSource()
         tasks = task_source.get_tasks(Path("/test"))
@@ -233,7 +235,8 @@ class TestGitHubTaskSource:
         assert len(tasks) == 1
         task = tasks[0]
         assert len(task.comments) == 1
-        assert task.comments[0] == "Author comment"
+        assert task.comments[0] == "Condensed summary"
+        mock_execute.assert_called_once()
 
     @patch("auto_slopp.workers.github_task_source.get_open_issues")
     def test_get_tasks_returns_empty_on_no_issues(self, mock_get_issues):
