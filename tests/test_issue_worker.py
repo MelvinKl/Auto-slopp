@@ -1179,3 +1179,87 @@ class TestIssueWorker:
             # Restore original _cli_states
             _cli_states.clear()
             _cli_states.update(original_cli_states)
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    def test_no_changes_llm_unavailable_calls_on_skip(
+        self,
+        mock_execute,
+        mock_cli,
+        mock_settings,
+        mock_current_branch,
+        mock_has_changes,
+        mock_create_branch,
+        mock_checkout,
+    ):
+        """Test that on_skip is called when LLM unavailable and no changes made (has_changes=False)."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_execute.return_value = {"success": True}
+        mock_has_changes.return_value = False
+        mock_current_branch.return_value = "main"
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        # Mock _is_llm_unavailable to return True
+        worker._is_llm_unavailable = lambda _: True
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert result["tasks_processed"] == 0
+        assert len(result["task_results"]) == 1
+        assert result["task_results"][0]["success"] is False
+        assert task_source.on_skip_called is True
+        assert task_source.on_no_changes_called is False
+
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    def test_no_commits_ahead_llm_unavailable_calls_on_skip(
+        self,
+        mock_cli,
+        mock_commits_ahead,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_has_changes,
+        mock_create_branch,
+        mock_checkout,
+        mock_commit_push,
+    ):
+        """Test that on_skip is called when LLM unavailable and no commits ahead of main."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_commits_ahead.return_value = 0
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_current_branch.return_value = "ai/task-1"
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": True,
+            "loops_executed": 1,
+            "steps_completed": 0,
+            "total_steps": 3,
+        }
+        # Mock _is_llm_unavailable to return True
+        worker._is_llm_unavailable = lambda _: True
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert result["tasks_processed"] == 0
+        assert len(result["task_results"]) == 1
+        assert result["task_results"][0]["success"] is False
+        assert task_source.on_skip_called is True
+        assert task_source.on_no_changes_called is False
