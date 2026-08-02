@@ -55,7 +55,8 @@ class GitHubTaskSource(TaskSource):
             issue_body = issue.get("body", "") or ""
 
             issue_author_login = issue.get("author", {}).get("login", "") if issue.get("author") else ""
-            comment_texts = self._condense_comments(repo_path, issue_number, issue_author_login)
+            allowed_creator = settings.github_issue_worker_allowed_creator
+            comment_texts = self._condense_comments(repo_path, issue_number, issue_author_login, allowed_creator)
 
             task = Task(
                 id=issue_number,
@@ -68,7 +69,9 @@ class GitHubTaskSource(TaskSource):
 
         return tasks
 
-    def _condense_comments(self, repo_path: Path, issue_number: int, issue_author_login: str) -> List[str]:
+    def _condense_comments(
+        self, repo_path: Path, issue_number: int, issue_author_login: str, allowed_creator: str
+    ) -> List[str]:
         """Condense comments from the issue author or allowed creator into a single comment.
 
         Fetches all comments via get_issue_comments(). Filters to only include comments
@@ -82,6 +85,7 @@ class GitHubTaskSource(TaskSource):
             repo_path: Path to the repository.
             issue_number: Issue number.
             issue_author_login: Login of the issue author.
+            allowed_creator: Whitelisted GitHub username whose comments should be included.
 
         Returns:
             List containing either [] (no comments), [single_comment_body] (one comment),
@@ -93,7 +97,6 @@ class GitHubTaskSource(TaskSource):
             return []
 
         # Filter comments to only include those from issue author or allowed creator
-        allowed_creator = settings.github_issue_worker_allowed_creator
         filtered_comments = []
         for comment in all_comments:
             author = comment.get("author")
