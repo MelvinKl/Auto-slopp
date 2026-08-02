@@ -75,7 +75,7 @@ class GitHubTaskSource(TaskSource):
         from the issue author or the whitelisted allowed creator. If there are 0 or 1
         filtered comments, returns them as-is (no condensing). If there are 2+ filtered
         comments, calls the CLI executor to summarize them, posts the summary as a new
-        comment, deletes the original filtered comments, and returns the summary as a
+        comment, deletes ALL original comments on the issue, and returns the summary as a
         single-element list.
 
         Args:
@@ -131,8 +131,8 @@ class GitHubTaskSource(TaskSource):
             condensed = "\n\n---\n\n".join([c.get("body", "") or "" for c in filtered_comments])
         # Post the condensed summary as a new comment
         comment_on_issue(repo_path, issue_number, condensed)
-        # Delete each original filtered comment
-        for comment in filtered_comments:
+        # Delete ALL original comments (not just filtered ones)
+        for comment in all_comments:
             cid = comment.get("id")
             if cid is not None:
                 delete_issue_comment(repo_path, issue_number, cid)

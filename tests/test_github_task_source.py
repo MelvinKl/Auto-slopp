@@ -354,7 +354,7 @@ class TestGitHubTaskSource:
     def test_condense_comments_posts_summary_and_deletes_originals(
         self, mock_settings, mock_get_comments, mock_get_issues, mock_execute, mock_comment, mock_delete
     ):
-        """Test that _condense_comments() posts a summary to GitHub and deletes original filtered comments."""
+        """Test that _condense_comments() posts a summary to GitHub and deletes ALL original comments."""
         mock_settings.github_issue_worker_required_label = "test-label"
         mock_settings.github_issue_worker_allowed_creator = "test-user"
 
@@ -368,7 +368,7 @@ class TestGitHubTaskSource:
             }
         ]
         mock_get_issues.return_value = mock_issues
-        # Multiple comments from allowed creator + one from other user (should be ignored, not deleted)
+        # Multiple comments from allowed creator + one from other user (ALL should be deleted)
         mock_get_comments.return_value = [
             {"author": "test-user", "body": "Comment 1", "id": 100},
             {"author": "test-user", "body": "Comment 2", "id": 200},
@@ -383,13 +383,11 @@ class TestGitHubTaskSource:
         assert tasks[0].comments == ["Condensed summary"]
         # Verify the condensed summary was posted as a new comment
         mock_comment.assert_called_once_with(Path("/test"), 1, "Condensed summary")
-        # Verify only filtered comments (from test-user) were deleted
-        assert mock_delete.call_count == 2
+        # Verify ALL comments were deleted (not just filtered ones)
+        assert mock_delete.call_count == 3
         mock_delete.assert_any_call(Path("/test"), 1, 100)
         mock_delete.assert_any_call(Path("/test"), 1, 200)
-        # Verify other-user's comment was NOT deleted
-        for call in mock_delete.call_args_list:
-            assert call[0][2] != 300
+        mock_delete.assert_any_call(Path("/test"), 1, 300)
 
     @patch("auto_slopp.workers.github_task_source.get_open_issues")
     @patch("auto_slopp.workers.github_task_source.get_issue_comments")
