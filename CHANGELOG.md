@@ -7,27 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- Comprehensive documentation suite
-- API reference documentation
-- Development guide with setup and workflow instructions
-- Architecture overview with design principles
-- Contributing guidelines and community standards
-- Enhanced documentation structure and navigation
+### Changed
+- **IssueWorker/RalphExecutor**: Removed intermediate per-step acceptance checks; now only a single final acceptance check runs after all steps complete
+- **RalphExecutor**: Removed `remaining_steps_update_name` constructor parameter and associated dead code (`_execute_step_acceptance_check`, `_update_remaining_steps`, `_build_acceptance_check_instructions`, `_build_remaining_steps_update_instructions`, `_extract_step_block`, `_find_step_description`)
+- **Final acceptance check**: Now requires explicit `acceptance_status: pass` in output; empty/unknown output is treated as failure
+- **Loop behavior**: `loops_executed` now consistently reports `iteration - 1` on both success and final-check failure paths; final check runs on max-iterations with partial work and result recorded in `last_error`
+
+### Removed
+- Per-step acceptance criteria validation after each step
+- Per-step remaining steps update after each step
+- `remaining_steps_update_name` parameter from `RalphExecutor` constructor and `IssueWorker` call site
 
 ### Documentation
-- Created `docs/api-reference.md` with complete API documentation
-- Created `docs/development-guide.md` with development workflow and standards
-- Created `docs/architecture.md` with system architecture and component interactions
-- Created `docs/contributing.md` with contribution guidelines and process
-- Updated `docs/README.md` with comprehensive documentation index
-- Enhanced main `README.md` with documentation links
-
-### Improved
-- Documentation organization and structure
-- Developer onboarding experience
-- Code contribution process clarity
-- API understanding and usage guidance
+- Updated README.md to reflect removal of intermediate checks and new final acceptance check behavior
 
 ## [0.1.0] - 2024-01-01
 
