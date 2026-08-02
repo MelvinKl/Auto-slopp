@@ -592,6 +592,10 @@ AUTO_SLOPP_DEBUG=false
 AUTO_SLOPP_WORKERS_DISABLED='[]'
 # Example: AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker"]'
 
+# GitHub Issue Worker configuration
+AUTO_SLOPP_GITHUB_ISSUE_WORKER_REQUIRED_LABEL=ai        # Required label for issues to be processed (default: "ai")
+AUTO_SLOPP_GITHUB_ISSUE_WORKER_ALLOWED_CREATOR=MelvinKl  # Whitelisted GitHub username whose comments are included in condensation (default: "MelvinKl")
+
 # Stale branch cleanup: days before a local-only branch is deleted (default: 1)
 AUTO_SLOPP_STALE_BRANCH_DAYS_THRESHOLD=1
 
@@ -762,6 +766,9 @@ vikunja_worker = IssueWorker(task_source=VikunjaTaskSource())
 
 ### GitHubIssueWorker
 Convenience wrapper around IssueWorker configured with GitHubTaskSource. Handles GitHub issue operations.
+
+**Comment Condensation**: When processing GitHub issues, Auto-slopp condenses comments from the issue author and/or the whitelisted `allowed_creator` into a single summary comment. Comments from other users are ignored. After condensation, the original comments from the author/allowed creator are deleted and replaced with the summary.
+
 ```python
 from auto_slopp.workers import GitHubIssueWorker
 
