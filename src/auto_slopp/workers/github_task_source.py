@@ -134,8 +134,8 @@ class GitHubTaskSource(TaskSource):
             condensed = "\n\n---\n\n".join([c.get("body", "") or "" for c in filtered_comments])
         # Post the condensed summary as a new comment
         comment_on_issue(repo_path, issue_number, condensed)
-        # Delete ALL original comments (not just filtered ones)
-        for comment in all_comments:
+        # Delete only the filtered comments (from issue author or allowed creator)
+        for comment in filtered_comments:
             cid = comment.get("id")
             if cid is not None:
                 delete_issue_comment(repo_path, issue_number, cid)
