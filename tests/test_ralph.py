@@ -758,37 +758,21 @@ class TestRalphExecutor:
             assert ralph_executor._step_is_closed(task_path, 999) is False
 
     def test_ensure_last_step_is_make_test(self, ralph_executor):
-        """Test ensuring last step is make test."""
+        """Test ensuring last step is make test in various scenarios."""
         with tempfile.TemporaryDirectory() as tmpdir:
             task_path = Path(tmpdir) / "task.md"
 
+            # Scenario 1: Single step without make test
             task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n")
-
             ralph_executor._ensure_last_step_is_make_test(task_path)
-
             content = task_path.read_text()
             assert "make test" in content.lower()
+            step_lines = [line for line in content.split("\n") if line.strip().startswith("- [ ]") and ". " in line]
+            assert len(step_lines) == 2
+            assert "make test" in step_lines[-1].lower()
 
-    def test_ensure_last_step_is_make_test_already_present(self, ralph_executor):
-        """Test ensuring last step is make test when already present."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            task_path = Path(tmpdir) / "task.md"
-
-            original = "# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Run make test\n"
-            task_path.write_text(original)
-
-            ralph_executor._ensure_last_step_is_make_test(task_path)
-
-            content = task_path.read_text()
-            assert content == original
-
-    def test_ensure_last_step_is_make_test_with_full_structure(self, ralph_executor):
-        """Test ensuring last step is make test with full 5-step structure where last step is not make test."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            task_path = Path(tmpdir) / "task.md"
-
-            # 5 steps without make test as last step
-            content = (
+            # Scenario 2: Full 5-step structure without make test as last step
+            task_path.write_text(
                 "# Test\n\n"
                 "## Steps\n\n"
                 "- [ ] 1. Analyze the required implementation changes\n"
@@ -797,19 +781,19 @@ class TestRalphExecutor:
                 "- [ ] 4. If the change affects user-facing behavior or documentation, update README.md and any documentation affected by the changes\n"
                 "- [ ] 5. Some other final step\n"
             )
-            task_path.write_text(content)
-
             ralph_executor._ensure_last_step_is_make_test(task_path)
-
-            updated_content = task_path.read_text()
-            assert "make test" in updated_content.lower()
-            # Should have 6 steps now (original 5 + make test)
-            step_lines = [
-                line for line in updated_content.split("\n") if line.strip().startswith("- [ ]") and ". " in line
-            ]
+            content = task_path.read_text()
+            assert "make test" in content.lower()
+            step_lines = [line for line in content.split("\n") if line.strip().startswith("- [ ]") and ". " in line]
             assert len(step_lines) == 6
-            # Last step should be make test
             assert "make test" in step_lines[-1].lower()
+
+            # Scenario 3: Make test already present as last step - should not duplicate
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Run make test\n")
+            original = task_path.read_text()
+            ralph_executor._ensure_last_step_is_make_test(task_path)
+            content = task_path.read_text()
+            assert content == original
 
     def test_build_progress_info(self, ralph_executor):
         """Test building progress info."""
