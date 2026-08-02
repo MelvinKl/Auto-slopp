@@ -130,31 +130,11 @@ class Settings(BaseSettings):
                 cli_command="opencode",
                 cli_args=[
                     "--model",
-                    "opencode/big-pickle",
-                    "run",
-                ],
-                capability=5,
-                name="opencode big pickle",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
                     "opencode/nemotron-3-ultra-free",
                     "run",
                 ],
                 capability=7,
                 name="opencode nemotron-3-ultra-free",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "opencode/north-mini-code-free ",
-                    "run",
-                ],
-                capability=7,
-                name="opencode north-mini-code-free ",
             ),
         ],
         description=(
