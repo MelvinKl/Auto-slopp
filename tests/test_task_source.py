@@ -226,7 +226,8 @@ class TestGitHubTaskSource:
         ]
         mock_comments.return_value = [
             {"author": "testuser", "body": "Comment 1"},
-            {"author": "otheruser", "body": "Comment 2"},
+            {"author": "testuser", "body": "Comment 2"},
+            {"author": "otheruser", "body": "Comment 3"},
         ]
         mock_execute.return_value = {"stdout": "Condensed summary", "success": True}
         source = GitHubTaskSource()
