@@ -301,9 +301,9 @@ class RalphExecutor:
             "- [ ] 3. Update or add tests for the implementation.\n"
             "  - Acceptance Criteria:\n"
             "    - Tests cover the implemented behavior.\n"
-            "- [ ] 4. Update README.md and any other documentation in the repository with the changes made.\n"
+            "- [ ] 4. If the change affects user-facing behavior or documentation, update README.md and any documentation affected by the changes.\n"
             "  - Acceptance Criteria:\n"
-            "    - Documentation reflects the changes made.\n"
+            "    - Documentation reflects the changes made (if applicable).\n"
             "- [ ] 5. Run `make test` and confirm it succeeds.\n"
             "  - Acceptance Criteria:\n"
             "    - `make test` exits successfully.\n"
@@ -343,7 +343,8 @@ class RalphExecutor:
             "- Keep the '## Steps' section and the existing file format.\n"
             "- Keep step numbering sequential and stable.\n"
             "- The last step must always verify that `make test` succeeds.\n"
-            "- Include a step to update README.md and any other documentation in the repository with the changes made.\n"
+            "- If the change affects user-facing behavior or documentation, include a step to update "
+            "README.md and any documentation affected by the changes before the final `make test` step.\n"
         )
 
         result = self.execute_fn(
@@ -449,7 +450,8 @@ class RalphExecutor:
             "- Every step must include acceptance criteria directly below it as bullets.\n"
             "- Keep step numbering sequential and stable.\n"
             "- The last step must always verify that `make test` succeeds.\n"
-            "- Include a step to update README.md and any other documentation in the repository with the changes made.\n"
+            "- If the change affects user-facing behavior or documentation, include a step to update "
+            "README.md and any documentation affected by the changes before the final `make test` step.\n"
             "- Do not commit, do not push, and do not create a PR.\n"
         )
 

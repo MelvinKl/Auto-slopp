@@ -617,13 +617,13 @@ class TestRalphExecutor:
             assert "- [ ] 2. Implement the required code changes." in content
             assert "- [ ] 3. Update or add tests for the implementation." in content
             assert (
-                "- [ ] 4. Update README.md and any other documentation in the repository with the changes made."
+                "- [ ] 4. If the change affects user-facing behavior or documentation, update README.md and any documentation affected by the changes."
                 in content
             )
             assert "- [ ] 5. Run `make test` and confirm it succeeds." in content
 
     def test_create_issue_task_file_steps_have_acceptance_criteria(self, ralph_executor):
-        """Test that each step has acceptance criteria."""
+        """Test that each step has acceptance criteria directly beneath it."""
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_dir = Path(tmpdir)
             task_path = repo_dir / ".ralph" / "github-123.md"
@@ -639,12 +639,54 @@ class TestRalphExecutor:
 
             content = task_path.read_text()
 
-            # Verify acceptance criteria for each step
-            assert "The affected files and expected behavior are clearly identified." in content
-            assert "Code changes are applied in the correct files." in content
-            assert "Tests cover the implemented behavior." in content
-            assert "Documentation reflects the changes made." in content
-            assert "`make test` exits successfully." in content
+            # Verify acceptance criteria for each step appear directly beneath the step
+            # by checking the structure: step line followed by acceptance criteria indented
+            lines = content.split("\n")
+
+            # Step 1 and its criteria
+            assert any("- [ ] 1. Analyze the required implementation changes" in line for line in lines)
+            step1_idx = next(
+                i for i, line in enumerate(lines) if "- [ ] 1. Analyze the required implementation changes" in line
+            )
+            assert "  - Acceptance Criteria:" in lines[step1_idx + 1]
+            assert "    - The affected files and expected behavior are clearly identified." in lines[step1_idx + 2]
+
+            # Step 2 and its criteria
+            assert any("- [ ] 2. Implement the required code changes" in line for line in lines)
+            step2_idx = next(
+                i for i, line in enumerate(lines) if "- [ ] 2. Implement the required code changes" in line
+            )
+            assert "  - Acceptance Criteria:" in lines[step2_idx + 1]
+            assert "    - Code changes are applied in the correct files." in lines[step2_idx + 2]
+
+            # Step 3 and its criteria
+            assert any("- [ ] 3. Update or add tests for the implementation" in line for line in lines)
+            step3_idx = next(
+                i for i, line in enumerate(lines) if "- [ ] 3. Update or add tests for the implementation" in line
+            )
+            assert "  - Acceptance Criteria:" in lines[step3_idx + 1]
+            assert "    - Tests cover the implemented behavior." in lines[step3_idx + 2]
+
+            # Step 4 and its criteria
+            assert any(
+                "- [ ] 4. If the change affects user-facing behavior or documentation, update README.md" in line
+                for line in lines
+            )
+            step4_idx = next(
+                i
+                for i, line in enumerate(lines)
+                if "- [ ] 4. If the change affects user-facing behavior or documentation, update README.md" in line
+            )
+            assert "  - Acceptance Criteria:" in lines[step4_idx + 1]
+            assert "    - Documentation reflects the changes made (if applicable)." in lines[step4_idx + 2]
+
+            # Step 5 and its criteria
+            assert any("- [ ] 5. Run `make test` and confirm it succeeds" in line for line in lines)
+            step5_idx = next(
+                i for i, line in enumerate(lines) if "- [ ] 5. Run `make test` and confirm it succeeds" in line
+            )
+            assert "  - Acceptance Criteria:" in lines[step5_idx + 1]
+            assert "    - `make test` exits successfully." in lines[step5_idx + 2]
 
     def test_create_issue_task_file_step_numbering_sequential(self, ralph_executor):
         """Test that step numbering is sequential from 1 to 5."""
@@ -741,7 +783,7 @@ class TestRalphExecutor:
             assert content == original
 
     def test_ensure_last_step_is_make_test_with_five_steps(self, ralph_executor):
-        """Test ensuring last step is make test with full 5-step structure."""
+        """Test ensuring last step is make test with full 5-step structure where last step is not make test."""
         with tempfile.TemporaryDirectory() as tmpdir:
             task_path = Path(tmpdir) / "task.md"
 
@@ -752,7 +794,7 @@ class TestRalphExecutor:
                 "- [ ] 1. Analyze the required implementation changes\n"
                 "- [ ] 2. Implement the required code changes\n"
                 "- [ ] 3. Update or add tests for the implementation\n"
-                "- [ ] 4. Update README.md and documentation\n"
+                "- [ ] 4. If the change affects user-facing behavior or documentation, update README.md and any documentation affected by the changes\n"
                 "- [ ] 5. Some other final step\n"
             )
             task_path.write_text(content)
@@ -817,7 +859,10 @@ class TestRalphExecutor:
                 branch_name="ai/branch",
             )
 
-            assert "Include a step to update README.md and any other documentation" in instructions
+            assert (
+                "If the change affects user-facing behavior or documentation, include a step to update README.md and any documentation affected by the changes before the final `make test` step"
+                in instructions
+            )
             assert "make test" in instructions
             assert "The last step must always verify" in instructions
 
@@ -849,7 +894,10 @@ class TestRalphExecutor:
 
             assert len(captured) == 1
             instructions = captured[0]
-            assert "Include a step to update README.md and any other documentation" in instructions
+            assert (
+                "If the change affects user-facing behavior or documentation, include a step to update README.md and any documentation affected by the changes before the final `make test` step"
+                in instructions
+            )
             assert "make test" in instructions
             assert "The last step must always verify" in instructions
 
