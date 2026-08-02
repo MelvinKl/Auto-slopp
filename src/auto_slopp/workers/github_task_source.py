@@ -71,11 +71,10 @@ class GitHubTaskSource(TaskSource):
     def _condense_comments(self, repo_path: Path, issue_number: int, issue_author_login: str) -> List[str]:
         """Condense all comments (except the issue description) into a single comment.
 
-        Fetches all comments via get_issue_comments(). If there are 0 or 1 comments
-        from the issue author, returns them as-is (no condensing). If there are 2+
-        comments from the issue author, calls the CLI executor to summarize them,
-        posts the summary as a new comment, deletes the original comments, and returns
-        the summary as a single-element list.
+        Fetches all comments via get_issue_comments(). If there are 0 or 1 comments,
+        returns them as-is (no condensing). If there are 2+ comments, calls the CLI
+        executor to summarize them, posts the summary as a new comment, deletes the
+        original comments, and returns the summary as a single-element list.
 
         Args:
             repo_path: Path to the repository.
@@ -83,53 +82,41 @@ class GitHubTaskSource(TaskSource):
             issue_author_login: Login of the issue author.
 
         Returns:
-            List containing either [] (no comments), [single_comment_body] (one comment
-            from the issue author), or [condensed_summary] (multiple comments from the
-            issue author condensed).
+            List containing either [] (no comments), [single_comment_body] (one comment),
+            or [condensed_summary] (multiple comments condensed).
         """
         # Fetch all comments (each is a dict with 'id', 'body', 'author', 'createdAt')
         all_comments = get_issue_comments(repo_path, issue_number)
-        # Filter to only comments from the issue author
-        author_comments = []
-        for comment in all_comments:
-            author = comment.get("author")
-            if isinstance(author, dict):
-                author_login = author.get("login")
-            else:
-                # Assume author is a string login
-                author_login = author
-            if author_login == issue_author_login:
-                author_comments.append(comment)
-        # No comments from author
-        if not author_comments:
+        # No comments at all
+        if not all_comments:
             return []
-        # Single comment from author: return its body as a single-element list (no condensing)
-        if len(author_comments) == 1:
-            return [author_comments[0].get("body", "") or ""]
-        # Two or more comments from author: condense
+        # Single comment: return its body as a single-element list (no condensing)
+        if len(all_comments) == 1:
+            return [all_comments[0].get("body", "") or ""]
+        # Two or more comments: condense ALL comments
         # Prepare prompt for the CLI executor
         comment_lines = []
-        for i, comment in enumerate(author_comments, start=1):
+        for i, comment in enumerate(all_comments, start=1):
             body = comment.get("body", "") or ""
             comment_lines.append(f"Comment {i}:{body}")
         prompt = "\n".join(comment_lines)
         # Execute condensation
         result = execute_with_instructions(
             instructions=prompt,
-            work_dir=str(repo_path),
+            work_dir=repo_path,
             agent_args=[],
             task_name="default",
         )
         condensed = ""
-        if result and getattr(result, "stdout", None):
-            condensed = result.stdout.strip()
+        if result and result.get("stdout"):
+            condensed = result["stdout"].strip()
         # If condensation produced empty string, fallback to joining with separator
         if not condensed:
-            condensed = "\n\n---\n\n".join([c.get("body", "") or "" for c in author_comments])
+            condensed = "\n\n---\n\n".join([c.get("body", "") or "" for c in all_comments])
         # Post the condensed summary as a new comment
         comment_on_issue(repo_path, issue_number, condensed)
-        # Delete each original comment from author
-        for comment in author_comments:
+        # Delete each original comment
+        for comment in all_comments:
             cid = comment.get("id")
             if cid is not None:
                 delete_issue_comment(repo_path, issue_number, cid)
