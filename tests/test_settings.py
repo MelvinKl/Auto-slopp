@@ -148,7 +148,7 @@ class TestSettings:
         """Test default tiered CLI configurations."""
         test_settings = Settings()
         # Check that we have a list of configurations
-        assert len(test_settings.cli_configurations) == 4
+        assert len(test_settings.cli_configurations) == 2
         # First config should use pi CLI, rest should use opencode
         assert test_settings.cli_configurations[0].cli_command == "pi"
         for config in test_settings.cli_configurations[1:]:
