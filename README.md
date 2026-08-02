@@ -755,7 +755,7 @@ The Ralph executor implements a structured 5-step process for handling issues:
 1. **Analyze** - Identify affected files and expected behavior
 2. **Implement** - Apply code changes in the correct files
 3. **Test** - Update or add tests covering the implementation
-4. **Document** - Update README.md and any other documentation with changes made
+4. **Document** - If the change affects user-facing behavior or documentation, update README.md and any documentation affected by the changes
 5. **Validate** - Run `make test` and confirm it succeeds
 
 ```python

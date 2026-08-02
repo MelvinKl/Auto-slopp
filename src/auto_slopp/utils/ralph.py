@@ -344,7 +344,7 @@ class RalphExecutor:
             "- Keep step numbering sequential and stable.\n"
             "- The last step must always verify that `make test` succeeds.\n"
             "- If the change affects user-facing behavior or documentation, include a step to update "
-            "README.md and any documentation affected by the changes before the final `make test` step.\n"
+            "README.md and any documentation affected by the changes. This step must come before the final `make test` step.\n"
         )
 
         result = self.execute_fn(
@@ -451,7 +451,7 @@ class RalphExecutor:
             "- Keep step numbering sequential and stable.\n"
             "- The last step must always verify that `make test` succeeds.\n"
             "- If the change affects user-facing behavior or documentation, include a step to update "
-            "README.md and any documentation affected by the changes before the final `make test` step.\n"
+            "README.md and any documentation affected by the changes. This step must come before the final `make test` step.\n"
             "- Do not commit, do not push, and do not create a PR.\n"
         )
 

@@ -782,7 +782,7 @@ class TestRalphExecutor:
             content = task_path.read_text()
             assert content == original
 
-    def test_ensure_last_step_is_make_test_with_five_steps(self, ralph_executor):
+    def test_ensure_last_step_is_make_test_with_full_structure(self, ralph_executor):
         """Test ensuring last step is make test with full 5-step structure where last step is not make test."""
         with tempfile.TemporaryDirectory() as tmpdir:
             task_path = Path(tmpdir) / "task.md"
@@ -860,7 +860,7 @@ class TestRalphExecutor:
             )
 
             assert (
-                "If the change affects user-facing behavior or documentation, include a step to update README.md and any documentation affected by the changes before the final `make test` step"
+                "If the change affects user-facing behavior or documentation, include a step to update README.md and any documentation affected by the changes. This step must come before the final `make test` step"
                 in instructions
             )
             assert "make test" in instructions
@@ -895,7 +895,7 @@ class TestRalphExecutor:
             assert len(captured) == 1
             instructions = captured[0]
             assert (
-                "If the change affects user-facing behavior or documentation, include a step to update README.md and any documentation affected by the changes before the final `make test` step"
+                "If the change affects user-facing behavior or documentation, include a step to update README.md and any documentation affected by the changes. This step must come before the final `make test` step"
                 in instructions
             )
             assert "make test" in instructions
