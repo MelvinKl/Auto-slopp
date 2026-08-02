@@ -769,7 +769,7 @@ github_worker = IssueWorker(task_source=GitHubTaskSource())
 vikunja_worker = IssueWorker(task_source=VikunjaTaskSource())
 ```
 
-The task execution creates a markdown-based plan file in `.ralph/` with checkboxes for each step. Steps are executed sequentially with acceptance criteria validation after each step. Completed steps are committed automatically. The final step always verifies that `make test` passes.
+The task execution creates a markdown-based plan file in `.ralph/` with checkboxes for each step. Steps are executed sequentially. Completed steps are committed automatically. A final acceptance check validates all steps at once after completion. The final step always verifies that `make test` passes.
 
 ### GitHubIssueWorker
 Convenience wrapper around IssueWorker configured with GitHubTaskSource. Handles GitHub issue operations.
