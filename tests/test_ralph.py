@@ -369,12 +369,10 @@ class TestRalphExecutor:
             task_planning_name="custom_planning",
             implementation_name="custom_impl",
             validation_name="custom_validation",
-            remaining_steps_update_name="custom_update",
         )
         assert executor.task_planning_name == "custom_planning"
         assert executor.implementation_name == "custom_impl"
         assert executor.validation_name == "custom_validation"
-        assert executor.remaining_steps_update_name == "custom_update"
 
     def test_default_phase_names(self):
         """Test that default phase names match settings keys."""
@@ -390,7 +388,6 @@ class TestRalphExecutor:
         assert executor.task_planning_name == "task_planning"
         assert executor.implementation_name == "implementation"
         assert executor.validation_name == "task_implementation_validation"
-        assert executor.remaining_steps_update_name == "remaining_steps_update"
 
     def test_update_issue_task_file_uses_task_planning_name(self):
         """Test that _update_issue_task_file passes task_planning_name as task_name."""
@@ -500,76 +497,6 @@ class TestRalphExecutor:
             )
 
         assert captured[0]["task_name"] == "implementation"
-
-    def test_execute_step_acceptance_check_uses_validation_name(self):
-        """Test that _execute_step_acceptance_check passes validation_name as task_name."""
-        captured = []
-
-        def spy_execute_fn(*args, **kwargs):
-            captured.append(kwargs)
-            return {"success": True, "stdout": "ACCEPTANCE_STATUS: pass"}
-
-        executor = RalphExecutor(
-            logger=logging.getLogger(__name__),
-            agent_args=[],
-            timeout=60,
-            execute_fn=spy_execute_fn,
-            has_changes_fn=lambda x: False,
-            commit_fn=lambda x, y, z: (True, True),
-            max_iterations=5,
-            file_prefix="github",
-        )
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo_dir = Path(tmpdir)
-            task_path = repo_dir / "task.md"
-            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. Step\n")
-
-            executor._execute_step_acceptance_check(
-                repo_dir=repo_dir,
-                task_path=task_path,
-                step=Step(number=1, description="Step"),
-                issue_title="Test",
-                issue_body="body",
-                branch_name="ai/branch",
-            )
-
-        assert captured[0]["task_name"] == "task_implementation_validation"
-
-    def test_update_remaining_steps_uses_remaining_steps_update_name(self):
-        """Test that _update_remaining_steps passes remaining_steps_update_name as task_name."""
-        captured = []
-
-        def spy_execute_fn(*args, **kwargs):
-            captured.append(kwargs)
-            return {"success": True, "stdout": ""}
-
-        executor = RalphExecutor(
-            logger=logging.getLogger(__name__),
-            agent_args=[],
-            timeout=60,
-            execute_fn=spy_execute_fn,
-            has_changes_fn=lambda x: False,
-            commit_fn=lambda x, y, z: (True, True),
-            max_iterations=5,
-            file_prefix="github",
-        )
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo_dir = Path(tmpdir)
-            task_path = repo_dir / "task.md"
-            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. Step\n- [ ] 2. Other\n")
-
-            executor._update_remaining_steps(
-                repo_dir=repo_dir,
-                task_path=task_path,
-                step=Step(number=1, description="Step"),
-                issue_title="Test",
-                issue_body="body",
-                branch_name="ai/branch",
-            )
-
-        assert captured[0]["task_name"] == "remaining_steps_update"
 
     def test_create_issue_task_file(self, ralph_executor):
         """Test creating an issue task file."""
@@ -682,28 +609,6 @@ class TestRalphExecutor:
             content = task_path.read_text()
             assert "- [x] 1. Step 1" in content
             assert "- [ ] 2. Step 2" in content
-
-    def test_extract_step_block(self, ralph_executor):
-        """Test extracting a step block from task file."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            task_path = Path(tmpdir) / "task.md"
-            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Second step\n")
-
-            block = ralph_executor._extract_step_block(task_path, 1)
-            assert "- [ ] 1. First step" in block
-            assert "Second step" not in block
-
-    def test_find_step_description(self, ralph_executor):
-        """Test finding step description."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            task_path = Path(tmpdir) / "task.md"
-            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Second step\n")
-
-            desc = ralph_executor._find_step_description(task_path, 1)
-            assert desc == "First step"
-
-            desc = ralph_executor._find_step_description(task_path, 999)
-            assert desc == "Unknown step"
 
     def test_step_is_closed(self, ralph_executor):
         """Test checking if a step is closed."""
@@ -873,42 +778,6 @@ class TestRalphExecutor:
         assert "ai/branch" in instructions
         assert "Step 1: Test step" in instructions
 
-    def test_build_acceptance_check_instructions(self, ralph_executor):
-        """Test building acceptance check instructions."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            task_path = Path(tmpdir) / "task.md"
-            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n")
-
-            instructions = ralph_executor._build_acceptance_check_instructions(
-                task_path=task_path,
-                step=Step(number=1, description="First step"),
-                issue_title="Test Issue",
-                issue_body="Test body",
-                branch_name="ai/branch",
-            )
-
-            assert "Test Issue" in instructions
-            assert "ACCEPTANCE_STATUS" in instructions
-            assert "First step" in instructions
-
-    def test_build_remaining_steps_update_instructions(self, ralph_executor):
-        """Test building remaining steps update instructions."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            task_path = Path(tmpdir) / "task.md"
-            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n")
-
-            instructions = ralph_executor._build_remaining_steps_update_instructions(
-                task_path=task_path,
-                step=Step(number=1, description="First step"),
-                issue_title="Test Issue",
-                issue_body="Test body",
-                branch_name="ai/branch",
-            )
-
-            assert "Test Issue" in instructions
-            assert "First step" in instructions
-            assert "Update only unchecked steps" in instructions
-
     def test_update_issue_task_file(self, ralph_executor):
         """Test updating an existing issue task file."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1046,93 +915,6 @@ class TestRalphExecutor:
 
             assert result["success"] is False
 
-    def test_execute_step_acceptance_check(self, ralph_executor):
-        """Test acceptance check for a step."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo_dir = Path(tmpdir)
-            task_path = repo_dir / "task.md"
-            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n")
-
-            ralph_executor.execute_fn = lambda *args, **kwargs: {
-                "success": True,
-                "stdout": "ACCEPTANCE_STATUS: pass",
-            }
-
-            result = ralph_executor._execute_step_acceptance_check(
-                repo_dir=repo_dir,
-                task_path=task_path,
-                step=Step(number=1, description="First step"),
-                issue_title="Test Issue",
-                issue_body="Test body",
-                branch_name="ai/branch",
-            )
-
-            assert result["success"] is True
-
-    def test_execute_step_acceptance_check_failure(self, ralph_executor):
-        """Test acceptance check when criteria are not met."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo_dir = Path(tmpdir)
-            task_path = repo_dir / "task.md"
-            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n")
-
-            ralph_executor.execute_fn = lambda *args, **kwargs: {
-                "success": True,
-                "stdout": "ACCEPTANCE_STATUS: fail",
-            }
-
-            result = ralph_executor._execute_step_acceptance_check(
-                repo_dir=repo_dir,
-                task_path=task_path,
-                step=Step(number=1, description="First step"),
-                issue_title="Test Issue",
-                issue_body="Test body",
-                branch_name="ai/branch",
-            )
-
-            assert result["success"] is False
-
-    def test_update_remaining_steps(self, ralph_executor):
-        """Test updating remaining steps after a completed step."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo_dir = Path(tmpdir)
-            task_path = repo_dir / "task.md"
-            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Second step\n")
-
-            result = ralph_executor._update_remaining_steps(
-                repo_dir=repo_dir,
-                task_path=task_path,
-                step=Step(number=1, description="First step"),
-                issue_title="Test Issue",
-                issue_body="Test body",
-                branch_name="ai/branch",
-            )
-
-            assert result["success"] is True
-
-    def test_update_remaining_steps_failure(self, ralph_executor):
-        """Test updating remaining steps when execution fails."""
-        ralph_executor.execute_fn = lambda *args, **kwargs: {
-            "success": False,
-            "error": "Update failed",
-        }
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo_dir = Path(tmpdir)
-            task_path = repo_dir / "task.md"
-            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n")
-
-            result = ralph_executor._update_remaining_steps(
-                repo_dir=repo_dir,
-                task_path=task_path,
-                step=Step(number=1, description="First step"),
-                issue_title="Test Issue",
-                issue_body="Test body",
-                branch_name="ai/branch",
-            )
-
-            assert result["success"] is False
-
     def test_execute_final_acceptance_check(self, ralph_executor):
         """Test final acceptance check for all steps."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1234,6 +1016,93 @@ class TestRalphExecutor:
 
         assert captured[0]["task_name"] == "task_implementation_validation"
 
+    def test_execute_final_acceptance_check_missing_pass_token(self, ralph_executor):
+        """Test that missing/empty acceptance output is treated as a failure."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [x] 1. First step\n")
+
+            ralph_executor.execute_fn = lambda *args, **kwargs: {"success": True, "stdout": ""}
+
+            result = ralph_executor._execute_final_acceptance_check(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is False
+            assert result["error"] == "Final acceptance criteria were not fulfilled"
+
+    def test_execute_final_acceptance_check_unrelated_output_is_failure(self, ralph_executor):
+        """Test that unrelated stdout without the pass token is treated as a failure."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [x] 1. First step\n")
+
+            ralph_executor.execute_fn = lambda *args, **kwargs: {"success": True, "stdout": "I don't know"}
+
+            result = ralph_executor._execute_final_acceptance_check(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is False
+
+    def test_execute_final_acceptance_check_missing_task_file(self, ralph_executor):
+        """Test that a missing task file fails the final check without calling execute_fn."""
+        execute_calls = [0]
+
+        def spy_execute_fn(*args, **kwargs):
+            execute_calls[0] += 1
+            return {"success": True, "stdout": "ACCEPTANCE_STATUS: pass"}
+
+        ralph_executor.execute_fn = spy_execute_fn
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+
+            result = ralph_executor._execute_final_acceptance_check(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is False
+            assert "Failed to build final acceptance check instructions" in result["error"]
+            assert execute_calls[0] == 0
+
+    def test_build_final_acceptance_check_instructions_includes_task_content(self, ralph_executor):
+        """Test that final check instructions embed task content without status markers."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            task_path = Path(tmpdir) / "task.md"
+            task_path.write_text(
+                "# Test\n\n## Steps\n\n- [x] 1. First step\n" "  - Acceptance Criteria:\n" "    - Behavior verified\n"
+            )
+
+            instructions = ralph_executor._build_final_acceptance_check_instructions(
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                branch_name="ai/branch",
+            )
+
+            assert "Test Issue" in instructions
+            assert "ACCEPTANCE_STATUS" in instructions
+            assert "First step" in instructions
+            assert "Behavior verified" in instructions
+            assert "✓" not in instructions
+            assert "○" not in instructions
+
     def test_execute_new_issue(self, ralph_executor):
         """Test execute method for a new issue (no existing task file)."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1296,6 +1165,7 @@ class TestRalphExecutor:
 
             assert result["success"] is True
             assert result["steps_completed"] == 2
+            assert result["loops_executed"] == 0
 
     def test_run_refined_task_loop_max_iterations(self, ralph_executor):
         """Test refined task loop reaching max iterations."""
@@ -1327,13 +1197,117 @@ class TestRalphExecutor:
             assert result["max_loops_reached"] is True
             assert "loops_executed" in result
 
+    def test_run_refined_task_loop_final_check_failure_sets_error(self, ralph_executor):
+        """Test that a final acceptance check failure is reported via 'error', not just 'last_error'."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [x] 1. Completed step\n")
+
+            ralph_executor.max_iterations = 1
+            ralph_executor.execute_fn = lambda *args, **kwargs: {
+                "success": True,
+                "stdout": "ACCEPTANCE_STATUS: fail",
+            }
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is False
+            assert result["error"] == "Final acceptance criteria were not fulfilled"
+            assert result["max_loops_reached"] is False
+            assert result["loops_executed"] == 0
+
+    def test_run_refined_task_loop_final_check_retries_while_iterations_remain(self, ralph_executor):
+        """Test that a failed final check is retried while iterations remain."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [x] 1. Completed step\n")
+
+            ralph_executor.max_iterations = 3
+            validation_calls = [0]
+
+            def flaky_execute_fn(*args, **kwargs):
+                if kwargs.get("task_name") == "task_implementation_validation":
+                    validation_calls[0] += 1
+                    if validation_calls[0] == 1:
+                        return {"success": True, "stdout": "ACCEPTANCE_STATUS: fail"}
+                    return {"success": True, "stdout": "ACCEPTANCE_STATUS: pass"}
+                return {"success": True, "stdout": "Done"}
+
+            ralph_executor.execute_fn = flaky_execute_fn
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is True
+            assert result["steps_completed"] == 1
+            assert validation_calls[0] == 2
+            assert result["loops_executed"] == 1
+
+    def test_run_refined_task_loop_max_iterations_partial_work_runs_final_check(self, ralph_executor):
+        """Test that the final acceptance check runs on partial work at max iterations."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Second step\n")
+
+            ralph_executor.max_iterations = 2
+            ralph_executor.has_changes_fn = lambda path: False
+
+            validation_calls = [0]
+
+            def tracking_execute_fn(*args, **kwargs):
+                if kwargs.get("task_name") == "task_implementation_validation":
+                    validation_calls[0] += 1
+                    return {"success": True, "stdout": "ACCEPTANCE_STATUS: fail"}
+                return {"success": True, "stdout": "Done"}
+
+            ralph_executor.execute_fn = tracking_execute_fn
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is False
+            assert result["max_loops_reached"] is True
+            assert "Maximum iterations" in result["error"]
+            assert result["steps_completed"] == 2
+            assert result["loops_executed"] == 2
+            assert validation_calls[0] == 1
+            assert result["last_error"] == "Final acceptance criteria were not fulfilled"
+
     def test_run_refined_task_loop_no_intermediate_checks(self, ralph_executor):
         """Test that refined task loop executes steps without intermediate checks."""
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_dir = Path(tmpdir)
             task_path = repo_dir / "task.md"
             task_path.write_text(
-                "# Test\n\n## Steps\n\n" "- [ ] 1. First step\n" "- [ ] 2. Second step\n" "- [ ] 3. Run make test\n"
+                "# Test\n"
+                "\n"
+                "## Steps\n"
+                "\n"
+                "- [ ] 1. First step\n"
+                "- [ ] 2. Second step\n"
+                "- [ ] 3. Run make test\n"
             )
 
             ralph_executor.max_iterations = 10
