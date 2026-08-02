@@ -193,22 +193,6 @@ class IssueWorker(Worker):
         task_title = task.title
         task_body = task.body
 
-        # Condense comments: we want to end up with exactly one comment that is the condensation of
-        # all comments except the first one. If there are no comments or only one comment, we
-        # provide a placeholder.
-        original_comment_count = len(task.comments)
-        if original_comment_count == 0:
-            task.comments = ["No comments provided."]
-            self.logger.info(f"No comments found for task #{task_id}, set to placeholder.")
-        elif original_comment_count == 1:
-            task.comments = ["Only one comment present; no additional comments to condense."]
-            self.logger.info(f"Only one comment for task #{task_id}, set to placeholder.")
-        else:
-            # Condense all comments except the first one
-            condensed = "\\n\\n---\\n\\n".join(task.comments[1:])
-            task.comments = [condensed]
-            self.logger.info(f"Condensed {original_comment_count - 1} comments into one for task #{task_id}.")
-
         self.logger.info(f"Processing task #{task_id}: {task_title}")
 
         result = {
