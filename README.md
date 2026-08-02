@@ -750,12 +750,12 @@ from auto_slopp.workers import PRWorker
 ### IssueWorker
 A unified worker class that processes tasks/issues using the Ralph execution logic. It accepts a TaskSource (base class) that abstracts the task loading mechanism, allowing it to work with different task sources (GitHub issues, Vikunja tasks, etc.).
 
-The Ralph executor implements a structured process for handling issues:
+The Ralph executor implements a structured 5-step process for handling issues:
 
 1. **Analyze** - Identify affected files and expected behavior
 2. **Implement** - Apply code changes in the correct files
 3. **Test** - Update or add tests covering the implementation
-4. **Document** - Update README.md and any other documentation with changes made
+4. **Document** - If the change affects user-facing behavior or documentation, update README.md and any documentation affected by the changes
 5. **Validate** - Run `make test` and confirm it succeeds
 
 ```python
