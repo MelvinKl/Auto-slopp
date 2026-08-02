@@ -884,7 +884,7 @@ from auto_slopp.workers import PRWorker
 ### IssueWorker
 A unified worker class that processes tasks/issues using the Ralph execution logic. It accepts a TaskSource (base class) that abstracts the task loading mechanism, allowing it to work with different task sources (GitHub issues, Vikunja tasks, etc.).
 
-The Ralph executor implements a structured 5-step process for handling issues:
+The Ralph executor implements a structured process for handling issues:
 
 1. **Analyze** - Identify affected files and expected behavior
 2. **Implement** - Apply code changes in the correct files
@@ -903,7 +903,7 @@ github_worker = IssueWorker(task_source=GitHubTaskSource())
 vikunja_worker = IssueWorker(task_source=VikunjaTaskSource())
 ```
 
-The task execution creates a markdown-based plan file in `.ralph/` with checkboxes for each step. Steps are executed sequentially with acceptance criteria validation after each step. Completed steps are committed automatically. The final step always verifies that `make test` passes.
+The task execution creates a markdown-based plan file in `.ralph/` with checkboxes for each step. Steps are executed sequentially. Completed steps are committed automatically. A final acceptance check validates all steps at once after completion. The final step always verifies that `make test` passes.
 
 ### GitHubIssueWorker
 Convenience wrapper around IssueWorker configured with GitHubTaskSource. Handles GitHub issue operations.

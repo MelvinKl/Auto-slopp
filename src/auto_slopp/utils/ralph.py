@@ -233,7 +233,6 @@ class RalphExecutor:
         task_planning_name: str = "task_planning",
         implementation_name: str = "implementation",
         validation_name: str = "task_implementation_validation",
-        remaining_steps_update_name: str = "remaining_steps_update",
     ):
         """Initialize the RalphExecutor.
 
@@ -251,7 +250,6 @@ class RalphExecutor:
             task_planning_name: Task difficulty name for planning/refinement phase.
             implementation_name: Task difficulty name for step implementation phase.
             validation_name: Task difficulty name for acceptance validation phase.
-            remaining_steps_update_name: Task difficulty name for updating remaining steps.
         """
         self.logger = logger
         self.agent_args = agent_args
@@ -264,7 +262,6 @@ class RalphExecutor:
         self.task_planning_name = task_planning_name
         self.implementation_name = implementation_name
         self.validation_name = validation_name
-        self.remaining_steps_update_name = remaining_steps_update_name
 
     def _get_issue_task_path(self, repo_dir: Path, issue_number: int) -> Path:
         """Get the canonical task file path for a task."""
@@ -503,104 +500,6 @@ class RalphExecutor:
 
         return result
 
-    def _execute_step_acceptance_check(
-        self,
-        repo_dir: Path,
-        task_path: Path,
-        step: Step,
-        issue_title: str,
-        issue_body: str,
-        branch_name: str,
-    ) -> Dict[str, Any]:
-        """Run acceptance criteria validation for a step.
-
-        Args:
-            repo_dir: Repository directory
-            task_path: Path to the task file
-            step: Step to validate
-            issue_title: GitHub issue title
-            issue_body: GitHub issue body
-            branch_name: Git branch name
-
-        Returns:
-            Dictionary with 'success' key and optional 'error'
-        """
-        instructions = self._build_acceptance_check_instructions(
-            task_path=task_path,
-            step=step,
-            issue_title=issue_title,
-            issue_body=issue_body,
-            branch_name=branch_name,
-        )
-
-        result = self.execute_fn(
-            instructions,
-            repo_dir,
-            self.agent_args,
-            self.timeout,
-            task_name=self.validation_name,
-        )
-
-        if not result.get("success", False):
-            return {
-                "success": False,
-                "error": result.get("error", "Acceptance criteria check command failed"),
-            }
-
-        stdout_lower = (result.get("stdout") or "").lower()
-        if "acceptance_status: fail" in stdout_lower or "acceptance status: fail" in stdout_lower:
-            return {
-                "success": False,
-                "error": "Acceptance criteria were not fulfilled",
-            }
-
-        return {"success": True}
-
-    def _update_remaining_steps(
-        self,
-        repo_dir: Path,
-        task_path: Path,
-        step: Step,
-        issue_title: str,
-        issue_body: str,
-        branch_name: str,
-    ) -> Dict[str, Any]:
-        """Update future steps with details learned from a completed step.
-
-        Args:
-            repo_dir: Repository directory
-            task_path: Path to the task file
-            step: Step whose completion triggered the update
-            issue_title: GitHub issue title
-            issue_body: GitHub issue body
-            branch_name: Git branch name
-
-        Returns:
-            Dictionary with 'success' key and optional 'error'
-        """
-        instructions = self._build_remaining_steps_update_instructions(
-            task_path=task_path,
-            step=step,
-            issue_title=issue_title,
-            issue_body=issue_body,
-            branch_name=branch_name,
-        )
-
-        result = self.execute_fn(
-            instructions,
-            repo_dir,
-            self.agent_args,
-            self.timeout,
-            task_name=self.remaining_steps_update_name,
-        )
-        if not result.get("success", False):
-            return {
-                "success": False,
-                "error": result.get("error", "Failed to update remaining steps"),
-            }
-
-        return {"success": True}
-
     def _build_step_instructions(
         self,
         step: Step,
@@ -661,85 +560,84 @@ class RalphExecutor:
             lines.append(f"{status} Step {step.number}: {step.description}")
         return "\n".join(lines)
 
-    def _build_acceptance_check_instructions(
+    def _build_final_acceptance_check_instructions(
         self,
         task_path: Path,
-        step: Step,
         issue_title: str,
         issue_body: str,
         branch_name: str,
     ) -> str:
-        """Build instructions for acceptance criteria checks."""
-        step_block = self._extract_step_block(task_path, step.number)
-        return (
-            f"You are already on branch '{branch_name}'. "
-            f"Check acceptance criteria for Step {step.number} in '{task_path}'.\n"
-            f"Issue title: {issue_title}\n"
-            f"Issue description:\n{issue_body}\n\n"
-            f"Step details:\n{step_block}\n\n"
-            "Validate that all acceptance criteria are fulfilled.\n"
-            "If all criteria are fulfilled, mark the step as completed in the task file.\n"
-            "If criteria are not fulfilled, keep the step open.\n"
-            "Do not commit, do not push, and do not create a PR.\n"
-            "At the end, output exactly one line: ACCEPTANCE_STATUS: pass or ACCEPTANCE_STATUS: fail"
-        )
+        """Build instructions for final acceptance criteria validation of all steps."""
+        task_content = task_path.read_text()
 
-    def _build_remaining_steps_update_instructions(
-        self,
-        task_path: Path,
-        step: Step,
-        issue_title: str,
-        issue_body: str,
-        branch_name: str,
-    ) -> str:
-        """Build instructions for updating remaining steps after a successful step."""
-        step_block = self._extract_step_block(task_path, step.number)
         return (
             f"You are already on branch '{branch_name}'. "
-            f"Update remaining open steps in '{task_path}' after completion of Step {step.number}.\n"
+            f"Perform final acceptance validation for all steps in '{task_path}'.\n"
             f"Issue title: {issue_title}\n"
             f"Issue description:\n{issue_body}\n\n"
-            f"Completed step details:\n{step_block}\n\n"
-            "Update only unchecked steps to include concrete details learned from the completed step.\n"
-            "Do not alter numbering, and do not modify completed steps.\n"
+            f"The task file with all steps and their acceptance criteria:\n{task_content}\n\n"
+            "Validate that ALL acceptance criteria for ALL steps are fulfilled.\n"
+            "Check that the implementation is complete and correct.\n"
+            "If all criteria are fulfilled, output exactly one line: ACCEPTANCE_STATUS: pass\n"
+            "If any criteria are not fulfilled, output exactly one line: ACCEPTANCE_STATUS: fail\n"
             "Do not commit, do not push, and do not create a PR."
         )
 
-    def _extract_step_block(self, task_path: Path, step_number: int) -> str:
-        """Extract a step block (step line plus child lines) from the task markdown file."""
-        content = task_path.read_text()
-        lines = content.splitlines()
-        step_pattern = re.compile(r"^\s*-\s\[[ x]\]\s*\d+\.\s+")
-        target_pattern = re.compile(rf"^\s*-\s\[[ x]\]\s*{step_number}\.\s+")
+    def _execute_final_acceptance_check(
+        self,
+        repo_dir: Path,
+        task_path: Path,
+        issue_title: str,
+        issue_body: str,
+        branch_name: str,
+    ) -> Dict[str, Any]:
+        """Run final acceptance criteria validation for all steps at once.
 
-        start_idx: Optional[int] = None
-        end_idx = len(lines)
+        Args:
+            repo_dir: Repository directory
+            task_path: Path to the task file
+            issue_title: GitHub issue title
+            issue_body: GitHub issue body
+            branch_name: Git branch name
 
-        for idx, line in enumerate(lines):
-            if target_pattern.match(line):
-                start_idx = idx
-                break
-
-        if start_idx is None:
-            return f"- [ ] {step_number}. {self._find_step_description(task_path, step_number)}"
-
-        for idx in range(start_idx + 1, len(lines)):
-            if step_pattern.match(lines[idx]):
-                end_idx = idx
-                break
-
-        return "\n".join(lines[start_idx:end_idx]).strip()
-
-    def _find_step_description(self, task_path: Path, step_number: int) -> str:
-        """Fallback helper to retrieve the step description for a given step number."""
+        Returns:
+            Dictionary with 'success' key and optional 'error'
+        """
         try:
-            plan = PlanParser.parse_file(task_path)
-        except Exception:
-            return "Unknown step"
-        for step in plan.steps:
-            if step.number == step_number:
-                return step.description
-        return "Unknown step"
+            instructions = self._build_final_acceptance_check_instructions(
+                task_path=task_path,
+                issue_title=issue_title,
+                issue_body=issue_body,
+                branch_name=branch_name,
+            )
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to build final acceptance check instructions: {str(e)}",
+            }
+
+        result = self.execute_fn(
+            instructions,
+            repo_dir,
+            self.agent_args,
+            self.timeout,
+            task_name=self.validation_name,
+        )
+
+        if not result.get("success", False):
+            return {
+                "success": False,
+                "error": result.get("error", "Final acceptance criteria check command failed"),
+            }
+
+        stdout_lower = (result.get("stdout") or "").lower()
+        if "acceptance_status: pass" not in stdout_lower:
+            return {
+                "success": False,
+                "error": "Final acceptance criteria were not fulfilled",
+            }
+
+        return {"success": True}
 
     def _step_is_closed(self, task_path: Path, step_number: int) -> bool:
         """Check whether a step is marked as completed in the task file."""
@@ -909,9 +807,30 @@ class RalphExecutor:
             result["total_steps"] = len(plan.steps)
             next_step = plan.get_next_open_step()
             if not next_step:
-                result["success"] = True
-                result["loops_executed"] = iteration - 1
                 result["steps_completed"] = len([step for step in plan.steps if step.is_closed])
+
+                final_check_result = self._execute_final_acceptance_check(
+                    repo_dir=repo_dir,
+                    task_path=task_path,
+                    issue_title=issue_title,
+                    issue_body=issue_body,
+                    branch_name=branch_name,
+                )
+                if final_check_result.get("success", False):
+                    result["success"] = True
+                    result["loops_executed"] = iteration - 1
+                    return result
+
+                # Final acceptance check failed. Retry it on subsequent iterations
+                # while the iteration budget remains so a spurious failure cannot
+                # end the task prematurely.
+                result["last_error"] = final_check_result.get("error", "Final acceptance check failed")
+                result["loops_executed"] = iteration - 1
+                if iteration < max_iterations:
+                    continue
+
+                # Iteration budget exhausted: report the acceptance failure.
+                result["error"] = final_check_result.get("error", "Final acceptance check failed")
                 return result
 
             step_result = self._execute_step(
@@ -928,40 +847,13 @@ class RalphExecutor:
                 result["loops_executed"] = iteration
                 continue
 
-            acceptance_result = self._execute_step_acceptance_check(
-                repo_dir=repo_dir,
-                task_path=task_path,
-                step=next_step,
-                issue_title=issue_title,
-                issue_body=issue_body,
-                branch_name=branch_name,
-            )
-            if not acceptance_result.get("success", False):
-                result["last_error"] = acceptance_result.get("error", "Acceptance criteria check failed")
-                result["loops_executed"] = iteration
-                continue
-
             if not self._step_is_closed(task_path, next_step.number):
                 self._mark_step_completed_in_file(task_path, next_step.number)
 
             if not self._step_is_closed(task_path, next_step.number):
-                result["last_error"] = f"Step {next_step.number} is still open after acceptance check"
+                result["last_error"] = f"Step {next_step.number} is still open after execution"
                 result["loops_executed"] = iteration
                 continue
-
-            remaining_steps_update_result = self._update_remaining_steps(
-                repo_dir=repo_dir,
-                task_path=task_path,
-                step=next_step,
-                issue_title=issue_title,
-                issue_body=issue_body,
-                branch_name=branch_name,
-            )
-            if not remaining_steps_update_result.get("success", False):
-                self.logger.warning(
-                    "Failed to update remaining steps after step completion: "
-                    f"{remaining_steps_update_result.get('error', 'Unknown error')}"
-                )
 
             repo_has_changes = False
             try:
@@ -991,7 +883,28 @@ class RalphExecutor:
             result["loops_executed"] = iteration
 
         result["max_loops_reached"] = True
+        result["loops_executed"] = max_iterations
         result["error"] = f"Maximum iterations ({max_iterations}) reached before all steps completed"
+
+        # Validate whatever work was accomplished before the budget ran out so
+        # the failure carries actionable context about the completed steps.
+        if result["steps_completed"] > 0:
+            final_check_result = self._execute_final_acceptance_check(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title=issue_title,
+                issue_body=issue_body,
+                branch_name=branch_name,
+            )
+            if final_check_result.get("success", False):
+                if result["steps_completed"] >= result["total_steps"]:
+                    # All steps were completed on the final iteration and pass
+                    # validation, so the task is actually complete.
+                    result["success"] = True
+                    result["max_loops_reached"] = False
+                    result.pop("error", None)
+            else:
+                result["last_error"] = final_check_result.get("error", "Final acceptance check failed")
         return result
 
 
