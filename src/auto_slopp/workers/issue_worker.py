@@ -84,7 +84,6 @@ class IssueWorker(Worker):
             task_planning_name="task_planning",
             implementation_name="implementation",
             validation_name="task_implementation_validation",
-            remaining_steps_update_name="remaining_steps_update",
         )
 
     def run(self, repo_path: Path) -> Dict[str, Any]:
