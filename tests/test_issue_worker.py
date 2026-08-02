@@ -1183,6 +1183,7 @@ class TestIssueWorker:
         assert result["task_results"][0]["success"] is False
         assert task_source.on_skip_called is True
         assert task_source.on_task_failure_called is False
+
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
