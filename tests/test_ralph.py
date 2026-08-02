@@ -595,6 +595,82 @@ class TestRalphExecutor:
             assert "Comment 1" in content
             assert "Comment 2" in content
 
+    def test_create_issue_task_file_has_all_five_steps(self, ralph_executor):
+        """Test that the created task file contains all 5 required steps."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / ".ralph" / "github-123.md"
+
+            ralph_executor._create_issue_task_file(
+                task_path=task_path,
+                issue_number=123,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch-123",
+            )
+
+            content = task_path.read_text()
+
+            # Verify all 5 steps are present with correct descriptions
+            assert "- [ ] 1. Analyze the required implementation changes for this issue." in content
+            assert "- [ ] 2. Implement the required code changes." in content
+            assert "- [ ] 3. Update or add tests for the implementation." in content
+            assert (
+                "- [ ] 4. Update README.md and any other documentation in the repository with the changes made."
+                in content
+            )
+            assert "- [ ] 5. Run `make test` and confirm it succeeds." in content
+
+    def test_create_issue_task_file_steps_have_acceptance_criteria(self, ralph_executor):
+        """Test that each step has acceptance criteria."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / ".ralph" / "github-123.md"
+
+            ralph_executor._create_issue_task_file(
+                task_path=task_path,
+                issue_number=123,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch-123",
+            )
+
+            content = task_path.read_text()
+
+            # Verify acceptance criteria for each step
+            assert "The affected files and expected behavior are clearly identified." in content
+            assert "Code changes are applied in the correct files." in content
+            assert "Tests cover the implemented behavior." in content
+            assert "Documentation reflects the changes made." in content
+            assert "`make test` exits successfully." in content
+
+    def test_create_issue_task_file_step_numbering_sequential(self, ralph_executor):
+        """Test that step numbering is sequential from 1 to 5."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / ".ralph" / "github-123.md"
+
+            ralph_executor._create_issue_task_file(
+                task_path=task_path,
+                issue_number=123,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch-123",
+            )
+
+            content = task_path.read_text()
+            lines = content.split("\n")
+
+            step_lines = [line for line in lines if line.strip().startswith("- [ ]") and ". " in line]
+            assert len(step_lines) == 5
+
+            # Verify sequential numbering
+            for i, line in enumerate(step_lines, 1):
+                assert f"- [ ] {i}. " in line
+
     def test_mark_step_completed_in_file(self, ralph_executor):
         """Test marking a step as completed in a file."""
         with tempfile.TemporaryDirectory() as tmpdir:
