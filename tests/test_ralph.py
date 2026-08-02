@@ -740,6 +740,35 @@ class TestRalphExecutor:
             content = task_path.read_text()
             assert content == original
 
+    def test_ensure_last_step_is_make_test_with_five_steps(self, ralph_executor):
+        """Test ensuring last step is make test with full 5-step structure."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            task_path = Path(tmpdir) / "task.md"
+
+            # 5 steps without make test as last step
+            content = (
+                "# Test\n\n"
+                "## Steps\n\n"
+                "- [ ] 1. Analyze the required implementation changes\n"
+                "- [ ] 2. Implement the required code changes\n"
+                "- [ ] 3. Update or add tests for the implementation\n"
+                "- [ ] 4. Update README.md and documentation\n"
+                "- [ ] 5. Some other final step\n"
+            )
+            task_path.write_text(content)
+
+            ralph_executor._ensure_last_step_is_make_test(task_path)
+
+            updated_content = task_path.read_text()
+            assert "make test" in updated_content.lower()
+            # Should have 6 steps now (original 5 + make test)
+            step_lines = [
+                line for line in updated_content.split("\n") if line.strip().startswith("- [ ]") and ". " in line
+            ]
+            assert len(step_lines) == 6
+            # Last step should be make test
+            assert "make test" in step_lines[-1].lower()
+
     def test_build_progress_info(self, ralph_executor):
         """Test building progress info."""
         steps = [
@@ -773,6 +802,56 @@ class TestRalphExecutor:
             assert "ai/branch" in instructions
             assert "## Steps" in instructions
             assert "make test" in instructions
+
+    def test_build_refinement_instructions_includes_documentation_step(self, ralph_executor):
+        """Test that refinement instructions require documentation update step."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            task_path = Path(tmpdir) / "task.md"
+            task_path.write_text("# Test")
+
+            instructions = ralph_executor._build_refinement_instructions(
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+            assert "Include a step to update README.md and any other documentation" in instructions
+            assert "make test" in instructions
+            assert "The last step must always verify" in instructions
+
+    def test_update_issue_task_file_instructions_include_documentation_step(self, ralph_executor):
+        """Test that update issue task file instructions require documentation update step."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / ".ralph" / "github-123.md"
+            task_path.parent.mkdir(parents=True, exist_ok=True)
+            task_path.write_text("# Test\n\n## Steps\n\n- [x] 1. Completed step\n")
+
+            captured = []
+
+            def spy_execute_fn(*args, **kwargs):
+                captured.append(kwargs.get("instructions", args[0] if args else ""))
+                return {"success": True, "stdout": ""}
+
+            ralph_executor.execute_fn = spy_execute_fn
+
+            ralph_executor._update_issue_task_file(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_number=123,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch-123",
+            )
+
+            assert len(captured) == 1
+            instructions = captured[0]
+            assert "Include a step to update README.md and any other documentation" in instructions
+            assert "make test" in instructions
+            assert "The last step must always verify" in instructions
 
     def test_build_step_instructions(self, ralph_executor):
         """Test building step instructions."""
