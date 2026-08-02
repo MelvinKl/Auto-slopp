@@ -1,5 +1,6 @@
 """Tests for unified IssueWorker."""
 
+import subprocess
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -1144,3 +1145,192 @@ class TestIssueWorker:
         assert task_source.on_task_complete_called is True
         mock_push.assert_called_once()
         mock_create_pr.assert_called_once()
+
+    def test_comments_pass_through_unchanged(self):
+        """Test that task.comments are passed through without modification.
+
+        Comment condensation is handled by GitHubTaskSource._condense_comments(),
+        not by IssueWorker. IssueWorker should pass comments directly to the agent.
+        """
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Test case 1: No comments
+            task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="", comments=[])])
+            worker = IssueWorker(task_source=task_source, dry_run=True)
+            worker.run(Path(temp_dir))
+            assert task_source.tasks[0].comments == []
+
+            # Test case 2: One comment
+            task_source = MockTaskSource(tasks=[Task(id=2, title="Test", body="", comments=["Only comment"])])
+            worker = IssueWorker(task_source=task_source, dry_run=True)
+            worker.run(Path(temp_dir))
+            assert task_source.tasks[0].comments == ["Only comment"]
+
+            # Test case 3: Multiple comments
+            comments = ["First comment", "Second comment", "Third comment"]
+            task_source = MockTaskSource(tasks=[Task(id=3, title="Test", body="", comments=comments)])
+            worker = IssueWorker(task_source=task_source, dry_run=True)
+            worker.run(Path(temp_dir))
+            assert task_source.tasks[0].comments == comments
+
+    @patch("auto_slopp.workers.issue_worker.ensure_ralph_in_gitignore")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_ensure_ralph_in_gitignore_called(
+        self, mock_settings, mock_create_branch, mock_checkout, mock_ensure_gitignore
+    ):
+        """Test that ensure_ralph_in_gitignore is called after branch creation and before Ralph execution."""
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": True,
+            "loops_executed": 1,
+            "steps_completed": 3,
+            "total_steps": 3,
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            worker.run(Path(temp_dir))
+
+        # Verify ensure_ralph_in_gitignore was called
+        mock_ensure_gitignore.assert_called_once()
+        call_args = mock_ensure_gitignore.call_args
+        assert call_args[0][0] == Path(temp_dir)
+
+    def _create_test_repo(self, repo_path: Path) -> None:
+        """Create a test git repository with main branch and no .gitignore."""
+        subprocess.run(["git", "init"], cwd=repo_path, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+
+        test_file = repo_path / "README.md"
+        test_file.write_text("# Test Repository")
+
+        subprocess.run(["git", "add", "."], cwd=repo_path, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+
+        subprocess.run(
+            ["git", "branch", "-M", "main"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_gitignore_integration_ralph_added_when_missing(
+        self, mock_settings, mock_commits_ahead, mock_create_pr, mock_get_pr, mock_push
+    ):
+        """Integration test: .ralph is added to .gitignore when missing."""
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_commits_ahead.return_value = 1
+        mock_push.return_value = (True, "")
+        mock_get_pr.return_value = None
+        mock_create_pr.return_value = {"url": "https://github.com/test/pr/1"}
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo(repo_path)
+
+            # Verify .gitignore doesn't exist initially
+            gitignore_path = repo_path / ".gitignore"
+            assert not gitignore_path.exists()
+
+            task_source = MockTaskSource(tasks=[Task(id=1, title="Test Task", body="Test body")])
+            worker = IssueWorker(task_source=task_source, dry_run=False)
+
+            # Mock RalphExecutor to avoid actual CLI execution
+            worker.ralph_executor.execute = lambda *args, **kwargs: {
+                "success": True,
+                "loops_executed": 1,
+                "steps_completed": 3,
+                "total_steps": 3,
+            }
+
+            # Mock _generate_pr_body_from_task_file to avoid file system access
+            worker._generate_pr_body_from_task_file = lambda **kwargs: "PR body"
+
+            # Run the worker
+            result = worker.run(repo_path)
+
+            # Verify the task was processed successfully
+            assert result["success"] is True
+            assert result["tasks_processed"] == 1
+
+            # Verify .gitignore was created and contains .ralph
+            assert gitignore_path.exists()
+            content = gitignore_path.read_text()
+            assert ".ralph/" in content
+
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_gitignore_integration_ralph_not_duplicated(
+        self, mock_settings, mock_commits_ahead, mock_create_pr, mock_get_pr, mock_push
+    ):
+        """Integration test: .ralph is not duplicated when already in .gitignore."""
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_commits_ahead.return_value = 1
+        mock_push.return_value = (True, "")
+        mock_get_pr.return_value = None
+        mock_create_pr.return_value = {"url": "https://github.com/test/pr/1"}
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo(repo_path)
+
+            # Create .gitignore with .ralph already present
+            gitignore_path = repo_path / ".gitignore"
+            gitignore_path.write_text("*.pyc\n__pycache__/\n.ralph/\n")
+
+            task_source = MockTaskSource(tasks=[Task(id=1, title="Test Task", body="Test body")])
+            worker = IssueWorker(task_source=task_source, dry_run=False)
+
+            # Mock RalphExecutor to avoid actual CLI execution
+            worker.ralph_executor.execute = lambda *args, **kwargs: {
+                "success": True,
+                "loops_executed": 1,
+                "steps_completed": 3,
+                "total_steps": 3,
+            }
+
+            # Mock _generate_pr_body_from_task_file to avoid file system access
+            worker._generate_pr_body_from_task_file = lambda **kwargs: "PR body"
+
+            # Run the worker
+            result = worker.run(repo_path)
+
+            # Verify the task was processed successfully
+            assert result["success"] is True
+            assert result["tasks_processed"] == 1
+
+            # Verify .gitignore still contains .ralph only once
+            content = gitignore_path.read_text()
+            assert content.count(".ralph/") == 1
+            assert "*.pyc" in content
+            assert "__pycache__/" in content

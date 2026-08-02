@@ -671,6 +671,42 @@ def push_to_remote(repo_dir: Path, remote: str = "origin", branch: Optional[str]
     return False, error_msg
 
 
+def ensure_ralph_in_gitignore(repo_dir: Path) -> bool:
+    """Ensure .ralph directory is in .gitignore.
+
+    Args:
+        repo_dir: Path to the git repository
+
+    Returns:
+        True if successful (already present or added), False otherwise.
+    """
+    gitignore_path = repo_dir / ".gitignore"
+    ralph_entry = ".ralph"
+
+    try:
+        if gitignore_path.exists():
+            content = gitignore_path.read_text()
+            # Check if .ralph is already in .gitignore (with or without trailing slash)
+            if ralph_entry in content or f"{ralph_entry}/" in content:
+                return True
+
+            # Add .ralph to .gitignore
+            if content and not content.endswith("\n"):
+                content += "\n"
+            content += f"\n{ralph_entry}/\n"
+            gitignore_path.write_text(content)
+        else:
+            # Create .gitignore with .ralph entry
+            gitignore_path.write_text(f"{ralph_entry}/\n")
+
+        logger.info(f"Added .ralph to .gitignore in {repo_dir.name}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to ensure .ralph in .gitignore for {repo_dir.name}: {e}")
+        return False
+
+
 def is_git_repo(directory: Path) -> bool:
     """Check if a directory is inside a git repository.
 
