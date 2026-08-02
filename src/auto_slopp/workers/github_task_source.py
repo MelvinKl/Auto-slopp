@@ -71,10 +71,12 @@ class GitHubTaskSource(TaskSource):
     def _condense_comments(self, repo_path: Path, issue_number: int, issue_author_login: str) -> List[str]:
         """Condense all comments (except the issue description) into a single comment.
 
-        Fetches all comments via get_issue_comments(). If there are 0 or 1 comments,
-        returns them as-is (no condensing). If there are 2+ comments, calls the CLI
-        executor to summarize them, posts the summary as a new comment, deletes the
-        original comments, and returns the summary as a single-element list.
+        Fetches all comments via get_issue_comments(). If there are 0 comments,
+        returns ["No comments provided."]. If there is 1 comment,
+        returns ["Only one comment present; no additional comments to condense."]
+        If there are 2+ comments, calls the CLI executor to summarize them, posts
+        the summary as a new comment, deletes the original comments, and returns
+        the summary as a single-element list.
 
         Args:
             repo_path: Path to the repository.
@@ -82,17 +84,18 @@ class GitHubTaskSource(TaskSource):
             issue_author_login: Login of the issue author.
 
         Returns:
-            List containing either [] (no comments), [single_comment_body] (one comment),
+            List containing ["No comments provided."] (no comments),
+            ["Only one comment present; no additional comments to condense."] (one comment),
             or [condensed_summary] (multiple comments condensed).
         """
         # Fetch all comments (each is a dict with 'id', 'body', 'author', 'createdAt')
         all_comments = get_issue_comments(repo_path, issue_number)
         # No comments at all
         if not all_comments:
-            return []
-        # Single comment: return its body as a single-element list (no condensing)
+            return ["No comments provided."]
+        # Single comment: return placeholder indicating no condensing needed
         if len(all_comments) == 1:
-            return [all_comments[0].get("body", "") or ""]
+            return ["Only one comment present; no additional comments to condense."]
         # Two or more comments: condense ALL comments
         # Prepare prompt for the CLI executor
         comment_lines = []

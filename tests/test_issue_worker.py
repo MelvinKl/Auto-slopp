@@ -1074,28 +1074,33 @@ class TestIssueWorker:
         mock_push.assert_called_once()
         mock_create_pr.assert_called_once()
 
-    def test_comment_condensation(self):
-        """Test that comments are properly condensed according to the rules."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Test case 1: No comments
-            task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="", comments=[])])
-            worker = IssueWorker(task_source=task_source, dry_run=True)
-            worker.run(Path(temp_dir))
-            assert task_source.tasks[0].comments == ["No comments provided."]
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    def test_comment_condensation(self, mock_get_comments):
+        """Test that GitHubTaskSource._condense_comments properly condenses comments."""
+        task_source = GitHubTaskSource()
 
-            # Test case 2: One comment
-            task_source = MockTaskSource(tasks=[Task(id=2, title="Test", body="", comments=["Only comment"])])
-            worker = IssueWorker(task_source=task_source, dry_run=True)
-            worker.run(Path(temp_dir))
-            assert task_source.tasks[0].comments == ["Only one comment present; no additional comments to condense."]
+        # Test case 1: No comments
+        mock_get_comments.return_value = []
+        result = task_source._condense_comments(Path("/tmp"), 1, "author")
+        assert result == ["No comments provided."]
 
-            # Test case 3: Multiple comments
-            comments = ["First comment", "Second comment", "Third comment"]
-            task_source = MockTaskSource(tasks=[Task(id=3, title="Test", body="", comments=comments)])
-            worker = IssueWorker(task_source=task_source, dry_run=True)
-            worker.run(Path(temp_dir))
-            expected = "Second comment\\n\\n---\\n\\nThird comment"
-            assert task_source.tasks[0].comments == [expected]
+        # Test case 2: One comment
+        mock_get_comments.return_value = [{"id": 1, "body": "Only comment", "author": {"login": "user"}}]
+        result = task_source._condense_comments(Path("/tmp"), 2, "author")
+        assert result == ["Only one comment present; no additional comments to condense."]
+
+        # Test case 3: Multiple comments - should call CLI to condense
+        mock_get_comments.return_value = [
+            {"id": 1, "body": "First comment", "author": {"login": "user"}},
+            {"id": 2, "body": "Second comment", "author": {"login": "user"}},
+            {"id": 3, "body": "Third comment", "author": {"login": "user"}},
+        ]
+        with patch("auto_slopp.workers.github_task_source.execute_with_instructions") as mock_execute:
+            mock_execute.return_value = {"success": True, "stdout": "Condensed summary"}
+            with patch("auto_slopp.workers.github_task_source.comment_on_issue"):
+                with patch("auto_slopp.workers.github_task_source.delete_issue_comment"):
+                    result = task_source._condense_comments(Path("/tmp"), 3, "author")
+                    assert result == ["Condensed summary"]
 
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")

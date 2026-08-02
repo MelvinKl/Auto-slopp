@@ -200,7 +200,7 @@ class TestGitHubTaskSource:
         assert task.id == 1
         assert task.title == "Test Issue"
         assert task.body == "Test Body"
-        assert task.comments == []
+        assert task.comments == ["No comments provided."]
         assert task.raw is not None
         assert task.raw.get("_repo_path") == Path("/test")
 
@@ -266,7 +266,7 @@ class TestGitHubTaskSource:
         assert len(tasks) == 1
         task = tasks[0]
         assert len(task.comments) == 1
-        assert task.comments[0] == "Single comment"
+        assert task.comments[0] == "Only one comment present; no additional comments to condense."
 
     @patch("auto_slopp.workers.github_task_source.get_open_issues")
     @patch("auto_slopp.workers.github_task_source.get_issue_comments")
