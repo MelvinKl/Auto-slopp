@@ -269,8 +269,8 @@ class GitHubTaskSource(TaskSource):
     def on_skip(self, task: Task) -> None:
         """Called when a task should be skipped (e.g., when LLM is unavailable).
 
-        Comments on the issue explaining the skip and removes the required label
-        so the issue can be retried later when conditions improve.
+        Comments on the issue explaining the skip. The required label is NOT
+        removed so the task can be retried when the LLM becomes available.
 
         Args:
             task: The task that should be skipped
@@ -286,16 +286,7 @@ class GitHubTaskSource(TaskSource):
             "The task will be retried when the LLM becomes available."
         )
         comment_on_issue(repo_path, task.id, skip_comment)
-
-        label_removed = remove_label_from_issue(
-            repo_path,
-            task.id,
-            settings.github_issue_worker_required_label,
-        )
-        if label_removed:
-            logger.info(f"Removed required label '{settings.github_issue_worker_required_label}' from issue #{task.id}")
-        else:
-            logger.warning(f"Failed to remove required label from issue #{task.id}")
+        logger.info(f"Skipped issue #{task.id} - LLM unavailable, label preserved for retry")
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.
