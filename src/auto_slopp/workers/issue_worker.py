@@ -221,6 +221,34 @@ class IssueWorker(Worker):
 
         return error_indicates_unavailable or all_clis_inactive
 
+    def _is_permanent_error(self, error_msg: str) -> bool:
+        """Check if the error indicates a permanent configuration/setup issue.
+
+        These errors require human intervention and should not be retried automatically.
+
+        Args:
+            error_msg: The error message to check
+
+        Returns:
+            True if the error indicates a permanent issue, False otherwise
+        """
+        error_lower = error_msg.lower()
+        permanent_indicators = (
+            "no cli configuration" in error_lower
+            or "no active cli" in error_lower
+            or "permission denied" in error_lower
+            or "authentication failed" in error_lower
+            or "unauthorized" in error_lower
+            or "access denied" in error_lower
+            or "forbidden" in error_lower
+            or "invalid token" in error_lower
+            or "token expired" in error_lower
+            or "not configured" in error_lower
+            or "configuration error" in error_lower
+            or "missing configuration" in error_lower
+        )
+        return permanent_indicators
+
     def _process_single_task(self, repo_dir: Path, task: Task) -> Dict[str, Any]:
         """Process a single task using Ralph loop.
 
@@ -302,6 +330,9 @@ class IssueWorker(Worker):
                             ralph_result.get("total_steps", 0),
                             ralph_result.get("error", "Unknown error"),
                         )
+                    elif self._is_permanent_error(ralph_error):
+                        self.logger.error(f"Permanent error detected for task #{task_id}: {ralph_error}")
+                        self.task_source.on_task_failure(task, ralph_error)
                     elif self._is_llm_unavailable(ralph_error):
                         self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
                         self.task_source.on_skip(task)
