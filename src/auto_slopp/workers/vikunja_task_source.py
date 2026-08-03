@@ -205,6 +205,11 @@ class VikunjaTaskSource(TaskSource):
             task: The failed task
             error: Error description
         """
+        repo_path = task.raw.get("_repo_path")
+        if repo_path is None:
+            logger.warning(f"No repo_path found in task #{task.id}, skipping failure handling")
+            return
+
         failure_comment = (
             f"⚠️ **Task Failed: Unexpected Error**\n\n"
             f"An unexpected error occurred while processing the task.\n\n"
@@ -214,13 +219,13 @@ class VikunjaTaskSource(TaskSource):
         )
         comment_success = comment_on_task(task.id, failure_comment)
         if comment_success:
-            commit(task.raw.get("_repo_path"), f"Added comment to task {task.id}")
+            commit(repo_path, f"Added comment to task {task.id}")
         else:
             logger.warning(f"Failed to add failure comment to task {task.id}")
 
         status_success = update_task_status(task.id, "failed")
         if status_success:
-            commit(task.raw.get("_repo_path"), "Updated task status to 'failed'")
+            commit(repo_path, "Updated task status to 'failed'")
         else:
             logger.warning(f"Failed to update status to 'failed' for task {task.id}")
 
@@ -253,12 +258,17 @@ class VikunjaTaskSource(TaskSource):
     def on_skip(self, task: Task) -> None:
         """Called when a task should be skipped (e.g., when LLM is unavailable).
 
-        Comments on the task explaining the skip and keeps the task in its
-        current state so it can be retried later.
+        Comments on the task explaining the skip. The required tag is NOT
+        removed so the task can be retried when the LLM becomes available.
 
         Args:
             task: The task that should be skipped
         """
+        repo_path = task.raw.get("_repo_path")
+        if repo_path is None:
+            logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
+            return
+
         skip_comment = (
             f"⏭️ **Task Skipped: LLM Unavailable**\n\n"
             f"This task has been skipped for this iteration because the LLM is currently unavailable. "
@@ -266,10 +276,10 @@ class VikunjaTaskSource(TaskSource):
             f"**Task:** {task.title}"
         )
         comment_success = comment_on_task(task.id, skip_comment)
-        if comment_success:
-            commit(task.raw.get("_repo_path"), f"Added skip comment to task {task.id}")
-        else:
+        if not comment_success:
             logger.warning(f"Failed to add skip comment to task {task.id}")
+        else:
+            logger.info(f"Skipped task #{task.id} - LLM unavailable, tag preserved for retry")
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.
