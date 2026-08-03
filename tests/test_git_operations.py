@@ -532,6 +532,39 @@ class TestCreateAndCheckoutBranch:
         assert mock_subprocess_run.call_count == 3
 
     @patch("auto_slopp.utils.git_operations.subprocess.run")
+    def test_checkout_failure_no_uncommitted_changes(self, mock_subprocess_run):
+        """Test checkout failure path when there are no uncommitted changes.
+
+        When the first checkout fails but there are no uncommitted changes,
+        stash_changes should return True immediately (no git stash push),
+        and the retry checkout should proceed.
+        """
+        repo_dir = Path("/tmp/test_repo")
+        branch = "feature/test"
+
+        # Mock git commands: first checkout fails, no changes to stash, retry succeeds
+        mock_subprocess_run.side_effect = [
+            Mock(returncode=0, stderr=""),  # git fetch
+            Mock(returncode=1, stderr="checkout failed"),  # git checkout (fails)
+            Mock(returncode=0, stderr="", stdout=""),  # git status --porcelain (no changes, has_changes returns False)
+            Mock(returncode=0, stderr=""),  # git checkout (retry succeeds)
+            Mock(returncode=1, stderr="no stash entries"),  # git stash pop (nothing to pop, but OK)
+            Mock(returncode=0, stderr=""),  # git pull
+        ]
+
+        result = checkout_branch_resilient(repo_dir, branch)
+
+        assert result is True
+        # Verify git stash push was NOT called (no uncommitted changes)
+        stash_push_calls = [
+            call
+            for call in mock_subprocess_run.call_args_list
+            if call[0] and call[0][0] == ["git"] and "stash" in call[0] and "push" in call[0]
+        ]
+        assert len(stash_push_calls) == 0, "git stash push should not be called when there are no changes"
+        assert mock_subprocess_run.call_count == 6
+
+    @patch("auto_slopp.utils.git_operations.subprocess.run")
     def test_checkout_with_stash_pop_failure(self, mock_subprocess_run):
         """Test checkout success even when git stash pop fails."""
         repo_dir = Path("/tmp/test_repo")
