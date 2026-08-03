@@ -439,3 +439,49 @@ class TestVikunjaTaskSource:
             assert identifier.startswith(
                 expected_prefix
             ), f"Identifier {identifier} doesn't start with prefix {expected_prefix}"
+
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    @patch("auto_slopp.workers.vikunja_task_source.settings")
+    def test_on_skip_adds_comment_and_preserves_tag(self, mock_settings, mock_comment):
+        """Test that on_skip adds a comment but does NOT remove the required tag."""
+        mock_settings.github_issue_worker_required_label = "test-tag"
+        mock_comment.return_value = True
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test Task", body="", comments=[], raw={"_repo_path": Path("/test")})
+
+        task_source.on_skip(task)
+
+        mock_comment.assert_called_once()
+        comment_args = mock_comment.call_args[0]
+        assert comment_args[0] == 42
+        assert "Skipped: LLM Unavailable" in comment_args[1]
+        assert "test-tag" not in comment_args[1].lower()  # Tag should not be mentioned as removed
+
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    @patch("auto_slopp.workers.vikunja_task_source.settings")
+    def test_on_skip_handles_missing_repo_path(self, mock_settings, mock_comment):
+        """Test that on_skip handles missing repo_path gracefully."""
+        mock_settings.github_issue_worker_required_label = "test-tag"
+        mock_comment.return_value = True
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test Task", body="", comments=[], raw={})
+
+        # Should not raise an exception
+        task_source.on_skip(task)
+
+        mock_comment.assert_not_called()
+
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.settings")
+    def test_on_skip_does_not_call_commit(self, mock_settings, mock_commit, mock_comment):
+        """Test that on_skip does not call commit for remote API operations."""
+        mock_settings.github_issue_worker_required_label = "test-tag"
+        mock_comment.return_value = True
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test Task", body="", comments=[], raw={"_repo_path": Path("/test")})
+
+        task_source.on_skip(task)
+
+        mock_comment.assert_called_once()
+        mock_commit.assert_not_called()

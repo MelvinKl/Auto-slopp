@@ -1179,8 +1179,11 @@ class TestIssueWorker:
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
+        assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is False
+        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["skipped"] is True
+        assert "skip_reason" in result["task_results"][0]
         assert task_source.on_skip_called is True
         assert task_source.on_task_failure_called is False
 
@@ -1203,8 +1206,11 @@ class TestIssueWorker:
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
+        assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is False
+        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["skipped"] is True
+        assert "skip_reason" in result["task_results"][0]
         assert task_source.on_skip_called is True
         assert task_source.on_task_failure_called is False
 
@@ -1230,6 +1236,7 @@ class TestIssueWorker:
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
+        assert result["tasks_skipped"] == 0
         assert len(result["task_results"]) == 1
         assert result["task_results"][0]["success"] is False
         assert task_source.on_task_failure_called is True
@@ -1323,6 +1330,28 @@ class TestIssueWorker:
             _cli_states.clear()
             _cli_states.update(original_cli_states)
 
+    def test_is_permanent_error(self):
+        """Test that _is_permanent_error correctly detects permanent configuration issues."""
+        task_source = MockTaskSource()
+        worker = IssueWorker(task_source=task_source)
+        # Permanent errors should return True
+        assert worker._is_permanent_error("No CLI configuration found") is True
+        assert worker._is_permanent_error("permission denied") is True
+        assert worker._is_permanent_error("Authentication failed") is True
+        assert worker._is_permanent_error("Unauthorized access") is True
+        assert worker._is_permanent_error("Access denied") is True
+        assert worker._is_permanent_error("Forbidden") is True
+        assert worker._is_permanent_error("Invalid token") is True
+        assert worker._is_permanent_error("Token expired") is True
+        assert worker._is_permanent_error("Not configured") is True
+        assert worker._is_permanent_error("Configuration error") is True
+        assert worker._is_permanent_error("Missing configuration") is True
+        # Transient errors should return False
+        assert worker._is_permanent_error("LLM timed out") is False
+        assert worker._is_permanent_error("Connection refused") is False
+        assert worker._is_permanent_error("Rate limit exceeded") is False
+        assert worker._is_permanent_error("") is False
+
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
@@ -1355,8 +1384,11 @@ class TestIssueWorker:
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
+        assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is False
+        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["skipped"] is True
+        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no changes made"
         assert task_source.on_skip_called is True
         assert task_source.on_no_changes_called is False
 
@@ -1402,8 +1434,11 @@ class TestIssueWorker:
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
+        assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is False
+        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["skipped"] is True
+        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no changes made"
         assert task_source.on_skip_called is True
         assert task_source.on_no_changes_called is False
 

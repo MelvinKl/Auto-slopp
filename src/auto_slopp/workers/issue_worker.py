@@ -126,7 +126,10 @@ class IssueWorker(Worker):
             task_result = self._process_single_task(repo_path, task)
             results["task_results"].append(task_result)
 
-            if task_result["success"]:
+            if task_result.get("skipped"):
+                results["tasks_skipped"] += 1
+                self.logger.info(f"Task #{task.id} skipped: {task_result.get('skip_reason', 'Unknown')}")
+            elif task_result["success"]:
                 results["tasks_processed"] += 1
                 results["openagent_executions"] += task_result.get("openagent_executions", 0)
                 results["prs_created"] += task_result.get("prs_created", 0)
@@ -150,6 +153,7 @@ class IssueWorker(Worker):
             "repositories_processed": 1,
             "repositories_with_errors": 0,
             "tasks_processed": 0,
+            "tasks_skipped": 0,
             "openagent_executions": 0,
             "prs_created": 0,
             "tasks_completed": 0,
@@ -330,12 +334,16 @@ class IssueWorker(Worker):
                             ralph_result.get("total_steps", 0),
                             ralph_result.get("error", "Unknown error"),
                         )
-                    elif self._is_permanent_error(ralph_error):
-                        self.logger.error(f"Permanent error detected for task #{task_id}: {ralph_error}")
-                        self.task_source.on_task_failure(task, ralph_error)
                     elif self._is_llm_unavailable(ralph_error):
                         self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
                         self.task_source.on_skip(task)
+                        result["success"] = True
+                        result["skipped"] = True
+                        result["skip_reason"] = ralph_error
+                        return result
+                    elif self._is_permanent_error(ralph_error):
+                        self.logger.error(f"Permanent error detected for task #{task_id}: {ralph_error}")
+                        self.task_source.on_task_failure(task, ralph_error)
                     else:
                         self.task_source.on_task_failure(task, ralph_error)
 
@@ -370,6 +378,13 @@ class IssueWorker(Worker):
                     if self._is_llm_unavailable(error_msg):
                         self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
                         self.task_source.on_skip(task)
+                        result["success"] = True
+                        result["skipped"] = True
+                        result["skip_reason"] = error_msg
+                        return result
+                    elif self._is_permanent_error(error_msg):
+                        self.logger.error(f"Permanent error detected for task #{task_id}: {error_msg}")
+                        self.task_source.on_task_failure(task, error_msg)
                     else:
                         self.task_source.on_task_failure(task, error_msg)
                     return result
@@ -379,7 +394,9 @@ class IssueWorker(Worker):
                 if self._is_llm_unavailable(""):
                     self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
                     self.task_source.on_skip(task)
-                    result["success"] = False
+                    result["success"] = True
+                    result["skipped"] = True
+                    result["skip_reason"] = "LLM unavailable - no changes made"
                     return result
 
                 self.logger.info(f"No changes made for task #{task_id}, closing task")
@@ -401,7 +418,9 @@ class IssueWorker(Worker):
                 if self._is_llm_unavailable(""):
                     self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
                     self.task_source.on_skip(task)
-                    result["success"] = False
+                    result["success"] = True
+                    result["skipped"] = True
+                    result["skip_reason"] = "LLM unavailable - no changes made"
                     return result
 
                 self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue")
@@ -813,6 +832,7 @@ Plan:
         self.logger.info(
             f"IssueWorker completed. Processed: "
             f"{results['tasks_processed']}, "
+            f"Skipped: {results['tasks_skipped']}, "
             f"{cli_tool} executions: {results['openagent_executions']}, "
             f"PRs created: {results['prs_created']}, "
             f"Tasks completed: {results['tasks_completed']}, "
