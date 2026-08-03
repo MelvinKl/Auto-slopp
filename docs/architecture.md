@@ -135,6 +135,10 @@ class TaskSource(ABC):
         """Called when no changes were needed for a task."""
 
     @abstractmethod
+    def on_skip(self, task: Task, reason: str) -> None:
+        """Called when a task is skipped (e.g., LLM unavailable) and should be retried later."""
+
+    @abstractmethod
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing."""
 ```
@@ -261,6 +265,16 @@ class IssueWorker(Worker):
 - Single implementation for all task processing logic
 - Task sources only need to implement TaskSource interface
 - Ralph loop logic is shared across GitHub and Vikunja workers
+
+#### LLM Unavailability Handling
+
+When the Ralph loop hits the maximum iteration limit (`max_loops_reached`), the worker distinguishes between two scenarios:
+
+1. **Genuine iteration exhaustion**: The task genuinely requires more iterations than allowed. The task is marked as failed permanently via `on_max_iterations_reached`, and the issue/task is closed with a failure comment.
+
+2. **LLM unavailability during execution**: The LLM/CLI tool became unavailable mid-loop (detected via `RalphExecutor._is_llm_unavailable()` which checks for patterns like "timed out", "rate limit", "connection refused", "service unavailable", "503", etc.). The task is **skipped** via `on_skip` instead of failed, preserving it for automatic retry when the LLM becomes available again. The required label is removed (GitHub) or task status is set to "skipped" (Vikunja) so it can be picked up on the next cycle.
+
+This fix addresses the issue where LLM outages during Ralph execution would previously cause `max_loops_reached` errors, permanently dropping issues instead of skipping them for retry.
 
 ### 5. Thin Worker Wrappers
 

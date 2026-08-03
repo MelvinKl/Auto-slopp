@@ -750,8 +750,8 @@ from auto_slopp.workers import PRWorker
 # Disable in AUTO_SLOPP_WORKERS_DISABLED
 # Returns: PR status, merge results, branch information
 ```
-
 ### IssueWorker
+
 A unified worker class that processes tasks/issues using the Ralph execution logic. It accepts a TaskSource (base class) that abstracts the task loading mechanism, allowing it to work with different task sources (GitHub issues, Vikunja tasks, etc.).
 
 The Ralph executor implements a structured 5-step process for handling issues:
@@ -774,6 +774,16 @@ vikunja_worker = IssueWorker(task_source=VikunjaTaskSource())
 ```
 
 The task execution creates a markdown-based plan file in `.ralph/` with checkboxes for each step. Steps are executed sequentially. Completed steps are committed automatically. A final acceptance check validates all steps at once after completion. The final step always verifies that `make test` passes.
+
+#### LLM Unavailability Handling
+
+When the Ralph loop hits the maximum iteration limit, the worker now distinguishes between two scenarios:
+
+- **Genuine iteration exhaustion**: The task genuinely requires more iterations than allowed. The task is marked as failed permanently via `on_max_iterations_reached`, and the issue/task is closed with a failure comment.
+
+- **LLM unavailability during execution**: The LLM/CLI tool became unavailable mid-loop (timeouts, connection errors, rate limits, service unavailable). The task is **skipped** via `on_skip` instead of failed, preserving it for automatic retry when the LLM becomes available again. The required label is removed (GitHub) or task status is set to "skipped" (Vikunja) so it can be picked up on the next cycle.
+
+This behavior is detected by the `RalphExecutor._is_llm_unavailable()` method which checks the last error for patterns like "timed out", "rate limit", "connection refused", "service unavailable", "503", etc.
 
 ### GitHubIssueWorker
 Convenience wrapper around IssueWorker configured with GitHubTaskSource. Handles GitHub issue operations.
