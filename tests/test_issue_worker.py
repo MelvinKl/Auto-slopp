@@ -396,6 +396,77 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
+    def test_ralph_executor_llm_unavailable_calls_on_skip(self, mock_settings, mock_create_branch, mock_checkout):
+        """Test that on_skip is called when Ralph executor fails due to LLM unavailability."""
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        # Mock the RalphExecutor.execute to simulate LLM unavailability
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": False,
+            "loops_executed": 1,
+            "steps_completed": 0,
+            "total_steps": 3,
+            "max_loops_reached": False,
+            "error": "No active CLI configuration available",
+        }
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert result["tasks_processed"] == 0
+        assert len(result["task_results"]) == 1
+        assert result["task_results"][0]["success"] is False
+        assert result["task_results"][0].get("skipped") is True
+        assert task_source.on_skip_called is True
+        assert "No active CLI configuration available" in task_source.skip_reason
+        assert task_source.on_max_iterations_called is False
+        assert task_source.on_task_failure_called is False
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    def test_direct_execution_llm_unavailable_calls_on_skip(
+        self,
+        mock_cli,
+        mock_execute,
+        mock_settings,
+        mock_current_branch,
+        mock_has_changes,
+        mock_create_branch,
+        mock_checkout,
+    ):
+        """Test that on_skip is called when direct CLI execution fails due to LLM unavailability."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_execute.return_value = {
+            "success": False,
+            "error": "All CLI configurations exhausted",
+        }
+        mock_has_changes.return_value = False
+        mock_current_branch.return_value = "ai/task-1"
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert result["tasks_processed"] == 0
+        assert len(result["task_results"]) == 1
+        assert result["task_results"][0]["success"] is False
+        assert result["task_results"][0].get("skipped") is True
+        assert task_source.on_skip_called is True
+        assert "All CLI configurations exhausted" in task_source.skip_reason
+        assert task_source.on_task_failure_called is False
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
     def test_branch_creation_failure(self, mock_settings, mock_create_branch, mock_checkout):
         """Test that run handles branch creation failure and calls on_task_failure."""
         mock_settings.ralph_enabled = False
