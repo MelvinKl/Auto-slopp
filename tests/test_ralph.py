@@ -1451,3 +1451,92 @@ class TestRalphExecutor:
         """Test _is_llm_unavailable detects service unavailable errors."""
         ralph_executor._last_error = "Service unavailable: API endpoint not responding"
         assert ralph_executor._is_llm_unavailable() is True
+
+    def test_is_llm_unavailable_prefers_last_iteration_error(self, ralph_executor):
+        """Test _is_llm_unavailable prefers _last_iteration_error over _last_error."""
+        # Set a stale non-LLM error from earlier in the run
+        ralph_executor._last_error = "Step implementation failed: syntax error"
+        # Set the current iteration error that indicates LLM unavailability
+        ralph_executor._last_iteration_error = "timed out waiting for response"
+        assert ralph_executor._is_llm_unavailable() is True
+
+    def test_is_llm_unavailable_last_iteration_error_fallback(self, ralph_executor):
+        """Test _is_llm_unavailable falls back to _last_error when _last_iteration_error is None."""
+        ralph_executor._last_iteration_error = None
+        ralph_executor._last_error = "timed out after 7200 seconds"
+        assert ralph_executor._is_llm_unavailable() is True
+
+    def test_is_llm_unavailable_last_iteration_error_clears_on_success(self, ralph_executor):
+        """Test that _last_iteration_error is cleared after a successful iteration."""
+        ralph_executor._last_iteration_error = "timed out waiting for response"
+        assert ralph_executor._is_llm_unavailable() is True
+
+        # Simulate a successful iteration clearing the error
+        ralph_executor._last_iteration_error = None
+        assert ralph_executor._is_llm_unavailable() is False
+
+    def test_run_refined_task_loop_sets_last_iteration_error_on_failure(self, ralph_executor):
+        """Test that _last_iteration_error is set during the loop on step failure."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. Step that will fail\n")
+
+            ralph_executor.max_iterations = 2
+            call_count = [0]
+
+            def failing_execute_fn(*args, **kwargs):
+                call_count[0] += 1
+                return {"success": False, "error": "timed out waiting for response"}
+
+            ralph_executor.execute_fn = failing_execute_fn
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is False
+            assert result["max_loops_reached"] is True
+            # Verify _last_iteration_error was set during the loop
+            assert ralph_executor._last_iteration_error is not None
+            assert "timed out" in ralph_executor._last_iteration_error
+
+    def test_run_refined_task_loop_last_iteration_error_cleared_on_success(self, ralph_executor):
+        """Test that _last_iteration_error is cleared after a successful iteration."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Second step that fails\n")
+
+            ralph_executor.max_iterations = 5
+            call_count = [0]
+
+            def success_then_fail(*args, **kwargs):
+                call_count[0] += 1
+                if call_count[0] == 1:
+                    return {"success": True, "stdout": "Done"}
+                return {"success": False, "error": "timed out waiting for response"}
+
+            ralph_executor.execute_fn = success_then_fail
+            ralph_executor.has_changes_fn = lambda path: True
+            ralph_executor.commit_fn = lambda path, msg, push: (True, None)
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is False
+            # After the first successful iteration, _last_iteration_error should be None
+            # (it was cleared), then set again on the second failure
+            assert ralph_executor._last_iteration_error is not None
+            assert "timed out" in ralph_executor._last_iteration_error

@@ -394,6 +394,84 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
+    def test_ralph_max_iterations_llm_unavailable_calls_on_skip(self, mock_settings, mock_create_branch, mock_checkout):
+        """Test that on_skip is called (not on_max_iterations_reached) when LLM is unavailable during Ralph loop.
+
+        This is the core integration test for the fix: when Ralph reaches max iterations
+        due to LLM unavailability (e.g., timeout), the task should be skipped for retry
+        rather than permanently dropped.
+        """
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+
+        # Mock RalphExecutor.execute to return max_loops_reached
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": False,
+            "loops_executed": 10,
+            "steps_completed": 8,
+            "total_steps": 15,
+            "max_loops_reached": True,
+            "error": "Maximum iterations (10) reached before all steps completed",
+        }
+        # Simulate that the LLM timed out during the loop (the key scenario the fix addresses)
+        worker.ralph_executor._last_iteration_error = "timed out waiting for response"
+
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert result["tasks_processed"] == 0
+        assert len(result["task_results"]) == 1
+        assert result["task_results"][0]["success"] is False
+        # on_skip should be called, NOT on_max_iterations_reached
+        assert task_source.on_skip_called is True
+        assert task_source.on_max_iterations_called is False
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_ralph_max_iterations_genuine_exhaustion_calls_on_max_iterations(
+        self, mock_settings, mock_create_branch, mock_checkout
+    ):
+        """Test that on_max_iterations_reached is still called for genuine iteration exhaustion.
+
+        When the LLM is available but the task simply can't be completed within the
+        iteration budget, the task should be dropped via on_max_iterations_reached.
+        """
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+
+        # Mock RalphExecutor.execute to return max_loops_reached
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": False,
+            "loops_executed": 10,
+            "steps_completed": 8,
+            "total_steps": 15,
+            "max_loops_reached": True,
+            "error": "Maximum iterations (10) reached before all steps completed",
+        }
+        # No LLM unavailability – genuine iteration exhaustion
+        worker.ralph_executor._last_iteration_error = None
+        worker.ralph_executor._last_error = "Step implementation failed: syntax error in code"
+
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert result["tasks_processed"] == 0
+        assert len(result["task_results"]) == 1
+        assert result["task_results"][0]["success"] is False
+        # on_max_iterations_reached should be called, NOT on_skip
+        assert task_source.on_max_iterations_called is True
+        assert task_source.on_skip_called is False
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
     def test_branch_creation_failure(self, mock_settings, mock_create_branch, mock_checkout):
         """Test that run handles branch creation failure and calls on_task_failure."""
         mock_settings.ralph_enabled = False
