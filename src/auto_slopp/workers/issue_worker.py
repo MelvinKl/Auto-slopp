@@ -181,6 +181,8 @@ class IssueWorker(Worker):
     def _is_llm_unavailable(self, error_msg: str) -> bool:
         """Check if the error indicates LLM unavailability.
 
+        Uses specific patterns to avoid false positives from unrelated errors.
+
         Args:
             error_msg: The error message to check
 
@@ -190,9 +192,17 @@ class IssueWorker(Worker):
         error_lower = error_msg.lower()
         error_indicates_unavailable = (
             "timed out" in error_lower
-            or "no cli configuration" in error_lower
-            or "llm" in error_lower
-            or "unavailable" in error_lower
+            or "connection refused" in error_lower
+            or "connection reset" in error_lower
+            or "rate limit" in error_lower
+            or "too many requests" in error_lower
+            or "service unavailable" in error_lower
+            or "gateway timeout" in error_lower
+            or "llm unavailable" in error_lower
+            or "503" in error_lower
+            or "502" in error_lower
+            or "504" in error_lower
+            or "internal server error" in error_lower
         )
         # Also check if all CLI configurations are inactive (in cooldown) and cooldown hasn't expired
         all_clis_inactive = False

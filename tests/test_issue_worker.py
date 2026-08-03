@@ -1236,15 +1236,31 @@ class TestIssueWorker:
         assert task_source.on_skip_called is False
 
     def test_is_llm_unavailable(self):
-        """Test that _is_llm_unavailable correctly detects LLM unavailability."""
+        """Test that _is_llm_unavailable correctly detects LLM unavailability with specific patterns."""
         task_source = MockTaskSource()
         worker = IssueWorker(task_source=task_source)
+        # Timeout patterns
         assert worker._is_llm_unavailable("LLM timed out waiting for response") is True
-        assert worker._is_llm_unavailable("LLM is unavailable") is True
-        assert worker._is_llm_unavailable("no cli configuration found") is True
+        assert worker._is_llm_unavailable("Request timed out") is True
+        # Connection errors
+        assert worker._is_llm_unavailable("Connection refused") is True
+        assert worker._is_llm_unavailable("Connection reset by peer") is True
+        # Rate limiting
+        assert worker._is_llm_unavailable("Rate limit exceeded") is True
+        assert worker._is_llm_unavailable("Too many requests") is True
+        # HTTP 5xx errors
         assert worker._is_llm_unavailable("Service unavailable") is True
+        assert worker._is_llm_unavailable("Gateway timeout") is True
+        assert worker._is_llm_unavailable("HTTP 503 Service Unavailable") is True
+        assert worker._is_llm_unavailable("HTTP 502 Bad Gateway") is True
+        assert worker._is_llm_unavailable("HTTP 504 Gateway Timeout") is True
+        assert worker._is_llm_unavailable("Internal server error") is True
+        assert worker._is_llm_unavailable("LLM unavailable") is True
+        # Non-LLM errors should return False
         assert worker._is_llm_unavailable("Git push failed") is False
         assert worker._is_llm_unavailable("Permission denied") is False
+        assert worker._is_llm_unavailable("no cli configuration found") is False
+        assert worker._is_llm_unavailable("LLM is unavailable") is False  # Too broad, not a specific pattern
         assert worker._is_llm_unavailable("") is False
 
     @patch("auto_slopp.workers.issue_worker.settings")
