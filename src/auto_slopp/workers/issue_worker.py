@@ -250,13 +250,26 @@ class IssueWorker(Worker):
                     result["error"] = f"Ralph loop failed: {ralph_result.get('error', 'Unknown error')}"
 
                     if ralph_result.get("max_loops_reached", False):
-                        self.logger.warning(f"Ralph loop reached max iterations for task #{task_id}")
-                        self.task_source.on_max_iterations_reached(
-                            task,
-                            ralph_result.get("steps_completed", 0),
-                            ralph_result.get("total_steps", 0),
-                            ralph_result.get("error", "Unknown error"),
-                        )
+                        # Distinguish between genuine iteration exhaustion and
+                        # LLM unavailability during the loop. The latter should
+                        # trigger a skip (retry later), not a permanent failure.
+                        if self.ralph_executor._is_llm_unavailable():
+                            self.logger.warning(
+                                f"Ralph loop hit max iterations but LLM was unavailable "
+                                f"during execution – skipping task #{task_id} for retry"
+                            )
+                            self.task_source.on_skip(
+                                task,
+                                ralph_result.get("error", "LLM unavailable during Ralph loop"),
+                            )
+                        else:
+                            self.logger.warning(f"Ralph loop reached max iterations for task #{task_id}")
+                            self.task_source.on_max_iterations_reached(
+                                task,
+                                ralph_result.get("steps_completed", 0),
+                                ralph_result.get("total_steps", 0),
+                                ralph_result.get("error", "Unknown error"),
+                            )
 
                     return result
 
