@@ -256,19 +256,28 @@ def has_changes(repo_dir: Path) -> bool:
     return bool(result.stdout.strip())
 
 
-def stash_changes(repo_dir: Path) -> bool:
+def stash_changes(repo_dir: Path) -> str | None:
     """Stash uncommitted changes in the repository.
 
     Args:
         repo_dir: Path to the git repository
 
     Returns:
-        True if stashing was successful or there were no changes to stash,
-        False if stashing failed.
+        Stash reference (e.g., 'stash@{0}') if stashing was successful,
+        None if there were no changes to stash or if stashing failed.
     """
     if not has_changes(repo_dir):
         logger.debug(f"No uncommitted changes to stash in {repo_dir.name}")
-        return True
+        return None
+
+    # Get current branch name for the stash message
+    branch_result = _run_git_command(repo_dir, "rev-parse", "--abbrev-ref", "HEAD", check=False)
+    current_branch = branch_result.stdout.strip() if branch_result.returncode == 0 else "unknown"
+
+    # Get timestamp for the stash message
+    from datetime import datetime
+
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
     logger.info(f"Stashing uncommitted changes in {repo_dir.name}")
     stash_result = _run_git_command(
@@ -276,17 +285,25 @@ def stash_changes(repo_dir: Path) -> bool:
         "stash",
         "push",
         "-m",
-        "auto-slopp: stash before checkout",
+        f"auto-slopp: stash before checkout on {current_branch} at {timestamp}",
         check=False,
     )
 
     if stash_result.returncode == 0:
+        # Get the stash reference
+        stash_list_result = _run_git_command(repo_dir, "stash", "list", "--oneline", check=False)
+        if stash_list_result.returncode == 0 and stash_list_result.stdout.strip():
+            # The first entry is the most recent stash (stash@{0})
+            first_line = stash_list_result.stdout.strip().split("\n")[0]
+            stash_ref = "stash@{0}"
+            logger.info(f"Successfully stashed changes in {repo_dir.name}: {stash_ref}")
+            return stash_ref
         logger.info(f"Successfully stashed changes in {repo_dir.name}")
-        return True
+        return "stash@{0}"
 
     stash_error = stash_result.stderr.strip() or stash_result.stdout.strip()
     logger.warning(f"Failed to stash changes in {repo_dir.name}: {stash_error}")
-    return False
+    return None
 
 
 def restore_stashed_changes(repo_dir: Path) -> bool:
@@ -364,11 +381,16 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
         logger.warning(f"Initial checkout failed for '{branch}' in {repo_dir.name}: {checkout_error}")
         logger.info(f"Attempting git stash and retry for '{branch}' in {repo_dir.name}")
 
-        if not stash_changes(repo_dir):
-            error_msg = "Failed to stash changes before retrying checkout"
-            logger.error(f"Stash failed in {repo_dir.name}: {error_msg}")
-            _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
-            return False
+        # Only attempt stash if there are uncommitted changes
+        if has_changes(repo_dir):
+            stash_ref = stash_changes(repo_dir)
+            if stash_ref is None:
+                error_msg = "Failed to stash changes before retrying checkout"
+                logger.error(f"Stash failed in {repo_dir.name}: {error_msg}")
+                _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
+                return False
+        else:
+            logger.debug(f"No uncommitted changes to stash in {repo_dir.name}")
 
         retry_checkout_result = _run_git_command(repo_dir, "checkout", branch, check=False, timeout=timeout)
 

@@ -253,7 +253,8 @@ class TestStashChanges:
 
             result = stash_changes(repo_path)
 
-            assert result is True
+            assert result is not None
+            assert "stash@{0}" in result
             # After stash, working directory should be clean
             status = subprocess.run(
                 ["git", "status", "--porcelain"],
@@ -280,7 +281,7 @@ class TestStashChanges:
 
             result = stash_changes(repo_path)
 
-            assert result is True
+            assert result is None
 
     def test_restore_stashed_changes(self):
         """Test restoring stashed changes."""
@@ -445,19 +446,32 @@ class TestCreateAndCheckoutBranch:
         }
 
         # Mock git commands: both checkout attempts fail
+        # stash_changes now calls: rev-parse HEAD, stash push, stash list --oneline
+        def make_mock(returncode=0, stderr="", stdout=""):
+            m = Mock()
+            m.returncode = returncode
+            m.stderr = stderr
+            m.stdout = stdout
+            return m
+
         mock_subprocess_run.side_effect = [
-            Mock(returncode=0, stderr=""),  # git fetch
-            Mock(returncode=1, stderr="checkout failed"),  # git checkout (fails)
-            Mock(returncode=0, stderr="changes"),  # git status --porcelain (has_changes returns True)
-            Mock(returncode=0, stderr=""),  # git stash push
-            Mock(returncode=1, stderr="checkout still failed"),  # git checkout (fails again)
-            Mock(returncode=0, stderr=""),  # git stash pop (restore on failure)
+            make_mock(returncode=0),  # git fetch
+            make_mock(returncode=1, stderr="checkout failed"),  # git checkout (fails)
+            make_mock(
+                returncode=0, stdout="M file.py"
+            ),  # git status --porcelain (has_changes in checkout_branch_resilient)
+            make_mock(returncode=0, stdout="M file.py"),  # git status --porcelain (has_changes in stash_changes)
+            make_mock(returncode=0, stdout="feature/test"),  # git rev-parse --abbrev-ref HEAD
+            make_mock(returncode=0),  # git stash push
+            make_mock(returncode=0, stdout="stash@{0}: ..."),  # git stash list --oneline
+            make_mock(returncode=1, stderr="checkout still failed"),  # git checkout (fails again)
+            make_mock(returncode=0),  # git stash pop (restore on failure)
         ]
 
         result = checkout_branch_resilient(repo_dir, branch)
 
         assert result is False
-        assert mock_subprocess_run.call_count == 6
+        assert mock_subprocess_run.call_count == 9
 
     @patch("auto_slopp.utils.git_operations.subprocess.run")
     @patch("auto_slopp.utils.git_operations.run_cli_executor")
@@ -473,17 +487,29 @@ class TestCreateAndCheckoutBranch:
         }
 
         # Mock git commands: checkout fails, stash also fails
+        # stash_changes now calls: rev-parse HEAD, stash push (fails)
+        def make_mock(returncode=0, stderr="", stdout=""):
+            m = Mock()
+            m.returncode = returncode
+            m.stderr = stderr
+            m.stdout = stdout
+            return m
+
         mock_subprocess_run.side_effect = [
-            Mock(returncode=0, stderr=""),  # git fetch
-            Mock(returncode=1, stderr="checkout failed"),  # git checkout (fails)
-            Mock(returncode=0, stderr="changes"),  # git status --porcelain (has_changes returns True)
-            Mock(returncode=1, stderr="stash failed"),  # git stash push (fails)
+            make_mock(returncode=0),  # git fetch
+            make_mock(returncode=1, stderr="checkout failed"),  # git checkout (fails)
+            make_mock(
+                returncode=0, stdout="M file.py"
+            ),  # git status --porcelain (has_changes in checkout_branch_resilient)
+            make_mock(returncode=0, stdout="M file.py"),  # git status --porcelain (has_changes in stash_changes)
+            make_mock(returncode=0, stdout="feature/test"),  # git rev-parse --abbrev-ref HEAD
+            make_mock(returncode=1, stderr="stash failed"),  # git stash push (fails)
         ]
 
         result = checkout_branch_resilient(repo_dir, branch)
 
         assert result is False
-        assert mock_subprocess_run.call_count == 4
+        assert mock_subprocess_run.call_count == 6
 
     @patch("auto_slopp.utils.git_operations.subprocess.run")
     def test_checkout_timeout(self, mock_subprocess_run):
@@ -538,13 +564,14 @@ class TestCreateAndCheckoutBranch:
         """Test checkout failure path when there are no uncommitted changes.
 
         When the first checkout fails but there are no uncommitted changes,
-        stash_changes should return True immediately (no git stash push),
+        stash_changes should return None immediately (no git stash push),
         and the retry checkout should proceed.
         """
         repo_dir = Path("/tmp/test_repo")
         branch = "feature/test"
 
         # Mock git commands: first checkout fails, no changes to stash, retry succeeds
+        # stash_changes returns None early when no changes, so no additional git commands
         mock_subprocess_run.side_effect = [
             Mock(returncode=0, stderr=""),  # git fetch
             Mock(returncode=1, stderr="checkout failed"),  # git checkout (fails)
@@ -573,20 +600,33 @@ class TestCreateAndCheckoutBranch:
         branch = "feature/test"
 
         # Mock git commands: first checkout fails, stash works, retry checkout succeeds, stash pop fails
+        # stash_changes now calls: rev-parse HEAD, stash push, stash list --oneline
+        def make_mock(returncode=0, stderr="", stdout=""):
+            m = Mock()
+            m.returncode = returncode
+            m.stderr = stderr
+            m.stdout = stdout
+            return m
+
         mock_subprocess_run.side_effect = [
-            Mock(returncode=0, stderr=""),  # git fetch
-            Mock(returncode=1, stderr="checkout failed"),  # git checkout (fails)
-            Mock(returncode=0, stderr="changes"),  # git status --porcelain (has_changes returns True)
-            Mock(returncode=0, stderr=""),  # git stash push (succeeds)
-            Mock(returncode=0, stderr=""),  # git checkout (succeeds)
-            Mock(returncode=1, stderr="stash pop failed"),  # git stash pop (fails but checkout still succeeded)
-            Mock(returncode=0, stderr=""),  # git pull
+            make_mock(returncode=0),  # git fetch
+            make_mock(returncode=1, stderr="checkout failed"),  # git checkout (fails)
+            make_mock(
+                returncode=0, stdout="M file.py"
+            ),  # git status --porcelain (has_changes in checkout_branch_resilient)
+            make_mock(returncode=0, stdout="M file.py"),  # git status --porcelain (has_changes in stash_changes)
+            make_mock(returncode=0, stdout="feature/test"),  # git rev-parse --abbrev-ref HEAD
+            make_mock(returncode=0),  # git stash push (succeeds)
+            make_mock(returncode=0, stdout="stash@{0}: ..."),  # git stash list --oneline
+            make_mock(returncode=0),  # git checkout (succeeds)
+            make_mock(returncode=1, stderr="stash pop failed"),  # git stash pop (fails but checkout still succeeded)
+            make_mock(returncode=0),  # git pull
         ]
 
         result = checkout_branch_resilient(repo_dir, branch)
 
         assert result is True
-        assert mock_subprocess_run.call_count == 7
+        assert mock_subprocess_run.call_count == 10
 
 
 class TestCheckoutBranchResilientIntegration:
