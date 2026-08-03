@@ -345,6 +345,34 @@ class TestVikunjaTaskSource:
         assert "8/15" in comment_args[1]
         assert "Max iterations reached" in comment_args[1]
 
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_on_skip_adds_comment_and_does_not_change_status(self, mock_comment, mock_commit):
+        """Test that on_skip adds a skip comment but does NOT change the task status."""
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
+
+        task_source.on_skip(task, "LLM unavailable")
+
+        mock_comment.assert_called_once()
+        call_args = mock_comment.call_args[0]
+        assert call_args[0] == 42
+        assert "Task Skipped" in call_args[1]
+        assert "LLM unavailable" in call_args[1]
+        assert "retried when the LLM becomes available" in call_args[1]
+        # Status should NOT be updated
+        mock_commit.assert_called_once()
+
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_on_skip_handles_missing_repo_path(self, mock_comment):
+        """Test that on_skip handles missing repo_path in task gracefully."""
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={})
+
+        task_source.on_skip(task, "LLM unavailable")
+
+        mock_comment.assert_not_called()
+
     @patch("auto_slopp.workers.vikunja_task_source.find_or_create_project")
     @patch("auto_slopp.workers.vikunja_task_source.get_open_tasks_by_project")
     @patch("auto_slopp.workers.vikunja_task_source.verify_blocking_closed")
