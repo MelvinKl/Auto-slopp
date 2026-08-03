@@ -262,6 +262,7 @@ class RalphExecutor:
         self.task_planning_name = task_planning_name
         self.implementation_name = implementation_name
         self.validation_name = validation_name
+        self._last_error: Optional[str] = None
 
     def _get_issue_task_path(self, repo_dir: Path, issue_number: int) -> Path:
         """Get the canonical task file path for a task."""
@@ -641,6 +642,53 @@ class RalphExecutor:
 
         return {"success": True}
 
+    def _is_llm_unavailable(self) -> bool:
+        """Check if the last error indicates the LLM/CLI tool is unavailable.
+
+        Detects LLM unavailability by looking for timeout patterns and other
+        indicators that the CLI tool (e.g., Claude Code, opencode) cannot
+        respond. This is used to distinguish between genuine iteration
+        exhaustion and temporary LLM outages that should trigger a skip
+        for retry.
+
+        Returns:
+            True if the last error indicates LLM unavailability, False otherwise.
+        """
+        if not self._last_error:
+            return False
+
+        error_lower = self._last_error.lower()
+
+        # Timeout errors indicate the LLM/CLI tool is not responding
+        if "timed out" in error_lower:
+            return True
+
+        # Explicit unavailability indicators
+        unavailability_patterns = [
+            "llm unavailable",
+            "llm is unavailable",
+            "llm is down",
+            "service unavailable",
+            "api unavailable",
+            "api is down",
+            "rate limit",
+            "too many requests",
+            "429",
+            "connection refused",
+            "connection reset",
+            "connection timeout",
+            "econnrefused",
+            "econnreset",
+            "etimedout",
+            "no response",
+            "not responding",
+            "unreachable",
+            "503 service unavailable",
+            "502 bad gateway",
+            "500 internal",
+        ]
+        return any(pattern in error_lower for pattern in unavailability_patterns)
+
     def _step_is_closed(self, task_path: Path, step_number: int) -> bool:
         """Check whether a step is marked as completed in the task file."""
         try:
@@ -707,6 +755,7 @@ class RalphExecutor:
                 branch_name=branch_name,
             )
             if not update_result.get("success", False):
+                self._last_error = update_result.get("error", "Failed to update issue task file")
                 return {
                     "success": False,
                     "error": update_result.get("error", "Failed to update issue task file"),
@@ -733,6 +782,7 @@ class RalphExecutor:
                 branch_name=branch_name,
             )
             if not refinement_result.get("success", False):
+                self._last_error = refinement_result.get("error", "Failed to refine issue task")
                 return {
                     "success": False,
                     "error": refinement_result.get("error", "Failed to refine issue task"),
@@ -845,7 +895,8 @@ class RalphExecutor:
                 branch_name=branch_name,
             )
             if not step_result.get("success", False):
-                result["last_error"] = step_result.get("error", "Step implementation failed")
+                self._last_error = step_result.get("error", "Step implementation failed")
+                result["last_error"] = self._last_error
                 result["loops_executed"] = iteration
                 continue
 

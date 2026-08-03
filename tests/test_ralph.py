@@ -1407,3 +1407,47 @@ class TestRalphExecutor:
             assert (
                 len(remaining_steps_calls) == 0
             ), f"Expected 0 remaining_steps_update calls, got {len(remaining_steps_calls)}"
+
+    def test_is_llm_unavailable_no_error(self, ralph_executor):
+        """Test _is_llm_unavailable returns False when no error is set."""
+        assert ralph_executor._is_llm_unavailable() is False
+
+    def test_is_llm_unavailable_timeout(self, ralph_executor):
+        """Test _is_llm_unavailable detects timeout errors."""
+        ralph_executor._last_error = "claude timed out after 7200 seconds"
+        assert ralph_executor._is_llm_unavailable() is True
+
+    def test_is_llm_unavailable_rate_limit(self, ralph_executor):
+        """Test _is_llm_unavailable detects rate limit errors."""
+        ralph_executor._last_error = "Rate limit exceeded: too many requests"
+        assert ralph_executor._is_llm_unavailable() is True
+
+    def test_is_llm_unavailable_connection_refused(self, ralph_executor):
+        """Test _is_llm_unavailable detects connection refused errors."""
+        ralph_executor._last_error = "Connection refused to API endpoint"
+        assert ralph_executor._is_llm_unavailable() is True
+
+    def test_is_llm_unavailable_503(self, ralph_executor):
+        """Test _is_llm_unavailable detects 503 service unavailable errors."""
+        ralph_executor._last_error = "503 Service Unavailable"
+        assert ralph_executor._is_llm_unavailable() is True
+
+    def test_is_llm_unavailable_step_failure_not_unavailable(self, ralph_executor):
+        """Test _is_llm_unavailable returns False for non-LLM failures."""
+        ralph_executor._last_error = "Step implementation failed: syntax error in code"
+        assert ralph_executor._is_llm_unavailable() is False
+
+    def test_is_llm_unavailable_parse_failure_not_unavailable(self, ralph_executor):
+        """Test _is_llm_unavailable returns False for parse failures."""
+        ralph_executor._last_error = "Failed to parse updated task file: invalid format"
+        assert ralph_executor._is_llm_unavailable() is False
+
+    def test_is_llm_unavailable_llm_down(self, ralph_executor):
+        """Test _is_llm_unavailable detects explicit LLM down indicators."""
+        ralph_executor._last_error = "LLM is down, please try again later"
+        assert ralph_executor._is_llm_unavailable() is True
+
+    def test_is_llm_unavailable_service_unavailable(self, ralph_executor):
+        """Test _is_llm_unavailable detects service unavailable errors."""
+        ralph_executor._last_error = "Service unavailable: API endpoint not responding"
+        assert ralph_executor._is_llm_unavailable() is True
