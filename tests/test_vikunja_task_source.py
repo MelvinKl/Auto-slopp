@@ -268,7 +268,7 @@ class TestVikunjaTaskSource:
         """Test that on_task_start updates status and adds comment."""
         mock_analyze.return_value = [{"id": 1}]
         task_source = VikunjaTaskSource()
-        task = Task(id=42, title="Test", body="", comments=[], raw={})
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test/repo")})
 
         task_source.on_task_start(task, "ai/task-42-test")
 
@@ -285,7 +285,7 @@ class TestVikunjaTaskSource:
     def test_on_task_complete_updates_status_and_comments(self, mock_comment, mock_update, mock_commit):
         """Test that on_task_complete updates status and adds comment."""
         task_source = VikunjaTaskSource()
-        task = Task(id=42, title="Test", body="", comments=[], raw={})
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test/repo")})
 
         task_source.on_task_complete(task, "ai/task-42-test", "https://github.com/test/pr/1")
 
@@ -302,7 +302,7 @@ class TestVikunjaTaskSource:
     def test_on_task_failure_updates_status_and_comments(self, mock_comment, mock_update, mock_commit):
         """Test that on_task_failure updates status and adds comment."""
         task_source = VikunjaTaskSource()
-        task = Task(id=42, title="Test", body="", comments=[], raw={})
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test/repo")})
 
         task_source.on_task_failure(task, "Test error")
 
@@ -318,7 +318,7 @@ class TestVikunjaTaskSource:
     def test_on_no_changes_updates_status_and_comments(self, mock_comment, mock_update, mock_commit):
         """Test that on_no_changes updates status and adds comment."""
         task_source = VikunjaTaskSource()
-        task = Task(id=42, title="Test", body="", comments=[], raw={})
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test/repo")})
 
         task_source.on_no_changes(task)
 
@@ -334,7 +334,7 @@ class TestVikunjaTaskSource:
     def test_on_max_iterations_reached_updates_status_and_comments(self, mock_comment, mock_update, mock_commit):
         """Test that on_max_iterations_reached updates status and adds comment."""
         task_source = VikunjaTaskSource()
-        task = Task(id=42, title="Test", body="", comments=[], raw={})
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test/repo")})
 
         task_source.on_max_iterations_reached(task, 8, 15, "Max iterations reached")
 
