@@ -10,6 +10,8 @@ from auto_slopp.utils.git_operations import (
     ensure_ralph_in_gitignore,
     get_current_branch,
     merge_main_into_branch,
+    restore_stashed_changes,
+    stash_changes,
 )
 
 
@@ -209,6 +211,98 @@ class TestMergeMainIntoBranch:
         assert mock_run_git.call_count == 3
 
 
+class TestStashChanges:
+    """Test cases for stash_changes and restore_stashed_changes functions."""
+
+    def _create_test_repo_with_changes(self, repo_path: Path) -> None:
+        """Create a test git repo with an uncommitted change."""
+        subprocess.run(["git", "init"], cwd=repo_path, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+        test_file = repo_path / "README.md"
+        test_file.write_text("# Test")
+        subprocess.run(["git", "add", "."], cwd=repo_path, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+        # Create an uncommitted change
+        test_file.write_text("# Test\nmodified")
+
+    def test_stash_changes_with_uncommitted_changes(self):
+        """Test stashing when there are uncommitted changes."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo_with_changes(repo_path)
+
+            result = stash_changes(repo_path)
+
+            assert result is True
+            # After stash, working directory should be clean
+            status = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+            )
+            assert status.stdout.strip() == ""
+
+    def test_stash_changes_without_uncommitted_changes(self):
+        """Test stashing when there are no uncommitted changes."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo_with_changes(repo_path)
+            # Clean working directory
+            subprocess.run(
+                ["git", "checkout", "--", "."],
+                cwd=repo_path,
+                check=True,
+                capture_output=True,
+            )
+
+            result = stash_changes(repo_path)
+
+            assert result is True
+
+    def test_restore_stashed_changes(self):
+        """Test restoring stashed changes."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_test_repo_with_changes(repo_path)
+
+            # Stash then restore
+            stash_changes(repo_path)
+            result = restore_stashed_changes(repo_path)
+
+            assert result is True
+            # After restore, changes should be back in working directory
+            status = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+            )
+            assert "M README.md" in status.stdout
+
+
 class TestCheckoutBranchResilient:
     """Test cases for checkout_branch_resilient function."""
 
@@ -337,8 +431,8 @@ class TestCreateAndCheckoutBranch:
 
     @patch("auto_slopp.utils.git_operations.subprocess.run")
     @patch("auto_slopp.utils.git_operations.run_cli_executor")
-    def test_checkout_failure_after_reset(self, mock_run_cli_executor, mock_subprocess_run):
-        """Test checkout failure even after reset."""
+    def test_checkout_failure_after_stash(self, mock_run_cli_executor, mock_subprocess_run):
+        """Test checkout failure even after stash."""
         repo_dir = Path("/tmp/test_repo")
         branch = "feature/test"
 
@@ -352,20 +446,21 @@ class TestCreateAndCheckoutBranch:
         mock_subprocess_run.side_effect = [
             Mock(returncode=0, stderr=""),  # git fetch
             Mock(returncode=1, stderr="checkout failed"),  # git checkout (fails)
-            Mock(returncode=0, stderr=""),  # git reset --hard
-            Mock(returncode=0, stderr=""),  # git clean
+            Mock(returncode=0, stderr="changes"),  # git status --porcelain (has_changes returns True)
+            Mock(returncode=0, stderr=""),  # git stash push
             Mock(returncode=1, stderr="checkout still failed"),  # git checkout (fails again)
+            Mock(returncode=0, stderr=""),  # git stash pop (restore on failure)
         ]
 
         result = checkout_branch_resilient(repo_dir, branch)
 
         assert result is False
-        assert mock_subprocess_run.call_count == 5
+        assert mock_subprocess_run.call_count == 6
 
     @patch("auto_slopp.utils.git_operations.subprocess.run")
     @patch("auto_slopp.utils.git_operations.run_cli_executor")
-    def test_checkout_reset_failure(self, mock_run_cli_executor, mock_subprocess_run):
-        """Test checkout failure when reset itself fails."""
+    def test_checkout_stash_failure(self, mock_run_cli_executor, mock_subprocess_run):
+        """Test checkout failure when stash itself fails."""
         repo_dir = Path("/tmp/test_repo")
         branch = "feature/test"
 
@@ -375,17 +470,18 @@ class TestCreateAndCheckoutBranch:
             "error": "CLI executor failed",
         }
 
-        # Mock git commands: checkout fails, reset also fails
+        # Mock git commands: checkout fails, stash also fails
         mock_subprocess_run.side_effect = [
             Mock(returncode=0, stderr=""),  # git fetch
             Mock(returncode=1, stderr="checkout failed"),  # git checkout (fails)
-            Mock(returncode=1, stderr="reset failed"),  # git reset --hard (fails)
+            Mock(returncode=0, stderr="changes"),  # git status --porcelain (has_changes returns True)
+            Mock(returncode=1, stderr="stash failed"),  # git stash push (fails)
         ]
 
         result = checkout_branch_resilient(repo_dir, branch)
 
         assert result is False
-        assert mock_subprocess_run.call_count == 3
+        assert mock_subprocess_run.call_count == 4
 
     @patch("auto_slopp.utils.git_operations.subprocess.run")
     def test_checkout_timeout(self, mock_subprocess_run):
@@ -436,22 +532,23 @@ class TestCreateAndCheckoutBranch:
         assert mock_subprocess_run.call_count == 3
 
     @patch("auto_slopp.utils.git_operations.subprocess.run")
-    def test_checkout_with_clean_failure(self, mock_subprocess_run):
-        """Test checkout success even when git clean fails."""
+    def test_checkout_with_stash_pop_failure(self, mock_subprocess_run):
+        """Test checkout success even when git stash pop fails."""
         repo_dir = Path("/tmp/test_repo")
         branch = "feature/test"
 
-        # Mock git commands: first checkout fails, reset works, clean fails, retry checkout succeeds
+        # Mock git commands: first checkout fails, stash works, retry checkout succeeds, stash pop fails
         mock_subprocess_run.side_effect = [
             Mock(returncode=0, stderr=""),  # git fetch
             Mock(returncode=1, stderr="checkout failed"),  # git checkout (fails)
-            Mock(returncode=0, stderr=""),  # git reset --hard
-            Mock(returncode=1, stderr="clean failed"),  # git clean (fails but shouldn't stop retry)
+            Mock(returncode=0, stderr="changes"),  # git status --porcelain (has_changes returns True)
+            Mock(returncode=0, stderr=""),  # git stash push (succeeds)
             Mock(returncode=0, stderr=""),  # git checkout (succeeds)
+            Mock(returncode=1, stderr="stash pop failed"),  # git stash pop (fails but checkout still succeeded)
             Mock(returncode=0, stderr=""),  # git pull
         ]
 
         result = checkout_branch_resilient(repo_dir, branch)
 
         assert result is True
-        assert mock_subprocess_run.call_count == 6
+        assert mock_subprocess_run.call_count == 7

@@ -256,10 +256,70 @@ def has_changes(repo_dir: Path) -> bool:
     return bool(result.stdout.strip())
 
 
+def stash_changes(repo_dir: Path) -> bool:
+    """Stash uncommitted changes in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+
+    Returns:
+        True if stashing was successful or there were no changes to stash,
+        False if stashing failed.
+    """
+    if not has_changes(repo_dir):
+        logger.debug(f"No uncommitted changes to stash in {repo_dir.name}")
+        return True
+
+    logger.info(f"Stashing uncommitted changes in {repo_dir.name}")
+    stash_result = _run_git_command(
+        repo_dir,
+        "stash",
+        "push",
+        "-m",
+        "auto-slopp: stash before checkout",
+        check=False,
+    )
+
+    if stash_result.returncode == 0:
+        logger.info(f"Successfully stashed changes in {repo_dir.name}")
+        return True
+
+    stash_error = stash_result.stderr.strip() or stash_result.stdout.strip()
+    logger.warning(f"Failed to stash changes in {repo_dir.name}: {stash_error}")
+    return False
+
+
+def restore_stashed_changes(repo_dir: Path) -> bool:
+    """Restore stashed changes in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+
+    Returns:
+        True if restoring was successful or there were no stashed changes,
+        False if restoring failed.
+    """
+    logger.info(f"Restoring stashed changes in {repo_dir.name}")
+    restore_result = _run_git_command(
+        repo_dir,
+        "stash",
+        "pop",
+        check=False,
+    )
+
+    if restore_result.returncode == 0:
+        logger.info(f"Successfully restored stashed changes in {repo_dir.name}")
+        return True
+
+    restore_error = restore_result.stderr.strip() or restore_result.stdout.strip()
+    logger.warning(f"Failed to restore stashed changes in {repo_dir.name}: {restore_error}")
+    return False
+
+
 def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = True, timeout: int = 60) -> bool:
     """Checkout a git branch with enhanced resilience.
 
-    If checkout fails, performs a git reset --hard and retries.
+    If checkout fails, stashes uncommitted changes and retries.
 
     Args:
         repo_dir: Path to the git repository
@@ -302,46 +362,45 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
 
         checkout_error = checkout_result.stderr.strip() or checkout_result.stdout.strip()
         logger.warning(f"Initial checkout failed for '{branch}' in {repo_dir.name}: {checkout_error}")
-        logger.info(f"Attempting git reset --hard and retry for '{branch}' in {repo_dir.name}")
+        logger.info(f"Attempting git stash and retry for '{branch}' in {repo_dir.name}")
 
-        reset_result = _run_git_command(repo_dir, "reset", "--hard", check=False, timeout=timeout)
-        if reset_result.returncode != 0:
-            reset_error = reset_result.stderr.strip() or reset_result.stdout.strip()
-            error_msg = f"Git reset --hard failed: {reset_error}"
-            logger.error(f"Git reset --hard failed in {repo_dir.name}: {reset_error}")
+        if not stash_changes(repo_dir):
+            error_msg = "Failed to stash changes before retrying checkout"
+            logger.error(f"Stash failed in {repo_dir.name}: {error_msg}")
             _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
             return False
-
-        clean_result = _run_git_command(repo_dir, "clean", "-fd", check=False, timeout=timeout)
-        if clean_result.returncode != 0:
-            clean_error = clean_result.stderr.strip() or clean_result.stdout.strip()
-            logger.warning(f"Git clean failed in {repo_dir.name}: {clean_error}")
 
         retry_checkout_result = _run_git_command(repo_dir, "checkout", branch, check=False, timeout=timeout)
 
-        if retry_checkout_result.returncode == 0:
-            logger.info(f"Successfully checked out '{branch}' in {repo_dir.name} after reset")
+        if retry_checkout_result.returncode != 0:
+            # Restore stashed changes before failing
+            restore_stashed_changes(repo_dir)
 
-            pull_result = _run_git_command(
-                repo_dir,
-                "pull",
-                "--rebase=false",
-                "origin",
-                branch,
-                check=False,
-                timeout=timeout,
-            )
-            if pull_result.returncode != 0:
-                pull_error = pull_result.stderr.strip() or pull_result.stdout.strip()
-                logger.warning(f"Pull failed for branch '{branch}' in {repo_dir.name}: {pull_error}")
-
-            return True
-        else:
             retry_error = retry_checkout_result.stderr.strip() or retry_checkout_result.stdout.strip()
-            error_msg = f"Failed to checkout '{branch}' even after reset: {retry_error}"
-            logger.error(f"Failed to checkout '{branch}' in {repo_dir.name} even after reset: {retry_error}")
+            error_msg = f"Failed to checkout '{branch}' even after stash: {retry_error}"
+            logger.error(f"Failed to checkout '{branch}' in {repo_dir.name} even after stash: {retry_error}")
             _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
             return False
+
+        # Restore stashed changes after successful checkout
+        restore_stashed_changes(repo_dir)
+
+        logger.info(f"Successfully checked out '{branch}' in {repo_dir.name} after stash")
+
+        pull_result = _run_git_command(
+            repo_dir,
+            "pull",
+            "--rebase=false",
+            "origin",
+            branch,
+            check=False,
+            timeout=timeout,
+        )
+        if pull_result.returncode != 0:
+            pull_error = pull_result.stderr.strip() or pull_result.stdout.strip()
+            logger.warning(f"Pull failed for branch '{branch}' in {repo_dir.name}: {pull_error}")
+
+        return True
 
     except GitOperationError as e:
         error_msg = f"Error checking out '{branch}': {str(e)}"
