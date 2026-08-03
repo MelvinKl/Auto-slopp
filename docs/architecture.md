@@ -137,6 +137,14 @@ class TaskSource(ABC):
     @abstractmethod
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing."""
+
+    @abstractmethod
+    def on_skip(self, task: Task, reason: str) -> None:
+        """Called when a task is skipped (e.g., due to LLM unavailability).
+
+        The task should remain processable for future retries. Do not remove
+        the required label/tag that identifies tasks for processing.
+        """
 ```
 
 **Implementations:**
@@ -254,7 +262,7 @@ class IssueWorker(Worker):
 **Integration with TaskSource:**
 - Delegates task loading to `task_source.get_tasks()`
 - Uses source-specific configuration via `task_source` methods
-- Calls lifecycle hooks: `on_task_start`, `on_task_complete`, `on_task_failure`, etc.
+- Calls lifecycle hooks: `on_task_start`, `on_task_complete`, `on_task_failure`, `on_no_changes`, `on_max_iterations_reached`, `on_skip`
 - Supports Ralph loop for step-based task execution
 
 **Benefits:**

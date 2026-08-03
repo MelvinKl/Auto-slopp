@@ -68,6 +68,81 @@ class MyWorker(Worker):
         return result
 ```
 
+### TaskSource
+
+Abstract base class for loading tasks from different sources (GitHub Issues, Vikunja, etc.).
+
+```python
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+from dataclasses import dataclass, field
+
+@dataclass
+class Task:
+    """Normalized task representation from any source."""
+    id: int
+    title: str
+    body: str
+    comments: List[str] = field(default_factory=list)
+    raw: Dict[str, Any] = field(default_factory=dict)
+
+class TaskSource(ABC):
+    """Abstract base class for loading tasks from different sources."""
+
+    @abstractmethod
+    def get_tasks(self, repo_path: Path) -> List[Task]:
+        """Fetch and filter tasks from the source."""
+
+    @abstractmethod
+    def get_branch_name(self, task: Task) -> str:
+        """Generate the branch name for a task."""
+
+    @abstractmethod
+    def get_ralph_file_prefix(self) -> str:
+        """Return the prefix for ralph task files."""
+
+    @abstractmethod
+    def get_pr_title(self, task: Task) -> str:
+        """Generate the PR title for a task."""
+
+    @abstractmethod
+    def get_default_pr_body(self, task: Task) -> str:
+        """Generate the default PR body for a task."""
+
+    @abstractmethod
+    def on_task_start(self, task: Task, branch_name: str) -> None:
+        """Called when task processing begins."""
+
+    @abstractmethod
+    def on_task_complete(self, task: Task, branch_name: str, pr_url: str, findings: Optional[List[str]] = None) -> None:
+        """Called when a task completes successfully."""
+
+    @abstractmethod
+    def on_task_failure(self, task: Task, error: str) -> None:
+        """Called when a task fails."""
+
+    @abstractmethod
+    def on_no_changes(self, task: Task) -> None:
+        """Called when no changes were needed for a task."""
+
+    @abstractmethod
+    def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
+        """Called when the ralph loop reaches max iterations without completing."""
+
+    @abstractmethod
+    def on_skip(self, task: Task, reason: str) -> None:
+        """Called when a task is skipped (e.g., due to LLM unavailability).
+
+        The task should remain processable for future retries. Do not remove
+        the required label/tag that identifies tasks for processing.
+        """
+```
+
+**Implementations:**
+- **GitHubTaskSource**: Loads tasks from GitHub Issues
+- **VikunjaTaskSource**: Loads tasks from Vikunja
+
 ### Executor
 
 Discovers and executes worker implementations.
