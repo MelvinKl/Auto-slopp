@@ -4,6 +4,8 @@ import subprocess
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pytest
+
 from auto_slopp.utils.git_operations import (
     checkout_branch_resilient,
     create_and_checkout_branch,
@@ -585,3 +587,155 @@ class TestCreateAndCheckoutBranch:
 
         assert result is True
         assert mock_subprocess_run.call_count == 7
+
+
+class TestCheckoutBranchResilientIntegration:
+    """Integration tests for checkout_branch_resilient with real git repos."""
+
+    def _create_repo_with_branch(self, repo_path: Path) -> None:
+        """Create a test repo with main branch and a feature branch."""
+        subprocess.run(["git", "init"], cwd=repo_path, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+
+        # Create initial file on main (rename default branch)
+        test_file = repo_path / "README.md"
+        test_file.write_text("# Main Branch Content")
+        subprocess.run(["git", "add", "."], cwd=repo_path, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=repo_path, check=True, capture_output=True)
+        subprocess.run(["git", "branch", "-M", "main"], cwd=repo_path, check=True, capture_output=True)
+
+        # Create feature branch with different content
+        subprocess.run(["git", "checkout", "-b", "feature"], cwd=repo_path, check=True, capture_output=True)
+        test_file.write_text("# Feature Branch Content")
+        subprocess.run(["git", "add", "."], cwd=repo_path, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Feature commit"], cwd=repo_path, check=True, capture_output=True)
+
+        # Switch back to main
+        subprocess.run(["git", "checkout", "main"], cwd=repo_path, check=True, capture_output=True)
+
+    @pytest.mark.integration
+    def test_checkout_stashes_and_restores_uncommitted_changes(self):
+        """Integration test: checkout stashes uncommitted changes and restores them.
+
+        Scenario:
+        1. Create a repo with main and feature branches
+        2. On main, create an extra file (only on main) and modify it without committing
+        3. Attempt to checkout feature branch (should fail due to local changes)
+        4. checkout_branch_resilient should stash, checkout, and restore changes
+        5. Verify the local uncommitted changes are preserved
+        """
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_repo_with_branch(repo_path)
+
+            # Create an extra file on main only (won't conflict with feature branch)
+            extra_file = repo_path / "local_notes.txt"
+            extra_file.write_text("# Local Uncommitted Change")
+            subprocess.run(["git", "add", "."], cwd=repo_path, check=True, capture_output=True)
+
+            # Verify we have uncommitted changes
+            status = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+            )
+            assert "local_notes.txt" in status.stdout, "Should have uncommitted changes"
+
+            # Attempt checkout - should succeed via stash mechanism
+            result = checkout_branch_resilient(repo_path, "feature", fetch_first=False)
+
+            assert result is True, "checkout_branch_resilient should succeed"
+
+            # Verify we're on the feature branch
+            current_branch = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+            )
+            assert current_branch.stdout.strip() == "feature", "Should be on feature branch"
+
+            # Verify the file still exists with our content (restored from stash)
+            assert extra_file.exists(), "Stashed file should be restored after checkout"
+            restored_content = extra_file.read_text()
+            assert "Local Uncommitted Change" in restored_content, "The uncommitted change content should be preserved"
+
+            # Verify the stash was cleaned up (no stash entries left)
+            stash_list = subprocess.run(
+                ["git", "stash", "list"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+            )
+            assert stash_list.stdout.strip() == "", "Stash should be empty after pop"
+
+    @pytest.mark.integration
+    def test_checkout_no_changes_skips_stash(self):
+        """Integration test: checkout succeeds without stash when no uncommitted changes.
+
+        Scenario:
+        1. Create a repo with main and feature branches
+        2. On main, ensure working directory is clean
+        3. Attempt to checkout feature branch
+        4. Verify checkout succeeds without stashing
+        """
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir)
+            self._create_repo_with_branch(repo_path)
+
+            # Verify working directory is clean
+            status = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+            )
+            assert status.stdout.strip() == "", "Working directory should be clean"
+
+            # Attempt checkout
+            result = checkout_branch_resilient(repo_path, "feature", fetch_first=False)
+
+            assert result is True, "checkout_branch_resilient should succeed"
+
+            # Verify we're on the feature branch
+            current_branch = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+            )
+            assert current_branch.stdout.strip() == "feature", "Should be on feature branch"
+
+            # Verify working directory is clean (no stash was created)
+            status_after = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+            )
+            assert status_after.stdout.strip() == "", "Working directory should remain clean"
+
+            # Verify no stash entries
+            stash_list = subprocess.run(
+                ["git", "stash", "list"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+            )
+            assert stash_list.stdout.strip() == "", "No stash should be created when no changes exist"
