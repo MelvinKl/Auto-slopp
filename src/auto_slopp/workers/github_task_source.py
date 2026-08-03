@@ -318,6 +318,29 @@ class GitHubTaskSource(TaskSource):
         else:
             logger.warning(f"Failed to remove required label from issue #{task.id}")
 
+    def on_skip(self, task: Task, reason: str) -> None:
+        """Called when a task is skipped (e.g., due to LLM unavailability).
+
+        Adds a skip comment to the issue but does NOT remove the required label,
+        so the issue remains eligible for future processing.
+
+        Args:
+            task: The task being skipped
+            reason: Reason for skipping (e.g., "LLM unavailable")
+        """
+        repo_path = task.raw.get("_repo_path")
+        if repo_path is None:
+            logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
+            return
+
+        skip_comment = (
+            f"⏭️ **Task Skipped**\n\n"
+            f"Reason: {reason}\n\n"
+            f"This issue will be retried when the LLM becomes available."
+        )
+        comment_on_issue(repo_path, task.id, skip_comment)
+        logger.info(f"Added skip comment to issue #{task.id}: {reason}")
+
     def _filter_renovate_issues(self, issues: List[dict]) -> List[dict]:
         """Filter out issues created by Renovate.
 

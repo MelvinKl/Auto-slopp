@@ -42,6 +42,9 @@ class ConcreteTaskSource(TaskSource):
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         pass
 
+    def on_skip(self, task: Task, reason: str) -> None:
+        pass
+
 
 class TestTask:
     """Tests for the Task dataclass."""

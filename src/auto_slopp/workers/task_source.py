@@ -129,3 +129,15 @@ class TaskSource(ABC):
             total_steps: Total number of steps
             error: Last error message
         """
+
+    @abstractmethod
+    def on_skip(self, task: Task, reason: str) -> None:
+        """Called when a task is skipped (e.g., due to LLM unavailability).
+
+        The task should remain processable for future retries. Do not remove
+        the required label/tag that identifies tasks for processing.
+
+        Args:
+            task: The task being skipped
+            reason: Reason for skipping (e.g., "LLM unavailable")
+        """

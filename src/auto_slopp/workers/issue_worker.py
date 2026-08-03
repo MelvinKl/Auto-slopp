@@ -257,6 +257,10 @@ class IssueWorker(Worker):
                             ralph_result.get("total_steps", 0),
                             ralph_result.get("error", "Unknown error"),
                         )
+                    elif self._is_llm_unavailable(ralph_result.get("error", "")):
+                        self.logger.warning(f"LLM unavailable for task #{task_id}, skipping")
+                        self.task_source.on_skip(task, ralph_result.get("error", "LLM unavailable"))
+                        result["skipped"] = True
 
                     return result
 
@@ -286,7 +290,14 @@ class IssueWorker(Worker):
                     cli_tool = get_active_cli_command()
                     error_msg = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
                     result["error"] = error_msg
-                    self.task_source.on_task_failure(task, error_msg)
+
+                    if self._is_llm_unavailable(openagent_result.get("error", "")):
+                        self.logger.warning(f"LLM unavailable for task #{task_id}, skipping")
+                        self.task_source.on_skip(task, openagent_result.get("error", "LLM unavailable"))
+                        result["skipped"] = True
+                    else:
+                        self.task_source.on_task_failure(task, error_msg)
+
                     return result
 
             current_branch = get_current_branch(repo_dir)
@@ -721,3 +732,29 @@ Plan:
             f"Tasks completed: {results['tasks_completed']}, "
             f"Errors: {results['repositories_with_errors']}"
         )
+
+    def _is_llm_unavailable(self, error_message: str) -> bool:
+        """Check if the error indicates LLM unavailability.
+
+        Args:
+            error_message: Error message from CLI execution
+
+        Returns:
+            True if the error indicates no LLM/CLI is available, False otherwise
+        """
+        if not error_message:
+            return False
+
+        error_lower = error_message.lower()
+        llm_unavailable_indicators = [
+            "no cli configuration",
+            "no active cli",
+            "all cli",
+            "exhausted",
+            "unavailable",
+            "not available",
+            "cooldown",
+            "no configuration meets",
+        ]
+
+        return any(indicator in error_lower for indicator in llm_unavailable_indicators)
