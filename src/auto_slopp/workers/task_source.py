@@ -120,6 +120,15 @@ class TaskSource(ABC):
         """
 
     @abstractmethod
+    def on_skip(self, task: Task, reason: str) -> None:
+        """Called when a task is skipped (e.g., LLM unavailable) and should be retried later.
+
+        Args:
+            task: The task being skipped
+            reason: Reason for skipping (e.g., "LLM unavailable")
+        """
+
+    @abstractmethod
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.
 
