@@ -263,6 +263,7 @@ class RalphExecutor:
         self.implementation_name = implementation_name
         self.validation_name = validation_name
         self._last_error: Optional[str] = None
+        self._last_iteration_error: Optional[str] = None
 
     def _get_issue_task_path(self, repo_dir: Path, issue_number: int) -> Path:
         """Get the canonical task file path for a task."""
@@ -654,10 +655,14 @@ class RalphExecutor:
         Returns:
             True if the last error indicates LLM unavailability, False otherwise.
         """
-        if not self._last_error:
+        # Prefer the error from the last iteration (most accurate for
+        # distinguishing LLM unavailability during the loop from stale
+        # errors set earlier in the run).
+        error = self._last_iteration_error or self._last_error
+        if not error:
             return False
 
-        error_lower = self._last_error.lower()
+        error_lower = error.lower()
 
         # Timeout errors indicate the LLM/CLI tool is not responding
         if "timed out" in error_lower:
@@ -896,6 +901,7 @@ class RalphExecutor:
             )
             if not step_result.get("success", False):
                 self._last_error = step_result.get("error", "Step implementation failed")
+                self._last_iteration_error = self._last_error
                 result["last_error"] = self._last_error
                 result["loops_executed"] = iteration
                 continue
@@ -904,7 +910,8 @@ class RalphExecutor:
                 self._mark_step_completed_in_file(task_path, next_step.number)
 
             if not self._step_is_closed(task_path, next_step.number):
-                result["last_error"] = f"Step {next_step.number} is still open after execution"
+                self._last_iteration_error = f"Step {next_step.number} is still open after execution"
+                result["last_error"] = self._last_iteration_error
                 result["loops_executed"] = iteration
                 continue
 
@@ -918,6 +925,7 @@ class RalphExecutor:
                 commit_message = f"Complete issue step {next_step.number}: {next_step.description}"
                 commit_success, _ = self.commit_fn(repo_dir, commit_message, False)
                 if not commit_success:
+                    self._last_iteration_error = f"Failed to commit changes for step {next_step.number}"
                     return {
                         "success": False,
                         "error": f"Failed to commit changes for step {next_step.number}",
@@ -932,6 +940,10 @@ class RalphExecutor:
                 result["steps_completed"] = len([step for step in updated_plan.steps if step.is_closed])
             except Exception:
                 pass
+
+            # Successful iteration – clear the last-iteration error so it
+            # cannot be confused with a later failure.
+            self._last_iteration_error = None
 
             result["loops_executed"] = iteration
 
