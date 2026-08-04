@@ -55,7 +55,8 @@ class GitHubTaskSource(TaskSource):
             issue_body = issue.get("body", "") or ""
 
             issue_author_login = issue.get("author", {}).get("login", "") if issue.get("author") else ""
-            comment_texts = self._condense_comments(repo_path, issue_number, issue_author_login)
+            allowed_creator = settings.github_issue_worker_allowed_creator
+            comment_texts = self._condense_comments(repo_path, issue_number, issue_author_login, allowed_creator)
 
             task = Task(
                 id=issue_number,
@@ -68,20 +69,23 @@ class GitHubTaskSource(TaskSource):
 
         return tasks
 
-    def _condense_comments(self, repo_path: Path, issue_number: int, issue_author_login: str) -> List[str]:
-        """Condense all comments (except the issue description) into a single comment.
+    def _condense_comments(
+        self, repo_path: Path, issue_number: int, issue_author_login: str, allowed_creator: str
+    ) -> List[str]:
+        """Condense comments from the issue author or allowed creator into a single comment.
 
-        Fetches all comments via get_issue_comments(). If there are 0 comments,
-        returns ["No comments provided."]. If there is 1 comment,
-        returns ["Only one comment present; no additional comments to condense."]
-        If there are 2+ comments, calls the CLI executor to summarize them, posts
-        the summary as a new comment, deletes the original comments, and returns
-        the summary as a single-element list.
+Fetches all comments via get_issue_comments(). Filters to only include comments
+        from the issue author or the whitelisted allowed creator. If there are 0 or 1
+        filtered comments, returns them as-is (no condensing). If there are 2+ filtered
+        comments, calls the CLI executor to summarize them, posts the summary as a new
+        comment, deletes ALL original comments on the issue, and returns the summary as a
+        single-element list.
 
         Args:
             repo_path: Path to the repository.
             issue_number: Issue number.
             issue_author_login: Login of the issue author.
+            allowed_creator: Whitelisted GitHub username whose comments should be included.
 
         Returns:
             List containing ["No comments provided."] (no comments),
@@ -89,21 +93,44 @@ class GitHubTaskSource(TaskSource):
             or [condensed_summary] (multiple comments condensed).
         """
         # Fetch all comments (each is a dict with 'id', 'body', 'author', 'createdAt')
-        all_comments = get_issue_comments(repo_path, issue_number)
-        # No comments at all
+        logger.debug(f"[Condense] Fetching comments for issue #{issue_number}")
+all_comments = get_issue_comments(repo_path, issue_number)
         if not all_comments:
-            return ["No comments provided."]
-        # Single comment: return placeholder indicating no condensing needed
-        if len(all_comments) == 1:
-            return ["Only one comment present; no additional comments to condense."]
-        # Two or more comments: condense ALL comments
-        # Prepare prompt for the CLI executor
+            logger.debug(f"[Condense] No comments found for issue #{issue_number}")
+            return []
+
+        logger.debug(f"[Condense] Found {len(all_comments)} total comments for issue #{issue_number}")
+
+        # Filter comments to only include those from issue author or allowed creator
+        filtered_comments = []
+        for comment in all_comments:
+            author = comment.get("author")
+            if isinstance(author, dict):
+                author_login = author.get("login")
+            else:
+                author_login = author
+            if author_login in (issue_author_login, allowed_creator):
+                filtered_comments.append(comment)
+
+        logger.debug(f"[Condense] Filtered to {len(filtered_comments)} comments (author: {issue_author_login}, allowed: {allowed_creator})")
+
+        # No relevant comments
+        if not filtered_comments:
+            logger.debug(f"[Condense] No relevant comments found for issue #{issue_number}")
+            return []
+        # Single relevant comment: return its body as-is (no condensing)
+        if len(filtered_comments) == 1:
+            logger.debug(f"[Condense] Only 1 relevant comment for issue #{issue_number}, returning as-is")
+            return [filtered_comments[0].get("body", "") or ""]
+        # Two or more relevant comments: condense them
+        logger.debug(f"[Condense] Condensing {len(filtered_comments)} comments for issue #{issue_number}")
         comment_lines = []
-        for i, comment in enumerate(all_comments, start=1):
+        for i, comment in enumerate(filtered_comments, start=1):
             body = comment.get("body", "") or ""
             comment_lines.append(f"Comment {i}:{body}")
         prompt = "\n".join(comment_lines)
         # Execute condensation
+        logger.debug(f"[Condense] Executing condensation for issue #{issue_number}")
         result = execute_with_instructions(
             instructions=prompt,
             work_dir=repo_path,
@@ -115,13 +142,17 @@ class GitHubTaskSource(TaskSource):
             condensed = result["stdout"].strip()
         # If condensation produced empty string, fallback to joining with separator
         if not condensed:
-            condensed = "\n\n---\n\n".join([c.get("body", "") or "" for c in all_comments])
+            logger.debug(f"[Condense] Condensation empty, using fallback for issue #{issue_number}")
+            condensed = "\n\n---\n\n".join([c.get("body", "") or "" for c in filtered_comments])
         # Post the condensed summary as a new comment
+        logger.debug(f"[Condense] Posting condensed summary for issue #{issue_number}")
         comment_on_issue(repo_path, issue_number, condensed)
-        # Delete each original comment
-        for comment in all_comments:
+        # Delete only the filtered comments (from issue author or allowed creator)
+        logger.debug(f"[Condense] Deleting {len(filtered_comments)} original comments for issue #{issue_number}")
+        for comment in filtered_comments:
             cid = comment.get("id")
             if cid is not None:
+                logger.debug(f"[Condense] Deleting comment {cid} for issue #{issue_number}")
                 delete_issue_comment(repo_path, issue_number, cid)
         # Return the condensed summary as the sole comment
         return [condensed]

@@ -208,8 +208,8 @@ class TestGitHubTaskSource:
     @patch("auto_slopp.workers.github_task_source.get_issue_comments")
     @patch("auto_slopp.workers.github_task_source.execute_with_instructions")
     @patch("auto_slopp.workers.github_task_source.settings")
-    def test_get_tasks_condenses_all_comments(self, mock_settings, mock_execute, mock_get_comments, mock_get_issues):
-        """Test that ALL comments are condensed into a single comment."""
+    def test_get_tasks_condenses_author_comments(self, mock_settings, mock_execute, mock_get_comments, mock_get_issues):
+        """Test that comments from issue author/allowed creator are condensed."""
         mock_settings.github_issue_worker_required_label = "test-label"
         mock_settings.github_issue_worker_allowed_creator = "test-user"
 
@@ -223,9 +223,11 @@ class TestGitHubTaskSource:
             }
         ]
         mock_get_issues.return_value = mock_issues
+        # Multiple comments from allowed creator + one from other user (should be ignored)
         mock_get_comments.return_value = [
-            {"author": "test-user", "body": "Author comment", "id": 1},
-            {"author": "other-user", "body": "Other comment", "id": 2},
+            {"author": "test-user", "body": "Author comment 1", "id": 1},
+            {"author": "test-user", "body": "Author comment 2", "id": 2},
+            {"author": "other-user", "body": "Other comment", "id": 3},
         ]
         mock_execute.return_value = {"stdout": "Condensed summary", "success": True}
 
@@ -289,9 +291,11 @@ class TestGitHubTaskSource:
             }
         ]
         mock_get_issues.return_value = mock_issues
+        # Multiple comments from allowed creator + one from other user (should be ignored)
         mock_get_comments.return_value = [
             {"author": "test-user", "body": "Comment 1", "id": 1},
-            {"author": "other-user", "body": "Comment 2", "id": 2},
+            {"author": "test-user", "body": "Comment 2", "id": 2},
+            {"author": "other-user", "body": "Other comment", "id": 3},
         ]
         mock_execute.return_value = {"stdout": "", "success": True}
 
@@ -301,6 +305,7 @@ class TestGitHubTaskSource:
         assert len(tasks) == 1
         task = tasks[0]
         assert len(task.comments) == 1
+        # Only filtered comments (from test-user) should be joined in fallback
         assert task.comments[0] == "Comment 1\n\n---\n\nComment 2"
 
     @patch("auto_slopp.workers.github_task_source.get_open_issues")
@@ -324,9 +329,10 @@ class TestGitHubTaskSource:
             }
         ]
         mock_get_issues.return_value = mock_issues
+        # Multiple comments from allowed creator to trigger condensation
         mock_get_comments.return_value = [
             {"author": "test-user", "body": "Comment 1", "id": 1},
-            {"author": "other-user", "body": "Comment 2", "id": 2},
+            {"author": "test-user", "body": "Comment 2", "id": 2},
         ]
         mock_execute.return_value = {"stdout": "Condensed summary", "success": True}
 
@@ -345,10 +351,10 @@ class TestGitHubTaskSource:
     @patch("auto_slopp.workers.github_task_source.get_open_issues")
     @patch("auto_slopp.workers.github_task_source.get_issue_comments")
     @patch("auto_slopp.workers.github_task_source.settings")
-    def test_condense_comments_posts_summary_and_deletes_originals(
+    def test_condense_comments_posts_summary_and_deletes_filtered_only(
         self, mock_settings, mock_get_comments, mock_get_issues, mock_execute, mock_comment, mock_delete
     ):
-        """Test that _condense_comments() posts a summary to GitHub and deletes original comments."""
+        """Test that _condense_comments() posts a summary and deletes only filtered comments."""
         mock_settings.github_issue_worker_required_label = "test-label"
         mock_settings.github_issue_worker_allowed_creator = "test-user"
 
@@ -362,9 +368,11 @@ class TestGitHubTaskSource:
             }
         ]
         mock_get_issues.return_value = mock_issues
+        # Multiple comments from allowed creator + one from other user
         mock_get_comments.return_value = [
             {"author": "test-user", "body": "Comment 1", "id": 100},
-            {"author": "other-user", "body": "Comment 2", "id": 200},
+            {"author": "test-user", "body": "Comment 2", "id": 200},
+            {"author": "other-user", "body": "Other comment", "id": 300},
         ]
         mock_execute.return_value = {"stdout": "Condensed summary", "success": True}
 
@@ -375,10 +383,82 @@ class TestGitHubTaskSource:
         assert tasks[0].comments == ["Condensed summary"]
         # Verify the condensed summary was posted as a new comment
         mock_comment.assert_called_once_with(Path("/test"), 1, "Condensed summary")
-        # Verify each original comment was deleted
+        # Verify only filtered comments (from allowed creator) were deleted, not all comments
         assert mock_delete.call_count == 2
         mock_delete.assert_any_call(Path("/test"), 1, 100)
         mock_delete.assert_any_call(Path("/test"), 1, 200)
+        # Comment from other-user should NOT be deleted
+        assert (Path("/test"), 1, 300) not in [(c[0][0], c[0][1], c[0][2]) for c in mock_delete.call_args_list]
+
+    @patch("auto_slopp.workers.github_task_source.get_open_issues")
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_get_tasks_ignores_comments_from_other_users(self, mock_settings, mock_get_comments, mock_get_issues):
+        """Test that comments from non-author/non-allowed users are ignored and not condensed."""
+        mock_settings.github_issue_worker_required_label = "test-label"
+        mock_settings.github_issue_worker_allowed_creator = "test-user"
+
+        mock_issues = [
+            {
+                "number": 1,
+                "title": "Test Issue",
+                "body": "Test Body",
+                "author": {"login": "test-user"},
+                "labels": [{"name": "test-label"}],
+            }
+        ]
+        mock_get_issues.return_value = mock_issues
+        # Only comments from other users - should result in empty comments list
+        mock_get_comments.return_value = [
+            {"author": "other-user", "body": "Other comment 1", "id": 1},
+            {"author": "another-user", "body": "Other comment 2", "id": 2},
+        ]
+
+        task_source = GitHubTaskSource()
+        tasks = task_source.get_tasks(Path("/test"))
+
+        assert len(tasks) == 1
+        task = tasks[0]
+        # No relevant comments, so comments should be empty
+        assert task.comments == []
+
+    @patch("auto_slopp.workers.github_task_source.get_open_issues")
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    @patch("auto_slopp.workers.github_task_source.execute_with_instructions")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_get_tasks_condenses_only_allowed_creator_comments(
+        self, mock_settings, mock_execute, mock_get_comments, mock_get_issues
+    ):
+        """Test that only comments from issue author or allowed creator are condensed."""
+        mock_settings.github_issue_worker_required_label = "test-label"
+        mock_settings.github_issue_worker_allowed_creator = "test-user"
+
+        mock_issues = [
+            {
+                "number": 1,
+                "title": "Test Issue",
+                "body": "Test Body",
+                "author": {"login": "test-user"},
+                "labels": [{"name": "test-label"}],
+            }
+        ]
+        mock_get_issues.return_value = mock_issues
+        # Comments from issue author (who is also allowed creator) and other users
+        mock_get_comments.return_value = [
+            {"author": "test-user", "body": "Author comment", "id": 1},
+            {"author": "test-user", "body": "Another author comment", "id": 2},
+            {"author": "other-user", "body": "Other comment", "id": 3},
+        ]
+        mock_execute.return_value = {"stdout": "Condensed summary", "success": True}
+
+        task_source = GitHubTaskSource()
+        tasks = task_source.get_tasks(Path("/test"))
+
+        assert len(tasks) == 1
+        task = tasks[0]
+        assert len(task.comments) == 1
+        assert task.comments[0] == "Condensed summary"
+        mock_execute.assert_called_once()
 
     @patch("auto_slopp.workers.github_task_source.get_open_issues")
     def test_get_tasks_returns_empty_on_no_issues(self, mock_get_issues):
@@ -640,3 +720,144 @@ class TestGitHubTaskSource:
         ]
 
         assert task_source._has_prs(Path("/test"), 42) is False
+
+    @patch("auto_slopp.workers.github_task_source.execute_with_instructions")
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    def test_condense_comments_filters_by_author_only(self, mock_get_comments, mock_execute):
+        """Test that _condense_comments filters to only include comments from the issue author."""
+        mock_execute.return_value = {"stdout": "Condensed", "success": True}
+        task_source = GitHubTaskSource()
+
+        mock_get_comments.return_value = [
+            {"author": {"login": "issue-author"}, "body": "Author comment 1", "id": 1},
+            {"author": {"login": "issue-author"}, "body": "Author comment 2", "id": 2},
+            {"author": {"login": "other-user"}, "body": "Other comment", "id": 3},
+        ]
+
+        result = task_source._condense_comments(Path("/test"), 42, "issue-author", "allowed-creator")
+
+        # Should condense the 2 issue-author comments
+        assert len(result) == 1
+        assert result[0] == "Condensed"
+        mock_execute.assert_called_once()
+
+    @patch("auto_slopp.workers.github_task_source.execute_with_instructions")
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    def test_condense_comments_filters_by_allowed_creator_only(self, mock_get_comments, mock_execute):
+        """Test that _condense_comments filters to only include comments from the allowed creator."""
+        mock_execute.return_value = {"stdout": "Condensed", "success": True}
+        task_source = GitHubTaskSource()
+
+        mock_get_comments.return_value = [
+            {"author": {"login": "issue-author"}, "body": "Author comment", "id": 1},
+            {"author": {"login": "allowed-creator"}, "body": "Allowed comment 1", "id": 2},
+            {"author": {"login": "allowed-creator"}, "body": "Allowed comment 2", "id": 3},
+            {"author": {"login": "other-user"}, "body": "Other comment", "id": 4},
+        ]
+
+        result = task_source._condense_comments(Path("/test"), 42, "issue-author", "allowed-creator")
+
+        # Should condense the 2 allowed-creator comments
+        assert len(result) == 1
+        assert result[0] == "Condensed"
+        mock_execute.assert_called_once()
+
+    @patch("auto_slopp.workers.github_task_source.execute_with_instructions")
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    def test_condense_comments_mixed_author_and_allowed_creator(self, mock_get_comments, mock_execute):
+        """Test that _condense_comments includes comments from both issue author AND allowed creator."""
+        mock_execute.return_value = {"stdout": "Condensed", "success": True}
+        task_source = GitHubTaskSource()
+
+        mock_get_comments.return_value = [
+            {"author": {"login": "issue-author"}, "body": "Author comment", "id": 1},
+            {"author": {"login": "allowed-creator"}, "body": "Allowed comment", "id": 2},
+            {"author": {"login": "other-user"}, "body": "Other comment", "id": 3},
+        ]
+
+        result = task_source._condense_comments(Path("/test"), 42, "issue-author", "allowed-creator")
+
+        # Should condense both the issue-author and allowed-creator comments (2 total)
+        assert len(result) == 1
+        assert result[0] == "Condensed"
+        mock_execute.assert_called_once()
+
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    def test_condense_comments_no_matching_author(self, mock_get_comments):
+        """Test that _condense_comments returns empty when no comments match author or allowed creator."""
+        task_source = GitHubTaskSource()
+
+        mock_get_comments.return_value = [
+            {"author": {"login": "other-user"}, "body": "Other comment 1", "id": 1},
+            {"author": {"login": "another-user"}, "body": "Other comment 2", "id": 2},
+        ]
+
+        result = task_source._condense_comments(Path("/test"), 42, "issue-author", "allowed-creator")
+
+        assert result == []
+
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    def test_condense_comments_single_matching_comment(self, mock_get_comments):
+        """Test that _condense_comments returns single comment without condensing."""
+        task_source = GitHubTaskSource()
+
+        mock_get_comments.return_value = [
+            {"author": {"login": "issue-author"}, "body": "Single comment", "id": 1},
+            {"author": {"login": "other-user"}, "body": "Other comment", "id": 2},
+        ]
+
+        result = task_source._condense_comments(Path("/test"), 42, "issue-author", "allowed-creator")
+
+        assert result == ["Single comment"]
+
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    def test_condense_comments_empty_comments_list(self, mock_get_comments):
+        """Test that _condense_comments returns empty when there are no comments."""
+        task_source = GitHubTaskSource()
+
+        mock_get_comments.return_value = []
+
+        result = task_source._condense_comments(Path("/test"), 42, "issue-author", "allowed-creator")
+
+        assert result == []
+
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    def test_condense_comments_handles_none_author(self, mock_get_comments):
+        """Test that _condense_comments handles comments with None author gracefully."""
+        task_source = GitHubTaskSource()
+
+        mock_get_comments.return_value = [
+            {"author": None, "body": "Comment without author", "id": 1},
+            {"author": {"login": "issue-author"}, "body": "Author comment", "id": 2},
+        ]
+
+        result = task_source._condense_comments(Path("/test"), 42, "issue-author", "allowed-creator")
+
+        assert result == ["Author comment"]
+
+    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.delete_issue_comment")
+    @patch("auto_slopp.workers.github_task_source.execute_with_instructions")
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    def test_condense_comments_deletes_only_filtered_comments(
+        self, mock_get_comments, mock_execute, mock_delete, mock_comment
+    ):
+        """Test that _condense_comments deletes only comments from author/allowed creator."""
+        mock_execute.return_value = {"stdout": "Condensed", "success": True}
+        task_source = GitHubTaskSource()
+
+        mock_get_comments.return_value = [
+            {"author": {"login": "issue-author"}, "body": "Author comment 1", "id": 100},
+            {"author": {"login": "issue-author"}, "body": "Author comment 2", "id": 101},
+            {"author": {"login": "other-user"}, "body": "Other comment", "id": 200},
+        ]
+
+        result = task_source._condense_comments(Path("/test"), 42, "issue-author", "allowed-creator")
+
+        assert result == ["Condensed"]
+        # Only the author's comments should be deleted, not the other user's
+        assert mock_delete.call_count == 2
+        mock_delete.assert_any_call(Path("/test"), 42, 100)
+        mock_delete.assert_any_call(Path("/test"), 42, 101)
+        # Summary should be posted
+        mock_comment.assert_called_with(Path("/test"), 42, "Condensed")
