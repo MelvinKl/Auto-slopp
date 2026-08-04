@@ -7,6 +7,7 @@ from pathlib import Path
 
 from auto_slopp.executor import run_executor
 from auto_slopp.telegram_handler import setup_telegram_logging
+from auto_slopp.utils.logging_util import add_file_handler
 from settings.main import settings
 
 
@@ -19,9 +20,14 @@ def setup_logging() -> None:
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
+    logger = logging.getLogger("auto_slopp")
+
+    # Add rotating file handler for warnings and above
+    log_dir = Path("logs")
+    add_file_handler(logger, log_dir=log_dir)
+
     telegram_handler = setup_telegram_logging(level=logging.WARNING)
     if telegram_handler:
-        logger = logging.getLogger("auto_slopp")
         logger.addHandler(telegram_handler)
         logger.info("Telegram logging integration enabled")
 
