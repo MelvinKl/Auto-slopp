@@ -1,6 +1,7 @@
 """Endless loop executor for running Worker instances."""
 
 import subprocess
+import threading
 import time
 import traceback
 from pathlib import Path
@@ -41,6 +42,8 @@ class Executor:
         """
         self.repo_path = repo_path
         self.running = False
+        self._repo_locks: dict[Path, threading.Lock] = {}
+        self._repo_locks_lock = threading.Lock()
 
     def start(self) -> None:
         """Start the endless execution loop."""
@@ -128,19 +131,36 @@ class Executor:
             try:
                 print(f"Processing subdirectory: {subdirectory.name}")
 
-                worker = self._instantiate_worker(worker_class)
+                repo_lock = self._get_repo_lock(subdirectory)
 
-                start_time = time.time()
-                result = worker.run(subdirectory)
-                execution_time = time.time() - start_time
+                with repo_lock:
+                    worker = self._instantiate_worker(worker_class)
 
-                print(f"Worker {worker_class.__name__} on {subdirectory.name} completed in {execution_time:.2f}s")
-                if result is not None:
-                    print(f"Result: {result}")
+                    start_time = time.time()
+                    result = worker.run(subdirectory)
+                    execution_time = time.time() - start_time
+
+                    print(f"Worker {worker_class.__name__} on {subdirectory.name} completed in {execution_time:.2f}s")
+                    if result is not None:
+                        print(f"Result: {result}")
 
             except Exception as e:
                 print(f"Error executing worker {worker_class.__name__} on {subdirectory.name}: {e}")
                 traceback.print_exc()
+
+    def _get_repo_lock(self, repo_path: Path) -> threading.Lock:
+        """Get or create a lock for a specific repository.
+
+        Args:
+            repo_path: Path to the repository.
+
+        Returns:
+            threading.Lock for the given repository.
+        """
+        with self._repo_locks_lock:
+            if repo_path not in self._repo_locks:
+                self._repo_locks[repo_path] = threading.Lock()
+            return self._repo_locks[repo_path]
 
     def _check_for_updates(self) -> bool:
         """Execute git pull in the working directory and detect if updates were downloaded.
