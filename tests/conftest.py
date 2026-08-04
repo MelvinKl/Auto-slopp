@@ -124,6 +124,7 @@ def mock_settings():
     settings.telegram_disable_web_page_preview = True
     settings.telegram_disable_notification = False
     settings.auto_update_reboot_delay = 300
+    settings.log_dir = Path("logs")
     return settings
 
 

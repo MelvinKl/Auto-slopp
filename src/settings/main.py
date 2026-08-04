@@ -57,6 +57,11 @@ class Settings(BaseSettings):
         description="Base path to the repository directory",
     )
 
+    log_dir: Path = Field(
+        default=Path("logs"),
+        description="Directory for log files",
+    )
+
     workers_disabled: List[str] = Field(
         default_factory=list,
         description="List of disabled worker names. Empty list means all workers are enabled.",
