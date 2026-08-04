@@ -200,6 +200,7 @@ class IssueWorker(Worker):
             "task_id": task_id,
             "task_title": task_title,
             "success": False,
+            "status": "pending",
             "openagent_executed": False,
             "openagent_executions": 0,
             "task_completed": False,
@@ -218,6 +219,7 @@ class IssueWorker(Worker):
                 self.logger.info(f"DRY RUN: Would create branch {branch_name} and execute with Ralph loop")
                 result["openagent_executed"] = True
                 result["success"] = True
+                result["status"] = "success"
                 return result
 
             self.task_source.on_task_start(task, branch_name)
@@ -227,6 +229,7 @@ class IssueWorker(Worker):
                 error_msg = f"Failed to create branch '{branch_name}' for task #{task_id}"
                 self.logger.error(error_msg)
                 result["error"] = error_msg
+                result["status"] = "failure"
                 self.task_source.on_task_failure(task, error_msg)
                 return result
 
@@ -248,6 +251,7 @@ class IssueWorker(Worker):
 
                 if not ralph_result.get("success", False):
                     result["error"] = f"Ralph loop failed: {ralph_result.get('error', 'Unknown error')}"
+                    result["status"] = "failure"
 
                     if ralph_result.get("max_loops_reached", False):
                         self.logger.warning(f"Ralph loop reached max iterations for task #{task_id}")
@@ -286,6 +290,7 @@ class IssueWorker(Worker):
                     cli_tool = get_active_cli_command()
                     error_msg = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
                     result["error"] = error_msg
+                    result["status"] = "failure"
                     self.task_source.on_task_failure(task, error_msg)
                     return result
 
@@ -298,6 +303,7 @@ class IssueWorker(Worker):
                 result["tasks_completed"] = 1
 
                 result["success"] = True
+                result["status"] = "success"
                 result["no_changes"] = True
                 return result
 
@@ -318,6 +324,7 @@ class IssueWorker(Worker):
                 result["task_completed"] = True
                 result["tasks_completed"] = 1
                 result["success"] = True
+                result["status"] = "success"
                 result["no_changes"] = True
                 return result
 
@@ -332,6 +339,7 @@ class IssueWorker(Worker):
                     error_msg = f"Failed to commit outstanding changes for task #{task_id}"
                     self.logger.error(error_msg)
                     result["error"] = error_msg
+                    result["status"] = "failure"
                     self.task_source.on_task_failure(task, error_msg)
                     return result
 
@@ -340,6 +348,7 @@ class IssueWorker(Worker):
                 error_msg = f"Failed to push branch '{current_branch}' for task #{task_id}: {push_message}"
                 self.logger.error(error_msg)
                 result["error"] = error_msg
+                result["status"] = "failure"
                 self.task_source.on_task_failure(task, error_msg)
                 return result
 
@@ -375,6 +384,7 @@ class IssueWorker(Worker):
                     error_msg = f"Failed to create pull request for task #{task_id} on branch '{current_branch}'"
                     self.logger.error(error_msg)
                     result["error"] = error_msg
+                    result["status"] = "failure"
                     self.task_source.on_task_failure(task, error_msg)
                     return result
 
@@ -383,6 +393,7 @@ class IssueWorker(Worker):
                 error_msg = f"Task #{task_id} processed but no PR URL available for branch '{current_branch}'"
                 self.logger.error(error_msg)
                 result["error"] = error_msg
+                result["status"] = "failure"
                 self.task_source.on_task_failure(task, error_msg)
                 return result
 
@@ -393,6 +404,7 @@ class IssueWorker(Worker):
                 result["task_completed"] = True
                 result["tasks_completed"] = 1
                 result["success"] = True
+                result["status"] = "success"
                 return result
 
             # Perform PR review to check for findings
@@ -426,6 +438,7 @@ class IssueWorker(Worker):
                 result["task_completed"] = False
                 result["tasks_completed"] = 0
                 result["success"] = True
+                result["status"] = "success"
                 result["pr_review_done"] = True
                 return result
             else:
@@ -443,11 +456,13 @@ class IssueWorker(Worker):
                 result["task_completed"] = True
                 result["tasks_completed"] = 1
                 result["success"] = True
+                result["status"] = "success"
                 result["label_removed"] = True
 
         except Exception as e:
             self.logger.error(f"Error processing task #{task_id}: {str(e)}")
             result["error"] = str(e)
+            result["status"] = "failure"
             self.task_source.on_task_failure(task, str(e))
 
         return result
