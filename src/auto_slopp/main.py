@@ -22,8 +22,10 @@ def setup_logging() -> None:
 
     logger = logging.getLogger("auto_slopp")
 
-    # Add rotating file handler for warnings and above
-    add_file_handler(logger, log_dir=settings.log_dir)
+    # Add rotating file handler for warnings and above (if configured)
+    if settings.log_file_dir is not None:
+        log_dir = Path(settings.log_file_dir).expanduser()
+        add_file_handler(logger, log_dir=log_dir)
 
     telegram_handler = setup_telegram_logging(level=logging.WARNING)
     if telegram_handler:

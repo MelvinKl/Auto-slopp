@@ -57,9 +57,9 @@ class Settings(BaseSettings):
         description="Base path to the repository directory",
     )
 
-    log_dir: Path = Field(
-        default=Path("logs"),
-        description="Directory for log files",
+    log_file_dir: Optional[Path] = Field(
+        default=None,
+        description="Directory for log files (WARNING+ severity). Set to None to disable file logging.",
     )
 
     workers_disabled: List[str] = Field(

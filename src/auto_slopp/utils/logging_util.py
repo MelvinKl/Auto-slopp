@@ -8,6 +8,15 @@ import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+# Module-level cache for idempotency
+_file_handler_cache: RotatingFileHandler | None = None
+
+
+def reset_file_handler_cache() -> None:
+    """Reset the module-level handler cache (mainly for testing)."""
+    global _file_handler_cache
+    _file_handler_cache = None
+
 
 def setup_file_handler(
     log_dir: Path,
@@ -17,6 +26,9 @@ def setup_file_handler(
     level: int = logging.WARNING,
 ) -> RotatingFileHandler:
     """Create and configure a rotating file handler.
+
+    This function is idempotent — calling it multiple times with the same
+    arguments returns the cached handler instance.
 
     Args:
         log_dir: Directory to write the log file into.
@@ -28,6 +40,12 @@ def setup_file_handler(
     Returns:
         Configured RotatingFileHandler.
     """
+    global _file_handler_cache
+
+    # Idempotency: return cached handler if same config
+    if _file_handler_cache is not None:
+        return _file_handler_cache
+
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / filename
 
@@ -42,6 +60,7 @@ def setup_file_handler(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
     handler.setFormatter(formatter)
+    _file_handler_cache = handler
     return handler
 
 

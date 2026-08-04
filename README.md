@@ -639,9 +639,9 @@ AUTO_SLOPP_TASK_DIFFICULTIES='{
 # Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
 AUTO_SLOPP_SLOP_TIMEOUT=7200
 
-# Log file directory (default: ./logs)
+# Log file directory (default: disabled — set to enable)
 # Logs at WARNING level and above are written to a rotating log file
-AUTO_SLOPP_LOG_DIR=./logs
+AUTO_SLOPP_LOG_FILE_DIR=./logs
 
 # Telegram logging (optional)
 AUTO_SLOPP_TELEGRAM_ENABLED=true
@@ -1096,14 +1096,14 @@ Auto-slopp writes logs at **WARNING level and above** to a rotating log file, co
 
 ### Configuration
 
-Set the log file directory with `AUTO_SLOPP_LOG_DIR`:
+Set the log file directory with `AUTO_SLOPP_LOG_FILE_DIR`:
 
 ```bash
-# Default: ./logs
-AUTO_SLOPP_LOG_DIR=./logs
+# Enable file logging (default: disabled — set to enable)
+AUTO_SLOPP_LOG_FILE_DIR=./logs
 
 # Custom directory
-AUTO_SLOPP_LOG_DIR=/var/log/auto-slopp
+AUTO_SLOPP_LOG_FILE_DIR=/var/log/auto-slopp
 ```
 
 ### Log File Details
