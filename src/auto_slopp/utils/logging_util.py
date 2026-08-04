@@ -63,6 +63,33 @@ def setup_file_handler(
     return handler
 
 
+def _find_existing_handler(
+    logger: logging.Logger,
+    log_dir: Path,
+    filename: str,
+) -> RotatingFileHandler | None:
+    """Check if the logger already has a RotatingFileHandler for the same file.
+
+    This avoids cross-logger contamination and duplicate handler attachment
+    without relying on a module-level cache.
+
+    Args:
+        logger: Logger to check.
+        log_dir: Expected log directory.
+        filename: Expected log filename.
+
+    Returns:
+        The existing handler if found, otherwise None.
+    """
+    log_path = log_dir / filename
+    for existing in logger.handlers:
+        if isinstance(existing, RotatingFileHandler):
+            existing_path = Path(existing.baseFilename)
+            if existing_path.resolve() == log_path.resolve():
+                return existing
+    return None
+
+
 def add_file_handler(
     logger: logging.Logger,
     log_dir: Path,
@@ -72,6 +99,10 @@ def add_file_handler(
     level: int = logging.WARNING,
 ) -> RotatingFileHandler:
     """Add a file handler to an existing logger.
+
+    Checks the logger's existing handlers for a RotatingFileHandler pointing
+    to the same file before creating a new one, avoiding duplicate attachment
+    and cross-logger contamination.
 
     Args:
         logger: Logger instance to attach the handler to.
@@ -84,6 +115,11 @@ def add_file_handler(
     Returns:
         The configured RotatingFileHandler that was added.
     """
+    # Check if logger already has a handler for the same file
+    existing = _find_existing_handler(logger, log_dir, filename)
+    if existing is not None:
+        return existing
+
     handler = setup_file_handler(
         log_dir=log_dir,
         filename=filename,
@@ -91,7 +127,5 @@ def add_file_handler(
         backup_count=backup_count,
         level=level,
     )
-    # Avoid adding the same handler twice
-    if handler not in logger.handlers:
-        logger.addHandler(handler)
+    logger.addHandler(handler)
     return handler
