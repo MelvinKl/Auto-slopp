@@ -157,9 +157,9 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
         data = json.loads(result.stdout)
         # Extract comments from the issue view response
         raw_comments = data.get("comments", [])
-        logger.debug(
-            f"[GetComments] Fetched {len(raw_comments)} raw comments for issue #{issue_number} in {repo_dir.name}"
-        )
+        # fmt: off
+        logger.debug(f"[GetComments] Fetched {len(raw_comments)} raw comments for issue #{issue_number} in {repo_dir.name}")
+        # fmt: on
 
         # Transform to expected format
         comments = []
@@ -211,9 +211,9 @@ def delete_issue_comment(repo_dir: Path, issue_number: int, comment_id: int) -> 
         if result.returncode == 0:
             logger.debug(f"[DeleteComment] Successfully deleted comment {comment_id}")
         else:
-            logger.warning(
-                f"[DeleteComment] Failed to delete comment {comment_id}, returncode: {result.returncode}, stderr: {result.stderr}"
-            )
+            # fmt: off
+            logger.warning(f"[DeleteComment] Failed to delete comment {comment_id}, returncode: {result.returncode}, stderr: {result.stderr}")
+            # fmt: on
         return result.returncode == 0
 
     except GitHubOperationError as e:
