@@ -32,12 +32,14 @@ def _check_startup_health(working_dir: Path) -> None:
     logger.info("Running startup health check for CLI configurations...")
     for index, config in enumerate(settings.cli_configurations):
         state = _get_cli_state(index)
-        c_dict = {
-            "cli_command": config.cli_command,
-            "cli_args": list(config.cli_args),
-            "name": config.name,
-        }
-        if _probe_configuration(c_dict, working_dir):
+        if _probe_configuration(
+            {
+                "cli_command": config.cli_command,
+                "cli_args": list(config.cli_args),
+                "name": config.name,
+            },
+            working_dir,
+        ):
             logger.info(f"CLI tool {config.name} is healthy.")
             state["active"] = True
         else:
