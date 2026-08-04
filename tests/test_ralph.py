@@ -1222,6 +1222,7 @@ class TestRalphExecutor:
                 issue_body="Test body",
                 comment_texts=[],
                 branch_name="ai/branch",
+                issue_number=1,
             )
 
             assert result["success"] is True
@@ -1252,6 +1253,7 @@ class TestRalphExecutor:
                 issue_body="Test body",
                 comment_texts=[],
                 branch_name="ai/branch",
+                issue_number=1,
             )
 
             assert result["success"] is False
@@ -1278,6 +1280,7 @@ class TestRalphExecutor:
                 issue_body="Test body",
                 comment_texts=[],
                 branch_name="ai/branch",
+                issue_number=1,
             )
 
             assert result["success"] is False
@@ -1285,25 +1288,19 @@ class TestRalphExecutor:
             assert result["max_loops_reached"] is False
             assert result["loops_executed"] == 0
 
-    def test_run_refined_task_loop_final_check_retries_while_iterations_remain(self, ralph_executor):
-        """Test that a failed final check is retried while iterations remain."""
+    def test_run_refined_task_loop_final_check_deletes_task_file_on_failure(self, ralph_executor):
+        """Test that a failed final check deletes the task file so it is recreated next time."""
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_dir = Path(tmpdir)
-            task_path = repo_dir / "task.md"
+            task_path = repo_dir / ".ralph" / "github-1.md"
+            task_path.parent.mkdir(parents=True, exist_ok=True)
             task_path.write_text("# Test\n\n## Steps\n\n- [x] 1. Completed step\n")
 
             ralph_executor.max_iterations = 3
-            validation_calls = [0]
-
-            def flaky_execute_fn(*args, **kwargs):
-                if kwargs.get("task_name") == "task_implementation_validation":
-                    validation_calls[0] += 1
-                    if validation_calls[0] == 1:
-                        return {"success": True, "stdout": "ACCEPTANCE_STATUS: fail"}
-                    return {"success": True, "stdout": "ACCEPTANCE_STATUS: pass"}
-                return {"success": True, "stdout": "Done"}
-
-            ralph_executor.execute_fn = flaky_execute_fn
+            ralph_executor.execute_fn = lambda *args, **kwargs: {
+                "success": True,
+                "stdout": "ACCEPTANCE_STATUS: fail",
+            }
 
             result = ralph_executor._run_refined_task_loop(
                 repo_dir=repo_dir,
@@ -1312,12 +1309,13 @@ class TestRalphExecutor:
                 issue_body="Test body",
                 comment_texts=[],
                 branch_name="ai/branch",
+                issue_number=1,
             )
 
-            assert result["success"] is True
-            assert result["steps_completed"] == 1
-            assert validation_calls[0] == 2
-            assert result["loops_executed"] == 1
+            assert result["success"] is False
+            assert result["error"] == "Final acceptance criteria were not fulfilled"
+            assert not task_path.exists(), "Task file should be deleted on failed evaluation"
+            assert result["loops_executed"] == 0
 
     def test_run_refined_task_loop_max_iterations_partial_work_runs_final_check(self, ralph_executor):
         """Test that the final acceptance check runs on partial work at max iterations."""
@@ -1346,6 +1344,7 @@ class TestRalphExecutor:
                 issue_body="Test body",
                 comment_texts=[],
                 branch_name="ai/branch",
+                issue_number=1,
             )
 
             assert result["success"] is False
@@ -1393,6 +1392,7 @@ class TestRalphExecutor:
                 issue_body="Test body",
                 comment_texts=[],
                 branch_name="ai/branch",
+                issue_number=1,
             )
 
             assert result["success"] is True
