@@ -198,6 +198,11 @@ class TestMainApplication:
                             mock_executor.side_effect = KeyboardInterrupt()
                             main()
 
+                            mock_check_startup.assert_called_once()
+                            mock_check_startup.assert_called_once_with(
+                                Path("/custom/repo"),
+                            )
+
                             mock_executor.assert_called_once_with(
                                 repo_path=Path("/custom/repo"),
                             )
