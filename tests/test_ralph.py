@@ -1355,6 +1355,36 @@ class TestRalphExecutor:
             assert validation_calls[0] == 1
             assert result["last_error"] == "Final acceptance criteria were not fulfilled"
 
+    def test_run_refined_task_loop_max_iterations_deletes_task_file_on_failed_check(self, ralph_executor):
+        """Test that the task file is deleted when final acceptance check fails at max iterations."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / ".ralph" / "github-1.md"
+            task_path.parent.mkdir(parents=True, exist_ok=True)
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Second step\n")
+
+            ralph_executor.max_iterations = 2
+            ralph_executor.has_changes_fn = lambda path: False
+
+            ralph_executor.execute_fn = lambda *args, **kwargs: {
+                "success": True,
+                "stdout": "ACCEPTANCE_STATUS: fail",
+            }
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+                issue_number=1,
+            )
+
+            assert result["success"] is False
+            assert result["max_loops_reached"] is True
+            assert not task_path.exists(), "Task file should be deleted on failed evaluation at max iterations"
+
     def test_run_refined_task_loop_no_intermediate_checks(self, ralph_executor):
         """Test that refined task loop executes steps without intermediate checks."""
         with tempfile.TemporaryDirectory() as tmpdir:

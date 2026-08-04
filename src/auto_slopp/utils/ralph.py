@@ -912,6 +912,10 @@ class RalphExecutor:
                     result.pop("error", None)
             else:
                 result["last_error"] = final_check_result.get("error", "Final acceptance check failed")
+                # Final acceptance check failed at max iterations. Delete the
+                # task file so it is recreated from scratch on the next Ralph
+                # invocation.
+                self._delete_task_file(repo_dir, issue_number)
         return result
 
 
