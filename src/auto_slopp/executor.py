@@ -44,6 +44,7 @@ class Executor:
         self.running = False
         self._repo_locks: dict[Path, threading.Lock] = {}
         self._repo_locks_lock = threading.Lock()
+        self._worker_threads: list[threading.Thread] = []
 
     def start(self) -> None:
         """Start the endless execution loop."""
@@ -75,8 +76,18 @@ class Executor:
 
             print(f"Running {len(enabled_workers)} workers: {[w.__name__ for w in enabled_workers]}")
 
+            self._worker_threads = []
             for worker_class in enabled_workers:
-                self._execute_worker(worker_class)
+                thread = threading.Thread(
+                    target=self._execute_worker,
+                    args=(worker_class,),
+                    name=f"worker-{worker_class.__name__}",
+                )
+                thread.start()
+                self._worker_threads.append(thread)
+
+            for thread in self._worker_threads:
+                thread.join()
 
         except Exception as e:
             print(f"Error in iteration: {e}")
