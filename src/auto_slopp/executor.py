@@ -45,6 +45,7 @@ class Executor:
         self._repo_locks: dict[Path, threading.Lock] = {}
         self._repo_locks_lock = threading.Lock()
         self._worker_threads: list[threading.Thread] = []
+        self._stop_event = threading.Event()
 
     def start(self) -> None:
         """Start the endless execution loop."""
@@ -76,6 +77,9 @@ class Executor:
 
             print(f"Running {len(enabled_workers)} workers: {[w.__name__ for w in enabled_workers]}")
 
+            # Signal all worker threads to stop after their current iteration
+            self._stop_event.set()
+
             self._worker_threads = []
             for worker_class in enabled_workers:
                 thread = threading.Thread(
@@ -88,6 +92,9 @@ class Executor:
 
             for thread in self._worker_threads:
                 thread.join()
+
+            # Clear the stop event after all workers have finished
+            self._stop_event.clear()
 
         except Exception as e:
             print(f"Error in iteration: {e}")
@@ -139,6 +146,13 @@ class Executor:
         print(f"Found {len(subdirectories)} subdirectories to process")
 
         for subdirectory in subdirectories:
+            # Check if we should stop after this subdirectory
+            if self._stop_event.is_set():
+                print(
+                    f"Worker {worker_class.__name__} received stop signal, finishing current subdirectory and exiting."
+                )
+                break
+
             try:
                 print(f"Processing subdirectory: {subdirectory.name}")
 
