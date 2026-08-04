@@ -371,8 +371,11 @@ def test_startup_health_check_marks_unhealthy_configs_in_cooldown(mock_run, monk
     assert _cli_states[0]["cooldown_until"] > 0
     assert _cli_states[1]["active"] is False
     assert _cli_states[1]["cooldown_until"] > 0
-    # Second tool should have longer cooldown
-    assert _cli_states[1]["cooldown_until"] > _cli_states[0]["cooldown_until"]
+    # Verify cooldown durations match expected values (deterministic, no wall-clock dependency)
+    import time
+
+    assert abs((_cli_states[0]["cooldown_until"] - time.time()) - 60) < 0.01
+    assert abs((_cli_states[1]["cooldown_until"] - time.time()) - 120) < 0.01
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
