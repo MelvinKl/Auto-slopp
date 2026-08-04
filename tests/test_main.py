@@ -131,8 +131,9 @@ class TestMainApplication:
 
                     mock_httpx_logger.setLevel.assert_called_with(30)
 
+    @patch("auto_slopp.main._check_startup_health")
     @patch("auto_slopp.main.run_executor")
-    def test_main_function_with_keyboard_interrupt(self, mock_run_executor, mock_settings):
+    def test_main_function_with_keyboard_interrupt(self, mock_run_executor, mock_check_startup, mock_settings):
         """Test main function handles KeyboardInterrupt gracefully."""
         mock_run_executor.side_effect = KeyboardInterrupt()
 
@@ -151,8 +152,9 @@ class TestMainApplication:
 
                         mock_exit.assert_called_once_with(0)
 
+    @patch("auto_slopp.main._check_startup_health")
     @patch("auto_slopp.main.run_executor")
-    def test_main_function_with_exception(self, mock_run_executor, mock_settings):
+    def test_main_function_with_exception(self, mock_run_executor, mock_check_startup, mock_settings):
         """Test main function handles exceptions gracefully."""
         mock_run_executor.side_effect = Exception("Test error")
 
@@ -171,8 +173,9 @@ class TestMainApplication:
 
                         mock_exit.assert_called_once_with(1)
 
+    @patch("auto_slopp.main._check_startup_health")
     @patch("auto_slopp.main.run_executor")
-    def test_main_function_successful_execution(self, mock_run_executor, mock_settings):
+    def test_main_function_successful_execution(self, mock_run_executor, mock_check_startup, mock_settings):
         """Test main function executes successfully."""
         mock_settings.base_repo_path = Path("/default/repo")
         mock_settings.debug = False

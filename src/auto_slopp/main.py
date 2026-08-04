@@ -7,6 +7,7 @@ from pathlib import Path
 
 from auto_slopp.executor import run_executor
 from auto_slopp.telegram_handler import setup_telegram_logging
+from auto_slopp.utils.cli_executor import _check_startup_health
 from settings.main import settings
 
 
@@ -79,6 +80,8 @@ def main() -> None:
 
     if debug:
         logger.debug("Debug mode enabled - showing detailed logs")
+
+    _check_startup_health(repo_path)
 
     try:
         run_executor(repo_path=repo_path)

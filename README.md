@@ -106,6 +106,7 @@ The capability rating system (0-10) helps match tasks with appropriate CLI tools
 3. The system selects tools within the task's min/max range
 4. Preference is given to tools closest to the task's recommended rating
 5. If a tool encounters errors, it enters cooldown (configurable duration)
+6. On startup, all configured CLI tools are probed for health; unhealthy tools are placed in cooldown automatically
 
 ##### Task Blacklisting
 

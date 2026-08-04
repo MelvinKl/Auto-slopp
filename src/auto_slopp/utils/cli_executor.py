@@ -27,6 +27,25 @@ def _get_cli_state(index: int) -> Dict[str, Any]:
     return _cli_states[index]
 
 
+def _check_startup_health(working_dir: Path) -> None:
+    """Probe all CLI configurations at startup and place unhealthy ones in cooldown."""
+    logger.info("Running startup health check for CLI configurations...")
+    for index, config in enumerate(settings.cli_configurations):
+        state = _get_cli_state(index)
+        c_dict = {
+            "cli_command": config.cli_command,
+            "cli_args": list(config.cli_args),
+            "name": config.name,
+        }
+        if _probe_configuration(c_dict, working_dir):
+            logger.info(f"CLI tool {config.name} is healthy.")
+            state["active"] = True
+        else:
+            logger.warning(f"CLI tool {config.name} failed health check. Placing in cooldown.")
+            state["active"] = False
+            state["cooldown_until"] = time.time() + config.cooldown_seconds
+
+
 def _check_cooldowns(working_dir: Path) -> None:
     now = time.time()
     for index, config in enumerate(settings.cli_configurations):

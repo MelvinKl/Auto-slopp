@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-from auto_slopp.utils.cli_executor import run_cli_executor
+from auto_slopp.utils.cli_executor import _check_startup_health, run_cli_executor
 from settings.main import CLIConfiguration, TaskRating
 
 
@@ -319,3 +319,83 @@ def test_all_configs_blacklisted_returns_error(mock_run, monkeypatch):
     assert result["success"] is False
     assert "no cli configuration meets" in result["error"].lower()
     assert mock_run.call_count == 0
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_startup_health_check_marks_healthy_configs_active(mock_run, monkeypatch):
+    """Startup health check should mark healthy configurations as active."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="tool-1", cli_args=["run"], name="tool-1"),
+            CLIConfiguration(cli_command="tool-2", cli_args=["run"], name="tool-2"),
+        ],
+    )
+
+    _check_startup_health(Path.cwd())
+
+    assert mock_run.call_count == 2
+    from auto_slopp.utils.cli_executor import _cli_states
+
+    assert _cli_states[0]["active"] is True
+    assert _cli_states[1]["active"] is True
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_startup_health_check_marks_unhealthy_configs_in_cooldown(mock_run, monkeypatch):
+    """Startup health check should place unhealthy configurations in cooldown."""
+    mock_run.return_value.returncode = 1
+    mock_run.return_value.stdout = ""
+    mock_run.return_value.stderr = "error"
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="tool-1", cli_args=["run"], name="tool-1", cooldown_seconds=60),
+            CLIConfiguration(cli_command="tool-2", cli_args=["run"], name="tool-2", cooldown_seconds=120),
+        ],
+    )
+
+    _check_startup_health(Path.cwd())
+
+    assert mock_run.call_count == 2
+    from auto_slopp.utils.cli_executor import _cli_states
+
+    assert _cli_states[0]["active"] is False
+    assert _cli_states[0]["cooldown_until"] > 0
+    assert _cli_states[1]["active"] is False
+    assert _cli_states[1]["cooldown_until"] > 0
+    # Second tool should have longer cooldown
+    assert _cli_states[1]["cooldown_until"] > _cli_states[0]["cooldown_until"]
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_startup_health_check_mixed_health(mock_run, monkeypatch):
+    """Startup health check should handle mixed healthy/unhealthy configurations."""
+    success_result = type("Result", (), {"returncode": 0, "stdout": "ok", "stderr": ""})()
+    fail_result = type("Result", (), {"returncode": 1, "stdout": "", "stderr": "error"})()
+    mock_run.side_effect = [success_result, fail_result]
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="healthy-tool", cli_args=["run"], name="healthy"),
+            CLIConfiguration(cli_command="unhealthy-tool", cli_args=["run"], name="unhealthy", cooldown_seconds=60),
+        ],
+    )
+
+    _check_startup_health(Path.cwd())
+
+    assert mock_run.call_count == 2
+    from auto_slopp.utils.cli_executor import _cli_states
+
+    assert _cli_states[0]["active"] is True
+    assert _cli_states[1]["active"] is False
+    assert _cli_states[1]["cooldown_until"] > 0
