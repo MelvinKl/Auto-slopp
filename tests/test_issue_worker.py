@@ -1082,25 +1082,25 @@ class TestIssueWorker:
 
         # Test case 1: No comments
         mock_get_comments.return_value = []
-        result = task_source._condense_comments(Path("/tmp"), 1, "author")
-        assert result == ["No comments provided."]
+        result = task_source._condense_comments(Path("/tmp"), 1, "author", "MelvinKl")
+        assert result == []
 
         # Test case 2: One comment
-        mock_get_comments.return_value = [{"id": 1, "body": "Only comment", "author": {"login": "user"}}]
-        result = task_source._condense_comments(Path("/tmp"), 2, "author")
-        assert result == ["Only one comment present; no additional comments to condense."]
+        mock_get_comments.return_value = [{"id": 1, "body": "Only comment", "author": {"login": "author"}}]
+        result = task_source._condense_comments(Path("/tmp"), 2, "author", "MelvinKl")
+        assert result == ["Only comment"]
 
         # Test case 3: Multiple comments - should call CLI to condense
         mock_get_comments.return_value = [
-            {"id": 1, "body": "First comment", "author": {"login": "user"}},
-            {"id": 2, "body": "Second comment", "author": {"login": "user"}},
-            {"id": 3, "body": "Third comment", "author": {"login": "user"}},
+            {"id": 1, "body": "First comment", "author": {"login": "author"}},
+            {"id": 2, "body": "Second comment", "author": {"login": "author"}},
+            {"id": 3, "body": "Third comment", "author": {"login": "author"}},
         ]
         with patch("auto_slopp.workers.github_task_source.execute_with_instructions") as mock_execute:
             mock_execute.return_value = {"success": True, "stdout": "Condensed summary"}
             with patch("auto_slopp.workers.github_task_source.comment_on_issue"):
                 with patch("auto_slopp.workers.github_task_source.delete_issue_comment"):
-                    result = task_source._condense_comments(Path("/tmp"), 3, "author")
+                    result = task_source._condense_comments(Path("/tmp"), 3, "author", "MelvinKl")
                     assert result == ["Condensed summary"]
 
     def test_comments_pass_through_unchanged(self):

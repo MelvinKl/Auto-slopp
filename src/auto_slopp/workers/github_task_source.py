@@ -74,27 +74,27 @@ class GitHubTaskSource(TaskSource):
     ) -> List[str]:
         """Condense comments from the issue author or allowed creator into a single comment.
 
-Fetches all comments via get_issue_comments(). Filters to only include comments
-        from the issue author or the whitelisted allowed creator. If there are 0 or 1
-        filtered comments, returns them as-is (no condensing). If there are 2+ filtered
-        comments, calls the CLI executor to summarize them, posts the summary as a new
-        comment, deletes ALL original comments on the issue, and returns the summary as a
-        single-element list.
+        Fetches all comments via get_issue_comments(). Filters to only include comments
+                from the issue author or the whitelisted allowed creator. If there are 0 or 1
+                filtered comments, returns them as-is (no condensing). If there are 2+ filtered
+                comments, calls the CLI executor to summarize them, posts the summary as a new
+                comment, deletes ALL original comments on the issue, and returns the summary as a
+                single-element list.
 
-        Args:
-            repo_path: Path to the repository.
-            issue_number: Issue number.
-            issue_author_login: Login of the issue author.
-            allowed_creator: Whitelisted GitHub username whose comments should be included.
+                Args:
+                    repo_path: Path to the repository.
+                    issue_number: Issue number.
+                    issue_author_login: Login of the issue author.
+                    allowed_creator: Whitelisted GitHub username whose comments should be included.
 
-        Returns:
-            List containing ["No comments provided."] (no comments),
-            ["Only one comment present; no additional comments to condense."] (one comment),
-            or [condensed_summary] (multiple comments condensed).
+                Returns:
+                    List containing ["No comments provided."] (no comments),
+                    ["Only one comment present; no additional comments to condense."] (one comment),
+                    or [condensed_summary] (multiple comments condensed).
         """
         # Fetch all comments (each is a dict with 'id', 'body', 'author', 'createdAt')
         logger.debug(f"[Condense] Fetching comments for issue #{issue_number}")
-all_comments = get_issue_comments(repo_path, issue_number)
+        all_comments = get_issue_comments(repo_path, issue_number)
         if not all_comments:
             logger.debug(f"[Condense] No comments found for issue #{issue_number}")
             return []
@@ -112,7 +112,9 @@ all_comments = get_issue_comments(repo_path, issue_number)
             if author_login in (issue_author_login, allowed_creator):
                 filtered_comments.append(comment)
 
-        logger.debug(f"[Condense] Filtered to {len(filtered_comments)} comments (author: {issue_author_login}, allowed: {allowed_creator})")
+        logger.debug(
+            f"[Condense] Filtered to {len(filtered_comments)} comments (author: {issue_author_login}, allowed: {allowed_creator})"
+        )
 
         # No relevant comments
         if not filtered_comments:
