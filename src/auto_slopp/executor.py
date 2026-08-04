@@ -77,9 +77,6 @@ class Executor:
 
             print(f"Running {len(enabled_workers)} workers: {[w.__name__ for w in enabled_workers]}")
 
-            # Signal all worker threads to stop after their current iteration
-            self._stop_event.set()
-
             self._worker_threads = []
             for worker_class in enabled_workers:
                 thread = threading.Thread(
@@ -90,11 +87,9 @@ class Executor:
                 thread.start()
                 self._worker_threads.append(thread)
 
+            # Wait for all worker threads to finish their current iteration
             for thread in self._worker_threads:
                 thread.join()
-
-            # Clear the stop event after all workers have finished
-            self._stop_event.clear()
 
         except Exception as e:
             print(f"Error in iteration: {e}")
@@ -210,6 +205,11 @@ class Executor:
 
             if update_detected:
                 print(f"Update detected: {output.strip()}")
+                # Signal all worker threads to stop after their current iteration
+                self._stop_event.set()
+                # Wait for all threads to finish their current subdirectory
+                for thread in self._worker_threads:
+                    thread.join()
                 self._schedule_reboot(settings.auto_update_reboot_delay)
                 return True
 
