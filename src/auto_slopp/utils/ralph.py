@@ -267,6 +267,13 @@ class RalphExecutor:
         """Get the canonical task file path for a task."""
         return repo_dir / ".ralph" / f"{self.file_prefix}-{issue_number}.md"
 
+    def _delete_task_file(self, repo_dir: Path, issue_number: int) -> None:
+        """Delete the task file for an issue if it exists."""
+        task_path = self._get_issue_task_path(repo_dir, issue_number)
+        if task_path.exists():
+            task_path.unlink()
+            self.logger.info(f"Deleted task file: {task_path}")
+
     def _create_issue_task_file(
         self,
         task_path: Path,
