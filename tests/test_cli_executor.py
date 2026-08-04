@@ -346,6 +346,16 @@ def test_startup_health_check_marks_healthy_configs_active(mock_run, monkeypatch
     assert _cli_states[1]["active"] is True
 
 
+class _FakeTime:
+    """Mock time module that returns a fixed value."""
+
+    def __init__(self, time_val: float):
+        self._time_val = time_val
+
+    def time(self) -> float:
+        return self._time_val
+
+
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
 def test_startup_health_check_marks_unhealthy_configs_in_cooldown(mock_run, monkeypatch):
     """Startup health check should place unhealthy configurations in cooldown."""
@@ -362,20 +372,19 @@ def test_startup_health_check_marks_unhealthy_configs_in_cooldown(mock_run, monk
         ],
     )
 
+    fixed_time = 1000.0
+    monkeypatch.setattr("auto_slopp.utils.cli_executor.time", _FakeTime(time_val=fixed_time))
+
     _check_startup_health(Path.cwd())
 
     assert mock_run.call_count == 2
     from auto_slopp.utils.cli_executor import _cli_states
 
     assert _cli_states[0]["active"] is False
-    assert _cli_states[0]["cooldown_until"] > 0
     assert _cli_states[1]["active"] is False
-    assert _cli_states[1]["cooldown_until"] > 0
     # Verify cooldown durations match expected values (deterministic, no wall-clock dependency)
-    import time
-
-    assert abs((_cli_states[0]["cooldown_until"] - time.time()) - 60) < 0.01
-    assert abs((_cli_states[1]["cooldown_until"] - time.time()) - 120) < 0.01
+    assert abs(_cli_states[0]["cooldown_until"] - (fixed_time + 60)) < 0.01
+    assert abs(_cli_states[1]["cooldown_until"] - (fixed_time + 120)) < 0.01
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
