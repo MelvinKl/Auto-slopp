@@ -1108,7 +1108,7 @@ AUTO_SLOPP_LOG_FILE_DIR=/var/log/auto-slopp
 
 ### Log File Details
 
-- **Location**: `<AUTO_SLOPP_LOG_DIR>/auto_slopp.log`
+- **Location**: `<AUTO_SLOPP_LOG_FILE_DIR>/auto_slopp.log`
 - **Format**: `%(asctime)s - %(name)s - %(levelname)s - %(message)s`
 - **Rotation**: 10 MB per file, 5 backup files kept
 - **Encoding**: UTF-8
@@ -1214,7 +1214,7 @@ This provides:
 ## Version History
 
 ### 0.1.1
-- Added rotating log file for WARNING level and above (configurable via `AUTO_SLOPP_LOG_DIR`)
+- Added rotating log file for WARNING level and above (configurable via `AUTO_SLOPP_LOG_FILE_DIR`)
 
 ### 0.1.0
 - Initial release
