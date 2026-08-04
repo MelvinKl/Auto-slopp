@@ -8,14 +8,14 @@ import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-# Module-level cache for idempotency
-_file_handler_cache: RotatingFileHandler | None = None
+# Module-level cache keyed by (log_dir, filename, level)
+_file_handler_cache: dict[tuple[Path, str, int], RotatingFileHandler] = {}
 
 
 def reset_file_handler_cache() -> None:
     """Reset the module-level handler cache (mainly for testing)."""
     global _file_handler_cache
-    _file_handler_cache = None
+    _file_handler_cache = {}
 
 
 def setup_file_handler(
@@ -40,11 +40,10 @@ def setup_file_handler(
     Returns:
         Configured RotatingFileHandler.
     """
-    global _file_handler_cache
-
-    # Idempotency: return cached handler if same config
-    if _file_handler_cache is not None:
-        return _file_handler_cache
+    # Idempotency: return cached handler if same (log_dir, filename, level)
+    cache_key = (log_dir, filename, level)
+    if cache_key in _file_handler_cache:
+        return _file_handler_cache[cache_key]
 
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / filename
@@ -60,7 +59,7 @@ def setup_file_handler(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
     handler.setFormatter(formatter)
-    _file_handler_cache = handler
+    _file_handler_cache[cache_key] = handler
     return handler
 
 
@@ -92,5 +91,7 @@ def add_file_handler(
         backup_count=backup_count,
         level=level,
     )
-    logger.addHandler(handler)
+    # Avoid adding the same handler twice
+    if handler not in logger.handlers:
+        logger.addHandler(handler)
     return handler
