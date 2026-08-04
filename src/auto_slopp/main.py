@@ -12,7 +12,11 @@ from settings.main import settings
 
 
 def setup_logging() -> None:
-    """Set up application logging with optional Telegram integration."""
+    """Set up application logging with optional Telegram integration.
+
+    Configures a console stream handler, an optional rotating file handler
+    for WARNING+ logs, and an optional Telegram handler.
+    """
     log_level = logging.DEBUG if settings.debug else logging.INFO
     logging.basicConfig(
         level=log_level,
@@ -20,19 +24,32 @@ def setup_logging() -> None:
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
+    # Get the application logger unconditionally — handlers are added below
+    # only when the corresponding settings are enabled.
     logger = logging.getLogger("auto_slopp")
 
-    # Add rotating file handler for warnings and above (if configured)
-    if settings.log_file_dir is not None:
-        log_dir = Path(settings.log_file_dir).expanduser()
-        add_file_handler(logger, log_dir=log_dir)
+    _add_file_handler_if_configured(logger)
+    _add_telegram_handler_if_configured(logger)
 
+    # Reduce noise from third-party loggers
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+
+def _add_file_handler_if_configured(logger: logging.Logger) -> None:
+    """Add a rotating file handler for WARNING+ logs if configured."""
+    if settings.log_file_dir is None:
+        return
+
+    log_dir = Path(settings.log_file_dir).expanduser()
+    add_file_handler(logger, log_dir=log_dir)
+
+
+def _add_telegram_handler_if_configured(logger: logging.Logger) -> None:
+    """Add a Telegram handler if Telegram logging is enabled."""
     telegram_handler = setup_telegram_logging(level=logging.WARNING)
     if telegram_handler:
         logger.addHandler(telegram_handler)
         logger.info("Telegram logging integration enabled")
-
-    logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def parse_arguments() -> argparse.Namespace:
