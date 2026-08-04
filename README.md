@@ -639,6 +639,10 @@ AUTO_SLOPP_TASK_DIFFICULTIES='{
 # Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
 AUTO_SLOPP_SLOP_TIMEOUT=7200
 
+# Log file directory (default: ./logs)
+# Logs at WARNING level and above are written to a rotating log file
+AUTO_SLOPP_LOG_DIR=./logs
+
 # Telegram logging (optional)
 AUTO_SLOPP_TELEGRAM_ENABLED=true
 AUTO_SLOPP_TELEGRAM_BOT_TOKEN=your_bot_token
