@@ -467,6 +467,33 @@ class IssueWorker(Worker):
 
         return result
 
+    def _skip_task(self, repo_dir: Path, task: Task) -> Dict[str, Any]:
+        """Create a properly structured result dict for a skipped task.
+
+        Args:
+            repo_dir: Path to the repository directory
+            task: The task that was skipped
+
+        Returns:
+            Result dict with status='skipped' and success=None
+        """
+        return {
+            "repository": repo_dir.name,
+            "task_id": task.id,
+            "task_title": task.title,
+            "success": None,
+            "status": "skipped",
+            "openagent_executed": False,
+            "openagent_executions": 0,
+            "task_completed": False,
+            "tasks_completed": 0,
+            "pr_created": False,
+            "prs_created": 0,
+            "error": None,
+            "ralph_loops_executed": 0,
+            "ralph_steps_completed": 0,
+        }
+
     def _build_instructions(
         self,
         task_title: str,

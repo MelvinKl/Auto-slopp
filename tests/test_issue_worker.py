@@ -1259,3 +1259,25 @@ class TestIssueWorker:
             assert content.count(".ralph/") == 1
             assert "*.pyc" in content
             assert "__pycache__/" in content
+
+    def test_skip_task_returns_proper_structure(self):
+        """Test that _skip_task produces a properly structured skipped result."""
+        task_source = MockTaskSource()
+        worker = IssueWorker(task_source=task_source)
+        task = Task(id=42, title="Skipped Task", body="Test body")
+        result = worker._skip_task(Path("/tmp"), task)
+
+        assert result["repository"] == "tmp"
+        assert result["task_id"] == 42
+        assert result["task_title"] == "Skipped Task"
+        assert result["success"] is None
+        assert result["status"] == "skipped"
+        assert result["openagent_executed"] is False
+        assert result["openagent_executions"] == 0
+        assert result["task_completed"] is False
+        assert result["tasks_completed"] == 0
+        assert result["pr_created"] is False
+        assert result["prs_created"] == 0
+        assert result["error"] is None
+        assert result["ralph_loops_executed"] == 0
+        assert result["ralph_steps_completed"] == 0
