@@ -16,6 +16,10 @@ class TaskRating(BaseModel):
     recommended_rating: int = Field(default=5, ge=0, le=10, description="Preferred capability level")
 
 
+NO_TIMEOUT = -1
+"""Sentinel value for timeout: -1 means never timeout (subprocess runs indefinitely)."""
+
+
 class CLIConfiguration(BaseModel):
     """Single CLI configuration entry for tiered failover."""
 
@@ -45,11 +49,11 @@ class CLIConfiguration(BaseModel):
         description="Task names for which this CLI configuration should not be used",
     )
     timeout: int = Field(
-        default=-1,
+        default=NO_TIMEOUT,
         description=(
             "Timeout in seconds for CLI command execution. "
-            "Set to -1 (NO_TIMEOUT) to disable timeout (never timeout). "
-            "When -1, the caller-provided timeout is ignored for this configuration."
+            "Set to NO_TIMEOUT to disable timeout (never timeout). "
+            "When NO_TIMEOUT, the caller-provided timeout is ignored for this configuration."
         ),
     )
 

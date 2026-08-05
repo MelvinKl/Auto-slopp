@@ -5,12 +5,11 @@ from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 from auto_slopp.utils.cli_executor import (
-    NO_TIMEOUT,
     _check_startup_health,
     _config_to_dict,
     run_cli_executor,
 )
-from settings.main import CLIConfiguration, TaskRating
+from settings.main import NO_TIMEOUT, CLIConfiguration, TaskRating
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")

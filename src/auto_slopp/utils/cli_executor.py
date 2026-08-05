@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from settings.main import CLIConfiguration, TaskRating, settings
+from settings.main import NO_TIMEOUT, CLIConfiguration, TaskRating, settings
 
 logger = logging.getLogger(__name__)
 _active_cli_configuration_index = 0
@@ -20,9 +20,6 @@ _PROBE_INSTRUCTIONS = "are you working?"
 # CLI tools like Claude Code or Codex can take minutes to cold-start, so we
 # allow generous time while still detecting genuinely broken configurations.
 _PROBE_TIMEOUT_SECONDS = 600
-
-# Sentinel value indicating no timeout (subprocess runs indefinitely).
-NO_TIMEOUT = -1
 
 _cli_states: Dict[int, Dict[str, Any]] = {}
 
