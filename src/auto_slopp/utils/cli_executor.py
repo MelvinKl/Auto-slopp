@@ -21,6 +21,9 @@ _PROBE_INSTRUCTIONS = "are you working?"
 # allow generous time while still detecting genuinely broken configurations.
 _PROBE_TIMEOUT_SECONDS = 600
 
+# Sentinel value indicating no timeout (subprocess runs indefinitely).
+NO_TIMEOUT = -1
+
 _cli_states: Dict[int, Dict[str, Any]] = {}
 
 
@@ -225,7 +228,7 @@ def _execute_command(
 def _probe_configuration(config: Dict[str, Any], working_dir: Path, timeout: Optional[int] = None) -> bool:
     """Run quick health probe for one configuration.
 
-    Uses the provided timeout: -1 means no timeout (None),
+    Uses the provided timeout: :data:`NO_TIMEOUT` means no timeout (None),
     positive values use that timeout, otherwise falls back to default probe timeout.
     """
     cmd = _build_command(
@@ -235,7 +238,7 @@ def _probe_configuration(config: Dict[str, Any], working_dir: Path, timeout: Opt
         additional_instructions=_PROBE_INSTRUCTIONS,
     )
 
-    if timeout == -1:
+    if timeout == NO_TIMEOUT:
         effective_timeout = None  # never timeout
     elif timeout is not None and timeout > 0:
         effective_timeout = timeout
@@ -372,9 +375,9 @@ def run_cli_executor(
 
         logger.info(f"Using CLI configuration: {config['name']} for task {task_name}")
 
-        # Use per-config timeout: -1 means never timeout, positive value overrides caller timeout
+        # Use per-config timeout: NO_TIMEOUT means never timeout, positive value overrides caller timeout
         _cfg = settings.cli_configurations[config_index]
-        if _cfg.timeout == -1:
+        if _cfg.timeout == NO_TIMEOUT:
             config_timeout = None  # never timeout
         elif _cfg.timeout > 0:
             config_timeout = _cfg.timeout

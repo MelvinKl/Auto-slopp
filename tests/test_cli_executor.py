@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 from auto_slopp.utils.cli_executor import (
+    NO_TIMEOUT,
     _check_startup_health,
     _config_to_dict,
     run_cli_executor,
@@ -577,7 +578,7 @@ def test_custom_timeout_from_config(mock_run, monkeypatch):
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
 def test_timeout_negative_one_means_no_timeout(mock_run, monkeypatch):
-    """timeout=-1 in config should result in timeout=None passed to subprocess (never timeout)."""
+    """NO_TIMEOUT in config should result in timeout=None passed to subprocess (never timeout)."""
     mock_run.return_value.returncode = 0
     mock_run.return_value.stdout = "ok"
     mock_run.return_value.stderr = ""
@@ -586,7 +587,7 @@ def test_timeout_negative_one_means_no_timeout(mock_run, monkeypatch):
     monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
     monkeypatch.setattr(
         "auto_slopp.utils.cli_executor.settings.cli_configurations",
-        [CLIConfiguration(cli_command="tool", cli_args=[], timeout=-1)],
+        [CLIConfiguration(cli_command="tool", cli_args=[], timeout=NO_TIMEOUT)],
     )
 
     result = run_cli_executor(
@@ -672,7 +673,7 @@ def test_probe_uses_config_timeout_positive(mock_run, monkeypatch):
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
 def test_probe_uses_config_timeout_negative_one(mock_run, monkeypatch):
-    """Probe with timeout=-1 should pass None to subprocess (never timeout)."""
+    """Probe with NO_TIMEOUT should pass None to subprocess (never timeout)."""
     from auto_slopp.utils.cli_executor import _probe_configuration
 
     mock_run.return_value.returncode = 0
@@ -680,7 +681,7 @@ def test_probe_uses_config_timeout_negative_one(mock_run, monkeypatch):
     mock_run.return_value.stderr = ""
 
     config = {"cli_command": "tool", "cli_args": []}
-    _probe_configuration(config, Path.cwd(), timeout=-1)
+    _probe_configuration(config, Path.cwd(), timeout=NO_TIMEOUT)
 
     call_kwargs = mock_run.call_args.kwargs if "args" in mock_run.call_args.kwargs else mock_run.call_args[1]
     assert call_kwargs["timeout"] is None
@@ -717,7 +718,7 @@ def test_startup_health_uses_config_timeout(mock_run, monkeypatch):
         "auto_slopp.utils.cli_executor.settings.cli_configurations",
         [
             CLIConfiguration(cli_command="tool-1", cli_args=[], name="tool-1", timeout=30),
-            CLIConfiguration(cli_command="tool-2", cli_args=[], name="tool-2", timeout=-1),
+            CLIConfiguration(cli_command="tool-2", cli_args=[], name="tool-2", timeout=NO_TIMEOUT),
         ],
     )
 
@@ -725,19 +726,8 @@ def test_startup_health_uses_config_timeout(mock_run, monkeypatch):
 
     assert mock_run.call_count == 2
     # First call should use timeout=30
-    call_kwargs_0 = (
-        mock_run.call_args_list[0].kwargs
-        if "args" in mock_run.call_args_list[0].kwargs
-        else mock_run.call_args_list[0].args[0]
-    )
-    # Second call should use timeout=None (never timeout)
-    call_kwargs_1 = (
-        mock_run.call_args_list[1].kwargs
-        if "args" in mock_run.call_args_list[1].kwargs
-        else mock_run.call_args_list[1].args[0]
-    )
-    # We need to check the kwargs directly
     timeout_0 = mock_run.call_args_list[0].kwargs.get("timeout")
+    # Second call should use timeout=None (never timeout)
     timeout_1 = mock_run.call_args_list[1].kwargs.get("timeout")
     assert timeout_0 == 30
     assert timeout_1 is None
