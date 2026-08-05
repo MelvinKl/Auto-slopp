@@ -7,8 +7,8 @@ from pathlib import Path
 
 from auto_slopp.executor import run_executor
 from auto_slopp.telegram_handler import setup_telegram_logging
-from auto_slopp.utils.logging_util import add_file_handler
 from auto_slopp.utils.cli_executor import _check_startup_health
+from auto_slopp.utils.logging_util import add_file_handler
 from settings.main import settings
 
 
