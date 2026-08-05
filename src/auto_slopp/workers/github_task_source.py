@@ -111,7 +111,9 @@ class GitHubTaskSource(TaskSource):
             if author_login in (issue_author_login, allowed_creator):
                 filtered_comments.append(comment)
 
-        logger.debug(f"[Condense] Filtered to {len(filtered_comments)} comments (author: {issue_author_login}, allowed: {allowed_creator})")
+        logger.debug(
+            f"[Condense] Filtered to {len(filtered_comments)} comments (author: {issue_author_login}, allowed: {allowed_creator})"
+        )
 
         # No relevant comments
         if not filtered_comments:
