@@ -12,11 +12,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from settings.main import TaskRating, settings
+from settings.main import CLIConfiguration, TaskRating, settings
 
 logger = logging.getLogger(__name__)
 _active_cli_configuration_index = 0
 _PROBE_INSTRUCTIONS = "are you working?"
+# 600 seconds (10 minutes) balances catching hung tools without waiting too long.
+# CLI tools like Claude Code or Codex can take minutes to cold-start, so we
+# allow generous time while still detecting genuinely broken configurations.
 _PROBE_TIMEOUT_SECONDS = 600
 
 _cli_states: Dict[int, Dict[str, Any]] = {}
@@ -30,6 +33,40 @@ def _get_cli_state(index: int) -> Dict[str, Any]:
         return _cli_states[index]
 
 
+def _config_to_dict(config: CLIConfiguration) -> Dict[str, Any]:
+    """Convert a CLIConfiguration to a plain dict for probe/execution."""
+    return {
+        "cli_command": config.cli_command,
+        "cli_args": list(config.cli_args),
+        "name": config.name,
+    }
+
+
+def _check_startup_health(working_dir: Path) -> None:
+    """Probe all CLI configurations at startup and place unhealthy ones in cooldown."""
+    logger.info("Running startup health check for CLI configurations...")
+    for index, config in enumerate(settings.cli_configurations):
+        state = _get_cli_state(index)
+        c_dict = _config_to_dict(config)
+        try:
+            if _probe_configuration(c_dict, working_dir):
+                logger.info(f"CLI tool {config.name} is healthy.")
+                state["active"] = True
+            else:
+                logger.warning(f"CLI tool {config.name} failed health check. Placing in cooldown.")
+                state["active"] = False
+                state["cooldown_until"] = time.time() + config.cooldown_seconds
+        except (
+            subprocess.TimeoutExpired,
+            FileNotFoundError,
+            PermissionError,
+            OSError,
+        ) as e:
+            logger.warning(f"CLI tool {config.name} probe raised {type(e).__name__}: {e}. Placing in cooldown.")
+            state["active"] = False
+            state["cooldown_until"] = time.time() + config.cooldown_seconds
+
+
 def _check_cooldowns(working_dir: Path) -> None:
     now = time.time()
     with _cli_lock:
@@ -38,19 +75,27 @@ def _check_cooldowns(working_dir: Path) -> None:
         state = states_snapshot.get(index, {"active": True, "cooldown_until": 0.0})
         if not state["active"] and now >= state["cooldown_until"]:
             logger.info(f"Checking if CLI tool {config.name} has recovered...")
-            c_dict = {
-                "cli_command": config.cli_command,
-                "cli_args": list(config.cli_args),
-                "name": config.name,
-            }
-            if _probe_configuration(c_dict, working_dir):
-                logger.info(f"CLI tool {config.name} successfully recovered.")
-                with _cli_lock:
-                    if index not in _cli_states:
-                        _cli_states[index] = {"active": True, "cooldown_until": 0.0}
-                    _cli_states[index]["active"] = True
-            else:
-                logger.warning(f"CLI tool {config.name} still timing out. Resetting cooldown.")
+            c_dict = _config_to_dict(config)
+            try:
+                if _probe_configuration(c_dict, working_dir):
+                    logger.info(f"CLI tool {config.name} successfully recovered.")
+                    with _cli_lock:
+                        if index not in _cli_states:
+                            _cli_states[index] = {"active": True, "cooldown_until": 0.0}
+                        _cli_states[index]["active"] = True
+                else:
+                    logger.warning(f"CLI tool {config.name} still timing out. Resetting cooldown.")
+                    with _cli_lock:
+                        if index not in _cli_states:
+                            _cli_states[index] = {"active": True, "cooldown_until": 0.0}
+                        _cli_states[index]["cooldown_until"] = now + config.cooldown_seconds
+            except (
+                subprocess.TimeoutExpired,
+                FileNotFoundError,
+                PermissionError,
+                OSError,
+            ) as e:
+                logger.warning(f"CLI tool {config.name} probe raised {type(e).__name__}: {e}. Resetting cooldown.")
                 with _cli_lock:
                     if index not in _cli_states:
                         _cli_states[index] = {"active": True, "cooldown_until": 0.0}
@@ -90,14 +135,7 @@ def _choose_best_config_index(task_rating: TaskRating, working_dir: Path, task_n
 
 def _get_cli_configurations() -> List[Dict[str, Any]]:
     """Return configured CLI configurations ordered by preference."""
-    return [
-        {
-            "cli_command": config.cli_command,
-            "cli_args": list(config.cli_args),
-            "name": config.name,
-        }
-        for config in settings.cli_configurations
-    ]
+    return [_config_to_dict(config) for config in settings.cli_configurations]
 
 
 def get_active_cli_command() -> str:
