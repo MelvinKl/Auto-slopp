@@ -547,3 +547,108 @@ def test_config_to_dict_mutation_safe():
     d = _config_to_dict(cfg)
     d["cli_args"].append("--mutated")
     assert "--mutated" not in cfg.cli_args
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_custom_timeout_from_config(mock_run, monkeypatch):
+    """A positive timeout in the config should override the caller-provided timeout."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [CLIConfiguration(cli_command="tool", cli_args=[], timeout=42)],
+    )
+
+    result = run_cli_executor(
+        additional_instructions="Do work",
+        working_directory=Path.cwd(),
+        timeout=7200,
+    )
+
+    assert result["success"] is True
+    # Verify the timeout passed to subprocess.run is the config's value, not the caller's
+    call_kwargs = mock_run.call_args.kwargs if "args" in mock_run.call_args.kwargs else mock_run.call_args[1]
+    assert call_kwargs["timeout"] == 42
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_timeout_negative_one_means_no_timeout(mock_run, monkeypatch):
+    """timeout=-1 in config should result in timeout=None passed to subprocess (never timeout)."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [CLIConfiguration(cli_command="tool", cli_args=[], timeout=-1)],
+    )
+
+    result = run_cli_executor(
+        additional_instructions="Do work",
+        working_directory=Path.cwd(),
+        timeout=30,
+    )
+
+    assert result["success"] is True
+    call_kwargs = mock_run.call_args.kwargs if "args" in mock_run.call_args.kwargs else mock_run.call_args[1]
+    assert call_kwargs["timeout"] is None
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_default_timeout_is_never_timeout(mock_run, monkeypatch):
+    """When config timeout defaults to -1, subprocess receives None (never timeout)."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [CLIConfiguration(cli_command="tool", cli_args=[])],  # timeout defaults to -1
+    )
+
+    result = run_cli_executor(
+        additional_instructions="Do work",
+        working_directory=Path.cwd(),
+        timeout=1800,
+    )
+
+    assert result["success"] is True
+    call_kwargs = mock_run.call_args.kwargs if "args" in mock_run.call_args.kwargs else mock_run.call_args[1]
+    assert call_kwargs["timeout"] is None
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_config_timeout_overrides_fallback(mock_run, monkeypatch):
+    """Config timeout should take priority over fallback timeout when both could apply."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="fast-tool", cli_args=[], timeout=60),
+            CLIConfiguration(cli_command="slow-tool", cli_args=[], timeout=3600),
+        ],
+    )
+
+    result = run_cli_executor(
+        additional_instructions="Do work",
+        working_directory=Path.cwd(),
+        timeout=7200,
+    )
+
+    assert result["success"] is True
+    # First config (fast-tool) should be used with its own timeout of 60
+    call_kwargs = mock_run.call_args.kwargs if "args" in mock_run.call_args.kwargs else mock_run.call_args[1]
+    assert call_kwargs["timeout"] == 60
