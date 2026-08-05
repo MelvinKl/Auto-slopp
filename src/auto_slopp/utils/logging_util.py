@@ -5,6 +5,7 @@ and above, complementing the console/Telegram handlers.
 """
 
 import logging
+from contextlib import suppress
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -16,6 +17,18 @@ def reset_file_handler_cache() -> None:
     """Reset the module-level handler cache (mainly for testing)."""
     global _file_handler_cache
     _file_handler_cache = {}
+
+
+def close_all_handlers() -> None:
+    """Close all cached file handlers and clear the cache.
+
+    Call this during application shutdown to release file handles
+    and prevent resource leaks.
+    """
+    for handler in _file_handler_cache.values():
+        with suppress(Exception):
+            handler.close()
+    _file_handler_cache.clear()
 
 
 def setup_file_handler(
