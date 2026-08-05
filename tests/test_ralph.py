@@ -1482,31 +1482,31 @@ class TestRalphExecutor:
         ralph_executor._last_error = "Service unavailable: API endpoint not responding"
         assert ralph_executor._is_llm_unavailable() is True
 
-    def test_is_llm_unavailable_prefers_last_iteration_error(self, ralph_executor):
-        """Test _is_llm_unavailable prefers _last_iteration_error over _last_error."""
+    def test_is_llm_unavailable_prefers_last_iteration_failure_reason(self, ralph_executor):
+        """Test _is_llm_unavailable prefers _last_iteration_failure_reason over _last_error."""
         # Set a stale non-LLM error from earlier in the run
         ralph_executor._last_error = "Step implementation failed: syntax error"
         # Set the current iteration error that indicates LLM unavailability
-        ralph_executor._last_iteration_error = "timed out waiting for response"
+        ralph_executor._last_iteration_failure_reason = "timed out waiting for response"
         assert ralph_executor._is_llm_unavailable() is True
 
-    def test_is_llm_unavailable_last_iteration_error_fallback(self, ralph_executor):
-        """Test _is_llm_unavailable falls back to _last_error when _last_iteration_error is None."""
-        ralph_executor._last_iteration_error = None
+    def test_is_llm_unavailable_last_iteration_failure_reason_fallback(self, ralph_executor):
+        """Test _is_llm_unavailable falls back to _last_error when _last_iteration_failure_reason is None."""
+        ralph_executor._last_iteration_failure_reason = None
         ralph_executor._last_error = "timed out after 7200 seconds"
         assert ralph_executor._is_llm_unavailable() is True
 
-    def test_is_llm_unavailable_last_iteration_error_clears_on_success(self, ralph_executor):
-        """Test that _last_iteration_error is cleared after a successful iteration."""
-        ralph_executor._last_iteration_error = "timed out waiting for response"
+    def test_is_llm_unavailable_last_iteration_failure_reason_clears_on_success(self, ralph_executor):
+        """Test that _last_iteration_failure_reason is cleared after a successful iteration."""
+        ralph_executor._last_iteration_failure_reason = "timed out waiting for response"
         assert ralph_executor._is_llm_unavailable() is True
 
         # Simulate a successful iteration clearing the error
-        ralph_executor._last_iteration_error = None
+        ralph_executor._last_iteration_failure_reason = None
         assert ralph_executor._is_llm_unavailable() is False
 
-    def test_run_refined_task_loop_sets_last_iteration_error_on_failure(self, ralph_executor):
-        """Test that _last_iteration_error is set during the loop on step failure."""
+    def test_run_refined_task_loop_sets_last_iteration_failure_reason_on_failure(self, ralph_executor):
+        """Test that _last_iteration_failure_reason is set during the loop on step failure."""
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_dir = Path(tmpdir)
             task_path = repo_dir / "task.md"
@@ -1532,12 +1532,12 @@ class TestRalphExecutor:
 
             assert result["success"] is False
             assert result["max_loops_reached"] is True
-            # Verify _last_iteration_error was set during the loop
-            assert ralph_executor._last_iteration_error is not None
-            assert "timed out" in ralph_executor._last_iteration_error
+            # Verify _last_iteration_failure_reason was set during the loop
+            assert ralph_executor._last_iteration_failure_reason is not None
+            assert "timed out" in ralph_executor._last_iteration_failure_reason
 
-    def test_run_refined_task_loop_last_iteration_error_cleared_on_success(self, ralph_executor):
-        """Test that _last_iteration_error is cleared after a successful iteration."""
+    def test_run_refined_task_loop_last_iteration_failure_reason_cleared_on_success(self, ralph_executor):
+        """Test that _last_iteration_failure_reason is cleared after a successful iteration."""
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_dir = Path(tmpdir)
             task_path = repo_dir / "task.md"
@@ -1566,7 +1566,7 @@ class TestRalphExecutor:
             )
 
             assert result["success"] is False
-            # After the first successful iteration, _last_iteration_error should be None
+            # After the first successful iteration, _last_iteration_failure_reason should be None
             # (it was cleared), then set again on the second failure
-            assert ralph_executor._last_iteration_error is not None
-            assert "timed out" in ralph_executor._last_iteration_error
+            assert ralph_executor._last_iteration_failure_reason is not None
+            assert "timed out" in ralph_executor._last_iteration_failure_reason

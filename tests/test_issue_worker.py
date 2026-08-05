@@ -418,7 +418,7 @@ class TestIssueWorker:
             "error": "Maximum iterations (10) reached before all steps completed",
         }
         # Simulate that the LLM timed out during the loop (the key scenario the fix addresses)
-        worker.ralph_executor._last_iteration_error = "timed out waiting for response"
+        worker.ralph_executor._last_iteration_failure_reason = "timed out waiting for response"
 
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
@@ -457,7 +457,7 @@ class TestIssueWorker:
             "error": "Maximum iterations (10) reached before all steps completed",
         }
         # No LLM unavailability – genuine iteration exhaustion
-        worker.ralph_executor._last_iteration_error = None
+        worker.ralph_executor._last_iteration_failure_reason = None
         worker.ralph_executor._last_error = "Step implementation failed: syntax error in code"
 
         result = worker.run(Path("/tmp"))
