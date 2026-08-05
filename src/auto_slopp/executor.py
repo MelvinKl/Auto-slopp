@@ -55,7 +55,8 @@ class Executor:
         try:
             while self.running:
                 self._run_iteration()
-                self._check_for_updates()
+                if self._check_for_updates():
+                    break
                 time.sleep(settings.executor_sleep_interval)
         except KeyboardInterrupt:
             print("\nReceived interrupt signal, shutting down...")
@@ -89,7 +90,9 @@ class Executor:
 
             # Wait for all worker threads to finish their current iteration
             for thread in self._worker_threads:
-                thread.join()
+                thread.join(timeout=10)
+                if thread.is_alive():
+                    print(f"Warning: Worker thread {thread.name} did not finish within timeout")
 
         except Exception as e:
             print(f"Error in iteration: {e}")
