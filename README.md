@@ -777,14 +777,14 @@ The task execution creates a markdown-based plan file in `.ralph/` with checkbox
 
 #### Task Results
 
-Each processed task produces a result dict containing a `status` field with one of the following values:
+Each processed task produces a result dict containing `status` and `success` fields. The `success` field uses `None` as the canonical signal for a skipped task (in addition to `status="skipped"`).
 
-| Status | Description |
-|--------|-------------|
-| `pending` | Task has not been processed yet |
-| `success` | Task completed successfully |
-| `failure` | Task failed due to an error |
-| `skipped` | Task was skipped (e.g., branch creation failed) — not counted as a failure |
+| Status | Success | Description |
+|--------|---------|-------------|
+| `pending` | — | Task has not been processed yet |
+| `success` | `True` | Task completed successfully |
+| `failure` | `False` | Task failed due to an error |
+| `skipped` | `None` | Task was skipped (e.g., branch creation failed) — not counted as a failure |
 
 The completion summary logs task counts broken down by outcome:
 

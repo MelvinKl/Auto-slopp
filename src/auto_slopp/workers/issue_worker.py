@@ -125,7 +125,7 @@ class IssueWorker(Worker):
             task_result = self._process_single_task(repo_path, task)
             results["task_results"].append(task_result)
 
-            if task_result["success"] is None:
+            if task_result.get("success") is None or task_result.get("status") == "skipped":
                 # Skip: distinct non-error outcome
                 results["tasks_skipped"] += 1
             elif task_result["success"]:
@@ -470,12 +470,16 @@ class IssueWorker(Worker):
     def _skip_task(self, repo_dir: Path, task: Task) -> Dict[str, Any]:
         """Create a properly structured result dict for a skipped task.
 
+        The canonical skip signal is `success=None` (in addition to `status='skipped'`).
+        All intentional skip paths in `_process_single_task` should go through this method
+        to ensure consistent result structure.
+
         Args:
             repo_dir: Path to the repository directory
             task: The task that was skipped
 
         Returns:
-            Result dict with status='skipped' and success=None
+            Result dict with status='skipped' and success=None (the canonical skip signal)
         """
         return {
             "repository": repo_dir.name,
