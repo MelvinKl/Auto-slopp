@@ -44,6 +44,14 @@ class CLIConfiguration(BaseModel):
         default_factory=list,
         description="Task names for which this CLI configuration should not be used",
     )
+    timeout: int = Field(
+        default=-1,
+        description=(
+            "Timeout in seconds for CLI command execution. "
+            "Set to -1 to disable timeout (never timeout). "
+            "When -1, the caller-provided timeout is ignored for this configuration."
+        ),
+    )
 
 
 class Settings(BaseSettings):
