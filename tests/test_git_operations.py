@@ -573,12 +573,12 @@ class TestCreateAndCheckoutBranch:
 
         # Mock git commands: first checkout fails, no changes to stash, retry succeeds
         # stash_changes returns None early when no changes, so no additional git commands
+        # restore_stashed_changes is also skipped since stashed=False
         mock_subprocess_run.side_effect = [
             Mock(returncode=0, stderr=""),  # git fetch
             Mock(returncode=1, stderr="checkout failed"),  # git checkout (fails)
             Mock(returncode=0, stderr="", stdout=""),  # git status --porcelain (no changes, has_changes returns False)
             Mock(returncode=0, stderr=""),  # git checkout (retry succeeds)
-            Mock(returncode=1, stderr="no stash entries"),  # git stash pop (nothing to pop, but OK)
             Mock(returncode=0, stderr=""),  # git pull
         ]
 
@@ -592,7 +592,7 @@ class TestCreateAndCheckoutBranch:
             if call[0] and call[0][0] == ["git"] and "stash" in call[0] and "push" in call[0]
         ]
         assert len(stash_push_calls) == 0, "git stash push should not be called when there are no changes"
-        assert mock_subprocess_run.call_count == 6
+        assert mock_subprocess_run.call_count == 5
 
     @patch("auto_slopp.utils.git_operations.subprocess.run")
     def test_checkout_with_stash_pop_failure(self, mock_subprocess_run):

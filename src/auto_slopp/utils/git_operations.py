@@ -384,6 +384,9 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
         logger.warning(f"Initial checkout failed for '{branch}' in {repo_dir.name}: {checkout_error}")
         logger.info(f"Attempting git stash and retry for '{branch}' in {repo_dir.name}")
 
+        # Track whether a stash was created so we only restore when needed
+        stashed = False
+
         # Only attempt stash if there are uncommitted changes
         if has_changes(repo_dir):
             stash_ref = stash_changes(repo_dir)
@@ -392,40 +395,49 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
                 logger.error(f"Stash failed in {repo_dir.name}: {error_msg}")
                 _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
                 return False
+            stashed = True
         else:
             logger.debug(f"No uncommitted changes to stash in {repo_dir.name}")
 
-        retry_checkout_result = _run_git_command(repo_dir, "checkout", branch, check=False, timeout=timeout)
+        retry_success = False
+        try:
+            retry_checkout_result = _run_git_command(repo_dir, "checkout", branch, check=False, timeout=timeout)
 
-        if retry_checkout_result.returncode != 0:
-            # Restore stashed changes before failing
-            restore_stashed_changes(repo_dir)
+            if retry_checkout_result.returncode != 0:
+                # Restore stashed changes before failing
+                if stashed:
+                    restore_stashed_changes(repo_dir)
 
-            retry_error = retry_checkout_result.stderr.strip() or retry_checkout_result.stdout.strip()
-            error_msg = f"Failed to checkout '{branch}' even after stash: {retry_error}"
-            logger.error(f"Failed to checkout '{branch}' in {repo_dir.name} even after stash: {retry_error}")
-            _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
-            return False
+                retry_error = retry_checkout_result.stderr.strip() or retry_checkout_result.stdout.strip()
+                error_msg = f"Failed to checkout '{branch}' even after stash: {retry_error}"
+                logger.error(f"Failed to checkout '{branch}' in {repo_dir.name} even after stash: {retry_error}")
+                _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
+            else:
+                # Restore stashed changes after successful checkout
+                if stashed:
+                    restore_stashed_changes(repo_dir)
+                retry_success = True
+        finally:
+            if retry_success:
+                logger.info(f"Successfully checked out '{branch}' in {repo_dir.name} after stash")
 
-        # Restore stashed changes after successful checkout
-        restore_stashed_changes(repo_dir)
+                pull_result = _run_git_command(
+                    repo_dir,
+                    "pull",
+                    "--rebase=false",
+                    "origin",
+                    branch,
+                    check=False,
+                    timeout=timeout,
+                )
+                if pull_result.returncode != 0:
+                    pull_error = pull_result.stderr.strip() or pull_result.stdout.strip()
+                    logger.warning(f"Pull failed for branch '{branch}' in {repo_dir.name}: {pull_error}")
 
-        logger.info(f"Successfully checked out '{branch}' in {repo_dir.name} after stash")
+        if retry_success:
+            return True
 
-        pull_result = _run_git_command(
-            repo_dir,
-            "pull",
-            "--rebase=false",
-            "origin",
-            branch,
-            check=False,
-            timeout=timeout,
-        )
-        if pull_result.returncode != 0:
-            pull_error = pull_result.stderr.strip() or pull_result.stdout.strip()
-            logger.warning(f"Pull failed for branch '{branch}' in {repo_dir.name}: {pull_error}")
-
-        return True
+        return False
 
     except GitOperationError as e:
         error_msg = f"Error checking out '{branch}': {str(e)}"
