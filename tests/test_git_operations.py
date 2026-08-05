@@ -253,8 +253,7 @@ class TestStashChanges:
 
             result = stash_changes(repo_path)
 
-            assert result is not None
-            assert "stash@{0}" in result
+            assert result is True
             # After stash, working directory should be clean
             status = subprocess.run(
                 ["git", "status", "--porcelain"],
@@ -281,7 +280,7 @@ class TestStashChanges:
 
             result = stash_changes(repo_path)
 
-            assert result is None
+            assert result is False
 
     def test_restore_stashed_changes(self):
         """Test restoring stashed changes."""
