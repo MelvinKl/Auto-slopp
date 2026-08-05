@@ -7,12 +7,22 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from auto_slopp.utils.logging_util import reset_file_handler_cache
+
 
 def pytest_configure(config):
     """Clear AUTO_SLOPP_ environment variables before tests run to allow .env file to be used."""
     for k in list(os.environ.keys()):
         if k.startswith("AUTO_SLOPP_"):
             del os.environ[k]
+
+
+@pytest.fixture(autouse=True)
+def _reset_logging_cache():
+    """Reset the logging utility cache before each test to ensure isolation."""
+    reset_file_handler_cache()
+    yield
+    reset_file_handler_cache()
 
 
 @pytest.fixture
@@ -124,6 +134,7 @@ def mock_settings():
     settings.telegram_disable_web_page_preview = True
     settings.telegram_disable_notification = False
     settings.auto_update_reboot_delay = 300
+    settings.log_file_dir = Path("logs")
     return settings
 
 

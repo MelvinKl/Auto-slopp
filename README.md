@@ -14,7 +14,7 @@ A Python-based automation framework for task execution with pluggable worker sys
 - **Shared Cooldown State**: CLI tool cooldown timers are shared across all worker threads
 - **Graceful Shutdown**: Stop signal allows all workers to finish their current iteration before stopping
 - **Configuration Management**: Pydantic-based settings with environment variable support
-- **Flexible Logging**: Built-in logging with optional Telegram integration for remote notifications
+- **Flexible Logging**: Built-in logging with rotating file handler (WARNING+) and optional Telegram integration for remote notifications
 - **Task Execution**: Configurable execution of worker implementations
 - **Modern Python**: Built with Python 3.14+ using uv package manager
 - **Comprehensive Testing**: Full test suite with pytest and mocked dependencies
@@ -644,6 +644,10 @@ AUTO_SLOPP_TASK_DIFFICULTIES='{
 # Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
 AUTO_SLOPP_SLOP_TIMEOUT=7200
 
+# Log file directory (default: disabled — set to enable)
+# Logs at WARNING level and above are written to a rotating log file
+AUTO_SLOPP_LOG_FILE_DIR=./logs
+
 # Telegram logging (optional)
 AUTO_SLOPP_TELEGRAM_ENABLED=true
 AUTO_SLOPP_TELEGRAM_BOT_TOKEN=your_bot_token
@@ -1121,6 +1125,67 @@ For comprehensive Telegram logging setup and configuration, see the [Telegram Lo
 - **Enable bot privacy settings** in BotFather
 - **Regular token rotation** recommended for production
 
+## Log Files
+
+Auto-slopp writes logs at **WARNING level and above** to a rotating log file, complementing the console and Telegram outputs. This ensures you have a persistent record of errors and warnings even when not actively monitoring.
+
+### Configuration
+
+Set the log file directory with `AUTO_SLOPP_LOG_FILE_DIR`:
+
+```bash
+# Enable file logging (default: disabled — set to enable)
+AUTO_SLOPP_LOG_FILE_DIR=./logs
+
+# Custom directory
+AUTO_SLOPP_LOG_FILE_DIR=/var/log/auto-slopp
+```
+
+### Log File Details
+
+- **Location**: `<AUTO_SLOPP_LOG_FILE_DIR>/auto_slopp.log`
+- **Format**: `%(asctime)s - %(name)s - %(levelname)s - %(message)s`
+- **Rotation**: 10 MB per file, 5 backup files kept
+- **Encoding**: UTF-8
+- **Minimum Level**: WARNING (30) — INFO and DEBUG messages go to console only
+
+### Example Log Output
+
+```
+2024-01-15 14:30:00,123 - auto_slopp.workers.IssueWorker - WARNING - GitHub API rate limit approaching
+2024-01-15 14:30:05,456 - auto_slopp.executor - ERROR - Failed to process issue #42: Connection timeout
+2024-01-15 14:30:10,789 - auto_slopp.workers.VikunjaWorker - CRITICAL - Vikunja API returned 500
+```
+
+### Viewing Logs
+
+```bash
+# Tail the log file in real-time
+tail -f logs/auto_slopp.log
+
+# Search for errors
+grep ERROR logs/auto_slopp.log
+
+# View last 50 lines
+tail -n 50 logs/auto_slopp.log
+```
+
+### Log Rotation
+
+Log files are automatically rotated using Python's `RotatingFileHandler`:
+
+- When `auto_slopp.log` reaches 10 MB, it is renamed to `auto_slopp.log.1`
+- Previous backups are shifted (`.1` → `.2`, etc.)
+- After 5 backup files, the oldest is deleted
+- A new `auto_slopp.log` is created for fresh entries
+
+### Security
+
+- Log files are stored locally on the filesystem
+- Ensure the log directory has appropriate permissions
+- Do not commit log files to version control (add `logs/` to `.gitignore`)
+- Review log files for sensitive data before sharing
+
 ## Troubleshooting
 
 ### Common Issues
@@ -1182,6 +1247,9 @@ This provides:
 [License information to be added]
 
 ## Version History
+
+### 0.1.1
+- Added rotating log file for WARNING level and above (configurable via `AUTO_SLOPP_LOG_FILE_DIR`)
 
 ### 0.1.0
 - Initial release
