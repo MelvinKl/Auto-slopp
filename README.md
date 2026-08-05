@@ -126,13 +126,15 @@ AUTO_SLOPP_CLI_CONFIGURATIONS='[
     "cli_args": ["--yolo", "-p"],
     "capability": 8,
     "cooldown_seconds": 300,
+    "timeout": -1,
     "blacklist_tasks": ["pr_review"]
   },
   {
     "cli_command": "opencode",
     "cli_args": ["run"],
     "capability": 5,
-    "cooldown_seconds": 300
+    "cooldown_seconds": 300,
+    "timeout": 3600
   }
 ]'
 ```
@@ -362,7 +364,8 @@ docker run -d \
       "cli_command": "gemini",
       "cli_args": ["--yolo", "-p"],
       "capability": 8,
-      "cooldown_seconds": 300
+      "cooldown_seconds": 300,
+      "timeout": -1
     }
   ]' \
   auto-slopp:latest
@@ -612,25 +615,29 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
     "cli_command": "gemini",
     "cli_args": ["--yolo", "-p"],
     "capability": 8,
-    "cooldown_seconds": 300
+    "cooldown_seconds": 300,
+    "timeout": -1
   },
   {
     "cli_command": "codex",
     "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"],
     "capability": 5,
-    "cooldown_seconds": 300
+    "cooldown_seconds": 300,
+    "timeout": 3600
   },
   {
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"],
     "capability": 5,
-    "cooldown_seconds": 300
+    "cooldown_seconds": 300,
+    "timeout": -1
   },
   {
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"],
     "capability": 2,
-    "cooldown_seconds": 300
+    "cooldown_seconds": 300,
+    "timeout": 1800
   }
 ]'
 
@@ -954,26 +961,30 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
   {
     "cli_command": "gemini",
     "cli_args": ["--yolo", "-p"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 8 },
-    "cooldown_seconds": 300
+    "capability": 8,
+    "cooldown_seconds": 300,
+    "timeout": -1
   },
   {
     "cli_command": "codex",
     "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
-    "cooldown_seconds": 300
+    "capability": 5,
+    "cooldown_seconds": 300,
+    "timeout": 3600
   },
   {
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
-    "cooldown_seconds": 300
+    "capability": 5,
+    "cooldown_seconds": 300,
+    "timeout": -1
   },
   {
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 2 },
-    "cooldown_seconds": 300
+    "capability": 2,
+    "cooldown_seconds": 300,
+    "timeout": 1800
   }
 ]'
 
@@ -998,26 +1009,30 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
   {
     "cli_command": "gemini",
     "cli_args": ["--yolo", "-p"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 8 },
-    "cooldown_seconds": 300
+    "capability": 8,
+    "cooldown_seconds": 300,
+    "timeout": -1
   },
   {
     "cli_command": "codex",
     "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
-    "cooldown_seconds": 300
+    "capability": 5,
+    "cooldown_seconds": 300,
+    "timeout": 3600
   },
   {
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
-    "cooldown_seconds": 300
+    "capability": 5,
+    "cooldown_seconds": 300,
+    "timeout": -1
   },
   {
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 2 },
-    "cooldown_seconds": 300
+    "capability": 2,
+    "cooldown_seconds": 300,
+    "timeout": 1800
   }
 ]'
 
