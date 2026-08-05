@@ -46,7 +46,7 @@ def _check_startup_health(working_dir: Path) -> None:
         state = _get_cli_state(index)
         c_dict = _config_to_dict(config)
         try:
-            if _probe_configuration(c_dict, working_dir):
+            if _probe_configuration(c_dict, working_dir, timeout=config.timeout):
                 logger.info(f"CLI tool {config.name} is healthy.")
                 state["active"] = True
             else:
@@ -72,7 +72,7 @@ def _check_cooldowns(working_dir: Path) -> None:
             logger.info(f"Checking if CLI tool {config.name} has recovered...")
             c_dict = _config_to_dict(config)
             try:
-                if _probe_configuration(c_dict, working_dir):
+                if _probe_configuration(c_dict, working_dir, timeout=config.timeout):
                     logger.info(f"CLI tool {config.name} successfully recovered.")
                     state["active"] = True
                 else:
@@ -222,19 +222,31 @@ def _execute_command(
         }
 
 
-def _probe_configuration(config: Dict[str, Any], working_dir: Path) -> bool:
-    """Run quick health probe for one configuration."""
+def _probe_configuration(config: Dict[str, Any], working_dir: Path, timeout: Optional[int] = None) -> bool:
+    """Run quick health probe for one configuration.
+
+    Uses the provided timeout: -1 means no timeout (None),
+    positive values use that timeout, otherwise falls back to default probe timeout.
+    """
     cmd = _build_command(
         cli_command=config["cli_command"],
         cli_base_args=config["cli_args"],
         agent_args=[],
         additional_instructions=_PROBE_INSTRUCTIONS,
     )
+
+    if timeout == -1:
+        effective_timeout = None  # never timeout
+    elif timeout is not None and timeout > 0:
+        effective_timeout = timeout
+    else:
+        effective_timeout = _PROBE_TIMEOUT_SECONDS
+
     result = _execute_command(
         cli_command=config["cli_command"],
         cmd=cmd,
         working_dir=working_dir,
-        timeout=_PROBE_TIMEOUT_SECONDS,
+        timeout=effective_timeout,
         capture_output=True,
     )
     return result["success"]
