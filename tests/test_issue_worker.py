@@ -391,7 +391,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
     def test_branch_creation_failure(self, mock_settings, mock_create_branch, mock_checkout):
-        """Test that run handles branch creation failure and calls on_task_failure."""
+        """Test that run handles branch creation failure by skipping the task."""
         mock_settings.ralph_enabled = False
         mock_checkout.return_value = True
         mock_create_branch.return_value = False
@@ -401,9 +401,9 @@ class TestIssueWorker:
         assert result["success"] is True
         assert result["tasks_processed"] == 0
         assert len(result["task_results"]) == 1
-        assert "Failed to create branch" in result["task_results"][0]["error"]
-        assert "task #1" in result["task_results"][0]["error"]
-        assert task_source.on_task_failure_called is True
+        assert result["task_results"][0]["status"] == "skipped"
+        assert result["task_results"][0]["success"] is None
+        assert task_source.on_task_failure_called is False
 
     @patch("auto_slopp.workers.issue_worker.settings")
     def test_create_results_dict(self, mock_settings):
