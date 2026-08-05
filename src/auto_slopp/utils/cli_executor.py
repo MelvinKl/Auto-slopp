@@ -359,11 +359,21 @@ def run_cli_executor(
         )
 
         logger.info(f"Using CLI configuration: {config['name']} for task {task_name}")
+
+        # Use per-config timeout: -1 means never timeout, positive value overrides caller timeout
+        _cfg = settings.cli_configurations[config_index]
+        if _cfg.timeout == -1:
+            config_timeout = None  # never timeout
+        elif _cfg.timeout > 0:
+            config_timeout = _cfg.timeout
+        else:
+            config_timeout = timeout  # fall back to caller-provided timeout
+
         result = _execute_command(
             cli_command=cli_command,
             cmd=cmd,
             working_dir=working_dir,
-            timeout=timeout,
+            timeout=config_timeout,
             capture_output=capture_output,
             start_time=start_time,
         )
