@@ -1281,3 +1281,141 @@ class TestIssueWorker:
         assert result["error"] is None
         assert result["ralph_loops_executed"] == 0
         assert result["ralph_steps_completed"] == 0
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_skipped_task_not_counted_as_processed(self, mock_settings, mock_create_branch, mock_checkout):
+        """Test that skipped tasks are counted in tasks_skipped, not tasks_processed."""
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = False
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        result = worker.run(Path("/tmp"))
+        assert result["tasks_skipped"] == 1
+        assert result["tasks_processed"] == 0
+        assert result["tasks_completed"] == 0
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_skipped_task_does_not_call_on_task_failure(self, mock_settings, mock_create_branch, mock_checkout):
+        """Test that skipped tasks do not trigger on_task_failure callback."""
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = False
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        result = worker.run(Path("/tmp"))
+        assert task_source.on_task_failure_called is False
+        assert task_source.on_task_complete_called is False
+        assert task_source.on_no_changes_called is False
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_skipped_task_does_not_log_failure_warning(self, mock_settings, mock_create_branch, mock_checkout, caplog):
+        """Test that skipped tasks do not trigger 'Failed to process task' warning log."""
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = False
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        with caplog.at_level("WARNING", logger="auto_slopp.workers.IssueWorker"):
+            result = worker.run(Path("/tmp"))
+        failure_messages = [r.message for r in caplog.records if "Failed to process task" in r.message]
+        assert len(failure_messages) == 0, f"Unexpected failure warnings: {failure_messages}"
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_skipped_task_calls_on_task_start_before_skip(self, mock_settings, mock_create_branch, mock_checkout):
+        """Test that on_task_start is called before the skip decision.
+
+        _process_single_task calls on_task_start before attempting branch creation,
+        so skipped tasks still trigger the start callback.
+        """
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = False
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        result = worker.run(Path("/tmp"))
+        assert task_source.on_task_start_called is True
+        assert task_source.on_task_complete_called is False
+        assert task_source.on_task_failure_called is False
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_mixed_outcomes_skipped_and_failed(self, mock_settings, mock_create_branch, mock_checkout):
+        """Test that skipped and failed tasks are counted separately."""
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        # First task: branch creation fails (skip), second task: execution fails
+        call_count = [0]
+
+        def branch_creator(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return False  # Skip first task
+            return True  # Create branch for second task
+
+        mock_create_branch.side_effect = branch_creator
+        task_source = MockTaskSource(
+            tasks=[
+                Task(id=1, title="Skip Me", body=""),
+                Task(id=2, title="Fail Me", body=""),
+            ]
+        )
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        result = worker.run(Path("/tmp"))
+        assert result["tasks_skipped"] == 1
+        assert result["tasks_processed"] == 0
+        assert result["tasks_completed"] == 0
+        assert len(result["task_results"]) == 2
+        assert result["task_results"][0]["status"] == "skipped"
+        assert result["task_results"][0]["success"] is None
+        assert result["task_results"][1]["status"] == "failure"
+        assert result["task_results"][1]["success"] is False
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_skipped_task_summary_includes_count(self, mock_settings, mock_create_branch, mock_checkout, caplog):
+        """Test that the completion summary log includes the tasks_skipped count."""
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = False
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        with caplog.at_level("INFO", logger="auto_slopp.workers.IssueWorker"):
+            result = worker.run(Path("/tmp"))
+        summary_messages = [r.message for r in caplog.records if "Skipped:" in r.message]
+        assert len(summary_messages) == 1
+        assert "Skipped: 1" in summary_messages[0]
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_all_tasks_skipped_no_failure_warning(self, mock_settings, mock_create_branch, mock_checkout, caplog):
+        """Test that when all tasks are skipped, no 'Failed to process task' warnings are logged."""
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = False
+        task_source = MockTaskSource(
+            tasks=[
+                Task(id=1, title="Test 1", body=""),
+                Task(id=2, title="Test 2", body=""),
+                Task(id=3, title="Test 3", body=""),
+            ]
+        )
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        with caplog.at_level("WARNING", logger="auto_slopp.workers.IssueWorker"):
+            result = worker.run(Path("/tmp"))
+        failure_messages = [r.message for r in caplog.records if "Failed to process task" in r.message]
+        assert len(failure_messages) == 0
+        assert result["tasks_skipped"] == 3
+        assert result["tasks_processed"] == 0
+        assert result["tasks_completed"] == 0
