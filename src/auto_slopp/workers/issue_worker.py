@@ -125,7 +125,9 @@ class IssueWorker(Worker):
             task_result = self._process_single_task(repo_path, task)
             results["task_results"].append(task_result)
 
-            if task_result["success"]:
+            if task_result.get("status") == "skipped":
+                results["tasks_skipped"] += 1
+            elif task_result["success"]:
                 results["tasks_processed"] += 1
                 results["openagent_executions"] += task_result.get("openagent_executions", 0)
                 results["prs_created"] += task_result.get("prs_created", 0)
@@ -149,6 +151,7 @@ class IssueWorker(Worker):
             "repositories_processed": 1,
             "repositories_with_errors": 0,
             "tasks_processed": 0,
+            "tasks_skipped": 0,
             "openagent_executions": 0,
             "prs_created": 0,
             "tasks_completed": 0,
@@ -734,6 +737,7 @@ Plan:
             "repositories_processed": 0,
             "repositories_with_errors": 1,
             "tasks_processed": 0,
+            "tasks_skipped": 0,
             "openagent_executions": 0,
             "prs_created": 0,
             "tasks_completed": 0,
@@ -754,6 +758,7 @@ Plan:
         self.logger.info(
             f"IssueWorker completed. Processed: "
             f"{results['tasks_processed']}, "
+            f"Skipped: {results.get('tasks_skipped', 0)}, "
             f"{cli_tool} executions: {results['openagent_executions']}, "
             f"PRs created: {results['prs_created']}, "
             f"Tasks completed: {results['tasks_completed']}, "
