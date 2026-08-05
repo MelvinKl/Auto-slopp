@@ -775,6 +775,23 @@ vikunja_worker = IssueWorker(task_source=VikunjaTaskSource())
 
 The task execution creates a markdown-based plan file in `.ralph/` with checkboxes for each step. Steps are executed sequentially. Completed steps are committed automatically. A final acceptance check validates all steps at once after completion. The final step always verifies that `make test` passes.
 
+#### Task Results
+
+Each processed task produces a result dict containing a `status` field with one of the following values:
+
+| Status | Description |
+|--------|-------------|
+| `pending` | Task has not been processed yet |
+| `success` | Task completed successfully |
+| `failure` | Task failed due to an error |
+| `skipped` | Task was skipped (e.g., branch creation failed) — not counted as a failure |
+
+The completion summary logs task counts broken down by outcome:
+
+```
+IssueWorker completed. Processed: 3, Skipped: 1, opencode executions: 3, PRs created: 2, Tasks completed: 2, Errors: 0
+```
+
 ### GitHubIssueWorker
 Convenience wrapper around IssueWorker configured with GitHubTaskSource. Handles GitHub issue operations.
 
