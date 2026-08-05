@@ -133,8 +133,9 @@ class TestMainApplication:
 
                     mock_httpx_logger.setLevel.assert_called_with(30)
 
+    @patch("auto_slopp.main._check_startup_health")
     @patch("auto_slopp.main.run_executor")
-    def test_main_function_with_keyboard_interrupt(self, mock_run_executor, mock_settings):
+    def test_main_function_with_keyboard_interrupt(self, mock_run_executor, mock_check_startup, mock_settings):
         """Test main function handles KeyboardInterrupt gracefully."""
         mock_run_executor.side_effect = KeyboardInterrupt()
 
@@ -153,8 +154,9 @@ class TestMainApplication:
 
                         mock_exit.assert_called_once_with(0)
 
+    @patch("auto_slopp.main._check_startup_health")
     @patch("auto_slopp.main.run_executor")
-    def test_main_function_with_exception(self, mock_run_executor, mock_settings):
+    def test_main_function_with_exception(self, mock_run_executor, mock_check_startup, mock_settings):
         """Test main function handles exceptions gracefully."""
         mock_run_executor.side_effect = Exception("Test error")
 
@@ -173,8 +175,9 @@ class TestMainApplication:
 
                         mock_exit.assert_called_once_with(1)
 
+    @patch("auto_slopp.main._check_startup_health")
     @patch("auto_slopp.main.run_executor")
-    def test_main_function_successful_execution(self, mock_run_executor, mock_settings):
+    def test_main_function_successful_execution(self, mock_run_executor, mock_check_startup, mock_settings):
         """Test main function executes successfully."""
         mock_settings.base_repo_path = Path("/default/repo")
         mock_settings.debug = False
@@ -185,6 +188,7 @@ class TestMainApplication:
                 mock_args = MagicMock()
                 mock_args.repo_path = Path("/custom/repo")
                 mock_args.debug = True
+                mock_args.no_health_check = False
                 mock_parse.return_value = mock_args
 
                 with patch("auto_slopp.main.setup_logging"):
@@ -197,6 +201,59 @@ class TestMainApplication:
                             mock_executor.side_effect = KeyboardInterrupt()
                             main()
 
+                            mock_check_startup.assert_called_once()
+                            mock_check_startup.assert_called_once_with(
+                                Path("/custom/repo"),
+                            )
+
                             mock_executor.assert_called_once_with(
                                 repo_path=Path("/custom/repo"),
                             )
+
+    @patch("auto_slopp.main._check_startup_health")
+    @patch("auto_slopp.main.run_executor")
+    def test_main_function_skips_health_check_with_flag(self, mock_run_executor, mock_check_startup, mock_settings):
+        """--no-health-check flag should skip the startup health check."""
+        mock_settings.base_repo_path = Path("/default/repo")
+        mock_settings.debug = False
+        mock_settings.telegram_enabled = False
+
+        with patch("auto_slopp.main.settings", mock_settings):
+            with patch("auto_slopp.main.parse_arguments") as mock_parse:
+                mock_args = MagicMock()
+                mock_args.repo_path = None
+                mock_args.debug = False
+                mock_args.no_health_check = True
+                mock_parse.return_value = mock_args
+
+                with patch("auto_slopp.main.setup_logging"):
+                    with patch("auto_slopp.main.sys.exit"):
+                        from auto_slopp.main import main
+
+                        main()
+
+                        mock_check_startup.assert_not_called()
+
+    @patch("auto_slopp.main._check_startup_health")
+    @patch("auto_slopp.main.run_executor")
+    def test_main_function_health_check_with_none_repo_path(self, mock_run_executor, mock_check_startup, mock_settings):
+        """When repo_path is None, settings default should be used."""
+        mock_settings.base_repo_path = Path("/settings/repo")
+        mock_settings.debug = False
+        mock_settings.telegram_enabled = False
+
+        with patch("auto_slopp.main.settings", mock_settings):
+            with patch("auto_slopp.main.parse_arguments") as mock_parse:
+                mock_args = MagicMock()
+                mock_args.repo_path = None
+                mock_args.debug = False
+                mock_args.no_health_check = False
+                mock_parse.return_value = mock_args
+
+                with patch("auto_slopp.main.setup_logging"):
+                    with patch("auto_slopp.main.sys.exit"):
+                        from auto_slopp.main import main
+
+                        main()
+
+                        mock_check_startup.assert_called_once_with(Path("/settings/repo"))

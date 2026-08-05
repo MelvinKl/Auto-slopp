@@ -106,6 +106,7 @@ The capability rating system (0-10) helps match tasks with appropriate CLI tools
 3. The system selects tools within the task's min/max range
 4. Preference is given to tools closest to the task's recommended rating
 5. If a tool encounters errors, it enters cooldown (configurable duration)
+6. On startup, all configured CLI tools are probed for health; unhealthy tools are placed in cooldown automatically
 
 ##### Task Blacklisting
 
@@ -778,6 +779,8 @@ vikunja_worker = IssueWorker(task_source=VikunjaTaskSource())
 ```
 
 The task execution creates a markdown-based plan file in `.ralph/` with checkboxes for each step. Steps are executed sequentially. Completed steps are committed automatically. A final acceptance check validates all steps at once after completion. The final step always verifies that `make test` passes.
+
+If the final evaluation fails (either after all steps complete or at max iterations), the task file is deleted so it will be recreated from scratch on the next iteration, ensuring a completely fresh context.
 
 ### GitHubIssueWorker
 Convenience wrapper around IssueWorker configured with GitHubTaskSource. Handles GitHub issue operations.

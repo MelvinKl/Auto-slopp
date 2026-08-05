@@ -2,9 +2,13 @@
 
 import subprocess
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, Mock, patch
 
-from auto_slopp.utils.cli_executor import run_cli_executor
+from auto_slopp.utils.cli_executor import (
+    _check_startup_health,
+    _config_to_dict,
+    run_cli_executor,
+)
 from settings.main import CLIConfiguration, TaskRating
 
 
@@ -60,7 +64,10 @@ def test_codex_preserves_existing_subcommand(mock_run, monkeypatch):
 def test_timeout_falls_back_to_next_configuration(mock_run, monkeypatch):
     """Timeout on preferred configuration should trigger next configured CLI."""
     timeout_exc = subprocess.TimeoutExpired(cmd=["opencode"], timeout=30)
-    success_result = type("Result", (), {"returncode": 0, "stdout": "ok", "stderr": ""})()
+    success_result = MagicMock()
+    success_result.returncode = 0
+    success_result.stdout = "ok"
+    success_result.stderr = ""
     mock_run.side_effect = [timeout_exc, success_result, success_result, success_result]
 
     monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
@@ -319,3 +326,224 @@ def test_all_configs_blacklisted_returns_error(mock_run, monkeypatch):
     assert result["success"] is False
     assert "no cli configuration meets" in result["error"].lower()
     assert mock_run.call_count == 0
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_startup_health_check_marks_healthy_configs_active(mock_run, monkeypatch):
+    """Startup health check should mark healthy configurations as active."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="tool-1", cli_args=["run"], name="tool-1"),
+            CLIConfiguration(cli_command="tool-2", cli_args=["run"], name="tool-2"),
+        ],
+    )
+
+    _check_startup_health(Path.cwd())
+
+    assert mock_run.call_count == 2
+    from auto_slopp.utils.cli_executor import _cli_states
+
+    assert _cli_states[0]["active"] is True
+    assert _cli_states[1]["active"] is True
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_startup_health_check_marks_unhealthy_configs_in_cooldown(mock_run, monkeypatch):
+    """Startup health check should place unhealthy configurations in cooldown."""
+    fail_result = MagicMock()
+    fail_result.returncode = 1
+    fail_result.stdout = ""
+    fail_result.stderr = "error"
+    mock_run.return_value = fail_result
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="tool-1", cli_args=["run"], name="tool-1", cooldown_seconds=60),
+            CLIConfiguration(cli_command="tool-2", cli_args=["run"], name="tool-2", cooldown_seconds=120),
+        ],
+    )
+
+    fixed_time = 1000.0
+    mock_time = Mock()
+    mock_time.time.return_value = fixed_time
+    monkeypatch.setattr("auto_slopp.utils.cli_executor.time", mock_time)
+
+    _check_startup_health(Path.cwd())
+
+    assert mock_run.call_count == 2
+    from auto_slopp.utils.cli_executor import _cli_states
+
+    assert _cli_states[0]["active"] is False
+    assert _cli_states[1]["active"] is False
+    # Verify cooldown durations match expected values (deterministic, no wall-clock dependency)
+    assert abs(_cli_states[0]["cooldown_until"] - (fixed_time + 60)) < 0.01
+    assert abs(_cli_states[1]["cooldown_until"] - (fixed_time + 120)) < 0.01
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_startup_health_check_mixed_health(mock_run, monkeypatch):
+    """Startup health check should handle mixed healthy/unhealthy configurations."""
+    success_result = MagicMock()
+    success_result.returncode = 0
+    success_result.stdout = "ok"
+    success_result.stderr = ""
+
+    fail_result = MagicMock()
+    fail_result.returncode = 1
+    fail_result.stdout = ""
+    fail_result.stderr = "error"
+    mock_run.side_effect = [success_result, fail_result]
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="healthy-tool", cli_args=["run"], name="healthy"),
+            CLIConfiguration(cli_command="unhealthy-tool", cli_args=["run"], name="unhealthy", cooldown_seconds=60),
+        ],
+    )
+
+    _check_startup_health(Path.cwd())
+
+    assert mock_run.call_count == 2
+    from auto_slopp.utils.cli_executor import _cli_states
+
+    assert _cli_states[0]["active"] is True
+    assert _cli_states[1]["active"] is False
+    assert _cli_states[1]["cooldown_until"] > 0
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_startup_health_all_healthy(mock_run, monkeypatch):
+    """All probes succeed — every configuration stays active."""
+    success_result = MagicMock()
+    success_result.returncode = 0
+    success_result.stdout = "ok"
+    success_result.stderr = ""
+    mock_run.return_value = success_result
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="a", cli_args=[], name="a"),
+            CLIConfiguration(cli_command="b", cli_args=[], name="b"),
+            CLIConfiguration(cli_command="c", cli_args=[], name="c"),
+        ],
+    )
+
+    _check_startup_health(Path.cwd())
+
+    assert mock_run.call_count == 3
+    from auto_slopp.utils.cli_executor import _cli_states
+
+    assert all(_cli_states[i]["active"] for i in range(3))
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_startup_health_exception_doesnt_crash(mock_run, monkeypatch):
+    """An exception in one probe must not prevent checking the others."""
+    mock_run.side_effect = [FileNotFoundError("missing binary"), MagicMock(returncode=0, stdout="ok", stderr="")]
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="broken", cli_args=[], name="broken", cooldown_seconds=30),
+            CLIConfiguration(cli_command="ok", cli_args=[], name="ok"),
+        ],
+    )
+
+    _check_startup_health(Path.cwd())  # should not raise
+
+    from auto_slopp.utils.cli_executor import _cli_states
+
+    assert _cli_states[0]["active"] is False
+    assert _cli_states[1]["active"] is True
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_startup_health_timeout_exception(mock_run, monkeypatch):
+    """TimeoutExpired in one probe is handled gracefully."""
+    mock_run.side_effect = [subprocess.TimeoutExpired(cmd=["slow"], timeout=600), MagicMock(returncode=0)]
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="slow", cli_args=[], name="slow", cooldown_seconds=90),
+            CLIConfiguration(cli_command="fast", cli_args=[], name="fast"),
+        ],
+    )
+
+    _check_startup_health(Path.cwd())
+
+    from auto_slopp.utils.cli_executor import _cli_states
+
+    assert _cli_states[0]["active"] is False
+    assert _cli_states[0]["cooldown_until"] > 0
+    assert _cli_states[1]["active"] is True
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_startup_health_cooldown_seconds_applied(mock_run, monkeypatch):
+    """Each config receives its own cooldown_seconds value."""
+    fixed_time = 5000.0
+    mock_time = Mock()
+    mock_time.time.return_value = fixed_time
+
+    fail_a = MagicMock()
+    fail_a.returncode = 1
+    fail_a.stdout = ""
+    fail_a.stderr = "err"
+    success_b = MagicMock()
+    success_b.returncode = 0
+    success_b.stdout = "ok"
+    success_b.stderr = ""
+
+    mock_run.side_effect = [fail_a, success_b]
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor.time", mock_time)
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="a", cli_args=[], name="a", cooldown_seconds=10),
+            CLIConfiguration(cli_command="b", cli_args=[], name="b", cooldown_seconds=200),
+        ],
+    )
+
+    _check_startup_health(Path.cwd())
+
+    from auto_slopp.utils.cli_executor import _cli_states
+
+    assert abs(_cli_states[0]["cooldown_until"] - (fixed_time + 10)) < 0.01
+    # config b is healthy so no cooldown set (cooldown_until stays 0)
+    assert _cli_states[1]["cooldown_until"] == 0
+
+
+def test_config_to_dict():
+    """_config_to_dict returns the expected keys and values."""
+    cfg = CLIConfiguration(cli_command="cc", cli_args=["--x", "--y"], name="my-cc")
+    d = _config_to_dict(cfg)
+    assert d == {
+        "cli_command": "cc",
+        "cli_args": ["--x", "--y"],
+        "name": "my-cc",
+    }
+
+
+def test_config_to_dict_mutation_safe():
+    """Returning a dict must not let callers mutate the original CLIConfiguration."""
+    cfg = CLIConfiguration(cli_command="cc", cli_args=["--x"], name="n")
+    d = _config_to_dict(cfg)
+    d["cli_args"].append("--mutated")
+    assert "--mutated" not in cfg.cli_args

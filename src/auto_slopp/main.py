@@ -8,6 +8,7 @@ from pathlib import Path
 from auto_slopp.executor import run_executor
 from auto_slopp.telegram_handler import setup_telegram_logging
 from auto_slopp.utils.logging_util import add_file_handler
+from auto_slopp.utils.cli_executor import _check_startup_health
 from settings.main import settings
 
 
@@ -83,6 +84,12 @@ Examples:
 
     parser.add_argument("--version", action="version", version="Auto-slopp 0.1.0")
 
+    parser.add_argument(
+        "--no-health-check",
+        action="store_true",
+        help="Skip startup health check for CLI configurations (useful for CI/debugging)",
+    )
+
     return parser.parse_args()
 
 
@@ -92,6 +99,7 @@ def main() -> None:
 
     repo_path = args.repo_path or settings.base_repo_path
     debug = args.debug or settings.debug
+    no_health_check = bool(args.no_health_check)
 
     setup_logging()
     logger = logging.getLogger("auto_slopp")
@@ -100,9 +108,13 @@ def main() -> None:
     logger.info(f"Repository path: {repo_path}")
     logger.info(f"Debug mode: {debug}")
     logger.info(f"Telegram logging: {'enabled' if settings.telegram_enabled else 'disabled'}")
+    logger.info(f"Startup health check: {'skipped' if no_health_check else 'enabled'}")
 
     if debug:
         logger.debug("Debug mode enabled - showing detailed logs")
+
+    if not no_health_check:
+        _check_startup_health(repo_path)
 
     try:
         run_executor(repo_path=repo_path)
