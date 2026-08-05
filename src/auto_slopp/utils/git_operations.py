@@ -317,20 +317,23 @@ def restore_stashed_changes(repo_dir: Path) -> bool:
         False if restoring failed.
     """
     logger.info(f"Restoring stashed changes in {repo_dir.name}")
-    restore_result = _run_git_command(
-        repo_dir,
-        "stash",
-        "pop",
-        check=False,
-    )
 
-    if restore_result.returncode == 0:
-        logger.info(f"Successfully restored stashed changes in {repo_dir.name}")
-        return True
+    # Use apply + drop instead of pop for safety: pop can fail mid-way
+    # (e.g., due to conflicts) leaving the stash entry in an inconsistent state.
+    apply_result = _run_git_command(repo_dir, "stash", "apply", check=False)
+    if apply_result.returncode != 0:
+        apply_error = apply_result.stderr.strip() or apply_result.stdout.strip()
+        logger.warning(f"Failed to apply stashed changes in {repo_dir.name}: {apply_error}")
+        return False
 
-    restore_error = restore_result.stderr.strip() or restore_result.stdout.strip()
-    logger.warning(f"Failed to restore stashed changes in {repo_dir.name}: {restore_error}")
-    return False
+    drop_result = _run_git_command(repo_dir, "stash", "drop", check=False)
+    if drop_result.returncode != 0:
+        drop_error = drop_result.stderr.strip() or drop_result.stdout.strip()
+        logger.warning(f"Failed to drop stash after applying in {repo_dir.name}: {drop_error}")
+        return False
+
+    logger.info(f"Successfully restored stashed changes in {repo_dir.name}")
+    return True
 
 
 def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = True, timeout: int = 60) -> bool:

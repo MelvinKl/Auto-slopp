@@ -465,13 +465,14 @@ class TestCreateAndCheckoutBranch:
             make_mock(returncode=0),  # git stash push
             make_mock(returncode=0, stdout="stash@{0}: ..."),  # git stash list --oneline
             make_mock(returncode=1, stderr="checkout still failed"),  # git checkout (fails again)
-            make_mock(returncode=0),  # git stash pop (restore on failure)
+            make_mock(returncode=0),  # git stash apply (restore on failure)
+            make_mock(returncode=0),  # git stash drop (restore on failure)
         ]
 
         result = checkout_branch_resilient(repo_dir, branch)
 
         assert result is False
-        assert mock_subprocess_run.call_count == 9
+        assert mock_subprocess_run.call_count == 10
 
     @patch("auto_slopp.utils.git_operations.subprocess.run")
     @patch("auto_slopp.utils.git_operations.run_cli_executor")
