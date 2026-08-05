@@ -269,6 +269,13 @@ class RalphExecutor:
         """Get the canonical task file path for a task."""
         return repo_dir / ".ralph" / f"{self.file_prefix}-{issue_number}.md"
 
+    def _delete_task_file(self, repo_dir: Path, issue_number: int) -> None:
+        """Delete the task file for an issue if it exists."""
+        task_path = self._get_issue_task_path(repo_dir, issue_number)
+        if task_path.exists():
+            task_path.unlink()
+            self.logger.info(f"Deleted task file: {task_path}")
+
     def _create_issue_task_file(
         self,
         task_path: Path,
@@ -821,6 +828,7 @@ class RalphExecutor:
         execution_result = self._run_refined_task_loop(
             repo_dir=repo_dir,
             task_path=task_path,
+            issue_number=issue_number,
             issue_title=issue_title,
             issue_body=issue_body,
             comment_texts=comment_texts,
@@ -837,6 +845,7 @@ class RalphExecutor:
         issue_body: str,
         comment_texts: List[str],
         branch_name: str,
+        issue_number: int = 0,
     ) -> Dict[str, Any]:
         """Iterate through task steps, implementing and validating acceptance criteria."""
         max_iterations = self.max_iterations
@@ -878,15 +887,11 @@ class RalphExecutor:
                     result["loops_executed"] = iteration - 1
                     return result
 
-                # Final acceptance check failed. Retry it on subsequent iterations
-                # while the iteration budget remains so a spurious failure cannot
-                # end the task prematurely.
+                # Final acceptance check failed. Delete the task file so it
+                # is recreated from scratch on the next Ralph invocation.
+                self._delete_task_file(repo_dir, issue_number)
                 result["last_error"] = final_check_result.get("error", "Final acceptance check failed")
                 result["loops_executed"] = iteration - 1
-                if iteration < max_iterations:
-                    continue
-
-                # Iteration budget exhausted: report the acceptance failure.
                 result["error"] = final_check_result.get("error", "Final acceptance check failed")
                 return result
 
@@ -970,6 +975,10 @@ class RalphExecutor:
                     result.pop("error", None)
             else:
                 result["last_error"] = final_check_result.get("error", "Final acceptance check failed")
+                # Final acceptance check failed at max iterations. Delete the
+                # task file so it is recreated from scratch on the next Ralph
+                # invocation.
+                self._delete_task_file(repo_dir, issue_number)
         return result
 
 
