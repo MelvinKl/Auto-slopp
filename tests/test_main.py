@@ -113,7 +113,9 @@ class TestMainApplication:
                     setup_logging()
 
                     mock_telegram.assert_called_once_with(level=logging.WARNING)
-                    mock_logger.addHandler.assert_called_once_with(mock_handler)
+                    # Called twice: once for file handler, once for telegram handler
+                    assert mock_logger.addHandler.call_count == 2
+                    mock_logger.addHandler.assert_called_with(mock_handler)
 
     def test_setup_logging_httpx_logging_configured(self, mock_settings):
         """Test that httpx logging is configured to be less noisy."""
