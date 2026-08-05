@@ -1130,6 +1130,37 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
+    def test_ensure_ralph_in_gitignore_no_warning_on_success(
+        self, mock_settings, mock_create_branch, mock_checkout, mock_ensure_gitignore, caplog
+    ):
+        """Test that no warning is logged when ensure_ralph_in_gitignore returns True."""
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_ensure_gitignore.return_value = True  # Simulate success
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": True,
+            "loops_executed": 1,
+            "steps_completed": 3,
+            "total_steps": 3,
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with caplog.at_level(logging.WARNING):
+                worker.run(Path(temp_dir))
+
+        # Verify ensure_ralph_in_gitignore was called
+        mock_ensure_gitignore.assert_called_once()
+        # Verify no warning was logged
+        gitignore_warnings = [r for r in caplog.records if "Failed to ensure .ralph in .gitignore" in r.message]
+        assert len(gitignore_warnings) == 0
+
+    @patch("auto_slopp.workers.issue_worker.ensure_ralph_in_gitignore")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
     def test_ensure_ralph_in_gitignore_logs_warning_on_failure(
         self, mock_settings, mock_create_branch, mock_checkout, mock_ensure_gitignore, caplog
     ):
