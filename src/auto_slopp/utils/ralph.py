@@ -218,6 +218,21 @@ class RalphExecutor:
 
     This class encapsulates the logic for creating, refining, and executing
     task plans defined in markdown files with step-by-step checkboxes.
+
+    Error tracking fields:
+        _last_error: Stores the most recent error message from any Ralph
+            operation (e.g., refinement, parsing, final acceptance check).
+            This field is set early in the run (before the step loop) and
+            persists as a "stale" error until overwritten. It is used as a
+            fallback by :meth:`_is_llm_unavailable` when no per-iteration
+            error is available.
+        _last_iteration_failure_reason: Stores the error reason from the
+            most recent iteration inside the step loop. This is cleared
+            after a successful iteration and overwritten on failure. It
+            takes precedence over :attr:`_last_error` in
+            :meth:`_is_llm_unavailable` because it reflects the actual
+            failure that caused loop exhaustion (e.g., an LLM outage mid-loop)
+            rather than a stale error from an earlier phase.
     """
 
     def __init__(
