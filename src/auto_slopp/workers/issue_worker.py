@@ -204,7 +204,6 @@ class IssueWorker(Worker):
             "task_id": task_id,
             "task_title": task_title,
             "success": False,
-            "status": "pending",
             "openagent_executed": False,
             "openagent_executions": 0,
             "task_completed": False,

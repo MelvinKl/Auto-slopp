@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `remaining_steps_update_name` parameter from `RalphExecutor` constructor and `IssueWorker` call site
 
 ### Fixed
-- **IssueWorker**: Skipped tasks (e.g., when branch creation fails) are no longer recorded as failures. A new `status` field on task results distinguishes between `success`, `failure`, `skipped`, and `pending`. The summary now reports skipped task counts separately from failures.
+- **IssueWorker**: Skipped tasks (e.g., when branch creation fails) are no longer recorded as failures. A new `status` field on task results distinguishes between `success`, `failure`, and `skipped`. The summary now reports skipped task counts separately from failures.
 
 ### Documentation
 - Updated README.md to reflect removal of intermediate checks and new final acceptance check behavior

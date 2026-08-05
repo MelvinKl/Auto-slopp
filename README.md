@@ -788,7 +788,6 @@ Each processed task produces a result dict containing `status` and `success` fie
 
 | Status | Success | Description |
 |--------|---------|-------------|
-| `pending` | — | Task has not been processed yet |
 | `success` | `True` | Task completed successfully |
 | `failure` | `False` | Task failed due to an error |
 | `skipped` | `None` | Task was skipped (e.g., branch creation failed) — not counted as a failure |
