@@ -697,7 +697,6 @@ class RalphExecutor:
             "unreachable",
             "503 service unavailable",
             "502 bad gateway",
-            "500 internal",
         ]
         return any(pattern in error_lower for pattern in unavailability_patterns)
 
