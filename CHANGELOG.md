@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 - Updated README.md to reflect removal of intermediate checks and new final acceptance check behavior
 
+### Added
+- **TaskSource**: New `on_skip()` lifecycle callback for skipping issues that should be retried later (e.g., LLM unavailability). Both `GitHubTaskSource` and `VikunjaTaskSource` implement this by committing a skip comment and updating issue status.
+
+### Migration Notes
+- **TaskSource.on_skip()**: Custom `TaskSource` implementations must now implement the `on_skip()` method. This is a breaking change for any external implementations of the `TaskSource` interface. The method receives the issue ID and an optional reason string, and should persist the skip state (e.g., by updating issue status and leaving a comment explaining the skip).
+- **RalphExecutor._last_iteration_failure_reason**: Renamed from `_last_iteration_error` for clarity. The field captures the failure reason from the last loop iteration so `_is_llm_unavailable()` can inspect it.
+
 ## [0.1.0] - 2024-01-01
 
 ### Added
