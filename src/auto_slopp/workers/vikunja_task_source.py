@@ -270,9 +270,8 @@ class VikunjaTaskSource(TaskSource):
             f"The task will be retried automatically once the LLM is available again."
         )
         comment_on_task(task.id, skip_comment)
-        commit(repo_path, f"Added skip comment to task {task.id}")
         update_task_status(task.id, "skipped")
-        commit(repo_path, "Updated task status to 'skipped'")
+        commit(repo_path, f"Skipped task {task.id}: {reason}")
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.
