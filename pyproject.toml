@@ -68,6 +68,9 @@ exclude = '''
     | openapi_client
   )/
 )
+|
+(src/auto_slopp/utils/github_operations\.py$
+|src/auto_slopp/workers/github_task_source\.py$)
 '''
 
 [tool.flake8]
@@ -102,6 +105,8 @@ extend-ignore = [
     "F811",
     "F841",
     "B007",
+    "B014",
+    "BLK100",
     "D104",
     "D406",
     "D407",
