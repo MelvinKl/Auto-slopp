@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from auto_slopp.utils.cli_executor import (
+    _cli_states,
     execute_with_instructions,
     get_active_cli_command,
     run_cli_executor,
@@ -125,7 +126,10 @@ class IssueWorker(Worker):
             task_result = self._process_single_task(repo_path, task)
             results["task_results"].append(task_result)
 
-            if task_result["success"]:
+            if task_result.get("skipped"):
+                results["tasks_skipped"] += 1
+                self.logger.info(f"Task #{task.id} skipped: {task_result.get('skip_reason', 'Unknown')}")
+            elif task_result["success"]:
                 results["tasks_processed"] += 1
                 results["openagent_executions"] += task_result.get("openagent_executions", 0)
                 results["prs_created"] += task_result.get("prs_created", 0)
@@ -149,6 +153,7 @@ class IssueWorker(Worker):
             "repositories_processed": 1,
             "repositories_with_errors": 0,
             "tasks_processed": 0,
+            "tasks_skipped": 0,
             "openagent_executions": 0,
             "prs_created": 0,
             "tasks_completed": 0,
@@ -176,6 +181,77 @@ class IssueWorker(Worker):
                 self.logger.warning(f"Failed to pull latest changes from {repo_dir.name}")
                 return False
         return True
+
+    def _is_llm_unavailable(self, error_msg: str) -> bool:
+        """Check if the error indicates LLM unavailability.
+
+        Uses specific patterns to avoid false positives from unrelated errors.
+
+        Args:
+            error_msg: The error message to check
+
+        Returns:
+            True if the error indicates LLM is unavailable, False otherwise
+        """
+        error_lower = error_msg.lower()
+        error_indicates_unavailable = (
+            "timed out" in error_lower
+            or "connection refused" in error_lower
+            or "connection reset" in error_lower
+            or "rate limit" in error_lower
+            or "too many requests" in error_lower
+            or "service unavailable" in error_lower
+            or "gateway timeout" in error_lower
+            or "llm unavailable" in error_lower
+            or "503" in error_lower
+            or "502" in error_lower
+            or "504" in error_lower
+            or "internal server error" in error_lower
+        )
+        # Also check if all CLI configurations are inactive (in cooldown) and cooldown hasn't expired
+        all_clis_inactive = False
+        cli_configs = settings.cli_configurations
+        if cli_configs and _cli_states:
+            now = time.time()
+            num_configs = len(cli_configs)
+            if num_configs > 0:
+                all_clis_inactive = True
+                for i in range(num_configs):
+                    state = _cli_states.get(i, {"active": True, "cooldown_until": 0.0})
+                    # CLI is available if active, or if inactive but cooldown has expired
+                    if state.get("active", True) or now >= state.get("cooldown_until", 0.0):
+                        all_clis_inactive = False
+                        break
+
+        return error_indicates_unavailable or all_clis_inactive
+
+    def _is_permanent_error(self, error_msg: str) -> bool:
+        """Check if the error indicates a permanent configuration/setup issue.
+
+        These errors require human intervention and should not be retried automatically.
+
+        Args:
+            error_msg: The error message to check
+
+        Returns:
+            True if the error indicates a permanent issue, False otherwise
+        """
+        error_lower = error_msg.lower()
+        permanent_indicators = (
+            "no cli configuration" in error_lower
+            or "no active cli" in error_lower
+            or "permission denied" in error_lower
+            or "authentication failed" in error_lower
+            or "unauthorized" in error_lower
+            or "access denied" in error_lower
+            or "forbidden" in error_lower
+            or "invalid token" in error_lower
+            or "token expired" in error_lower
+            or "not configured" in error_lower
+            or "configuration error" in error_lower
+            or "missing configuration" in error_lower
+        )
+        return permanent_indicators
 
     def _process_single_task(self, repo_dir: Path, task: Task) -> Dict[str, Any]:
         """Process a single task using Ralph loop.
@@ -247,7 +323,8 @@ class IssueWorker(Worker):
                 result["openagent_executions"] = ralph_result.get("loops_executed", 0)
 
                 if not ralph_result.get("success", False):
-                    result["error"] = f"Ralph loop failed: {ralph_result.get('error', 'Unknown error')}"
+                    ralph_error = f"Ralph loop failed: {ralph_result.get('error', 'Unknown error')}"
+                    result["error"] = ralph_error
 
                     if ralph_result.get("max_loops_reached", False):
                         self.logger.warning(f"Ralph loop reached max iterations for task #{task_id}")
@@ -257,6 +334,18 @@ class IssueWorker(Worker):
                             ralph_result.get("total_steps", 0),
                             ralph_result.get("error", "Unknown error"),
                         )
+                    elif self._is_llm_unavailable(ralph_error):
+                        self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
+                        self.task_source.on_skip(task)
+                        result["success"] = True
+                        result["skipped"] = True
+                        result["skip_reason"] = ralph_error
+                        return result
+                    elif self._is_permanent_error(ralph_error):
+                        self.logger.error(f"Permanent error detected for task #{task_id}: {ralph_error}")
+                        self.task_source.on_task_failure(task, ralph_error)
+                    else:
+                        self.task_source.on_task_failure(task, ralph_error)
 
                     return result
 
@@ -286,11 +375,30 @@ class IssueWorker(Worker):
                     cli_tool = get_active_cli_command()
                     error_msg = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
                     result["error"] = error_msg
-                    self.task_source.on_task_failure(task, error_msg)
+                    if self._is_llm_unavailable(error_msg):
+                        self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
+                        self.task_source.on_skip(task)
+                        result["success"] = True
+                        result["skipped"] = True
+                        result["skip_reason"] = error_msg
+                        return result
+                    elif self._is_permanent_error(error_msg):
+                        self.logger.error(f"Permanent error detected for task #{task_id}: {error_msg}")
+                        self.task_source.on_task_failure(task, error_msg)
+                    else:
+                        self.task_source.on_task_failure(task, error_msg)
                     return result
 
             current_branch = get_current_branch(repo_dir)
             if current_branch in ("main", "master"):
+                if self._is_llm_unavailable(""):
+                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
+                    self.task_source.on_skip(task)
+                    result["success"] = True
+                    result["skipped"] = True
+                    result["skip_reason"] = "LLM unavailable - no changes made"
+                    return result
+
                 self.logger.info(f"No changes made for task #{task_id}, closing task")
                 self.task_source.on_no_changes(task)
 
@@ -307,6 +415,14 @@ class IssueWorker(Worker):
             # to ensure everything is committed before proceeding.
             ahead_count = get_commits_ahead_of_branch(repo_dir, base_branch="main")
             if ahead_count == 0:
+                if self._is_llm_unavailable(""):
+                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
+                    self.task_source.on_skip(task)
+                    result["success"] = True
+                    result["skipped"] = True
+                    result["skip_reason"] = "LLM unavailable - no changes made"
+                    return result
+
                 self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue")
                 # Clean up the branch since no work was done
                 try:
@@ -716,6 +832,7 @@ Plan:
         self.logger.info(
             f"IssueWorker completed. Processed: "
             f"{results['tasks_processed']}, "
+            f"Skipped: {results['tasks_skipped']}, "
             f"{cli_tool} executions: {results['openagent_executions']}, "
             f"PRs created: {results['prs_created']}, "
             f"Tasks completed: {results['tasks_completed']}, "
