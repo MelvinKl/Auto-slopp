@@ -1415,6 +1415,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.push_to_remote")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.ensure_ralph_in_gitignore")
     def test_no_commits_ahead_llm_unavailable_calls_on_skip(
         self,
         mock_cli,
@@ -1426,6 +1427,8 @@ class TestIssueWorker:
         mock_create_branch,
         mock_checkout,
         mock_commit_push,
+        mock_ensure_gitignore,
+        caplog,
     ):
         """Test that on_skip is called when LLM unavailable and no commits ahead of main."""
         mock_cli.return_value = "opencode"
@@ -1435,7 +1438,6 @@ class TestIssueWorker:
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_current_branch.return_value = "ai/task-1"
->>>>>>> 6bc5b4120142132c30d0b4675ce72d5d766ae7fc
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
         worker.ralph_executor.execute = lambda *args, **kwargs: {
@@ -1486,23 +1488,6 @@ class TestIssueWorker:
         assert len(warning_records) == 1
         assert Path(temp_dir).name in warning_records[0].message
         assert "generated .ralph files may be committed to the repository" in warning_records[0].message
-=======
-            "steps_completed": 0,
-            "total_steps": 3,
-        }
-        # Mock _is_llm_unavailable to return True
-        worker._is_llm_unavailable = lambda _: True
-        result = worker.run(Path("/tmp"))
-        assert result["success"] is True
-        assert result["tasks_processed"] == 0
-        assert result["tasks_skipped"] == 1
-        assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is True
-        assert result["task_results"][0]["skipped"] is True
-        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no changes made"
-        assert task_source.on_skip_called is True
-        assert task_source.on_no_changes_called is False
->>>>>>> 6bc5b4120142132c30d0b4675ce72d5d766ae7fc
 
     def _create_test_repo(self, repo_path: Path) -> None:
         """Create a test git repository with main branch and no .gitignore."""

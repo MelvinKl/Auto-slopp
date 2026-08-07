@@ -6,7 +6,7 @@ Vikunja, following the same patterns used by VikunjaWorker.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from auto_slopp.utils.git_operations import commit, sanitize_branch_name
 from auto_slopp.utils.vikunja_operations import (
