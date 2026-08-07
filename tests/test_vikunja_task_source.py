@@ -268,7 +268,7 @@ class TestVikunjaTaskSource:
         """Test that on_task_start updates status and adds comment."""
         mock_analyze.return_value = [{"id": 1}]
         task_source = VikunjaTaskSource()
-        task = Task(id=42, title="Test", body="", comments=[], raw={})
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test/repo")})
 
         task_source.on_task_start(task, "ai/task-42-test")
 
@@ -285,7 +285,7 @@ class TestVikunjaTaskSource:
     def test_on_task_complete_updates_status_and_comments(self, mock_comment, mock_update, mock_commit):
         """Test that on_task_complete updates status and adds comment."""
         task_source = VikunjaTaskSource()
-        task = Task(id=42, title="Test", body="", comments=[], raw={})
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test/repo")})
 
         task_source.on_task_complete(task, "ai/task-42-test", "https://github.com/test/pr/1")
 
@@ -302,7 +302,7 @@ class TestVikunjaTaskSource:
     def test_on_task_failure_updates_status_and_comments(self, mock_comment, mock_update, mock_commit):
         """Test that on_task_failure updates status and adds comment."""
         task_source = VikunjaTaskSource()
-        task = Task(id=42, title="Test", body="", comments=[], raw={})
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test/repo")})
 
         task_source.on_task_failure(task, "Test error")
 
@@ -318,7 +318,7 @@ class TestVikunjaTaskSource:
     def test_on_no_changes_updates_status_and_comments(self, mock_comment, mock_update, mock_commit):
         """Test that on_no_changes updates status and adds comment."""
         task_source = VikunjaTaskSource()
-        task = Task(id=42, title="Test", body="", comments=[], raw={})
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test/repo")})
 
         task_source.on_no_changes(task)
 
@@ -334,7 +334,7 @@ class TestVikunjaTaskSource:
     def test_on_max_iterations_reached_updates_status_and_comments(self, mock_comment, mock_update, mock_commit):
         """Test that on_max_iterations_reached updates status and adds comment."""
         task_source = VikunjaTaskSource()
-        task = Task(id=42, title="Test", body="", comments=[], raw={})
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test/repo")})
 
         task_source.on_max_iterations_reached(task, 8, 15, "Max iterations reached")
 
@@ -467,3 +467,49 @@ class TestVikunjaTaskSource:
             assert identifier.startswith(
                 expected_prefix
             ), f"Identifier {identifier} doesn't start with prefix {expected_prefix}"
+
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    @patch("auto_slopp.workers.vikunja_task_source.settings")
+    def test_on_skip_adds_comment_and_preserves_tag(self, mock_settings, mock_comment):
+        """Test that on_skip adds a comment but does NOT remove the required tag."""
+        mock_settings.github_issue_worker_required_label = "test-tag"
+        mock_comment.return_value = True
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test Task", body="", comments=[], raw={"_repo_path": Path("/test")})
+
+        task_source.on_skip(task)
+
+        mock_comment.assert_called_once()
+        comment_args = mock_comment.call_args[0]
+        assert comment_args[0] == 42
+        assert "Skipped: LLM Unavailable" in comment_args[1]
+        assert "test-tag" not in comment_args[1].lower()  # Tag should not be mentioned as removed
+
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    @patch("auto_slopp.workers.vikunja_task_source.settings")
+    def test_on_skip_handles_missing_repo_path(self, mock_settings, mock_comment):
+        """Test that on_skip handles missing repo_path gracefully."""
+        mock_settings.github_issue_worker_required_label = "test-tag"
+        mock_comment.return_value = True
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test Task", body="", comments=[], raw={})
+
+        # Should not raise an exception
+        task_source.on_skip(task)
+
+        mock_comment.assert_not_called()
+
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.settings")
+    def test_on_skip_does_not_call_commit(self, mock_settings, mock_commit, mock_comment):
+        """Test that on_skip does not call commit for remote API operations."""
+        mock_settings.github_issue_worker_required_label = "test-tag"
+        mock_comment.return_value = True
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test Task", body="", comments=[], raw={"_repo_path": Path("/test")})
+
+        task_source.on_skip(task)
+
+        mock_comment.assert_called_once()
+        mock_commit.assert_not_called()
