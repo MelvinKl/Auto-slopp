@@ -39,6 +39,9 @@ class ConcreteTaskSource(TaskSource):
     def on_no_changes(self, task: Task) -> None:
         pass
 
+    def on_skip(self, task: Task) -> None:
+        pass
+
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         pass
 
@@ -458,7 +461,7 @@ class TestVikunjaTaskSource:
         mock_update_status.return_value = True
         mock_analyze.return_value = []
         source = VikunjaTaskSource()
-        task = Task(id=42, title="Test", body="")
+        task = Task(id=42, title="Test", body="", raw={"_repo_path": Path("/tmp")})
         source.on_task_start(task, "ai/task-42")
         mock_update_status.assert_called_once_with(42, "in_progress")
         mock_comment.assert_called_once()
@@ -483,7 +486,7 @@ class TestVikunjaTaskSource:
         """Test that on_task_failure updates status and adds failure comment."""
         mock_update_status.return_value = True
         source = VikunjaTaskSource()
-        task = Task(id=42, title="Test", body="")
+        task = Task(id=42, title="Test", body="", raw={"_repo_path": Path("/tmp")})
         source.on_task_failure(task, "Test error")
         mock_update_status.assert_called_once_with(42, "failed")
         mock_comment.assert_called_once()
