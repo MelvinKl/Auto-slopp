@@ -75,21 +75,22 @@ class GitHubTaskSource(TaskSource):
         """Condense comments from the issue author or allowed creator into a single comment.
 
         Fetches all comments via get_issue_comments(). Filters to only include comments
-        from the issue author or the whitelisted allowed creator. If there are 0 or 1
-        filtered comments, returns them as-is (no condensing). If there are 2+ filtered
-        comments, calls the CLI executor to summarize them, posts the summary as a new
-        comment, deletes ALL original comments on the issue, and returns the summary as a
-        single-element list.
+                from the issue author or the whitelisted allowed creator. If there are 0 or 1
+                filtered comments, returns them as-is (no condensing). If there are 2+ filtered
+                comments, calls the CLI executor to summarize them, posts the summary as a new
+                comment, deletes ALL original comments on the issue, and returns the summary as a
+                single-element list.
 
-        Args:
-            repo_path: Path to the repository.
-            issue_number: Issue number.
-            issue_author_login: Login of the issue author.
-            allowed_creator: Whitelisted GitHub username whose comments should be included.
+                Args:
+                    repo_path: Path to the repository.
+                    issue_number: Issue number.
+                    issue_author_login: Login of the issue author.
+                    allowed_creator: Whitelisted GitHub username whose comments should be included.
 
-        Returns:
-            List containing either [] (no comments), [single_comment_body] (one comment),
-            or [condensed_summary] (multiple comments condensed).
+                Returns:
+                    List containing ["No comments provided."] (no comments),
+                    ["Only one comment present; no additional comments to condense."] (one comment),
+                    or [condensed_summary] (multiple comments condensed).
         """
         # Fetch all comments (each is a dict with 'id', 'body', 'author', 'createdAt')
         logger.debug(f"[Condense] Fetching comments for issue #{issue_number}")
@@ -297,6 +298,28 @@ class GitHubTaskSource(TaskSource):
         )
         comment_on_issue(repo_path, task.id, no_changes_comment)
         close_issue(repo_path, task.id)
+
+    def on_skip(self, task: Task) -> None:
+        """Called when a task should be skipped (e.g., when LLM is unavailable).
+
+        Comments on the issue explaining the skip. The required label is NOT
+        removed so the task can be retried when the LLM becomes available.
+
+        Args:
+            task: The task that should be skipped
+        """
+        repo_path = task.raw.get("_repo_path")
+        if repo_path is None:
+            logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
+            return
+
+        skip_comment = (
+            "⏭️ **Skipped: LLM Unavailable**\n\n"
+            "This issue has been skipped for this iteration because the LLM is currently unavailable. "
+            "The task will be retried when the LLM becomes available."
+        )
+        comment_on_issue(repo_path, task.id, skip_comment)
+        logger.info(f"Skipped issue #{task.id} - LLM unavailable, label preserved for retry")
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.
