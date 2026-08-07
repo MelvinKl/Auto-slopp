@@ -20,6 +20,7 @@ class MockTaskSource(TaskSource):
         self.on_task_complete_called = False
         self.on_task_failure_called = False
         self.on_no_changes_called = False
+        self.on_skip_called = False
         self.on_max_iterations_called = False
         self.on_skip_called = False
         self.findings = None  # To store findings passed to on_task_complete
@@ -51,6 +52,9 @@ class MockTaskSource(TaskSource):
 
     def on_no_changes(self, task: Task) -> None:
         self.on_no_changes_called = True
+
+    def on_skip(self, task: Task) -> None:
+        self.on_skip_called = True
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         self.on_max_iterations_called = True
@@ -1153,6 +1157,34 @@ class TestIssueWorker:
         mock_push.assert_called_once()
         mock_create_pr.assert_called_once()
 
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    def test_comment_condensation(self, mock_get_comments):
+        """Test that GitHubTaskSource._condense_comments properly condenses comments."""
+        task_source = GitHubTaskSource()
+
+        # Test case 1: No comments
+        mock_get_comments.return_value = []
+        result = task_source._condense_comments(Path("/tmp"), 1, "author", "MelvinKl")
+        assert result == []
+
+        # Test case 2: One comment
+        mock_get_comments.return_value = [{"id": 1, "body": "Only comment", "author": {"login": "author"}}]
+        result = task_source._condense_comments(Path("/tmp"), 2, "author", "MelvinKl")
+        assert result == ["Only comment"]
+
+        # Test case 3: Multiple comments - should call CLI to condense
+        mock_get_comments.return_value = [
+            {"id": 1, "body": "First comment", "author": {"login": "author"}},
+            {"id": 2, "body": "Second comment", "author": {"login": "author"}},
+            {"id": 3, "body": "Third comment", "author": {"login": "author"}},
+        ]
+        with patch("auto_slopp.workers.github_task_source.execute_with_instructions") as mock_execute:
+            mock_execute.return_value = {"success": True, "stdout": "Condensed summary"}
+            with patch("auto_slopp.workers.github_task_source.comment_on_issue"):
+                with patch("auto_slopp.workers.github_task_source.delete_issue_comment"):
+                    result = task_source._condense_comments(Path("/tmp"), 3, "author", "MelvinKl")
+                    assert result == ["Condensed summary"]
+
     def test_comments_pass_through_unchanged(self):
         """Test that task.comments are passed through without modification.
 
@@ -1206,6 +1238,291 @@ class TestIssueWorker:
         mock_ensure_gitignore.assert_called_once()
         call_args = mock_ensure_gitignore.call_args
         assert call_args[0][0] == Path(temp_dir)
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_llm_unavailable_calls_on_skip_ralph(self, mock_settings, mock_create_branch, mock_checkout):
+        """Test that on_skip is called when LLM is unavailable during Ralph loop."""
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": False,
+            "loops_executed": 1,
+            "steps_completed": 2,
+            "total_steps": 5,
+            "max_loops_reached": False,
+            "error": "LLM timed out waiting for response",
+        }
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert result["tasks_processed"] == 0
+        assert result["tasks_skipped"] == 1
+        assert len(result["task_results"]) == 1
+        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["skipped"] is True
+        assert "skip_reason" in result["task_results"][0]
+        assert task_source.on_skip_called is True
+        assert task_source.on_task_failure_called is False
+
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_llm_unavailable_calls_on_skip_cli(
+        self, mock_settings, mock_create_branch, mock_checkout, mock_cli, mock_execute
+    ):
+        """Test that on_skip is called when LLM is unavailable during CLI execution."""
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_cli.return_value = "opencode"
+        mock_execute.return_value = {"success": False, "error": "LLM unavailable"}
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert result["tasks_processed"] == 0
+        assert result["tasks_skipped"] == 1
+        assert len(result["task_results"]) == 1
+        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["skipped"] is True
+        assert "skip_reason" in result["task_results"][0]
+        assert task_source.on_skip_called is True
+        assert task_source.on_task_failure_called is False
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_ralph_non_llm_error_calls_on_task_failure(self, mock_settings, mock_create_branch, mock_checkout):
+        """Test that non-LLM errors still call on_task_failure, not on_skip."""
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": False,
+            "loops_executed": 1,
+            "steps_completed": 2,
+            "total_steps": 5,
+            "max_loops_reached": False,
+            "error": "Git push failed: permission denied",
+        }
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert result["tasks_processed"] == 0
+        assert result["tasks_skipped"] == 0
+        assert len(result["task_results"]) == 1
+        assert result["task_results"][0]["success"] is False
+        assert task_source.on_task_failure_called is True
+        assert task_source.on_skip_called is False
+
+    def test_is_llm_unavailable(self):
+        """Test that _is_llm_unavailable correctly detects LLM unavailability with specific patterns."""
+        task_source = MockTaskSource()
+        worker = IssueWorker(task_source=task_source)
+        # Timeout patterns
+        assert worker._is_llm_unavailable("LLM timed out waiting for response") is True
+        assert worker._is_llm_unavailable("Request timed out") is True
+        # Connection errors
+        assert worker._is_llm_unavailable("Connection refused") is True
+        assert worker._is_llm_unavailable("Connection reset by peer") is True
+        # Rate limiting
+        assert worker._is_llm_unavailable("Rate limit exceeded") is True
+        assert worker._is_llm_unavailable("Too many requests") is True
+        # HTTP 5xx errors
+        assert worker._is_llm_unavailable("Service unavailable") is True
+        assert worker._is_llm_unavailable("Gateway timeout") is True
+        assert worker._is_llm_unavailable("HTTP 503 Service Unavailable") is True
+        assert worker._is_llm_unavailable("HTTP 502 Bad Gateway") is True
+        assert worker._is_llm_unavailable("HTTP 504 Gateway Timeout") is True
+        assert worker._is_llm_unavailable("Internal server error") is True
+        assert worker._is_llm_unavailable("LLM unavailable") is True
+        # Non-LLM errors should return False
+        assert worker._is_llm_unavailable("Git push failed") is False
+        assert worker._is_llm_unavailable("Permission denied") is False
+        assert worker._is_llm_unavailable("no cli configuration found") is False
+        assert worker._is_llm_unavailable("LLM is unavailable") is False  # Too broad, not a specific pattern
+        assert worker._is_llm_unavailable("") is False
+
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_is_llm_unavailable_via_cli_states(self, mock_settings):
+        """Test that _is_llm_unavailable checks _cli_states against cli_configurations."""
+        import time
+
+        from auto_slopp.utils.cli_executor import _cli_states
+
+        task_source = MockTaskSource()
+        worker = IssueWorker(task_source=task_source)
+
+        num_configs = 3
+        mock_settings.cli_configurations = [type("Config", (), {"name": f"config{i}"}) for i in range(num_configs)]
+
+        # Save original _cli_states
+        original_cli_states = _cli_states.copy()
+
+        try:
+            # Test 1: All configs inactive, cooldown not expired -> True
+            now = time.time()
+            _cli_states.clear()
+            _cli_states.update({i: {"active": False, "cooldown_until": now + 3600} for i in range(num_configs)})
+            assert worker._is_llm_unavailable("") is True
+
+            # Test 2: All configs active -> False
+            _cli_states.clear()
+            _cli_states.update({i: {"active": True, "cooldown_until": 0.0} for i in range(num_configs)})
+            assert worker._is_llm_unavailable("") is False
+
+            # Test 3: One config active, others inactive -> False
+            _cli_states.clear()
+            _cli_states.update(
+                {
+                    0: {"active": True, "cooldown_until": 0.0},
+                    1: {"active": False, "cooldown_until": now + 3600},
+                    2: {"active": False, "cooldown_until": now + 3600},
+                }
+            )
+            assert worker._is_llm_unavailable("") is False
+
+            # Test 4: All inactive but one cooldown expired -> False
+            _cli_states.clear()
+            _cli_states.update(
+                {
+                    0: {"active": False, "cooldown_until": now - 3600},
+                    1: {"active": False, "cooldown_until": now + 3600},
+                    2: {"active": False, "cooldown_until": now + 3600},
+                }
+            )
+            assert worker._is_llm_unavailable("") is False
+
+            # Test 5: String matching still works alongside cli_states check
+            _cli_states.clear()
+            _cli_states.update({i: {"active": True, "cooldown_until": 0.0} for i in range(num_configs)})
+            assert worker._is_llm_unavailable("LLM timed out") is True
+            assert worker._is_llm_unavailable("Git push failed") is False
+        finally:
+            # Restore original _cli_states
+            _cli_states.clear()
+            _cli_states.update(original_cli_states)
+
+    def test_is_permanent_error(self):
+        """Test that _is_permanent_error correctly detects permanent configuration issues."""
+        task_source = MockTaskSource()
+        worker = IssueWorker(task_source=task_source)
+        # Permanent errors should return True
+        assert worker._is_permanent_error("No CLI configuration found") is True
+        assert worker._is_permanent_error("permission denied") is True
+        assert worker._is_permanent_error("Authentication failed") is True
+        assert worker._is_permanent_error("Unauthorized access") is True
+        assert worker._is_permanent_error("Access denied") is True
+        assert worker._is_permanent_error("Forbidden") is True
+        assert worker._is_permanent_error("Invalid token") is True
+        assert worker._is_permanent_error("Token expired") is True
+        assert worker._is_permanent_error("Not configured") is True
+        assert worker._is_permanent_error("Configuration error") is True
+        assert worker._is_permanent_error("Missing configuration") is True
+        # Transient errors should return False
+        assert worker._is_permanent_error("LLM timed out") is False
+        assert worker._is_permanent_error("Connection refused") is False
+        assert worker._is_permanent_error("Rate limit exceeded") is False
+        assert worker._is_permanent_error("") is False
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    def test_no_changes_llm_unavailable_calls_on_skip(
+        self,
+        mock_execute,
+        mock_cli,
+        mock_settings,
+        mock_current_branch,
+        mock_has_changes,
+        mock_create_branch,
+        mock_checkout,
+    ):
+        """Test that on_skip is called when LLM unavailable and no changes made (has_changes=False)."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_execute.return_value = {"success": True}
+        mock_has_changes.return_value = False
+        mock_current_branch.return_value = "main"
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        # Mock _is_llm_unavailable to return True
+        worker._is_llm_unavailable = lambda _: True
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert result["tasks_processed"] == 0
+        assert result["tasks_skipped"] == 1
+        assert len(result["task_results"]) == 1
+        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["skipped"] is True
+        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no changes made"
+        assert task_source.on_skip_called is True
+        assert task_source.on_no_changes_called is False
+
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    def test_no_commits_ahead_llm_unavailable_calls_on_skip(
+        self,
+        mock_cli,
+        mock_commits_ahead,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_has_changes,
+        mock_create_branch,
+        mock_checkout,
+        mock_commit_push,
+    ):
+        """Test that on_skip is called when LLM unavailable and no commits ahead of main."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_commits_ahead.return_value = 0
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_current_branch.return_value = "ai/task-1"
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": True,
+            "loops_executed": 1,
+            "steps_completed": 0,
+            "total_steps": 3,
+        }
+        # Mock _is_llm_unavailable to return True
+        worker._is_llm_unavailable = lambda _: True
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert result["tasks_processed"] == 0
+        assert result["tasks_skipped"] == 1
+        assert len(result["task_results"]) == 1
+        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["skipped"] is True
+        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no changes made"
+        assert task_source.on_skip_called is True
+        assert task_source.on_no_changes_called is False
 
     def _create_test_repo(self, repo_path: Path) -> None:
         """Create a test git repository with main branch and no .gitignore."""

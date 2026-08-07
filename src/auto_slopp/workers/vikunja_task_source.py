@@ -205,6 +205,11 @@ class VikunjaTaskSource(TaskSource):
             task: The failed task
             error: Error description
         """
+        repo_path = task.raw.get("_repo_path")
+        if repo_path is None:
+            logger.warning(f"No repo_path found in task #{task.id}, skipping failure handling")
+            return
+
         failure_comment = (
             f"⚠️ **Task Failed: Unexpected Error**\n\n"
             f"An unexpected error occurred while processing the task.\n\n"
@@ -214,13 +219,13 @@ class VikunjaTaskSource(TaskSource):
         )
         comment_success = comment_on_task(task.id, failure_comment)
         if comment_success:
-            commit(task.raw.get("_repo_path"), f"Added comment to task {task.id}")
+            commit(repo_path, f"Added comment to task {task.id}")
         else:
             logger.warning(f"Failed to add failure comment to task {task.id}")
 
         status_success = update_task_status(task.id, "failed")
         if status_success:
-            commit(task.raw.get("_repo_path"), "Updated task status to 'failed'")
+            commit(repo_path, "Updated task status to 'failed'")
         else:
             logger.warning(f"Failed to update status to 'failed' for task {task.id}")
 
