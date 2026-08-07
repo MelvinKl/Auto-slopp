@@ -126,7 +126,7 @@ class IssueWorker(Worker):
             task_result = self._process_single_task(repo_path, task)
             results["task_results"].append(task_result)
 
-            if task_result.get("skipped"):
+            if task_result.get("success") is None or task_result.get("skipped"):
                 results["tasks_skipped"] += 1
                 self.logger.info(f"Task #{task.id} skipped: {task_result.get('skip_reason', 'Unknown')}")
             elif task_result["success"]:
