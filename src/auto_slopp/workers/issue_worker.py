@@ -49,6 +49,21 @@ class IssueWorker(Worker):
     events (start, complete, failure, no changes) via the TaskSource interface.
     """
 
+    UNAVAILABILITY_PATTERNS: tuple[str, ...] = (
+        "timed out",
+        "connection refused",
+        "connection reset",
+        "rate limit",
+        "too many requests",
+        "service unavailable",
+        "gateway timeout",
+        "llm unavailable",
+        "503",
+        "502",
+        "504",
+        "internal server error",
+    )
+
     def __init__(
         self,
         task_source: TaskSource,
@@ -194,20 +209,7 @@ class IssueWorker(Worker):
             True if the error indicates LLM is unavailable, False otherwise
         """
         error_lower = error_msg.lower()
-        error_indicates_unavailable = (
-            "timed out" in error_lower
-            or "connection refused" in error_lower
-            or "connection reset" in error_lower
-            or "rate limit" in error_lower
-            or "too many requests" in error_lower
-            or "service unavailable" in error_lower
-            or "gateway timeout" in error_lower
-            or "llm unavailable" in error_lower
-            or "503" in error_lower
-            or "502" in error_lower
-            or "504" in error_lower
-            or "internal server error" in error_lower
-        )
+        error_indicates_unavailable = any(pattern in error_lower for pattern in self.UNAVAILABILITY_PATTERNS)
         # Also check if all CLI configurations are inactive (in cooldown) and cooldown hasn't expired
         all_clis_inactive = False
         cli_configs = settings.cli_configurations
