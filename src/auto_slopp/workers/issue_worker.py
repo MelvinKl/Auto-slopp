@@ -184,6 +184,11 @@ class IssueWorker(Worker):
     def _process_single_task(self, repo_dir: Path, task: Task) -> Dict[str, Any]:
         """Process a single task using Ralph loop.
 
+        Note: Result dicts never carry a "pending" status. Only "skipped",
+        "success", or "failure" are used to indicate the final outcome.
+        The initial `success: False` in the dict is a placeholder that gets
+        overwritten by the actual outcome before the dict is returned.
+
         Args:
             repo_dir: Path to the repository directory
             task: The task to process

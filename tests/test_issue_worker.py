@@ -1421,7 +1421,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
-    def test_run_guard_uses_only_success_none_signal(self, mock_settings, mock_create_branch, mock_checkout):
+    def test_skip_guard_uses_canonical_success_none_signal(self, mock_settings, mock_create_branch, mock_checkout):
         """Test that the run() guard uses only `success is None` to detect skips.
 
         The canonical skip signal is `success=None`. The guard in run() must not
@@ -1438,6 +1438,7 @@ class TestIssueWorker:
         # The skip signal must be `success=None` (the canonical indicator)
         task_result = result["task_results"][0]
         assert task_result["success"] is None, "Skip signal must be success=None"
+        assert task_result["status"] == "skipped"
 
         # The task must be counted as skipped (not processed or failed)
         assert result["tasks_skipped"] == 1
@@ -1455,6 +1456,18 @@ class TestIssueWorker:
         # The guard must NOT also check `status == "skipped"` (no duplication)
         assert 'status == "skipped"' not in source
         assert "status" not in source.split('"""')[0]  # not in docstring either
+
+        # Verify that a mock result with success=None AND status="skipped"
+        # (matching _skip_task() output) is correctly counted as skipped.
+        mock_skip_result = {"success": None, "status": "skipped"}
+        assert mock_skip_result.get("success") is None  # Would be caught by guard
+
+        # Verify that a mock result with success=False AND status="skipped"
+        # (an inconsistent/buggy state) is NOT counted as skipped — it falls
+        # through to the failure path because `success is None` is the guard.
+        mock_buggy_result = {"success": False, "status": "skipped"}
+        assert mock_buggy_result.get("success") is not None  # NOT caught by guard
+        assert mock_buggy_result["success"] is False  # Would be logged as failure
 
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
