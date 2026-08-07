@@ -223,40 +223,8 @@ class RalphExecutor:
         - ``_last_error``: The most recent error encountered during execution.
           This is overwritten on every iteration (successful or not) and represents
           the latest error state.
-        - ``_last_iteration_failure_reason``: A descriptive string explaining why
-          the current iteration failed. This is cleared at the start of each
-          successful iteration (when a step completes without error) so it only
-          reflects the most recent failure cause. Use this field to distinguish
-          between a stale error from a previous run and an active failure reason
-          for the current iteration.
-    """
 
-    # Patterns that indicate the LLM backend is temporarily unavailable.
-    # These are matched against error messages to decide whether to skip a task
-    # (transient) or report it as a failure (persistent/bug).
-    # Note: HTTP 5xx patterns are intentionally excluded — a persistent 500 error
-    # indicates a bug in the LLM implementation, not temporary unavailability.
-    # Skipping tasks indefinitely due to 5xx errors would mask real bugs.
-    UNAVAILABILITY_PATTERNS: tuple[str, ...] = (
-        "429 Too Many Requests",
-        "rate limit",
-        "rate_limit",
-        "too many requests",
-        "408 Request Timeout",
-        "timeout",
-        "connection reset",
-        "connection refused",
-        "ECONNRESET",
-        "ETIMEDOUT",
-        "broken pipe",
-        "socket timeout",
-        "504 Gateway Timeout",
-        "502 Bad Gateway",
-        "service unavailable",
-        "503 Service Unavailable",
-        "backend not ready",
-        "pending",
-    )
+    """
 
     def __init__(
         self,
@@ -300,30 +268,10 @@ class RalphExecutor:
 
         # Error tracking fields.
         # _last_error: overwritten on every iteration; represents the latest error state.
-        # _last_iteration_failure_reason: cleared on successful step completion; only
-        #   reflects the most recent failure cause, distinguishing stale errors from
-        #   active iteration failures.
         self._last_error: Optional[str] = None
-        self._last_iteration_failure_reason: Optional[str] = None
         self.task_planning_name = task_planning_name
         self.implementation_name = implementation_name
         self.validation_name = validation_name
-
-    def _is_llm_unavailable(self, error: str) -> bool:
-        """Check whether an error indicates the LLM backend is temporarily unavailable.
-
-        Matches against ``UNAVAILABILITY_PATTERNS`` (case-insensitive). Returns
-        ``False`` for persistent errors (e.g., HTTP 500) which indicate bugs in
-        the LLM implementation rather than transient unavailability.
-
-        Args:
-            error: The error message to check.
-
-        Returns:
-            ``True`` if the error matches a transient unavailability pattern.
-        """
-        error_lower = error.lower()
-        return any(pattern.lower() in error_lower for pattern in self.UNAVAILABILITY_PATTERNS)
 
     def _get_issue_task_path(self, repo_dir: Path, issue_number: int) -> Path:
         """Get the canonical task file path for a task."""
@@ -912,7 +860,6 @@ class RalphExecutor:
                 branch_name=branch_name,
             )
             if not step_result.get("success", False):
-                self._last_iteration_failure_reason = step_result.get("error", "Step implementation failed")
                 result["last_error"] = step_result.get("error", "Step implementation failed")
                 result["loops_executed"] = iteration
                 continue
@@ -921,13 +868,9 @@ class RalphExecutor:
                 self._mark_step_completed_in_file(task_path, next_step.number)
 
             if not self._step_is_closed(task_path, next_step.number):
-                self._last_iteration_failure_reason = f"Step {next_step.number} is still open after execution"
                 result["last_error"] = f"Step {next_step.number} is still open after execution"
                 result["loops_executed"] = iteration
                 continue
-
-            # Clear failure reason on successful step completion
-            self._last_iteration_failure_reason = None
 
             repo_has_changes = False
             try:
@@ -939,7 +882,6 @@ class RalphExecutor:
                 commit_message = f"Complete issue step {next_step.number}: {next_step.description}"
                 commit_success, _ = self.commit_fn(repo_dir, commit_message, False)
                 if not commit_success:
-                    self._last_iteration_failure_reason = f"Failed to commit changes for step {next_step.number}"
                     return {
                         "success": False,
                         "error": f"Failed to commit changes for step {next_step.number}",
