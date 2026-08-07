@@ -134,9 +134,13 @@ class TaskSource(ABC):
     def on_no_changes(self, task: Task) -> None:
         """Called when no changes were needed for a task."""
 
-    @abstractmethod
     def on_skip(self, task: Task, reason: str) -> None:
-        """Called when a task is skipped (e.g., LLM unavailable) and should be retried later."""
+        """Called when a task is skipped (e.g., LLM unavailable) and should be retried later.
+
+        This is a non-abstract hook so that subclasses which do not need to
+        annotate skipped tasks (e.g., purely internal task lists) can rely on
+        the default no-op.  Sources that do track skip state (GitHub, Vikunja)
+        override this method to add a comment / update the task status.
 
     @abstractmethod
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
