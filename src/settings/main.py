@@ -141,6 +141,26 @@ class Settings(BaseSettings):
                 capability=7,
                 name="opencode nemotron-3-ultra-free",
             ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "openai/gpt-5",
+                    "run",
+                ],
+                capability=8,
+                name="opencode gpt-5",
+            ),
+            CLIConfiguration(
+                cli_command="opencode",
+                cli_args=[
+                    "--model",
+                    "openai/gpt-5-mini",
+                    "run",
+                ],
+                capability=9,
+                name="opencode gpt-5-mini",
+            ),
         ],
         description=(
             "Tiered CLI configurations ordered by preference. " "Lower index entries are preferred and used first."
