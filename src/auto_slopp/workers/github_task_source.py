@@ -311,7 +311,7 @@ class GitHubTaskSource(TaskSource):
         """
         repo_path = task.raw.get("_repo_path")
         if repo_path is None:
-            logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
+            logger.error(f"No repo_path found in task #{task.id}, skipping skip handling")
             return
 
         skip_comment = (
@@ -329,7 +329,7 @@ class GitHubTaskSource(TaskSource):
         if label_removed:
             logger.info(f"Removed required label '{settings.github_issue_worker_required_label}' from issue #{task.id}")
         else:
-            logger.warning(f"Failed to remove required label from issue #{task.id}")
+            logger.error(f"Failed to remove required label from issue #{task.id}")
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.

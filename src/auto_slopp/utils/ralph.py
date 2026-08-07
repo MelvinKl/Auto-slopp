@@ -233,7 +233,37 @@ class RalphExecutor:
             :meth:`_is_llm_unavailable` because it reflects the actual
             failure that caused loop exhaustion (e.g., an LLM outage mid-loop)
             rather than a stale error from an earlier phase.
+
+    Class constants:
+        UNAVAILABILITY_PATTERNS: Lowercase substrings that indicate the LLM/
+            CLI tool is unavailable. Used by :meth:`_is_llm_unavailable` to
+            distinguish temporary outages (which should trigger a skip for
+            retry) from genuine iteration exhaustion (which should drop the
+            task via :meth:`TaskSource.on_max_iterations_reached`).
     """
+
+    UNAVAILABILITY_PATTERNS: tuple[str, ...] = (
+        "llm unavailable",
+        "llm is unavailable",
+        "llm is down",
+        "service unavailable",
+        "api unavailable",
+        "api is down",
+        "rate limit",
+        "too many requests",
+        "429",
+        "connection refused",
+        "connection reset",
+        "connection timeout",
+        "econnrefused",
+        "econnreset",
+        "etimedout",
+        "no response",
+        "not responding",
+        "unreachable",
+        "503 service unavailable",
+        "502 bad gateway",
+    )
 
     def __init__(
         self,
@@ -690,30 +720,7 @@ class RalphExecutor:
         if "timed out" in error_lower:
             return True
 
-        # Explicit unavailability indicators
-        unavailability_patterns = [
-            "llm unavailable",
-            "llm is unavailable",
-            "llm is down",
-            "service unavailable",
-            "api unavailable",
-            "api is down",
-            "rate limit",
-            "too many requests",
-            "429",
-            "connection refused",
-            "connection reset",
-            "connection timeout",
-            "econnrefused",
-            "econnreset",
-            "etimedout",
-            "no response",
-            "not responding",
-            "unreachable",
-            "503 service unavailable",
-            "502 bad gateway",
-        ]
-        return any(pattern in error_lower for pattern in unavailability_patterns)
+        return any(pattern in error_lower for pattern in self.UNAVAILABILITY_PATTERNS)
 
     def _step_is_closed(self, task_path: Path, step_number: int) -> bool:
         """Check whether a step is marked as completed in the task file."""
