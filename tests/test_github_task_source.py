@@ -600,12 +600,12 @@ class TestGitHubTaskSource:
         task_source = GitHubTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
 
-        task_source.on_skip(task)
+        task_source.on_skip(task, "test reason")
 
         mock_comment.assert_called_once()
         comment_body = mock_comment.call_args[0][2]
-        assert "Skipped: LLM Unavailable" in comment_body
-        mock_remove.assert_not_called()
+        assert "Task Skipped" in comment_body
+        assert "test reason" in comment_body
 
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
     @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
@@ -616,7 +616,7 @@ class TestGitHubTaskSource:
         task_source = GitHubTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={})
 
-        task_source.on_skip(task)
+        task_source.on_skip(task, "test reason")
 
         mock_comment.assert_not_called()
         mock_remove.assert_not_called()
@@ -630,10 +630,10 @@ class TestGitHubTaskSource:
         task_source = GitHubTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
 
-        task_source.on_skip(task)
+        task_source.on_skip(task, "test reason")
 
         mock_comment.assert_called_once()
-        mock_remove.assert_not_called()
+        mock_remove.assert_called_once()
 
     def test_pr_mentions_issue_in_title(self):
         """Test that _pr_mentions_issue returns True when issue number is in PR title."""

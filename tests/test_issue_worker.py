@@ -427,8 +427,11 @@ class TestIssueWorker:
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
+        assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is False
+        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["skipped"] is True
+        assert "skip_reason" in result["task_results"][0]
         # on_skip should be called, NOT on_max_iterations_reached
         assert task_source.on_skip_called is True
         assert task_source.on_max_iterations_called is False
@@ -1255,9 +1258,10 @@ class TestIssueWorker:
             "loops_executed": 1,
             "steps_completed": 2,
             "total_steps": 5,
-            "max_loops_reached": False,
+            "max_loops_reached": True,
             "error": "LLM timed out waiting for response",
         }
+        worker.ralph_executor._is_llm_unavailable = lambda: True
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0

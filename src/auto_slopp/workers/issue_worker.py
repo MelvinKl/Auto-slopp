@@ -339,6 +339,9 @@ class IssueWorker(Worker):
                                 task,
                                 ralph_result.get("error", "LLM unavailable during Ralph loop"),
                             )
+                            result["success"] = True
+                            result["skipped"] = True
+                            result["skip_reason"] = ralph_result.get("error", "LLM unavailable during Ralph loop")
                         else:
                             self.logger.warning(f"Ralph loop reached max iterations for task #{task_id}")
                             self.task_source.on_max_iterations_reached(
@@ -347,6 +350,10 @@ class IssueWorker(Worker):
                                 ralph_result.get("total_steps", 0),
                                 ralph_result.get("error", "Unknown error"),
                             )
+                    else:
+                        # Non-retryable error during Ralph execution
+                        self.logger.error(f"Ralph loop failed for task #{task_id}: {ralph_error}")
+                        self.task_source.on_task_failure(task, ralph_error)
 
                     return result
 
@@ -378,7 +385,7 @@ class IssueWorker(Worker):
                     result["error"] = error_msg
                     if self._is_llm_unavailable(error_msg):
                         self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                        self.task_source.on_skip(task)
+                        self.task_source.on_skip(task, error_msg)
                         result["success"] = True
                         result["skipped"] = True
                         result["skip_reason"] = error_msg
@@ -394,7 +401,7 @@ class IssueWorker(Worker):
             if current_branch in ("main", "master"):
                 if self._is_llm_unavailable(""):
                     self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                    self.task_source.on_skip(task)
+                    self.task_source.on_skip(task, "LLM unavailable - no changes made")
                     result["success"] = True
                     result["skipped"] = True
                     result["skip_reason"] = "LLM unavailable - no changes made"
@@ -418,7 +425,7 @@ class IssueWorker(Worker):
             if ahead_count == 0:
                 if self._is_llm_unavailable(""):
                     self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                    self.task_source.on_skip(task)
+                    self.task_source.on_skip(task, "LLM unavailable - no changes made")
                     result["success"] = True
                     result["skipped"] = True
                     result["skip_reason"] = "LLM unavailable - no changes made"
