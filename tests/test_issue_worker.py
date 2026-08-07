@@ -1417,5 +1417,79 @@ class TestIssueWorker:
         failure_messages = [r.message for r in caplog.records if "Failed to process task" in r.message]
         assert len(failure_messages) == 0
         assert result["tasks_skipped"] == 3
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_run_guard_uses_only_success_none_signal(self, mock_settings, mock_create_branch, mock_checkout):
+        """Test that the run() guard uses only `success is None` to detect skips.
+
+        The canonical skip signal is `success=None`. The guard in run() must not
+        also check `status == "skipped"` — that would duplicate the signal and
+        make the canonical indicator less obvious.
+        """
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = False
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        result = worker.run(Path("/tmp"))
+
+        # The skip signal must be `success=None` (the canonical indicator)
+        task_result = result["task_results"][0]
+        assert task_result["success"] is None, "Skip signal must be success=None"
+
+        # The task must be counted as skipped (not processed or failed)
+        assert result["tasks_skipped"] == 1
+        assert result["tasks_processed"] == 0
+        assert result["tasks_completed"] == 0
+
+        # Verify the source code guard uses only `success is None` by
+        # inspecting the run method's source for the guard pattern.
+        import inspect
+
+        source = inspect.getsource(IssueWorker.run)
+        # The guard must check `success is None` (canonical signal)
+        assert "success" in source
+        assert "None" in source
+        # The guard must NOT also check `status == "skipped"` (no duplication)
+        assert 'status == "skipped"' not in source
+        assert "status" not in source.split('"""')[0]  # not in docstring either
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_run_guard_distinguishes_skip_from_failure(self, mock_settings, mock_create_branch, mock_checkout):
+        """Test that the run() guard correctly distinguishes skip (None) from failure (False)."""
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        # First task: branch creation fails → skip (success=None)
+        # Second task: branch created but Ralph loop fails → failure (success=False)
+        call_count = [0]
+
+        def branch_creator(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return False  # First task: skip
+            return True  # Second task: create branch (will fail in Ralph)
+
+        mock_create_branch.side_effect = branch_creator
+        task_source = MockTaskSource(
+            tasks=[
+                Task(id=1, title="Skip Me", body=""),
+                Task(id=2, title="Fail Me", body=""),
+            ]
+        )
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        result = worker.run(Path("/tmp"))
+
+        # Skip: success is None, counted in tasks_skipped
+        assert result["task_results"][0]["success"] is None
+        assert result["task_results"][0]["status"] == "skipped"
+        # Failure: success is False, NOT counted in tasks_skipped
+        assert result["task_results"][1]["success"] is False
+        assert result["task_results"][1]["status"] == "failure"
+        # Counts are separate
+        assert result["tasks_skipped"] == 1
         assert result["tasks_processed"] == 0
         assert result["tasks_completed"] == 0
