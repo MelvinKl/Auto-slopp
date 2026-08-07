@@ -7,7 +7,7 @@ GitHub Issues, following the same patterns used by GitHubIssueWorker.
 import logging
 import subprocess
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from auto_slopp.utils.cli_executor import execute_with_instructions
 from auto_slopp.utils.git_operations import sanitize_branch_name

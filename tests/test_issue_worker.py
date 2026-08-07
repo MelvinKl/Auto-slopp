@@ -1,6 +1,5 @@
 """Tests for unified IssueWorker."""
 
-import logging
 import subprocess
 import tempfile
 from pathlib import Path
@@ -1148,7 +1147,7 @@ class TestIssueWorker:
             "total_steps": 3,
         }
         with tempfile.TemporaryDirectory() as temp_dir:
-            with caplog.at_level(logging.WARNING):
+            with caplog.at_level("WARNING"):
                 worker.run(Path(temp_dir))
 
         # Verify ensure_ralph_in_gitignore was called
@@ -1179,16 +1178,16 @@ class TestIssueWorker:
             "total_steps": 3,
         }
         with tempfile.TemporaryDirectory() as temp_dir:
-            with caplog.at_level(logging.WARNING):
+            with caplog.at_level("WARNING"):
                 worker.run(Path(temp_dir))
 
         # Verify ensure_ralph_in_gitignore was called
         mock_ensure_gitignore.assert_called_once()
-        # Verify warning was logged
-        assert any("Failed to ensure .ralph in .gitignore" in record.message for record in caplog.records)
-        assert any(
-            "generated .ralph files may be committed to the repository" in record.message for record in caplog.records
-        )
+        # Verify warning was logged with repo_dir name in the message
+        warning_records = [r for r in caplog.records if "Failed to ensure .ralph in .gitignore" in r.message]
+        assert len(warning_records) == 1
+        assert Path(temp_dir).name in warning_records[0].message
+        assert "generated .ralph files may be committed to the repository" in warning_records[0].message
 
     def _create_test_repo(self, repo_path: Path) -> None:
         """Create a test git repository with main branch and no .gitignore."""

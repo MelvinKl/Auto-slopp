@@ -314,10 +314,8 @@ class IssueWorker(Worker):
                 self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue")
                 # Clean up the branch since no work was done
                 try:
-                    if not checkout_branch_resilient(repo_dir=repo_dir, branch="main", fetch_first=False, timeout=10):
-                        self.logger.warning(f"Failed to checkout main branch for cleanup in {repo_dir.name}")
-                    if not delete_branch(repo_dir, current_branch):
-                        self.logger.warning(f"Failed to delete branch '{current_branch}' in {repo_dir.name}")
+                    checkout_branch_resilient(repo_dir=repo_dir, branch="main", fetch_first=False, timeout=10)
+                    delete_branch(repo_dir, current_branch)
                 except Exception as e:
                     self.logger.warning(f"Failed to clean up branch {current_branch}: {e}")
                 self.task_source.on_no_changes(task)

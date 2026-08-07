@@ -130,7 +130,7 @@ class TaskSource(ABC):
             error: Last error message
         """
 
-    def on_skip(self, task: Task, ralph_result: Dict[str, Any]) -> None:
+    def on_skip(self, task: Task, ralph_result: Dict[str, Any]) -> None:  # noqa: B027
         """Called when a task is skipped (e.g., due to LLM unavailability or other transient failures).
 
         This is a hook method with a default no-op implementation. Subclasses may override

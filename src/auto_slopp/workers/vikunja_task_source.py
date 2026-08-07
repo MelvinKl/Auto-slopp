@@ -206,7 +206,9 @@ class VikunjaTaskSource(TaskSource):
             f"**Task:** {task.title}\n\n"
             f"This task will not be processed again automatically."
         )
-        self._update_task_with_comment_and_status(task.id, failure_comment, "failed", task.raw.get("_repo_path", Path()))
+        self._update_task_with_comment_and_status(
+            task.id, failure_comment, "failed", task.raw.get("_repo_path", Path())
+        )
 
     def on_no_changes(self, task: Task) -> None:
         """Called when no changes were needed for a task.
@@ -224,7 +226,9 @@ class VikunjaTaskSource(TaskSource):
             f"After analyzing the requirements and exploring the codebase, "
             f"the task was determined to be already complete or not applicable."
         )
-        self._update_task_with_comment_and_status(task.id, no_changes_comment, "done", task.raw.get("_repo_path", Path()))
+        self._update_task_with_comment_and_status(
+            task.id, no_changes_comment, "done", task.raw.get("_repo_path", Path())
+        )
 
     def on_skip(self, task: Task, ralph_result: Dict[str, Any]) -> None:
         """Called when a task is skipped (e.g., due to LLM unavailability).
@@ -288,7 +292,9 @@ class VikunjaTaskSource(TaskSource):
             f"- Last error: {error}\n\n"
             f"This task will not be processed again automatically."
         )
-        self._update_task_with_comment_and_status(task.id, failure_comment, "failed", task.raw.get("_repo_path", Path()))
+        self._update_task_with_comment_and_status(
+            task.id, failure_comment, "failed", task.raw.get("_repo_path", Path())
+        )
 
     def _filter_tasks_by_tag(self, tasks: List[dict], tag_name: str) -> List[dict]:
         """Filter tasks to only those whose labels contain a label with a matching title.
