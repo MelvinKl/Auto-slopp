@@ -67,8 +67,10 @@ class VikunjaTaskSource(TaskSource):
             if status_success:
                 commit_msg = commit_message or f"Updated task {task_id}: {status}"
                 commit(repo_path, commit_msg)
+                return True
             else:
                 logger.warning(f"Failed to update status to '{status}' for task {task_id}")
+                # Fall through to add comment commit if status update failed
 
         commit_msg = commit_message or f"Added comment to task {task_id}"
         commit(repo_path, commit_msg)
