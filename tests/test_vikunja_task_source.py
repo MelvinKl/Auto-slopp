@@ -439,3 +439,55 @@ class TestVikunjaTaskSource:
             assert identifier.startswith(
                 expected_prefix
             ), f"Identifier {identifier} doesn't start with prefix {expected_prefix}"
+
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_on_skip_updates_status_and_comments(self, mock_comment, mock_update, mock_commit):
+        """Test that on_skip updates status to skipped and adds a skip comment."""
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
+        ralph_result = {"error": "Rate limit exceeded", "steps_completed": 2, "total_steps": 5}
+
+        task_source.on_skip(task, ralph_result)
+
+        mock_update.assert_called_once_with(42, "skipped")
+        mock_comment.assert_called_once()
+        comment_args = mock_comment.call_args[0]
+        assert comment_args[0] == 42
+        assert "Skipped" in comment_args[1]
+        assert "Rate limit exceeded" in comment_args[1]
+        assert "2/5" in comment_args[1]
+        # Verify single atomic commit is made
+        assert mock_commit.call_count == 1
+
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_on_skip_handles_missing_repo_path(self, mock_comment, mock_update, mock_commit):
+        """Test that on_skip returns early when repo_path is missing."""
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={})
+        ralph_result = {"error": "Rate limit exceeded", "steps_completed": 0, "total_steps": 0}
+
+        task_source.on_skip(task, ralph_result)
+
+        mock_comment.assert_not_called()
+        mock_update.assert_not_called()
+        mock_commit.assert_not_called()
+
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_on_skip_uses_default_values_when_ralph_result_empty(self, mock_comment, mock_update, mock_commit):
+        """Test that on_skip uses default values when ralph_result lacks keys."""
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
+
+        task_source.on_skip(task, {})
+
+        mock_update.assert_called_once_with(42, "skipped")
+        mock_comment.assert_called_once()
+        comment_args = mock_comment.call_args[0]
+        assert "Unknown error" in comment_args[1]
+        assert "0/0" in comment_args[1]

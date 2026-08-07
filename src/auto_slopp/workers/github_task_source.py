@@ -298,6 +298,44 @@ class GitHubTaskSource(TaskSource):
         comment_on_issue(repo_path, task.id, no_changes_comment)
         close_issue(repo_path, task.id)
 
+    def on_skip(self, task: Task, ralph_result: Dict[str, Any]) -> None:
+        """Called when a task is skipped (e.g., due to LLM unavailability).
+
+        Removes the required label from the issue and adds a skip comment.
+
+        Args:
+            task: The task that was skipped
+            ralph_result: Dictionary with execution context (e.g., steps_completed, total_steps, error)
+        """
+        repo_path = task.raw.get("_repo_path")
+        if repo_path is None:
+            logger.error(f"No repo_path found in task #{task.id}, cannot handle skip")
+            return
+
+        error_msg = ralph_result.get("error", "Unknown error")
+        steps_completed = ralph_result.get("steps_completed", 0)
+        total_steps = ralph_result.get("total_steps", 0)
+
+        skip_comment = (
+            f"⏭️ **Task Skipped**\n\n"
+            f"This task was skipped due to a transient error.\n\n"
+            f"**Details:**\n"
+            f"- Error: {error_msg}\n"
+            f"- Steps completed: {steps_completed}/{total_steps}\n\n"
+            f"The required label has been removed so this issue will not be processed again automatically."
+        )
+        comment_on_issue(repo_path, task.id, skip_comment)
+
+        label_removed = remove_label_from_issue(
+            repo_path,
+            task.id,
+            settings.github_issue_worker_required_label,
+        )
+        if label_removed:
+            logger.info(f"Removed required label '{settings.github_issue_worker_required_label}' from issue #{task.id}")
+        else:
+            logger.warning(f"Failed to remove required label from issue #{task.id}")
+
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.
 

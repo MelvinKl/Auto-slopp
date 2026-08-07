@@ -6,7 +6,7 @@ Vikunja, following the same patterns used by VikunjaWorker.
 
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from auto_slopp.utils.git_operations import commit, sanitize_branch_name
 from auto_slopp.utils.vikunja_operations import (
@@ -149,8 +149,9 @@ class VikunjaTaskSource(TaskSource):
             task: The task being started
             branch_name: The branch created for this task
         """
+        repo_path = task.raw.get("_repo_path")
         update_task_status(task.id, "in_progress")
-        commit(task.raw.get("_repo_path"), "Updated task status to 'in_progress'")
+        commit(repo_path, "Updated task status to 'in_progress'")
 
         subtasks = analyze_task(task.id)
         if subtasks:
@@ -162,12 +163,13 @@ class VikunjaTaskSource(TaskSource):
             f"The worker has started processing this task."
         )
         comment_on_task(task.id, start_comment)
-        commit(task.raw.get("_repo_path"), f"Added comment to task {task.id}")
+        commit(repo_path, f"Added comment to task {task.id}")
 
     def on_task_complete(self, task: Task, branch_name: str, pr_url: str, findings: Optional[List[str]] = None) -> None:
         """Called when a task completes successfully.
 
         Updates Vikunja task status to done and adds a comment with the PR URL.
+        Uses a single atomic commit for both the status update and comment.
 
         Args:
             task: The completed task
@@ -175,31 +177,23 @@ class VikunjaTaskSource(TaskSource):
             pr_url: URL of the created pull request
             findings: Optional list of finding strings from PR review (ignored for Vikunja tasks)
         """
-        status_success = update_task_status(task.id, "done")
-        if status_success:
-            commit(task.raw.get("_repo_path"), "Updated task status to 'done'")
+        repo_path = task.raw.get("_repo_path")
 
-        if status_success:
-            pr_info = f"\n\n**Pull Request:** {pr_url}" if pr_url else ""
-            success_comment = (
-                f"✅ **Task Completed Successfully**\n\n"
-                f"**Task:** {task.title}\n\n"
-                f"The task has been implemented and pushed to branch `{branch_name}`.\n\n"
-                f"**Branch:** {branch_name}{pr_info}\n\n"
-                f"Changes have been committed and pushed. The task is ready for review."
-            )
-            comment_success = comment_on_task(task.id, success_comment)
-            if comment_success:
-                commit(task.raw.get("_repo_path"), f"Added comment to task {task.id}")
-            else:
-                logger.warning(f"Failed to add comment to task {task.id}")
-        else:
-            logger.warning(f"Failed to update status for task {task.id}")
+        pr_info = f"\n\n**Pull Request:** {pr_url}" if pr_url else ""
+        success_comment = (
+            f"✅ **Task Completed Successfully**\n\n"
+            f"**Task:** {task.title}\n\n"
+            f"The task has been implemented and pushed to branch `{branch_name}`.\n\n"
+            f"**Branch:** {branch_name}{pr_info}\n\n"
+            f"Changes have been committed and pushed. The task is ready for review."
+        )
+        self._update_task_with_comment_and_status(task.id, success_comment, "done", repo_path)
 
     def on_task_failure(self, task: Task, error: str) -> None:
         """Called when a task fails.
 
         Updates task status to failed and adds a failure comment.
+        Uses a single atomic commit for both the status update and comment.
 
         Args:
             task: The failed task
@@ -212,22 +206,13 @@ class VikunjaTaskSource(TaskSource):
             f"**Task:** {task.title}\n\n"
             f"This task will not be processed again automatically."
         )
-        comment_success = comment_on_task(task.id, failure_comment)
-        if comment_success:
-            commit(task.raw.get("_repo_path"), f"Added comment to task {task.id}")
-        else:
-            logger.warning(f"Failed to add failure comment to task {task.id}")
-
-        status_success = update_task_status(task.id, "failed")
-        if status_success:
-            commit(task.raw.get("_repo_path"), "Updated task status to 'failed'")
-        else:
-            logger.warning(f"Failed to update status to 'failed' for task {task.id}")
+        self._update_task_with_comment_and_status(task.id, failure_comment, "failed", task.raw.get("_repo_path", Path()))
 
     def on_no_changes(self, task: Task) -> None:
         """Called when no changes were needed for a task.
 
         Updates Vikunja task status to done with a no-changes comment.
+        Uses a single atomic commit for both the status update and comment.
 
         Args:
             task: The task that required no changes
@@ -239,21 +224,55 @@ class VikunjaTaskSource(TaskSource):
             f"After analyzing the requirements and exploring the codebase, "
             f"the task was determined to be already complete or not applicable."
         )
-        comment_success = comment_on_task(task.id, no_changes_comment)
-        if comment_success:
-            commit(task.raw.get("_repo_path"), f"Added comment to task {task.id}")
-        else:
-            logger.warning(f"Failed to add no-changes comment to task {task.id}")
-        status_success = update_task_status(task.id, "done")
-        if status_success:
-            commit(task.raw.get("_repo_path"), "Updated task status to 'done'")
-        else:
-            logger.warning(f"Failed to update status for task {task.id}")
+        self._update_task_with_comment_and_status(task.id, no_changes_comment, "done", task.raw.get("_repo_path", Path()))
+
+    def on_skip(self, task: Task, ralph_result: Dict[str, Any]) -> None:
+        """Called when a task is skipped (e.g., due to LLM unavailability).
+
+        Updates Vikunja task status to skipped and adds a skip comment.
+        Uses a single atomic commit for both the status update and comment.
+
+        Args:
+            task: The task that was skipped
+            ralph_result: Dictionary with execution context (e.g., steps_completed, total_steps, error)
+        """
+        repo_path = task.raw.get("_repo_path")
+        if repo_path is None:
+            logger.error(f"No repo_path found in task #{task.id}, cannot handle skip")
+            return
+
+        error_msg = ralph_result.get("error", "Unknown error")
+        steps_completed = ralph_result.get("steps_completed", 0)
+        total_steps = ralph_result.get("total_steps", 0)
+
+        skip_comment = (
+            f"⏭️ **Task Skipped**\n\n"
+            f"This task was skipped due to a transient error.\n\n"
+            f"**Details:**\n"
+            f"- Error: {error_msg}\n"
+            f"- Steps completed: {steps_completed}/{total_steps}\n\n"
+            f"The task has been marked as skipped and will not be processed again automatically."
+        )
+        self._update_task_with_comment_and_status(task.id, skip_comment, "skipped", repo_path)
+
+    def _update_task_with_comment_and_status(self, task_id: int, comment: str, status: str, repo_path: Path) -> None:
+        """Update a Vikunja task's status and add a comment in a single atomic commit.
+
+        Args:
+            task_id: The Vikunja task ID
+            comment: Comment text to add to the task
+            status: New status to set (e.g., 'done', 'failed', 'skipped')
+            repo_path: Path to the repository for git commit
+        """
+        comment_on_task(task_id, comment)
+        update_task_status(task_id, status)
+        commit(repo_path, f"Updated task {task_id} status to '{status}' and added comment")
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.
 
         Updates Vikunja task status to failed and adds a failure comment.
+        Uses a single atomic commit for both the status update and comment.
 
         Args:
             task: The task that hit the iteration limit
@@ -269,10 +288,7 @@ class VikunjaTaskSource(TaskSource):
             f"- Last error: {error}\n\n"
             f"This task will not be processed again automatically."
         )
-        comment_on_task(task.id, failure_comment)
-        commit(task.raw.get("_repo_path"), f"Added comment to task {task.id}")
-        update_task_status(task.id, "failed")
-        commit(task.raw.get("_repo_path"), "Updated task status to 'failed'")
+        self._update_task_with_comment_and_status(task.id, failure_comment, "failed", task.raw.get("_repo_path", Path()))
 
     def _filter_tasks_by_tag(self, tasks: List[dict], tag_name: str) -> List[dict]:
         """Filter tasks to only those whose labels contain a label with a matching title.

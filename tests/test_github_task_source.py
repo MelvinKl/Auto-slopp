@@ -591,6 +591,59 @@ class TestGitHubTaskSource:
         mock_comment.assert_not_called()
         mock_remove.assert_not_called()
 
+    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_on_skip_comments_and_removes_label(self, mock_settings, mock_remove, mock_comment):
+        """Test that on_skip adds a skip comment and removes the required label."""
+        mock_settings.github_issue_worker_required_label = "test-label"
+        mock_remove.return_value = True
+        task_source = GitHubTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
+        ralph_result = {"error": "Rate limit exceeded", "steps_completed": 3, "total_steps": 5}
+
+        task_source.on_skip(task, ralph_result)
+
+        mock_comment.assert_called_once()
+        comment_args = mock_comment.call_args[0]
+        assert comment_args[0] == Path("/test")
+        assert comment_args[1] == 42
+        assert "Skipped" in comment_args[2]
+        assert "Rate limit exceeded" in comment_args[2]
+        assert "3/5" in comment_args[2]
+        mock_remove.assert_called_once_with(Path("/test"), 42, "test-label")
+
+    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_on_skip_handles_missing_repo_path(self, mock_settings, mock_remove, mock_comment):
+        """Test that on_skip logs error and returns early when repo_path is missing."""
+        mock_settings.github_issue_worker_required_label = "test-label"
+        task_source = GitHubTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={})
+        ralph_result = {"error": "Rate limit exceeded", "steps_completed": 0, "total_steps": 0}
+
+        task_source.on_skip(task, ralph_result)
+
+        mock_comment.assert_not_called()
+        mock_remove.assert_not_called()
+
+    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_on_skip_includes_default_values_when_ralph_result_empty(self, mock_settings, mock_remove, mock_comment):
+        """Test that on_skip uses default values when ralph_result lacks keys."""
+        mock_settings.github_issue_worker_required_label = "test-label"
+        mock_remove.return_value = True
+        task_source = GitHubTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
+
+        task_source.on_skip(task, {})
+
+        comment_args = mock_comment.call_args[0]
+        assert "Unknown error" in comment_args[2]
+        assert "0/0" in comment_args[2]
+
     def test_pr_mentions_issue_in_title(self):
         """Test that _pr_mentions_issue returns True when issue number is in PR title."""
         task_source = GitHubTaskSource()
