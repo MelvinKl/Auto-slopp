@@ -246,15 +246,26 @@ class VikunjaTaskSource(TaskSource):
     def _update_task_with_comment_and_status(self, task_id: int, comment: str, status: str, repo_path: Path) -> None:
         """Update a Vikunja task's status and add a comment in a single atomic commit.
 
+        Only commits when both comment_on_task and update_task_status succeed.
+        Logs warnings if either operation fails so failures are visible.
+
         Args:
             task_id: The Vikunja task ID
             comment: Comment text to add to the task
             status: New status to set (e.g., 'done', 'failed', 'skipped')
             repo_path: Path to the repository for git commit
         """
-        comment_on_task(task_id, comment)
-        update_task_status(task_id, status)
-        commit(repo_path, f"Updated task {task_id} status to '{status}' and added comment")
+        comment_success = comment_on_task(task_id, comment)
+        if not comment_success:
+            logger.warning(f"Failed to add comment to task {task_id}")
+
+        status_success = update_task_status(task_id, status)
+        if not status_success:
+            logger.warning(f"Failed to update status to '{status}' for task {task_id}")
+
+        # Only commit when both operations succeeded to avoid orphan commits
+        if comment_success and status_success:
+            commit(repo_path, f"Updated task {task_id} status to '{status}' and added comment")
 
     def on_skip(self, task: Task) -> None:
         """Called when a task should be skipped (e.g., when LLM is unavailable).
