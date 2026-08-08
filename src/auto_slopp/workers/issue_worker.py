@@ -92,16 +92,19 @@ class IssueWorker(Worker):
         Each task processed by this method will end in one of three outcomes,
         reflected in the per-task result dict and the summary counters:
 
-        * **Success** — `success=True`, `status='success'`. Counted in
+        * **Success** — ``success=True``, ``status='success'``. Counted in
           ``tasks_processed`` and ``tasks_completed`` (if the task finished
           all its work).
         * **Skipped** — ``success=None``, ``status='skipped'``. This is the
-          canonical skip signal. Counted in ``tasks_skipped``. Happens when
-          branch creation fails, the LLM is unavailable, or the task produced
-          no changes.
-        * **Failure** — ``success=False``. Counted in
-          ``repositories_with_errors``. Happens on permanent errors, push
+          canonical skip signal. Counted in ``tasks_skipped``. No warning is
+          logged. Happens when branch creation fails, the LLM is unavailable,
+          or the task produced no changes.
+        * **Failure** — ``success=False``. A warning is logged via
+          ``"Failed to process task"``. Happens on permanent errors, push
           failures, or PR creation failures.
+
+        The guard in the main loop checks ``success is None`` first to
+        distinguish skips from failures cleanly.
 
         Args:
             repo_path: Path to the repository directory
