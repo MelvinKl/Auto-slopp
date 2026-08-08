@@ -13,6 +13,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from auto_slopp.constants import UNAVAILABILITY_PATTERNS as _UNAVAILABILITY_PATTERNS
+
 logger = logging.getLogger(__name__)
 
 
@@ -242,28 +244,8 @@ class RalphExecutor:
             task via :meth:`TaskSource.on_max_iterations_reached`).
     """
 
-    UNAVAILABILITY_PATTERNS: tuple[str, ...] = (
-        "llm unavailable",
-        "llm is unavailable",
-        "llm is down",
-        "service unavailable",
-        "api unavailable",
-        "api is down",
-        "rate limit",
-        "too many requests",
-        "429",
-        "connection refused",
-        "connection reset",
-        "connection timeout",
-        "econnrefused",
-        "econnreset",
-        "etimedout",
-        "no response",
-        "not responding",
-        "unreachable",
-        "503 service unavailable",
-        "502 bad gateway",
-    )
+    # Shared source of truth for LLM unavailability detection.
+    UNAVAILABILITY_PATTERNS: tuple[str, ...] = _UNAVAILABILITY_PATTERNS
 
     def __init__(
         self,

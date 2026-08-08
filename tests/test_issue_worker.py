@@ -22,7 +22,6 @@ class MockTaskSource(TaskSource):
         self.on_no_changes_called = False
         self.on_skip_called = False
         self.on_max_iterations_called = False
-        self.on_skip_called = False
         self.findings = None  # To store findings passed to on_task_complete
 
     def get_tasks(self, repo_path: Path) -> list[Task]:
@@ -53,14 +52,11 @@ class MockTaskSource(TaskSource):
     def on_no_changes(self, task: Task) -> None:
         self.on_no_changes_called = True
 
-    def on_skip(self, task: Task) -> None:
+    def on_skip(self, task: Task, reason: str) -> None:
         self.on_skip_called = True
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         self.on_max_iterations_called = True
-
-    def on_skip(self, task: Task, reason: str) -> None:
-        self.on_skip_called = True
 
 
 class CapturingTaskSourceWithFindings(MockTaskSource):
@@ -1353,7 +1349,7 @@ class TestIssueWorker:
         assert worker._is_llm_unavailable("Git push failed") is False
         assert worker._is_llm_unavailable("Permission denied") is False
         assert worker._is_llm_unavailable("no cli configuration found") is False
-        assert worker._is_llm_unavailable("LLM is unavailable") is False  # Too broad, not a specific pattern
+        assert worker._is_llm_unavailable("LLM is unavailable") is True  # Shared pattern from constants
         assert worker._is_llm_unavailable("") is False
 
     @patch("auto_slopp.workers.issue_worker.settings")

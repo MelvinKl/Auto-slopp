@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from auto_slopp.constants import UNAVAILABILITY_PATTERNS
 from auto_slopp.utils.cli_executor import (
     _cli_states,
     execute_with_instructions,
@@ -49,20 +50,8 @@ class IssueWorker(Worker):
     events (start, complete, failure, no changes) via the TaskSource interface.
     """
 
-    UNAVAILABILITY_PATTERNS: tuple[str, ...] = (
-        "timed out",
-        "connection refused",
-        "connection reset",
-        "rate limit",
-        "too many requests",
-        "service unavailable",
-        "gateway timeout",
-        "llm unavailable",
-        "503",
-        "502",
-        "504",
-        "internal server error",
-    )
+    # Shared source of truth for LLM unavailability detection.
+    UNAVAILABILITY_PATTERNS: tuple[str, ...] = UNAVAILABILITY_PATTERNS
 
     def __init__(
         self,
@@ -353,9 +342,23 @@ class IssueWorker(Worker):
                                 ralph_result.get("error", "Unknown error"),
                             )
                     else:
-                        # Non-retryable error during Ralph execution
-                        self.logger.error(f"Ralph loop failed for task #{task_id}: {ralph_error}")
-                        self.task_source.on_task_failure(task, ralph_error)
+                        # Non-max-loops-reached Ralph failure – check for LLM
+                        # unavailability before falling back to permanent failure.
+                        if self._is_llm_unavailable(ralph_error):
+                            self.logger.warning(
+                                f"Ralph loop failed but LLM appears unavailable "
+                                f"(refinement/parse phase) – skipping task #{task_id} for retry"
+                            )
+                            self.task_source.on_skip(task, ralph_error)
+                            result["success"] = True
+                            result["skipped"] = True
+                            result["skip_reason"] = ralph_error
+                        elif self._is_permanent_error(ralph_error):
+                            self.logger.error(f"Permanent error detected for task #{task_id}: {ralph_error}")
+                            self.task_source.on_task_failure(task, ralph_error)
+                        else:
+                            self.logger.error(f"Ralph loop failed for task #{task_id}: {ralph_error}")
+                            self.task_source.on_task_failure(task, ralph_error)
 
                     return result
 
