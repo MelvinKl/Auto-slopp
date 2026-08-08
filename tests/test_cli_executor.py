@@ -82,9 +82,9 @@ def test_timeout_falls_back_to_next_configuration(mock_run, monkeypatch):
     result = run_cli_executor(additional_instructions="Do work", working_directory=Path.cwd(), timeout=30)
 
     assert result["success"] is True
-    called_commands = [call.args[0] for call in mock_run.call_args_list]
-    assert called_commands[0][0] == "opencode"
-    assert called_commands[1][0] == "codex"
+    called_commands = [call.args[0][0] for call in mock_run.call_args_list]
+    assert called_commands[0] == "opencode"
+    assert called_commands[1] == "codex"
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
@@ -162,9 +162,9 @@ def test_high_min_rating_skips_low_capability_tools(mock_run, monkeypatch):
     )
 
     assert result["success"] is True
-    called_commands = [call.args[0] for call in mock_run.call_args_list]
-    assert called_commands[0][0] == "strong-tool"
-    assert "weak-tool" not in called_commands[0]
+    called_commands = [call.args[0][0] for call in mock_run.call_args_list]
+    assert called_commands[0] == "strong-tool"
+    assert "weak-tool" not in called_commands
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
@@ -198,9 +198,9 @@ def test_min_rating_respects_max_rating_boundary(mock_run, monkeypatch):
     )
 
     assert result["success"] is True
-    called_commands = [call.args[0] for call in mock_run.call_args_list]
-    assert called_commands[0][0] == "perfect-tool"
-    assert "low-tool" not in called_commands[0]
+    called_commands = [call.args[0][0] for call in mock_run.call_args_list]
+    assert called_commands[0] == "perfect-tool"
+    assert "low-tool" not in called_commands
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
@@ -238,9 +238,9 @@ def test_blacklist_tasks_skips_configuration(mock_run, monkeypatch):
     )
 
     assert result["success"] is True
-    called_commands = [call.args[0] for call in mock_run.call_args_list]
-    assert called_commands[0][0] == "fallback-tool"
-    assert "blacklisted-tool" not in called_commands[0]
+    called_commands = [call.args[0][0] for call in mock_run.call_args_list]
+    assert called_commands[0] == "fallback-tool"
+    assert "blacklisted-tool" not in called_commands
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
@@ -280,8 +280,8 @@ def test_blacklist_tasks_does_not_affect_other_tasks(mock_run, monkeypatch):
     )
 
     assert result["success"] is True
-    called_commands = [call.args[0] for call in mock_run.call_args_list]
-    assert called_commands[0][0] == "preferred-tool"
+    called_commands = [call.args[0][0] for call in mock_run.call_args_list]
+    assert called_commands[0] == "preferred-tool"
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
@@ -777,3 +777,19 @@ def test_resolve_timeout_zero_uses_fallback():
     assert _resolve_timeout(0, fallback=45) == 45
     assert _resolve_timeout(-5, fallback=45) == 45
     assert _resolve_timeout(0) == _PROBE_TIMEOUT_SECONDS
+
+
+def test_resolve_timeout_with_invalid_positive_uses_fallback():
+    """A timeout exceeding the maximum should use fallback."""
+    from auto_slopp.utils.cli_executor import _MAX_TIMEOUT_SECONDS, _resolve_timeout
+
+    assert _resolve_timeout(_MAX_TIMEOUT_SECONDS + 1, fallback=100) == 100
+    assert _resolve_timeout(99999999, fallback=100) == 100
+
+
+def test_resolve_timeout_max_boundary():
+    """The maximum timeout boundary value should be accepted as-is."""
+    from auto_slopp.utils.cli_executor import _MAX_TIMEOUT_SECONDS, _resolve_timeout
+
+    assert _resolve_timeout(_MAX_TIMEOUT_SECONDS) == _MAX_TIMEOUT_SECONDS
+    assert _resolve_timeout(_MAX_TIMEOUT_SECONDS, fallback=100) == _MAX_TIMEOUT_SECONDS
