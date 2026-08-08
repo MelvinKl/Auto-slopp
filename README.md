@@ -782,15 +782,41 @@ The task execution creates a markdown-based plan file in `.ralph/` with checkbox
 
 If the final evaluation fails (either after all steps complete or at max iterations), the task file is deleted so it will be recreated from scratch on the next iteration, ensuring a completely fresh context.
 
-#### Task Results
+#### TaskResult Structure
 
-Each processed task produces a result dict containing `status` and `success` fields. The `success` field uses `None` as the canonical signal for a skipped task (in addition to `status="skipped"`).
+Each processed task produces a `TaskResult` dict. The `success` field uses `None` as the canonical signal for a skipped task (in addition to `status="skipped"`). All result-returning paths use `_create_base_result()` to ensure a consistent structure.
 
-| status value | Success | Description |
-|--------|---------|-------------|
+**Status values:**
+
+| `status` value | `success` value | Description |
+|---|---|---|
 | `success` | `True` | Task completed successfully |
-| `failure` | `False` | Task failed due to an error |
-| `skipped` | `None` | Task was skipped (e.g., branch creation failed) — not counted as a failure |
+| `failure` | `False` | Task failed due to an error (logged as warning) |
+| `skipped` | `None` | Task was skipped intentionally — **not** counted as a failure |
+
+**Result dict fields:**
+
+| Field | Type | Description |
+|---|---|---|
+| `repository` | `str` | Repository name |
+| `task_id` | `int` | Task/issue ID |
+| `task_title` | `str` | Task title |
+| `success` | `bool \| None` | `True`=success, `False`=failure, `None`=skipped (canonical skip signal) |
+| `status` | `str` | Outcome label: `'success'`, `'failure'`, or `'skipped'` |
+| `openagent_executed` | `bool` | Whether an agent was executed |
+| `openagent_executions` | `int` | Number of agent executions |
+| `task_completed` | `bool` | Whether the task was fully completed |
+| `tasks_completed` | `int` | Count of fully completed sub-tasks |
+| `pr_created` | `bool` | Whether a PR was created |
+| `prs_created` | `int` | Count of PRs created |
+| `error` | `str \| None` | Error message (if any) |
+| `ralph_loops_executed` | `int` | Number of Ralph loops executed |
+| `ralph_steps_completed` | `int` | Number of Ralph steps completed |
+| `skip_reason` | `str` | Reason for skipping (optional, set when skipped) |
+| `no_changes` | `bool` | True when task required no changes (optional) |
+| `pr_url` | `str` | URL of the created PR (optional) |
+| `pr_review_done` | `bool` | True when PR review was performed (optional) |
+| `label_removed` | `bool` | True when an automatic label was removed (optional) |
 
 The completion summary logs task counts broken down by outcome:
 
