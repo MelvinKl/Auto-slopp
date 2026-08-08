@@ -161,7 +161,7 @@ def _build_command(
 
 def _execute_command(
     cli_command: str,
-    cmd: List[str],
+    args: List[str],
     working_dir: Path,
     timeout: Optional[int],
     capture_output: bool,
@@ -171,7 +171,7 @@ def _execute_command(
 
     Args:
         cli_command: Name of the CLI command being executed.
-        cmd: Full command list to pass to subprocess.run.
+        args: Full command list to pass to subprocess.run.
         working_dir: Working directory for command execution.
         timeout: Timeout in seconds, or None for no timeout.
         capture_output: Whether to capture stdout/stderr.
@@ -181,7 +181,7 @@ def _execute_command(
 
     try:
         result = subprocess.run(
-            cmd,
+            args,
             cwd=working_dir,
             capture_output=capture_output,
             text=True,
@@ -196,7 +196,7 @@ def _execute_command(
             "execution_time": execution_time,
             "timestamp": datetime.now().isoformat(),
             "working_directory": str(working_dir),
-            "command": " ".join(cmd),
+            "command": " ".join(args),
             "return_code": result.returncode,
             "timeout": False,
         }
@@ -230,7 +230,7 @@ def _execute_command(
             "execution_time": execution_time,
             "timestamp": datetime.now().isoformat(),
             "working_directory": str(working_dir),
-            "command": " ".join(cmd),
+            "command": " ".join(args),
             "return_code": -1,
             "timeout": True,
             "error": error_msg,
@@ -288,7 +288,7 @@ def _probe_configuration(config: Dict[str, Any], working_dir: Path, timeout: Opt
 
     result = _execute_command(
         cli_command=config["cli_command"],
-        cmd=cmd,
+        args=cmd,
         working_dir=working_dir,
         timeout=effective_timeout,
         capture_output=True,
@@ -422,7 +422,7 @@ def run_cli_executor(
 
         result = _execute_command(
             cli_command=cli_command,
-            cmd=cmd,
+            args=cmd,
             working_dir=working_dir,
             timeout=config_timeout,
             capture_output=capture_output,
