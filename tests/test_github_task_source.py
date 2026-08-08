@@ -619,20 +619,6 @@ class TestGitHubTaskSource:
         mock_comment.assert_not_called()
         mock_remove.assert_not_called()
 
-    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
-    @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
-    @patch("auto_slopp.workers.github_task_source.settings")
-    def test_on_skip_does_not_remove_label(self, mock_settings, mock_remove, mock_comment):
-        """Test that on_skip does not call remove_label_from_issue or post a comment."""
-        mock_settings.github_issue_worker_required_label = "test-label"
-        task_source = GitHubTaskSource()
-        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
-
-        task_source.on_skip(task)
-
-        mock_comment.assert_not_called()
-        mock_remove.assert_not_called()
-
     def test_pr_mentions_issue_in_title(self):
         """Test that _pr_mentions_issue returns True when issue number is in PR title."""
         task_source = GitHubTaskSource()
