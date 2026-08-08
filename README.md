@@ -93,9 +93,11 @@ AUTO_SLOPP_TASK_DIFFICULTIES='{
 
 # Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
 AUTO_SLOPP_SLOP_TIMEOUT=7200
+
+# Use -1 (NO_TIMEOUT) to disable timeout entirely
 ```
 
-##### Understanding the Rating System
+##### Understanding the Capability Rating System
 
 The capability rating system (0-10) helps match tasks with appropriate CLI tools:
 
@@ -969,28 +971,28 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
   {
     "cli_command": "gemini",
     "cli_args": ["--yolo", "-p"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 8 },
+    "capability": 8,
     "cooldown_seconds": 300,
     "timeout": -1
   },
   {
     "cli_command": "codex",
     "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
+    "capability": 5,
     "cooldown_seconds": 300,
     "timeout": 3600
   },
   {
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
+    "capability": 5,
     "cooldown_seconds": 300,
     "timeout": -1
   },
   {
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 2 },
+    "capability": 2,
     "cooldown_seconds": 300,
     "timeout": 1800
   }
@@ -1017,28 +1019,28 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
   {
     "cli_command": "gemini",
     "cli_args": ["--yolo", "-p"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 8 },
+    "capability": 8,
     "cooldown_seconds": 300,
     "timeout": -1
   },
   {
     "cli_command": "codex",
     "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
+    "capability": 5,
     "cooldown_seconds": 300,
     "timeout": 3600
   },
   {
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
+    "capability": 5,
     "cooldown_seconds": 300,
     "timeout": -1
   },
   {
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 2 },
+    "capability": 2,
     "cooldown_seconds": 300,
     "timeout": 1800
   }
@@ -1046,6 +1048,8 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
 
 # Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
 export AUTO_SLOPP_SLOP_TIMEOUT=7200
+
+# Use -1 (NO_TIMEOUT) to disable timeout entirely
 
 # Days after which a local branch without remote is considered stale and deleted (default: 1)
 AUTO_SLOPP_STALE_BRANCH_DAYS_THRESHOLD=1

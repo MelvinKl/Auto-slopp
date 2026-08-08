@@ -299,7 +299,7 @@ def _probe_configuration(config: Dict[str, Any], working_dir: Path, timeout: Opt
 def run_cli_executor(
     additional_instructions: Optional[str] = None,
     working_directory: Optional[Path] = None,
-    timeout: int = 7200,
+    timeout: Optional[int] = None,
     agent_args: Optional[List[str]] = None,
     capture_output: bool = True,
     task_name: str = "default",
@@ -312,7 +312,8 @@ def run_cli_executor(
     Args:
         additional_instructions: Additional instructions to pass to the CLI
         working_directory: Directory where the CLI should be executed
-        timeout: Command execution timeout in seconds (default: 7200)
+        timeout: Command execution timeout in seconds (default: None = per-config timeout).
+                 Use ``NO_TIMEOUT`` (-1) to disable timeout entirely.
         agent_args: Additional arguments to pass to the CLI
         capture_output: Whether to capture stdout/stderr (default: True)
         task_name: Name of the task type for difficulty matching (default: "default")
@@ -368,9 +369,17 @@ def run_cli_executor(
     working_dir = working_directory or Path.cwd()
     cli_configurations = _get_cli_configurations()
 
+    resolved = _resolve_timeout(timeout)
+    if resolved is None and timeout == NO_TIMEOUT:
+        timeout_display = "disabled (NO_TIMEOUT)"
+    elif resolved is None:
+        timeout_display = "disabled (no timeout)"
+    else:
+        timeout_display = f"{resolved}s"
+
     logger.info(f"Executing with instructions: {additional_instructions if additional_instructions else 'None'}...")
     logger.info(f"Working directory: {working_dir}")
-    logger.info(f"Timeout: {timeout}s")
+    logger.info(f"Timeout: {timeout_display}")
     logger.info(f"Agent args: {agent_args}")
 
     task_rating = settings.task_difficulties.get(task_name, settings.task_difficulties["default"])
@@ -464,7 +473,7 @@ def execute_with_instructions(
     instructions: str,
     work_dir: Path,
     agent_args: Optional[List[str]] = None,
-    timeout: int = 7200,
+    timeout: Optional[int] = None,
     task_name: str = "default",
 ) -> Dict[str, Any]:
     """Execute CLI with specific instructions.
@@ -473,7 +482,7 @@ def execute_with_instructions(
         instructions: The instructions to pass to the CLI
         work_dir: Working directory for command execution
         agent_args: Additional arguments to pass to the CLI
-        timeout: Command execution timeout in seconds
+        timeout: Command execution timeout in seconds (default: None). Use ``NO_TIMEOUT`` (-1) to disable timeout.
         task_name: Name of the task type for difficulty matching
 
     Returns:
