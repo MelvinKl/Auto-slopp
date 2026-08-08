@@ -379,7 +379,7 @@ def run_cli_executor(
         elif _cfg.timeout > 0:
             config_timeout = _cfg.timeout
         else:
-            config_timeout = timeout  # fall back to caller-provided timeout
+            raise AssertionError("unreachable: validate_timeout only allows -1 or positive integers")
 
         result = _execute_command(
             cli_command=cli_command,
