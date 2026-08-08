@@ -225,8 +225,18 @@ def _execute_command(
 def _probe_configuration(config: Dict[str, Any], working_dir: Path, timeout: Optional[int] = None) -> bool:
     """Run quick health probe for one configuration.
 
-    Uses the provided timeout: :data:`NO_TIMEOUT` means no timeout (None),
-    positive values use that timeout, otherwise falls back to default probe timeout.
+    Uses the provided timeout:
+      - :data:`NO_TIMEOUT` (-1) means no timeout (effective timeout is ``None``).
+      - A positive integer uses that value as the timeout in seconds.
+      - ``None`` or any other value falls back to :data:`_PROBE_TIMEOUT_SECONDS`
+        (600 seconds / 10 minutes).
+
+    Note:
+        Internal callers (:func:`_check_startup_health` and
+        :func:`_check_cooldowns`) always pass a validated config timeout
+        (never ``None``), so the fallback to ``_PROBE_TIMEOUT_SECONDS`` is
+        only reachable from external callers that invoke this function
+        directly without providing a valid timeout.
     """
     cmd = _build_command(
         cli_command=config["cli_command"],
