@@ -11,7 +11,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from settings.main import NO_TIMEOUT, CLIConfiguration, TaskRating, settings
+from settings.main import (
+    _MAX_TIMEOUT_SECONDS,
+    NO_TIMEOUT,
+    CLIConfiguration,
+    TaskRating,
+    settings,
+)
 
 logger = logging.getLogger(__name__)
 _active_cli_configuration_index = 0
@@ -234,18 +240,22 @@ def _execute_command(
 def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None) -> Optional[int]:
     """Resolve a raw timeout value to an effective timeout.
 
+    Handles the NO_TIMEOUT sentinel (-1), validates range (0 < timeout ≤ 30 days),
+    and falls back to _PROBE_TIMEOUT_SECONDS when the value is invalid.
+
     Args:
         raw_timeout: The timeout value (None for unspecified, -1 for NO_TIMEOUT, or a positive integer).
-        fallback: Default timeout in seconds to use when raw_timeout is None or non-positive.
-                  Defaults to None; when None, falls back to _PROBE_TIMEOUT_SECONDS (600s).
+        fallback: Default timeout in seconds to use when raw_timeout is None, non-positive,
+                  or exceeds the maximum. Defaults to None; when None, falls back to
+                  _PROBE_TIMEOUT_SECONDS (600s).
 
     Returns:
-        None if raw_timeout is NO_TIMEOUT (-1), the raw_timeout value if positive,
+        None if raw_timeout is NO_TIMEOUT (-1), the raw_timeout value if positive and within range,
         or the fallback value (or _PROBE_TIMEOUT_SECONDS if fallback is None) otherwise.
     """
     if raw_timeout == NO_TIMEOUT:
         return None
-    if raw_timeout is not None and raw_timeout > 0:
+    if raw_timeout is not None and 0 < raw_timeout <= _MAX_TIMEOUT_SECONDS:
         return raw_timeout
     return fallback if fallback is not None else _PROBE_TIMEOUT_SECONDS
 
