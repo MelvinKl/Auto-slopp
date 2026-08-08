@@ -45,7 +45,7 @@ Auto-slopp supports a tiered CLI configuration system with capability-based task
 # timeout: seconds before CLI command times out; use -1 (NO_TIMEOUT) to disable
 #
 # Validation rules for `timeout`:
-#   - `-1` (NO_TIMEOUT): never timeout — the subprocess runs indefinitely
+#   - `-1` (NO_TIMEOUT): no timeout (subprocess runs indefinitely)
 #   - Positive integer: seconds before the CLI command is killed
 #   - Zero or negative values other than `-1` are rejected with a validation error
 AUTO_SLOPP_CLI_CONFIGURATIONS='[
