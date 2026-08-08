@@ -262,9 +262,10 @@ def _probe_configuration(config: Dict[str, Any], working_dir: Path, timeout: Opt
     Note:
         Internal callers (:func:`_check_startup_health` and
         :func:`_check_cooldowns`) always pass a validated config timeout
-        (never ``None``), so the fallback to ``_PROBE_TIMEOUT_SECONDS`` is
-        only reachable from external callers that invoke this function
-        directly without providing a valid timeout.
+        (never ``None``). The fallback to ``_PROBE_TIMEOUT_SECONDS`` is
+        intentionally exposed for external callers that invoke this function
+        directly without providing a timeout, allowing them to probe
+        configurations with a sensible default.
     """
     cmd = _build_command(
         cli_command=config["cli_command"],
