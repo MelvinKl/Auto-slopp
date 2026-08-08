@@ -200,10 +200,28 @@ def delete_issue_comment(repo_dir: Path, issue_number: int, comment_id: int) -> 
     """
     try:
         logger.debug(f"[DeleteComment] Deleting comment {comment_id} from issue #{issue_number} in {repo_dir.name}")
+        # Get repo owner/name from the git remote
+        repo_info_result = _run_gh_command(
+            repo_dir,
+            "repo",
+            "view",
+            "--json",
+            "owner,name",
+            check=False,
+        )
+        if repo_info_result.returncode != 0:
+            logger.error(f"Failed to get repo info for {repo_dir.name}")
+            return False
+        repo_info = json.loads(repo_info_result.stdout)
+        owner = repo_info.get("owner", {}).get("login")
+        repo_name = repo_info.get("name")
+        if not owner or not repo_name:
+            logger.error(f"Could not determine owner/repo for {repo_dir.name}")
+            return False
         result = _run_gh_command(
             repo_dir,
             "api",
-            f"repos/{settings.github_owner}/{settings.github_repo}/issues/comments/{comment_id}",
+            f"repos/{owner}/{repo_name}/issues/comments/{comment_id}",
             "-X",
             "DELETE",
             check=False,
