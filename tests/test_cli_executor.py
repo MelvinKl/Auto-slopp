@@ -730,3 +730,50 @@ def test_startup_health_uses_config_timeout(mock_run, monkeypatch):
     timeout_1 = mock_run.call_args_list[1].kwargs.get("timeout")
     assert timeout_0 == 30
     assert timeout_1 is None
+
+
+def test_resolve_timeout_no_timeout_returns_none():
+    """NO_TIMEOUT (-1) should resolve to None (no timeout)."""
+    from auto_slopp.utils.cli_executor import _resolve_timeout
+
+    assert _resolve_timeout(NO_TIMEOUT) is None
+    assert _resolve_timeout(NO_TIMEOUT, fallback=30) is None
+
+
+def test_resolve_timeout_positive_returns_value():
+    """A positive timeout should be returned as-is."""
+    from auto_slopp.utils.cli_executor import _resolve_timeout
+
+    assert _resolve_timeout(30) == 30
+    assert _resolve_timeout(3600) == 3600
+    assert _resolve_timeout(3600, fallback=60) == 3600
+
+
+def test_resolve_timeout_none_with_fallback():
+    """When raw_timeout is None and fallback is provided, use fallback."""
+    from auto_slopp.utils.cli_executor import _resolve_timeout
+
+    assert _resolve_timeout(None, fallback=120) == 120
+
+
+def test_resolve_timeout_none_without_fallback():
+    """When raw_timeout is None and no fallback, use _PROBE_TIMEOUT_SECONDS."""
+    from auto_slopp.utils.cli_executor import _PROBE_TIMEOUT_SECONDS, _resolve_timeout
+
+    assert _resolve_timeout(None) == _PROBE_TIMEOUT_SECONDS
+
+
+def test_resolve_timeout_none_explicit_fallback_none():
+    """When raw_timeout is None and fallback is explicitly None, still use _PROBE_TIMEOUT_SECONDS."""
+    from auto_slopp.utils.cli_executor import _PROBE_TIMEOUT_SECONDS, _resolve_timeout
+
+    assert _resolve_timeout(None, fallback=None) == _PROBE_TIMEOUT_SECONDS
+
+
+def test_resolve_timeout_zero_uses_fallback():
+    """A zero or negative (non-NO_TIMEOUT) timeout should use fallback."""
+    from auto_slopp.utils.cli_executor import _PROBE_TIMEOUT_SECONDS, _resolve_timeout
+
+    assert _resolve_timeout(0, fallback=45) == 45
+    assert _resolve_timeout(-5, fallback=45) == 45
+    assert _resolve_timeout(0) == _PROBE_TIMEOUT_SECONDS

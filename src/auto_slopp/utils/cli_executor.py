@@ -236,12 +236,12 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
 
     Args:
         raw_timeout: The timeout value (None for unspecified, -1 for NO_TIMEOUT, or a positive integer).
-        fallback: Default timeout in seconds to use when raw_timeout is None.
-                  Defaults to _PROBE_TIMEOUT_SECONDS.
+        fallback: Default timeout in seconds to use when raw_timeout is None or non-positive.
+                  Defaults to None; when None, falls back to _PROBE_TIMEOUT_SECONDS (600s).
 
     Returns:
         None if raw_timeout is NO_TIMEOUT (-1), the raw_timeout value if positive,
-        or the fallback value otherwise.
+        or the fallback value (or _PROBE_TIMEOUT_SECONDS if fallback is None) otherwise.
     """
     if raw_timeout == NO_TIMEOUT:
         return None
