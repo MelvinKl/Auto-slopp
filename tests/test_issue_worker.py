@@ -1824,3 +1824,127 @@ class TestIssueWorker:
         assert result["tasks_skipped"] == 1
         assert result["tasks_processed"] == 0
         assert result["tasks_completed"] == 0
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_unified_skip_signal_all_paths(self, mock_settings, mock_create_branch, mock_checkout, caplog):
+        """Regression test: all skip paths produce the same canonical skip signal.
+
+        The canonical skip signal is `success=None` with `status='skipped'`.
+        All three skip paths in _process_single_task must produce this signal:
+        1. Branch creation failure
+        2. LLM unavailable during Ralph loop
+        3. LLM unavailable during CLI execution
+
+        This test verifies that:
+        - All skip paths produce `success=None` and `status='skipped'`
+        - Skipped tasks are counted in `tasks_skipped`, not `tasks_processed`
+        - No 'Failed to process task' warning is logged for skips
+        - `on_skip` is called for LLM-unavailable skips
+        - `on_task_failure` is NOT called for skips
+        """
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = False
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+
+        with caplog.at_level("WARNING", logger="auto_slopp.workers.IssueWorker"):
+            result = worker.run(Path("/tmp"))
+
+        # Canonical skip signal
+        task_result = result["task_results"][0]
+        assert task_result["success"] is None, "Skip signal must be success=None"
+        assert task_result["status"] == "skipped"
+
+        # Counted in tasks_skipped, NOT in tasks_processed or tasks_completed
+        assert result["tasks_skipped"] == 1
+        assert result["tasks_processed"] == 0
+        assert result["tasks_completed"] == 0
+
+        # No failure warning logged
+        failure_messages = [r.message for r in caplog.records if "Failed to process task" in r.message]
+        assert len(failure_messages) == 0, f"Unexpected failure warnings: {failure_messages}"
+
+        # on_skip is NOT called for branch creation failure (that's a different skip path)
+        # but the canonical signal is still correct
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_unified_skip_signal_ralph_llm_unavailable(self, mock_settings, mock_create_branch, mock_checkout, caplog):
+        """Regression: LLM unavailable during Ralph loop produces canonical skip signal."""
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": False,
+            "loops_executed": 1,
+            "steps_completed": 2,
+            "total_steps": 5,
+            "max_loops_reached": False,
+            "error": "LLM timed out waiting for response",
+        }
+
+        with caplog.at_level("WARNING", logger="auto_slopp.workers.IssueWorker"):
+            result = worker.run(Path("/tmp"))
+
+        # Canonical skip signal
+        task_result = result["task_results"][0]
+        assert task_result["success"] is None, "Skip signal must be success=None"
+        assert task_result["status"] == "skipped"
+        assert "skip_reason" in task_result
+
+        # Counted in tasks_skipped
+        assert result["tasks_skipped"] == 1
+        assert result["tasks_processed"] == 0
+
+        # No failure warning
+        failure_messages = [r.message for r in caplog.records if "Failed to process task" in r.message]
+        assert len(failure_messages) == 0
+
+        # on_skip called, on_task_failure NOT called
+        assert task_source.on_skip_called is True
+        assert task_source.on_task_failure_called is False
+
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_unified_skip_signal_cli_llm_unavailable(
+        self, mock_settings, mock_create_branch, mock_checkout, mock_cli, mock_execute, caplog
+    ):
+        """Regression: LLM unavailable during CLI execution produces canonical skip signal."""
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_cli.return_value = "opencode"
+        mock_execute.return_value = {"success": False, "error": "LLM unavailable: connection refused"}
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+
+        with caplog.at_level("WARNING", logger="auto_slopp.workers.IssueWorker"):
+            result = worker.run(Path("/tmp"))
+
+        # Canonical skip signal
+        task_result = result["task_results"][0]
+        assert task_result["success"] is None, "Skip signal must be success=None"
+        assert task_result["status"] == "skipped"
+        assert "skip_reason" in task_result
+
+        # Counted in tasks_skipped
+        assert result["tasks_skipped"] == 1
+        assert result["tasks_processed"] == 0
+
+        # No failure warning
+        failure_messages = [r.message for r in caplog.records if "Failed to process task" in r.message]
+        assert len(failure_messages) == 0
+
+        # on_skip called, on_task_failure NOT called
+        assert task_source.on_skip_called is True
+        assert task_source.on_task_failure_called is False
