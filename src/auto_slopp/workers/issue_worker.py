@@ -304,12 +304,18 @@ class IssueWorker(Worker):
     def _process_single_task(self, repo_dir: Path, task: Task) -> TaskResult:
         """Process a single task using Ralph loop.
 
+        Returns a TaskResult dict with the following keys:
+        - success: True=success, False=failure, None=skipped
+        - status: 'success', 'failure', or 'skipped'
+        - task_completed: Whether the task completed all its work
+        - error: Error message (if any)
+
         Args:
             repo_dir: Path to the repository directory
             task: The task to process
 
         Returns:
-            Processing result for this task
+            TaskResult dict with processing outcome
         """
         self.logger.info(f"Processing task for: {repo_dir.name}")
 
@@ -375,7 +381,9 @@ class IssueWorker(Worker):
                     else:
                         self.task_source.on_task_failure(task, ralph_error)
 
+                    result["status"] = "failure"
                     result["task_completed"] = False
+                    result["success"] = False
                     return result
 
                 result["openagent_executed"] = True
@@ -413,7 +421,9 @@ class IssueWorker(Worker):
                     else:
                         self.task_source.on_task_failure(task, error_msg)
 
+                    result["status"] = "failure"
                     result["task_completed"] = False
+                    result["success"] = False
                     return result
 
             current_branch = get_current_branch(repo_dir)
@@ -598,6 +608,7 @@ class IssueWorker(Worker):
             result["error"] = str(e)
             result["status"] = "failure"
             result["task_completed"] = False
+            result["success"] = False
             self.task_source.on_task_failure(task, str(e))
 
         return result
