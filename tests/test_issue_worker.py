@@ -394,7 +394,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
-    def test_branch_creation_failure(self, mock_settings, mock_create_branch, mock_checkout):
+    def test_branch_creation_skip(self, mock_settings, mock_create_branch, mock_checkout):
         """Test that run handles branch creation failure by skipping the task."""
         mock_settings.ralph_enabled = False
         mock_checkout.return_value = True
