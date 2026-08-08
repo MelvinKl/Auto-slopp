@@ -111,13 +111,18 @@ class TaskSource(ABC):
             error: Error description
         """
 
-    @abstractmethod
     def on_no_changes(self, task: Task) -> None:
         """Called when no changes were needed for a task.
+
+        This is a non-abstract hook so that subclasses which do not need to
+        annotate no-change state (e.g., purely internal task lists) can rely on
+        the default no-op.  Sources that do track no-change state (GitHub, Vikunja)
+        override this method to add a comment / update the task status.
 
         Args:
             task: The task that required no changes
         """
+        pass  # noqa: B027 (intentional no-op hook for sources that don't track no-changes)
 
     def on_skip(self, task: Task, reason: str) -> None:
         """Called when a task is skipped (e.g., LLM unavailable) and should be retried later.
