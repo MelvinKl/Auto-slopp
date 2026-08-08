@@ -231,6 +231,25 @@ def _execute_command(
         }
 
 
+def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None) -> Optional[int]:
+    """Resolve a raw timeout value to an effective timeout.
+
+    Args:
+        raw_timeout: The timeout value (None for unspecified, -1 for NO_TIMEOUT, or a positive integer).
+        fallback: Default timeout in seconds to use when raw_timeout is None.
+                  Defaults to _PROBE_TIMEOUT_SECONDS.
+
+    Returns:
+        None if raw_timeout is NO_TIMEOUT (-1), the raw_timeout value if positive,
+        or the fallback value otherwise.
+    """
+    if raw_timeout == NO_TIMEOUT:
+        return None
+    if raw_timeout is not None and raw_timeout > 0:
+        return raw_timeout
+    return fallback if fallback is not None else _PROBE_TIMEOUT_SECONDS
+
+
 def _probe_configuration(config: Dict[str, Any], working_dir: Path, timeout: Optional[int] = None) -> bool:
     """Run quick health probe for one configuration.
 
@@ -254,12 +273,7 @@ def _probe_configuration(config: Dict[str, Any], working_dir: Path, timeout: Opt
         additional_instructions=_PROBE_INSTRUCTIONS,
     )
 
-    if timeout == NO_TIMEOUT:
-        effective_timeout = None  # never timeout
-    elif timeout is not None and timeout > 0:
-        effective_timeout = timeout
-    else:
-        effective_timeout = _PROBE_TIMEOUT_SECONDS
+    effective_timeout = _resolve_timeout(timeout)
 
     result = _execute_command(
         cli_command=config["cli_command"],
@@ -393,12 +407,7 @@ def run_cli_executor(
 
         # Use per-config timeout: NO_TIMEOUT means never timeout, positive value overrides caller timeout
         _cfg = settings.cli_configurations[config_index]
-        if _cfg.timeout == NO_TIMEOUT:
-            config_timeout = None  # never timeout
-        elif _cfg.timeout > 0:
-            config_timeout = _cfg.timeout
-        else:
-            raise AssertionError("unreachable: validate_timeout only allows -1 or positive integers")
+        config_timeout = _resolve_timeout(_cfg.timeout)
 
         result = _execute_command(
             cli_command=cli_command,
