@@ -571,7 +571,7 @@ def test_custom_timeout_from_config(mock_run, monkeypatch):
 
     assert result["success"] is True
     # Verify the timeout passed to subprocess.run is the config's value, not the caller's
-    call_kwargs = mock_run.call_args.kwargs if "args" in mock_run.call_args.kwargs else mock_run.call_args[1]
+    call_kwargs = mock_run.call_args.kwargs
     assert call_kwargs["timeout"] == 42
 
 
@@ -596,7 +596,7 @@ def test_timeout_negative_one_means_no_timeout(mock_run, monkeypatch):
     )
 
     assert result["success"] is True
-    call_kwargs = mock_run.call_args.kwargs if "args" in mock_run.call_args.kwargs else mock_run.call_args[1]
+    call_kwargs = mock_run.call_args.kwargs
     assert call_kwargs["timeout"] is None
 
 
@@ -621,7 +621,7 @@ def test_default_timeout_is_never_timeout(mock_run, monkeypatch):
     )
 
     assert result["success"] is True
-    call_kwargs = mock_run.call_args.kwargs if "args" in mock_run.call_args.kwargs else mock_run.call_args[1]
+    call_kwargs = mock_run.call_args.kwargs
     assert call_kwargs["timeout"] is None
 
 
@@ -650,7 +650,7 @@ def test_config_timeout_overrides_fallback(mock_run, monkeypatch):
 
     assert result["success"] is True
     # First config (fast-tool) should be used with its own timeout of 60
-    call_kwargs = mock_run.call_args.kwargs if "args" in mock_run.call_args.kwargs else mock_run.call_args[1]
+    call_kwargs = mock_run.call_args.kwargs
     assert call_kwargs["timeout"] == 60
 
 
@@ -666,7 +666,7 @@ def test_probe_uses_config_timeout_positive(mock_run, monkeypatch):
     config = {"cli_command": "tool", "cli_args": []}
     _probe_configuration(config, Path.cwd(), timeout=30)
 
-    call_kwargs = mock_run.call_args.kwargs if "args" in mock_run.call_args.kwargs else mock_run.call_args[1]
+    call_kwargs = mock_run.call_args.kwargs
     assert call_kwargs["timeout"] == 30
 
 
@@ -682,7 +682,7 @@ def test_probe_uses_config_timeout_negative_one(mock_run, monkeypatch):
     config = {"cli_command": "tool", "cli_args": []}
     _probe_configuration(config, Path.cwd(), timeout=NO_TIMEOUT)
 
-    call_kwargs = mock_run.call_args.kwargs if "args" in mock_run.call_args.kwargs else mock_run.call_args[1]
+    call_kwargs = mock_run.call_args.kwargs
     assert call_kwargs["timeout"] is None
 
 
@@ -701,7 +701,7 @@ def test_probe_falls_back_to_default_timeout(mock_run, monkeypatch):
     config = {"cli_command": "tool", "cli_args": []}
     _probe_configuration(config, Path.cwd())
 
-    call_kwargs = mock_run.call_args.kwargs if "args" in mock_run.call_args.kwargs else mock_run.call_args[1]
+    call_kwargs = mock_run.call_args.kwargs
     assert call_kwargs["timeout"] == _PROBE_TIMEOUT_SECONDS
 
 
