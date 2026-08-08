@@ -1170,6 +1170,21 @@ class TestIssueWorker:
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_ensure_gitignore.return_value = True  # Simulate success
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": True,
+            "loops_executed": 1,
+            "steps_completed": 3,
+            "total_steps": 3,
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with caplog.at_level("WARNING", logger="auto_slopp.workers.issue_worker"):
+                worker.run(Path(temp_dir))
+
+        # No warning should be logged when ensure_ralph_in_gitignore succeeds
+        gitignore_warnings = [r for r in caplog.records if "Failed to ensure .ralph in .gitignore" in r.getMessage()]
+        assert len(gitignore_warnings) == 0
 
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
