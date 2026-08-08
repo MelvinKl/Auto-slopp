@@ -152,7 +152,7 @@ class GitHubTaskSource(TaskSource):
         # Delete only the filtered comments (from issue author or allowed creator)
         logger.debug(f"[Condense] Deleting {len(filtered_comments)} original comments for issue #{issue_number}")
         for comment in filtered_comments:
-            cid = comment.get("id")
+            cid = comment.get("databaseId")
             if cid is not None:
                 logger.debug(f"[Condense] Deleting comment {cid} for issue #{issue_number}")
                 delete_issue_comment(repo_path, issue_number, cid)
