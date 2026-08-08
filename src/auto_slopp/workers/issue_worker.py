@@ -89,6 +89,20 @@ class IssueWorker(Worker):
     def run(self, repo_path: Path) -> Dict[str, Any]:
         """Execute the task processing workflow for a single repository.
 
+        Each task processed by this method will end in one of three outcomes,
+        reflected in the per-task result dict and the summary counters:
+
+        * **Success** — `success=True`, `status='success'`. Counted in
+          ``tasks_processed`` and ``tasks_completed`` (if the task finished
+          all its work).
+        * **Skipped** — ``success=None``, ``status='skipped'``. This is the
+          canonical skip signal. Counted in ``tasks_skipped``. Happens when
+          branch creation fails, the LLM is unavailable, or the task produced
+          no changes.
+        * **Failure** — ``success=False``. Counted in
+          ``repositories_with_errors``. Happens on permanent errors, push
+          failures, or PR creation failures.
+
         Args:
             repo_path: Path to the repository directory
 
