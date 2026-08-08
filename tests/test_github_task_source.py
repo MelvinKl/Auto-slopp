@@ -591,10 +591,10 @@ class TestGitHubTaskSource:
         mock_comment.assert_not_called()
         mock_remove.assert_not_called()
 
-    @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
     @patch("auto_slopp.workers.github_task_source.settings")
-    def test_on_skip_no_comment(self, mock_settings, mock_comment, mock_remove):
+    def test_on_skip_no_comment(self, mock_settings, mock_remove, mock_comment):
         """Test that on_skip does NOT post a GitHub comment, only logs."""
         mock_settings.github_issue_worker_required_label = "test-label"
         task_source = GitHubTaskSource()
@@ -619,10 +619,10 @@ class TestGitHubTaskSource:
         mock_comment.assert_not_called()
         mock_remove.assert_not_called()
 
-    @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
     @patch("auto_slopp.workers.github_task_source.settings")
-    def test_on_skip_does_not_remove_label(self, mock_settings, mock_comment, mock_remove):
+    def test_on_skip_does_not_remove_label(self, mock_settings, mock_remove, mock_comment):
         """Test that on_skip does not call remove_label_from_issue or post a comment."""
         mock_settings.github_issue_worker_required_label = "test-label"
         task_source = GitHubTaskSource()
