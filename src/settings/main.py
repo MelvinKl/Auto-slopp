@@ -26,20 +26,6 @@ class CLIConfiguration(BaseModel):
     cli_command: str = Field(
         description="CLI command to execute for automation tasks (e.g., opencode, claude, gemini)",
     )
-
-    @field_validator("timeout")
-    @classmethod
-    def validate_timeout(cls, v: int) -> int:
-        """Only allow -1 (NO_TIMEOUT) or positive integers for timeout."""
-        if v == NO_TIMEOUT:
-            return v
-        if v > 0:
-            return v
-        raise ValueError(
-            f"timeout must be -1 (NO_TIMEOUT) or a positive integer, got {v}. "
-            "A value of -1 means never timeout; positive values specify seconds."
-        )
-
     cli_args: List[str] = Field(
         default_factory=list,
         description="Arguments to pass to the CLI command",
@@ -70,6 +56,19 @@ class CLIConfiguration(BaseModel):
             "When NO_TIMEOUT, the caller-provided timeout is ignored for this configuration."
         ),
     )
+
+    @field_validator("timeout")
+    @classmethod
+    def validate_timeout(cls, v: int) -> int:
+        """Only allow -1 (NO_TIMEOUT) or positive integers for timeout."""
+        if v == NO_TIMEOUT:
+            return v
+        if v > 0:
+            return v
+        raise ValueError(
+            f"timeout must be -1 (NO_TIMEOUT) or a positive integer, got {v}. "
+            "A value of -1 means never timeout; positive values specify seconds."
+        )
 
 
 class Settings(BaseSettings):
