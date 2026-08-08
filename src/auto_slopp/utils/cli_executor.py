@@ -157,7 +157,7 @@ def _execute_command(
     cli_command: str,
     cmd: List[str],
     working_dir: Path,
-    timeout: int,
+    timeout: Optional[int],
     capture_output: bool,
     start_time: Optional[float] = None,
 ) -> Dict[str, Any]:
