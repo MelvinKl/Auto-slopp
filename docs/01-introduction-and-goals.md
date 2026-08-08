@@ -9,7 +9,7 @@ The framework enables:
 - Dynamic worker discovery and execution
 - Multi-source task processing through a unified interface
 - Real-time monitoring via Telegram notifications
-- Tiered CLI tool selection based on task complexity
+- Tiered CLI tool selection based on task complexity (configurable in code)
 
 ## 1.2 Vision
 
@@ -53,7 +53,7 @@ Auto-slopp Quality Goals
 |----------|----------|
 | Add a new worker type | Inherit from `Worker` base class, implement `run()` method, place in `workers/` directory |
 | Add a new task source | Implement `TaskSource` abstract class, register with `IssueWorker` |
-| Change CLI tool configuration | Update `AUTO_SLOPP_CLI_CONFIGURATIONS` environment variable (JSON) |
+| Change CLI tool configuration | Edit `cli_configurations` in `settings/main.py` |
 | Monitor system remotely | Configure Telegram bot token and chat ID via environment variables |
 | Scale to multiple repositories | Set `AUTO_SLOPP_BASE_REPO_PATH` to directory containing repos |
 

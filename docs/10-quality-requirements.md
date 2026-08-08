@@ -41,9 +41,9 @@ Auto-slopp Quality Attributes
 
 | Scenario | Response Time |
 |----------|--------------|
-| Add a new worker type (e.g., `JiraWorker`) | Create `jira_worker.py` inheriting from `Worker`, implement `run()`. No core changes needed. |
+| Add a new worker type (e.g., `JiraWorker`) | Create `jira_worker.py` inheriting from `Worker`, implement `run()`, add to `ALL_WORKERS` in `executor.py`. |
 | Add a new task source (e.g., `JiraTaskSource`) | Implement `TaskSource` interface methods, create worker wrapper. ~1 day of work. |
-| Add a new CLI tool | Add entry to `AUTO_SLOPP_CLI_CONFIGURATIONS` JSON. No code changes. |
+| Add a new CLI tool | Add `CLIConfiguration` to `cli_configurations` in `settings/main.py`. Code change required. |
 
 ### Configurability
 

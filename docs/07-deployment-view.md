@@ -115,16 +115,20 @@ All configuration is via environment variables with `AUTO_SLOPP_` prefix:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `AUTO_SLOPP_BASE_REPO_PATH` | Yes | Directory containing git repositories |
+| `AUTO_SLOPP_BASE_REPO_PATH` | No | Directory containing git repositories (default: cwd) |
 | `AUTO_SLOPP_DEBUG` | No | Enable debug mode (default: false) |
 | `AUTO_SLOPP_TELEGRAM_ENABLED` | No | Enable Telegram logging (default: false) |
 | `AUTO_SLOPP_TELEGRAM_BOT_TOKEN` | No* | Telegram bot token |
 | `AUTO_SLOPP_TELEGRAM_CHAT_ID` | No* | Telegram chat ID |
-| `AUTO_SLOPP_CLI_CONFIGURATIONS` | No | JSON array of CLI tool configs |
-| `AUTO_SLOPP_TASK_DIFFICULTIES` | No | JSON object of task difficulty ratings |
-| `AUTO_SLOPP_SLOP_TIMEOUT` | No | Execution timeout in seconds (default: 7200) |
 | `AUTO_SLOPP_LOG_FILE_DIR` | No | Directory for rotating log files |
-| `AUTO_SLOPP_WORKERS_DISABLED` | No | JSON array of disabled worker names |
+| `AUTO_SLOPP_WORKERS_DISABLED` | No | Comma-separated list of disabled worker names |
+| `AUTO_SLOPP_RALPH_MAX_LOOPS` | No | Max Ralph loop iterations (default: 500) |
+| `AUTO_SLOPP_GITHUB_ISSUE_STEP_MAX_ITERATIONS` | No | Max step iterations per issue (default: 50) |
+| `AUTO_SLOPP_RALPH_ENABLED` | No | Enable Ralph loop (default: true) |
+| `AUTO_SLOPP_ADDITIONAL_ENV_FILE` | No | Path to additional .env file for subprocess calls |
+| `AUTO_SLOPP_STALE_BRANCH_DAYS_THRESHOLD` | No | Days before branch is stale (default: 1) |
+| `AUTO_SLOPP_AUTO_UPDATE_REBOOT_DELAY` | No | Seconds before reboot after update (default: 300) |
+| `AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL` | No | Seconds between executor iterations (default: 600) |
 
 *Only required when `AUTO_SLOPP_TELEGRAM_ENABLED=true`
 

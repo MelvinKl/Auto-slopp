@@ -66,28 +66,39 @@ Each step is represented as a checkbox in a markdown plan file (`.ralph/`). Step
 
 ## 8.3 Tiered CLI Tool Selection
 
-Auto-slopp supports multiple AI-powered CLI tools with automatic selection:
+Auto-slopp defines CLI tool configurations in code as a Pydantic `List[CLIConfiguration]`:
 
 ```
-Task Difficulty: {min: 0, max: 10, recommended: 5}
+Default CLI Configurations:
+┌────────────┬──────────┬──────────────────────────────────┐
+│ Tool       │ Capability│ Name                          │
+├────────────┼──────────┼──────────────────────────────────┤
+│ pi         │ 6        │ pi Qwen3.6-35B-A3B             │
+│ opencode   │ 7        │ opencode nemotron-3-ultra-free │
+│ opencode   │ 8        │ opencode gpt-5                  │
+│ opencode   │ 9        │ opencode gpt-5-mini             │
+└────────────┴──────────┴──────────────────────────────────┘
 
-Available Tools:
-┌────────────┬──────────┬──────────────────┐
-│ Tool       │ Capability│ Status          │
-├────────────┼──────────┼──────────────────┤
-│ gemini     │ 8        │ ✓ Healthy       │
-│ codex      │ 5        │ ✓ Healthy       │
-│ opencode   │ 5        │ ✓ Healthy       │
-│ opencode   │ 2        │ ✓ Healthy       │
-└────────────┴──────────┴──────────────────┘
+Task Difficulty: {min: 0, max: 10, recommended: 10}
 
-Selection: codex (capability 5, closest to recommended 5)
+Selection: opencode gpt-5-mini (capability 9, closest to recommended 10)
 ```
 
 **Filtering**: Tools outside `[min_rating, max_rating]` are excluded.
-**Ranking**: Tools are sorted by closeness to `recommended_rating`.
-**Cooldown**: Failing tools enter cooldown for `cooldown_seconds`.
+**Ranking**: Tools are sorted by closeness to `recommended_rating` (lower index preferred on tie).
+**Cooldown**: Failing tools enter cooldown for `cooldown_seconds` (configurable per tool).
 **Health Probe**: All tools are probed on startup; unhealthy ones start in cooldown.
+**Blacklisting**: Tools can be blacklisted for specific task types via `blacklist_tasks`.
+
+Task difficulty ratings are defined per-task-type:
+- `task_planning`: min=0, max=10, recommended=10
+- `implementation`: min=5, max=10, recommended=10
+- `task_implementation_validation`: min=0, max=10, recommended=6
+- `remaining_steps_update`: min=0, max=10, recommended=4
+- `pr_description`: min=0, max=10, recommended=1
+- `pr_review`: min=0, max=10, recommended=4
+- `git_checkout`: min=0, max=10, recommended=2
+- `default`: min=0, max=10, recommended=5
 
 ## 8.4 Comment Condensation (GitHub)
 
@@ -116,16 +127,27 @@ main ─────────────────────────
 3. If changes exist, create PR via task source
 4. Clean up branch after merge
 
-## 8.6 Worker Discovery
+## 8.6 Worker Registration
 
-Workers are discovered dynamically from the `src/auto_slopp/workers/` package:
+Workers are registered in a hardcoded list in `executor.py`:
 
-1. Scan for Python modules in the workers directory
-2. Import each module
-3. Find classes that inherit from `Worker` (but are not `Worker` itself)
-4. Execute each discovered worker
+```python
+ALL_WORKERS: list[Type[Worker]] = [
+    GitHubIssueWorker,
+    PRWorker,
+    StaleBranchCleanupWorker,
+    VikunjaWorker,
+    PrReviewWorker,
+]
+```
 
-This allows adding new workers by simply creating a new file in `workers/`.
+**Adding a new worker**:
+1. Create a new file in `workers/` (e.g., `jira_worker.py`)
+2. Implement the `Worker` base class with `run(repo_path)` method
+3. Add the worker class to `ALL_WORKERS` in `executor.py`
+4. Import it in `workers/__init__.py`
+
+**Disabling workers**: Set `AUTO_SLOPP_WORKERS_DISABLED` to a comma-separated list of worker class names (e.g., `"StaleBranchCleanupWorker,PrReviewWorker"`).
 
 ## 8.7 Logging Architecture
 

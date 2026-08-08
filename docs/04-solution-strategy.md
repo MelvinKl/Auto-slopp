@@ -34,12 +34,13 @@
 
 ### Tiered CLI Tool Selection
 
-**Decision**: Configure multiple CLI tools with capability ratings (0-10) and automatically select based on task difficulty.
+**Decision**: Define multiple CLI tool configurations as a Pydantic `List[CLIConfiguration]` with capability ratings (0-10), automatically selecting based on task difficulty.
 
-**Rationale**: Matches task complexity with appropriate tool sophistication. Simpler tasks use faster/cheaper tools; complex tasks use more capable ones.
+**Rationale**: Matches task complexity with appropriate tool sophistication. Simpler tasks use faster/cheaper tools; complex tasks use more capable ones. Configurations are defined in code with sensible defaults.
 
 **Alternatives Considered**:
 - Single CLI tool — Rejected: not flexible enough for varying task complexity
+- JSON env var configuration — Rejected: harder to validate, less type-safe
 - Manual tool selection — Rejected: requires human intervention
 
 ## 4.2 Key Technical Decisions
@@ -51,6 +52,8 @@ All configuration uses Pydantic `BaseSettings` with `AUTO_SLOPP_` environment va
 - Automatic validation
 - Environment variable mapping
 - `.env` file support
+- Default values baked into code (e.g., default CLI configurations, task difficulty ratings)
+- Overrides via `.env` file or environment variables
 
 ### Async Logging
 
@@ -80,10 +83,11 @@ Each task creates a dedicated git branch:
 |-------|-----------|
 | Language | Python 3.14+ |
 | Package Manager | uv |
-| Configuration | Pydantic BaseSettings |
+| Configuration | Pydantic BaseSettings (`pydantic-settings`) |
 | HTTP Client | httpx (async) |
 | Logging | Python logging + Telegram handler |
 | Testing | pytest |
 | Code Quality | black, isort, flake8, safety, bandit |
 | CI/CD | GitHub Actions |
 | Deployment | Docker, systemd |
+| Default CLI Tools | pi (Qwen3.6-35B-A3B), opencode (multiple models) |

@@ -99,10 +99,13 @@ Entry point that orchestrates initialization:
 ### Executor (`executor.py`)
 
 Manages the worker lifecycle:
-1. Discovers worker classes from `src/auto_slopp/workers/`
-2. Instantiates each worker
-3. Calls `run(repo_path)` on each
-4. Aggregates results
+1. Uses a predefined list of workers (`ALL_WORKERS`) — not dynamic discovery
+2. Filters out disabled workers via `AUTO_SLOPP_WORKERS_DISABLED` setting
+3. Instantiates each enabled worker
+4. Calls `run(repo_path)` on each worker for every subdirectory in `base_repo_path`
+5. Handles exceptions per-worker (one failure doesn't stop others)
+6. Runs in an endless loop with configurable sleep interval
+7. Checks for git updates and can auto-reboot
 
 ### IssueWorker (`workers/issue_worker.py`)
 
@@ -123,10 +126,12 @@ Structured 5-step task execution:
 ### Tiered CLI Executor (`utils/cli_executor.py`)
 
 Selects and executes CLI tools:
-1. Filters tools by task difficulty range (min/max rating)
-2. Prefers tools closest to recommended rating
-3. Handles cooldown for failing tools
-4. Probes tool health on startup
+1. Uses `settings.cli_configurations` (Pydantic model, not JSON env var)
+2. Filters tools by task difficulty range (min/max rating from `task_difficulties`)
+3. Prefers tools closest to recommended rating
+4. Handles cooldown for failing tools (configurable per-tool)
+5. Probes tool health on startup via `_check_startup_health()`
+6. Maintains per-tool cooldown state to avoid repeated failures
 
 ## 5.4 Data Flow
 

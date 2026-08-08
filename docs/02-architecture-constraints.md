@@ -18,7 +18,7 @@
 | `gh` CLI | GitHub API access | Requires `GH_TOKEN` environment variable |
 | Telegram Bot API | Real-time notifications | Requires bot token and chat ID |
 | Vikunja API | Task management (optional) | Requires Vikunja instance URL and token |
-| CLI tools (opencode, gemini, codex) | AI task execution | Configurable via `AUTO_SLOPP_CLI_CONFIGURATIONS` |
+| CLI tools (pi, opencode) | AI task execution | Configurable in `settings/main.py` as `CLIConfiguration` list |
 
 ### Security Constraints
 
@@ -77,4 +77,4 @@ Key decisions that constrain the architecture:
 2. **Abstract Worker Interface** — All workers must inherit from `Worker` base class with `run(repo_path)` method
 3. **TaskSource Abstraction** — Task loading is abstracted behind `TaskSource` interface
 4. **Ralph Loop** — Task execution follows a fixed 5-step pattern (Analyze, Implement, Test, Document, Validate)
-5. **Tiered CLI Selection** — Multiple CLI tools can be configured with capability ratings (0-10)
+5. **Tiered CLI Selection** — CLI tools defined in code with capability ratings (0-10), automatically selected based on task difficulty

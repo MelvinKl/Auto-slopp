@@ -36,11 +36,13 @@
 
 **Status**: Accepted
 **Context**: Different tasks have different complexity; a single CLI tool is insufficient.
-**Decision**: Support multiple CLI tools with capability ratings (0-10), automatic selection based on task difficulty.
+**Decision**: Define multiple CLI tool configurations as a Pydantic `List[CLIConfiguration]` with capability ratings (0-10), automatic selection based on task difficulty.
 **Consequences**:
 - (+) Optimal tool selection for task complexity
 - (+) Fallback to simpler tools for easy tasks
-- (-) Configuration is complex (JSON in environment variable)
+- (+) Type-safe configuration with validation
+- (+) Sensible defaults baked into code
+- (-) Adding new tools requires code changes (not just env vars)
 - (-) Tool health must be monitored and managed
 
 ## AD-05: Pydantic Settings
