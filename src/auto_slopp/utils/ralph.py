@@ -8,12 +8,15 @@ This module provides a mechanism for:
 
 import logging
 import re
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from auto_slopp.constants import UNAVAILABILITY_PATTERNS as _UNAVAILABILITY_PATTERNS
+from auto_slopp.utils.cli_executor import _cli_states
+from settings.main import settings
 
 logger = logging.getLogger(__name__)
 
@@ -697,12 +700,26 @@ class RalphExecutor:
             return False
 
         error_lower = error.lower()
+        error_indicates_unavailable = any(pattern in error_lower for pattern in self.UNAVAILABILITY_PATTERNS)
 
-        # Timeout errors indicate the LLM/CLI tool is not responding
-        if "timed out" in error_lower:
-            return True
+        # Also check if all CLI configurations are inactive (in cooldown) and
+        # cooldown hasn't expired — aligns with IssueWorker._is_llm_unavailable.
+        all_clis_inactive = False
+        cli_configs = settings.cli_configurations
+        if cli_configs and _cli_states:
+            now = time.time()
+            num_configs = len(cli_configs)
+            if num_configs > 0:
+                all_clis_inactive = True
+                for i in range(num_configs):
+                    state = _cli_states.get(i, {"active": True, "cooldown_until": 0.0})
+                    # CLI is available if active, or if inactive but cooldown
+                    # has expired
+                    if state.get("active", True) or now >= state.get("cooldown_until", 0.0):
+                        all_clis_inactive = False
+                        break
 
-        return any(pattern in error_lower for pattern in self.UNAVAILABILITY_PATTERNS)
+        return error_indicates_unavailable or all_clis_inactive
 
     def _step_is_closed(self, task_path: Path, step_number: int) -> bool:
         """Check whether a step is marked as completed in the task file."""
