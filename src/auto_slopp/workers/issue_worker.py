@@ -140,7 +140,7 @@ class IssueWorker(Worker):
             task_result = self._process_single_task(repo_path, task)
             results["task_results"].append(task_result)
 
-            if task_result.get("success") is None or task_result.get("skipped"):
+            if task_result.get("success") is None:
                 results["tasks_skipped"] += 1
                 self.logger.info(f"Task #{task.id} skipped: {task_result.get('skip_reason', 'Unknown')}")
             elif task_result["success"]:
@@ -369,10 +369,7 @@ class IssueWorker(Worker):
                     elif self._is_llm_unavailable(ralph_error):
                         self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
                         self.task_source.on_skip(task)
-                        result["success"] = True
-                        result["skipped"] = True
-                        result["skip_reason"] = ralph_error
-                        return result
+                        return self._skip_task(repo_dir, task, skip_reason=ralph_error)
                     elif self._is_permanent_error(ralph_error):
                         self.logger.error(f"Permanent error detected for task #{task_id}: {ralph_error}")
                         self.task_source.on_task_failure(task, ralph_error)
@@ -410,10 +407,7 @@ class IssueWorker(Worker):
                     if self._is_llm_unavailable(error_msg):
                         self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
                         self.task_source.on_skip(task)
-                        result["success"] = True
-                        result["skipped"] = True
-                        result["skip_reason"] = error_msg
-                        return result
+                        return self._skip_task(repo_dir, task, skip_reason=error_msg)
                     elif self._is_permanent_error(error_msg):
                         self.logger.error(f"Permanent error detected for task #{task_id}: {error_msg}")
                         self.task_source.on_task_failure(task, error_msg)
@@ -426,10 +420,7 @@ class IssueWorker(Worker):
                 if self._is_llm_unavailable(""):
                     self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
                     self.task_source.on_skip(task)
-                    result["success"] = True
-                    result["skipped"] = True
-                    result["skip_reason"] = "LLM unavailable - no changes made"
-                    return result
+                    return self._skip_task(repo_dir, task, skip_reason="LLM unavailable - no changes made")
 
                 self.logger.info(f"No changes made for task #{task_id}, closing task")
                 self.task_source.on_no_changes(task)
@@ -451,10 +442,7 @@ class IssueWorker(Worker):
                 if self._is_llm_unavailable(""):
                     self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
                     self.task_source.on_skip(task)
-                    result["success"] = True
-                    result["skipped"] = True
-                    result["skip_reason"] = "LLM unavailable - no changes made"
-                    return result
+                    return self._skip_task(repo_dir, task, skip_reason="LLM unavailable - no changes made")
 
                 self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue")
                 # Clean up the branch since no work was done
@@ -610,7 +598,7 @@ class IssueWorker(Worker):
 
         return result
 
-    def _skip_task(self, repo_dir: Path, task: Task) -> Dict[str, Any]:
+    def _skip_task(self, repo_dir: Path, task: Task, skip_reason: str = "") -> Dict[str, Any]:
         """Create a properly structured result dict for a skipped task.
 
         The canonical skip signal is `success=None` (in addition to `status='skipped'`).
@@ -620,6 +608,7 @@ class IssueWorker(Worker):
         Args:
             repo_dir: Path to the repository directory
             task: The task that was skipped
+            skip_reason: Optional reason for skipping the task
 
         Returns:
             Result dict with status='skipped' and success=None (the canonical skip signal)
@@ -627,6 +616,8 @@ class IssueWorker(Worker):
         result = self._create_base_result(repo_dir, task)
         result["success"] = None
         result["status"] = "skipped"
+        if skip_reason:
+            result["skip_reason"] = skip_reason
         return result
 
     def _build_instructions(

@@ -1181,8 +1181,8 @@ class TestIssueWorker:
         assert result["tasks_processed"] == 0
         assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is True
-        assert result["task_results"][0]["skipped"] is True
+        assert result["task_results"][0]["success"] is None
+        assert result["task_results"][0]["status"] == "skipped"
         assert "skip_reason" in result["task_results"][0]
         assert task_source.on_skip_called is True
         assert task_source.on_task_failure_called is False
@@ -1208,8 +1208,8 @@ class TestIssueWorker:
         assert result["tasks_processed"] == 0
         assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is True
-        assert result["task_results"][0]["skipped"] is True
+        assert result["task_results"][0]["success"] is None
+        assert result["task_results"][0]["status"] == "skipped"
         assert "skip_reason" in result["task_results"][0]
         assert task_source.on_skip_called is True
         assert task_source.on_task_failure_called is False
@@ -1386,8 +1386,8 @@ class TestIssueWorker:
         assert result["tasks_processed"] == 0
         assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is True
-        assert result["task_results"][0]["skipped"] is True
+        assert result["task_results"][0]["success"] is None
+        assert result["task_results"][0]["status"] == "skipped"
         assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no changes made"
         assert task_source.on_skip_called is True
         assert task_source.on_no_changes_called is False
@@ -1436,8 +1436,8 @@ class TestIssueWorker:
         assert result["tasks_processed"] == 0
         assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is True
-        assert result["task_results"][0]["skipped"] is True
+        assert result["task_results"][0]["success"] is None
+        assert result["task_results"][0]["status"] == "skipped"
         assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no changes made"
         assert task_source.on_skip_called is True
         assert task_source.on_no_changes_called is False
