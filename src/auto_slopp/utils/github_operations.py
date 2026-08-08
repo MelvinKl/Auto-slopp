@@ -142,12 +142,20 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
     try:
         # Use GraphQL API to get comments with databaseId (needed for deletion)
         # gh issue view --json comments doesn't expose databaseId
+        owner = settings.github_issue_worker_allowed_creator
+        repo = repo_dir.name
+        query = (
+            '{ repository(owner: "' + owner + '", name: "' + repo + '") '
+            '{ issue(number: ' + str(issue_number) + ') '
+            '{ comments(first: 100) '
+            '{ nodes { id databaseId body author { login } createdAt } } } } }'
+        )
         result = _run_gh_command(
             repo_dir,
             "api",
             "graphql",
             "-f",
-            f'query={{ repository(owner: "{settings.github_issue_worker_allowed_creator}", name: "{repo_dir.name}") {{ issue(number: {issue_number}}) {{ comments(first: 100) {{ nodes {{ id databaseId body author {{ login }} createdAt }} }} }} }} }}',
+            "query=" + query,
             check=False,
         )
 
