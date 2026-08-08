@@ -375,6 +375,7 @@ class IssueWorker(Worker):
                     else:
                         self.task_source.on_task_failure(task, ralph_error)
 
+                    result["task_completed"] = False
                     return result
 
                 result["openagent_executed"] = True
@@ -412,6 +413,8 @@ class IssueWorker(Worker):
                         self.task_source.on_task_failure(task, error_msg)
                     else:
                         self.task_source.on_task_failure(task, error_msg)
+
+                    result["task_completed"] = False
                     return result
 
             current_branch = get_current_branch(repo_dir)
