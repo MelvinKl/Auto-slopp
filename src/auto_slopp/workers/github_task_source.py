@@ -302,8 +302,8 @@ class GitHubTaskSource(TaskSource):
     def on_skip(self, task: Task) -> None:
         """Called when a task should be skipped (e.g., when LLM is unavailable).
 
-        Logs the skip. No comment is posted to the issue - skip information
-        is only recorded in the logs. The required label is NOT removed so
+        No comment is posted to the issue - skip information is only recorded
+        in the logs. The required label is NOT removed so
         the task can be retried when the LLM becomes available.
 
         Args:
