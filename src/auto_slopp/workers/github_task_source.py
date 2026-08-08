@@ -306,6 +306,9 @@ class GitHubTaskSource(TaskSource):
         in the logs. The required label is NOT removed so
         the task can be retried when the LLM becomes available.
 
+        Skip events are still logged for observability, so future maintainers
+        understand the information isn't lost, just moved to logs.
+
         Args:
             task: The task that should be skipped
         """
@@ -315,7 +318,7 @@ class GitHubTaskSource(TaskSource):
             return
 
         # No GitHub comment is posted for skips — skip events are logged-only
-        # to avoid cluttering issues with "skipped" noise. The label is preserved
+        # to avoid cluttering issues with skip notifications. The label is preserved
         # so the task can be retried when the LLM becomes available.
         logger.info(f"Skipped issue #{task.id} - LLM unavailable, label preserved for retry")
 
