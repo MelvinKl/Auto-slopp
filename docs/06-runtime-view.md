@@ -24,8 +24,8 @@
    - Console handler (all levels)
    - File handler (WARNING+, rotating) if `AUTO_SLOPP_LOG_FILE_DIR` is set
    - Telegram handler (WARNING+) if `AUTO_SLOPP_TELEGRAM_ENABLED=true`
-4. **Worker Discovery**: Scan `src/auto_slopp/workers/` for `Worker` subclasses
-5. **Executor Creation**: Pass search path to `Executor`
+4. **Worker Setup**: Use hardcoded `ALL_WORKERS` list from `executor.py` (no dynamic discovery)
+5. **Executor Creation**: Initialize `Executor` with `repo_path`
 
 ## 6.2 Execution Sequence
 
@@ -82,18 +82,25 @@ Each worker's `run(repo_path)` is called independently. Failures in one worker d
                                                       ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         GitHubTaskSource                            │
-│  • get_tasks: gh CLI → list issues with label "ai"                │
-│  • get_branch_name: "ai/issue-<number>-<title>"                    │
-│  • on_task_complete: Create PR via gh CLI                          │
-│  • Comment condensation: merge author comments into one            │
+│  • get_tasks: gh CLI → get_open_issues → filter by label/creator  │
+│  • get_branch_name: "ai/issue-<number>-<sanitized-title>"          │
+│  • get_pr_title: "#<number>: <title>"                              │
+│  • on_task_complete: Close issue, add PR comment, remove label     │
+│  • Comment condensation: AI-summarize author comments, delete originals │
+│  • on_no_changes: Close issue if no evidence of work               │
+│  • on_skip: Comment on issue about LLM unavailability              │
+│  • on_max_iterations_reached: Comment and remove label             │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         VikunjaTaskSource                           │
 │  • get_tasks: Vikunja API → list open tasks with tag "ai"          │
-│  • get_branch_name: "ai/vikunja-<task-id>-<title>"                 │
-│  • on_task_complete: Update task status via API                    │
-│  • Create subtasks and PRs based on processing results             │
+│  • get_branch_name: "ai/vikunja-<task-id>-<sanitized-title>"       │
+│  • get_pr_title: "<title>"                                         │
+│  • on_task_complete: Update task status via API, create subtasks/PRs │
+│  • on_no_changes: Update task status without creating PR           │
+│  • on_skip: Update task with skip reason                           │
+│  • on_max_iterations_reached: Update task with failure info        │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 

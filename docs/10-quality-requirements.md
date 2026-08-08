@@ -8,7 +8,7 @@ Auto-slopp Quality Attributes
 ├── Extensibility (High Priority)
 │   ├── Add new worker type: < 1 hour of work (inherit Worker, implement run())
 │   ├── Add new task source: < 1 day of work (implement TaskSource interface)
-│   └── Add new CLI tool: Update JSON config, no code changes
+│   └── Add new CLI tool: Update `settings/main.py` (code change required)
 │
 ├── Configurability (High Priority)
 │   ├── All settings via environment variables: ✓
@@ -43,7 +43,7 @@ Auto-slopp Quality Attributes
 |----------|--------------|
 | Add a new worker type (e.g., `JiraWorker`) | Create `jira_worker.py` inheriting from `Worker`, implement `run()`, add to `ALL_WORKERS` in `executor.py`. |
 | Add a new task source (e.g., `JiraTaskSource`) | Implement `TaskSource` interface methods, create worker wrapper. ~1 day of work. |
-| Add a new CLI tool | Add `CLIConfiguration` to `cli_configurations` in `settings/main.py`. Code change required. |
+| Add a new CLI tool | Add `CLIConfiguration` to `cli_configurations` in `settings/main.py`. Code change required. | ~15 minutes |
 
 ### Configurability
 
@@ -52,7 +52,7 @@ Auto-slopp Quality Attributes
 | Change base repository path | Set `AUTO_SLOPP_BASE_REPO_PATH` or use `--repo-path` |
 | Enable/disable a worker | Update `AUTO_SLOPP_WORKERS_DISABLED` JSON array |
 | Change Telegram settings | Update `AUTO_SLOPP_TELEGRAM_*` environment variables |
-| Change CLI tool configuration | Update `AUTO_SLOPP_CLI_CONFIGURATIONS` JSON |
+| Change CLI tool configuration | Update `cli_configurations` in `settings/main.py` (code change) or use `AUTO_SLOPP_CLI_CONFIGURATIONS` env var (JSON) |
 
 ### Observability
 

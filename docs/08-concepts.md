@@ -32,37 +32,91 @@ The `TaskSource` interface decouples task processing logic from task loading log
 
 ## 8.2 Ralph Loop
 
-The Ralph loop is a structured 5-step execution pattern for processing tasks:
+The Ralph loop is a structured step-based task execution system. It works with markdown plan files stored in `.ralph/` directories:
 
 ```
 ┌──────────────────────────────────────────────────────┐
 │                    Ralph Loop                         │
 │                                                       │
-│  ┌─────────┐    ┌─────────┐    ┌─────────┐          │
-│  │ Analyze │───▶│Implement│───▶│  Test   │          │
-│  └─────────┘    └─────────┘    └─────────┘          │
-│       ▲                              │               │
-│       │         ┌─────────┐          │               │
-│       └─────────│Document │◀─────────┘               │
-│                 └────┬────┘                          │
-│                      │                               │
-│                      ▼                               │
-│               ┌─────────┐                            │
-│               │Validate │                            │
-│               │(make     │                            │
-│               │ test)   │                            │
-│               └────┬────┘                            │
-│                    │                                  │
-│              ┌─────┴─────┐                            │
-│              │           │                            │
-│              ▼           ▼                            │
-│         ┌─────────┐ ┌─────────┐                      │
-│         │Success  │ │Max Iter.│                      │
-│         └─────────┘ └─────────┘                      │
+│  Phase 1: Task Planning                               │
+│  ┌──────────────┐    ┌──────────────┐                │
+│  │ Create Task  │───▶│  Refine via  │                │
+│  │ File         │    │   CLI (LLM)  │                │
+│  └──────────────┘    └──────┬───────┘                │
+│                             │                        │
+│  Phase 2: Step Execution Loop                          │
+│  ┌──────────────┐    ┌──────────────┐                │
+│  │  Get Next    │───▶│ Execute Step │                │
+│  │  Open Step   │    │  via CLI     │                │
+│  └──────────────┘    └──────┬───────┘                │
+│                             │                        │
+│              ┌──────────────┴───────┐                │
+│              │                      │                │
+│              ▼                      ▼                │
+│         ┌──────────┐       ┌──────────────┐         │
+│         │ Step      │       │ Mark Closed  │         │
+│         │ Failed?   │────▶│ + Commit     │         │
+│         └──────────┘       └──────────────┘         │
+│              │                      │                │
+│              └──────────────┬───────┘                │
+│                             │                        │
+│  Phase 3: Final Validation                             │
+│  ┌──────────────┐    ┌──────────────┐                │
+│  │ All Steps    │───▶│ Final        │                │
+│  │ Completed?   │    │ Acceptance   │                │
+│  └──────────────┘    │ Check via    │                │
+│                       │ CLI (LLM)    │                │
+│                       └──────┬───────┘                │
+│                              │                        │
+│                    ┌─────────┴─────────┐             │
+│                    │                   │             │
+│                    ▼                   ▼             │
+│               ┌──────────┐    ┌──────────────┐      │
+│               │ Success  │    │ Delete file  │      │
+│               │          │    │ for retry    │      │
+│               └──────────┘    └──────────────┘      │
 └──────────────────────────────────────────────────────┘
 ```
 
-Each step is represented as a checkbox in a markdown plan file (`.ralph/`). Steps execute sequentially. Completed steps are committed automatically. If the final validation (`make test`) fails, the task file is deleted for a fresh start on next iteration.
+### Task File Format
+
+Each task is stored as a markdown file in `.ralph/<prefix>-<issue-number>.md`:
+
+```markdown
+# Task: Issue Title
+
+Task Number: 42
+Branch: ai/issue-42-fix-bug
+
+## Required Task
+
+[Issue description]
+
+## Steps
+
+- [ ] 1. Analyze the required implementation changes.
+  - Acceptance Criteria:
+    - The affected files and expected behavior are clearly identified.
+- [ ] 2. Implement the required code changes.
+  - Acceptance Criteria:
+    - Code changes are applied in the correct files.
+...
+```
+
+### Execution Phases
+
+1. **Task Planning**: Create initial task file, then refine it via CLI (LLM) into concrete steps with acceptance criteria
+2. **Step Execution Loop**: Execute each open step sequentially, committing after each completed step
+3. **Final Validation**: When all steps are complete, run a final acceptance check via CLI
+
+### Key Behaviors
+
+- Steps are represented as checkboxes (`[ ]` / `[x]`) in markdown
+- Completed steps are committed automatically
+- If final validation fails, the task file is deleted for a fresh start on next iteration
+- The last step always verifies that `make test` succeeds
+- If a change affects user-facing behavior, a step to update documentation is included before the final test step
+- Max iterations configurable via `AUTO_SLOPP_RALPH_MAX_LOOPS` (default: 500)
 
 ## 8.3 Tiered CLI Tool Selection
 
@@ -140,6 +194,13 @@ ALL_WORKERS: list[Type[Worker]] = [
     PrReviewWorker,
 ]
 ```
+
+**Worker types**:
+- `GitHubIssueWorker`: Processes GitHub issues (wrapper around `IssueWorker` + `GitHubTaskSource`)
+- `PRWorker`: Tests open PR branches and fixes failing tests
+- `StaleBranchCleanupWorker`: Cleans up local branches without remote tracking
+- `VikunjaWorker`: Processes Vikunja tasks (wrapper around `IssueWorker` + `VikunjaTaskSource`)
+- `PrReviewWorker`: Reviews PRs with the "AI Review" label
 
 **Adding a new worker**:
 1. Create a new file in `workers/` (e.g., `jira_worker.py`)
