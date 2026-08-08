@@ -140,12 +140,14 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
         GitHubOperationError: If gh command fails
     """
     try:
+        # Use GraphQL API to get comments with databaseId (needed for deletion)
+        # gh issue view --json comments doesn't expose databaseId
         result = _run_gh_command(
             repo_dir,
-            "issue",
-            "view",
-            str(issue_number),
-            "--json=comments",
+            "api",
+            "graphql",
+            "-f",
+            f'query={{ repository(owner: "{settings.github_issue_worker_allowed_creator}", name: "{repo_dir.name}") {{ issue(number: {issue_number}}) {{ comments(first: 100) {{ nodes {{ id databaseId body author {{ login }} createdAt }} }} }} }} }}',
             check=False,
         )
 
@@ -155,8 +157,14 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
             return []
 
         data = json.loads(result.stdout)
-        # Extract comments from the issue view response
-        raw_comments = data.get("comments", [])
+        # Extract comments from GraphQL response
+        raw_comments = (
+            data.get("data", {})
+            .get("repository", {})
+            .get("issue", {})
+            .get("comments", {})
+            .get("nodes", [])
+        )
         logger.debug(
             f"[GetComments] Fetched {len(raw_comments)} raw comments for issue #{issue_number} in {repo_dir.name}"
         )
@@ -167,6 +175,7 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
             comments.append(
                 {
                     "id": comment.get("id"),
+                    "databaseId": comment.get("databaseId"),
                     "body": comment.get("body", ""),
                     "author": comment.get("author", {}).get("login") if comment.get("author") else None,
                     "createdAt": comment.get("createdAt"),
