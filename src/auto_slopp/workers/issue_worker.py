@@ -368,7 +368,6 @@ class IssueWorker(Worker):
                         )
                     elif self._is_llm_unavailable(ralph_error):
                         self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                        self.task_source.on_skip(task)
                         return self._skip_task(repo_dir, task, skip_reason=ralph_error)
                     elif self._is_permanent_error(ralph_error):
                         self.logger.error(f"Permanent error detected for task #{task_id}: {ralph_error}")
@@ -407,7 +406,6 @@ class IssueWorker(Worker):
                     result["error"] = error_msg
                     if self._is_llm_unavailable(error_msg):
                         self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                        self.task_source.on_skip(task)
                         return self._skip_task(repo_dir, task, skip_reason=error_msg)
                     elif self._is_permanent_error(error_msg):
                         self.logger.error(f"Permanent error detected for task #{task_id}: {error_msg}")
@@ -422,7 +420,6 @@ class IssueWorker(Worker):
             if current_branch in ("main", "master"):
                 if self._is_llm_unavailable(""):
                     self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                    self.task_source.on_skip(task)
                     return self._skip_task(repo_dir, task, skip_reason="LLM unavailable - no changes made")
 
                 self.logger.info(f"No changes made for task #{task_id}, closing task")
@@ -444,7 +441,6 @@ class IssueWorker(Worker):
             if ahead_count == 0:
                 if self._is_llm_unavailable(""):
                     self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                    self.task_source.on_skip(task)
                     return self._skip_task(repo_dir, task, skip_reason="LLM unavailable - no changes made")
 
                 self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue")
@@ -626,6 +622,7 @@ class IssueWorker(Worker):
         result["status"] = "skipped"
         if skip_reason:
             result["skip_reason"] = skip_reason
+        self.task_source.on_skip(task)
         return result
 
     def _build_instructions(
