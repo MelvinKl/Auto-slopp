@@ -1049,20 +1049,28 @@ AUTO_SLOPP_TELEGRAM_PARSE_MODE=HTML
 
 ## Documentation
 
-For comprehensive documentation, see the [docs/](docs/) directory:
+The project uses [Arc 42](https://arc42.org/) for architecture documentation, split across multiple markdown files in the [docs/](docs/) directory.
 
-### User Documentation
-- **[Telegram Logging Guide](docs/telegram-logging.md)** - Complete setup and configuration guide
+### Architecture Documentation (Arc 42)
 
-### Developer Documentation
-- **[API Reference](docs/api-reference.md)** - Complete API documentation
-- **[Development Guide](docs/development-guide.md)** - Development setup and workflow
-- **[Architecture Overview](docs/architecture.md)** - System architecture and design
-- **[Contributing Guide](docs/contributing.md)** - Contribution guidelines
+| # | Chapter | File |
+|---|---------|------|
+| 1 | Introduction and Goals | [docs/01-introduction-and-goals.md](docs/01-introduction-and-goals.md) |
+| 2 | Architecture Constraints | [docs/02-architecture-constraints.md](docs/02-architecture-constraints.md) |
+| 3 | Context and Scope | [docs/03-context-and-scope.md](docs/03-context-and-scope.md) |
+| 4 | Solution Strategy | [docs/04-solution-strategy.md](docs/04-solution-strategy.md) |
+| 5 | Building Block View | [docs/05-building-block-view.md](docs/05-building-block-view.md) |
+| 6 | Runtime View | [docs/06-runtime-view.md](docs/06-runtime-view.md) |
+| 7 | Deployment View | [docs/07-deployment-view.md](docs/07-deployment-view.md) |
+| 8 | Concepts | [docs/08-concepts.md](docs/08-concepts.md) |
+| 9 | Design Decisions | [docs/09-design-decisions.md](docs/09-design-decisions.md) |
+| 10 | Quality Requirements | [docs/10-quality-requirements.md](docs/10-quality-requirements.md) |
+| 11 | Technical Risks | [docs/11-technical-risks.md](docs/11-technical-risks.md) |
+| 12 | Glossary | [docs/12-glossary.md](docs/12-glossary.md) |
 
 ## Telegram Logging
 
-For comprehensive Telegram logging setup and configuration, see the [Telegram Logging Guide](docs/telegram-logging.md).
+For comprehensive Telegram logging setup and configuration, see the [Deployment View](docs/07-deployment-view.md).
 
 ### Quick Setup
 
@@ -1185,7 +1193,7 @@ Log files are automatically rotated using Python's `RotatingFileHandler`:
 - Ensure boolean values use `true`/`false` (case-insensitive)
 
 **Telegram integration not working:**
-- 📖 **See complete guide:** [Telegram Logging Guide](docs/telegram-logging.md#troubleshooting)
+- 📖 **See complete guide:** [Deployment View](docs/07-deployment-view.md)
 - Verify bot token and chat ID are correct
 - Check network connectivity to Telegram API
 - Enable debug mode to see API error details
