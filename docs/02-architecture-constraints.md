@@ -9,7 +9,9 @@
 | Python Version | 3.14 or higher |
 | Package Manager | `uv` (astral-sh/uv) |
 | Virtual Environment | `.venv/` managed by uv |
-| Entry Point | `auto-slopp` CLI command |
+| Entry Point | `auto-slopp` CLI command (from `pyproject.toml`) |
+| OS Support | Linux (primary), macOS (development) |
+| Git Required | Yes — all repository operations use git CLI |
 
 ### External Dependencies
 
@@ -19,6 +21,9 @@
 | Telegram Bot API | Real-time notifications | Requires bot token and chat ID |
 | Vikunja API | Task management (optional) | Requires Vikunja instance URL and token |
 | CLI tools (pi, opencode) | AI task execution | Configurable in `settings/main.py` as `CLIConfiguration` list |
+| httpx | Async HTTP client | Used for Telegram API and retry logic |
+| pydantic / pydantic-settings | Configuration validation | Type-safe settings with env var mapping |
+| python-dotenv | .env file loading | Loads `.env` for default values |
 
 ### Security Constraints
 
@@ -26,6 +31,8 @@
 - **Telegram Token Security**: Bot tokens treated as secrets, stored only in environment variables
 - **HTTPS Only**: All network communication uses HTTPS
 - **No Hardcoded Secrets**: All sensitive configuration via environment variables
+- **PATH Security**: Systemd `PATH` must include `.venv/bin` first to use project dependencies
+- **Docker Volumes**: Repo mounts must be read-write for git operations
 
 ## 2.2 Organizational Constraints
 

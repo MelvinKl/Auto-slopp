@@ -53,6 +53,12 @@ Auto-slopp operates within a broader ecosystem of tools and services:
 - Logging and monitoring (console, file, Telegram)
 - CLI tool selection based on task difficulty ratings
 - Branch management (create, checkout, push, cleanup)
+- PR creation and management
+- Automated PR review with conventional comments
+- Stale branch cleanup
+- GitHub Actions workflow monitoring
+- Comment condensation for GitHub issues
+- Resilient git operations with retry logic
 
 ### Out of Scope
 
@@ -61,6 +67,10 @@ Auto-slopp operates within a broader ecosystem of tools and services:
 - Human review/approval workflows
 - Database or persistent storage (stateless per execution)
 - Web interface or dashboard
+- Email notifications
+- Slack/Discord integration
+- Multi-threaded parallel execution (workers run sequentially)
+- Kubernetes or cloud-native deployment patterns
 
 ## 3.3 Running Environments
 

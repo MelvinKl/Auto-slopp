@@ -19,6 +19,32 @@ Auto-slopp aims to be a general-purpose automation framework that can handle div
 - **Observable**: Comprehensive logging with Telegram integration for real-time monitoring
 - **Modern**: Built with Python 3.14+ using modern tooling (uv, pydantic, type hints)
 
+## 1.3 Problem Statement
+
+Modern development teams face repetitive tasks that consume developer time:
+- Triaging and assigning GitHub issues
+- Reviewing and fixing failing PR tests
+- Managing stale branches across multiple repositories
+- Processing task lists from project management tools
+
+Manual handling of these tasks is error-prone and time-consuming. Auto-slopp automates these workflows using AI-powered CLI tools while maintaining human oversight through PR-based change delivery.
+
+## 1.4 Goals and Non-Goals
+
+### Goals
+- Automate GitHub issue processing with structured task execution
+- Support multiple task sources (GitHub, Vikunja, future sources)
+- Provide reliable, repeatable task processing via the Ralph loop
+- Enable real-time monitoring via Telegram
+- Maintain code quality through automated testing
+
+### Non-Goals
+- Replace human developers or code reviewers
+- Provide a web dashboard or UI
+- Manage CI/CD pipelines directly
+- Replace dedicated project management tools
+- Handle non-git-based workflows
+
 ## 1.3 Quality Goals
 
 ### Quality Tree

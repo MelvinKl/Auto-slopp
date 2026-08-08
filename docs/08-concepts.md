@@ -226,6 +226,95 @@ Three logging outputs, all configurable:
 └─────────────────────────────────────────────────────┘
 ```
 
-- **Console**: All log levels, immediate output
+- **Console**: All log levels, immediate output to stdout
 - **File**: WARNING and above, rotating (10MB × 5 files), enabled via `AUTO_SLOPP_LOG_FILE_DIR`
 - **Telegram**: WARNING and above, async HTTP with retries, enabled via `AUTO_SLOPP_TELEGRAM_ENABLED`
+
+### Telegram Handler Details
+
+The Telegram handler uses `httpx.AsyncClient` with:
+- **Retry logic**: Configurable retry attempts (default: 3) with exponential backoff
+- **Rate limit handling**: Respects `Retry-After` header on 429 responses
+- **HTML escaping**: Special characters (`&`, `<`, `>`) are escaped for HTML parse mode
+- **Error isolation**: Logging errors never break the main application
+
+## 8.8 Vikunja Integration Concept
+
+Vikunja is an open-source task management application. The `VikunjaTaskSource` abstraction allows Auto-slopp to process Vikunja tasks alongside GitHub issues:
+
+```
+┌──────────────────────────────────────────────────────┐
+│                  Vikunja Task Flow                     │
+│                                                       │
+│  1. VikunjaTaskSource.get_tasks()                    │
+│     └── Fetch open tasks from Vikunja API            │
+│     └── Filter by "ai" tag                           │
+│                                                       │
+│  2. IssueWorker processes each task via Ralph loop   │
+│                                                       │
+│  3. On completion:                                   │
+│     ├── Update task status via Vikunja API           │
+│     ├── Create subtasks/PRs as needed                │
+│     └── Update task description with results         │
+│                                                       │
+│  4. On failure:                                      │
+│     └── Update task with failure information         │
+└──────────────────────────────────────────────────────┘
+```
+
+**Key differences from GitHub**: 
+- No PR creation (Vikunja tasks are self-contained)
+- Task status updates instead of issue comments
+- Subtask creation for complex task breakdowns
+- Uses Vikunja API instead of `gh` CLI
+
+## 8.9 PR Review Concept
+
+The `PrReviewWorker` provides automated code review for pull requests:
+
+```
+┌──────────────────────────────────────────────────────┐
+│               PR Review Flow                           │
+│                                                       │
+│  1. Find PRs with "AI" label                         │
+│  2. Get PR diff via `gh pr diff`                     │
+│  3. Send diff to CLI tool for review                 │
+│  4. Parse review output for conventional comments:   │
+│     - "issue:" for problems                           │
+│     - "suggestion:" for improvements                  │
+│     - "nit:" for minor comments                       │
+│     - "question:" for clarifications                  │
+│     - "praise:" for positive feedback                 │
+│     - "chore:" for maintenance suggestions            │
+│  5. Submit review via `gh pr review --comment`       │
+│  6. Remove "AI" label to prevent re-review           │
+└──────────────────────────────────────────────────────┘
+```
+
+**Configuration**:
+- `AUTO_SLOPP_PR_REVIEW_WORKER_REQUIRED_LABEL`: Label to trigger reviews (default: "AI")
+- `AUTO_SLOPP_PR_REVIEW_WORKER_MIN_COMMENTS`: Minimum comments per review (default: 0)
+- `AUTO_SLOPP_PR_REVIEW_WORKER_MAX_COMMENTS`: Maximum comments per review (default: 9)
+
+## 8.10 Health Check Concept
+
+On startup, all CLI tool configurations are probed for health:
+
+```
+┌──────────────────────────────────────────────────────┐
+│            CLI Health Check Flow                       │
+│                                                       │
+│  1. For each CLI configuration:                      │
+│     ├── Send probe: "are you working?"               │
+│     ├── Wait up to 600 seconds                       │
+│     ├── If success: mark as active                   │
+│     └── If failure: place in cooldown                │
+│                                                       │
+│  2. During execution:                                │
+│     ├── Check cooldown expiry on each selection      │
+│     ├── Re-probe failed tools after cooldown         │
+│     └── If recovered: mark as active again           │
+└──────────────────────────────────────────────────────┘
+```
+
+This ensures only healthy tools are used and failed tools auto-recover when they become available again.

@@ -134,6 +134,91 @@ Selects and executes CLI tools:
 5. Probes tool health on startup via `_check_startup_health()`
 6. Maintains per-tool cooldown state to avoid repeated failures
 
+## 5.3.1 Utility Components
+
+### Git Operations (`utils/git_operations.py`)
+
+Core git operations used across all workers:
+
+| Function | Purpose |
+|----------|--------|
+| `checkout_branch_resilient()` | Checkout with retry on failure (reset + clean) |
+| `create_and_checkout_branch()` | Create new branch from base branch |
+| `commit_and_push_changes()` | Stage, commit, and optionally push |
+| `merge_main_into_branch()` | Merge origin/main into current branch |
+| `push_branch()` / `push_to_remote()` | Push branch to remote |
+| `delete_branch()` | Delete local branch |
+| `has_changes()` | Check for uncommitted changes |
+| `get_local_branches()` / `get_remote_branches()` | List branches with metadata |
+| `ensure_ralph_in_gitignore()` | Ensure `.ralph/` is gitignored |
+| `branch_exists()` | Check branch existence |
+| `sanitize_branch_name()` | Sanitize strings for valid git branch names |
+
+All git operations use `_run_git_command()` with configurable timeout and error handling.
+
+### GitHub Operations (`utils/github_operations.py`)
+
+GitHub API operations via `gh` CLI:
+
+| Function | Purpose |
+|----------|--------|
+| `get_open_issues()` | List open issues with metadata |
+| `get_issue_comments()` | Get comments on an issue |
+| `comment_on_issue()` | Add comment to issue |
+| `delete_issue_comment()` | Delete a specific comment |
+| `close_issue()` | Close an issue |
+| `create_pull_request()` | Create PR from branch |
+| `get_open_prs()` / `get_closed_prs()` | List PRs by state |
+| `get_open_prs_with_label()` | Filter PRs by label |
+| `get_pr_for_branch()` | Get PR info for a specific branch |
+| `get_pr_diff()` / `get_pr_files()` | Get PR diff content |
+| `comment_on_pr()` | Add comment to PR |
+| `submit_pr_review()` | Submit review (COMMENT/APPROVE/REQUEST_CHANGES) |
+| `get_workflow_runs_for_branch()` | Get GitHub Actions workflow runs |
+| `remove_label_from_issue()` | Remove label from issue/PR |
+
+All operations use `_run_gh_command()` which loads env from `settings.additional_env_file`.
+
+### Vikunja Operations (`utils/vikunja_operations.py`)
+
+Vikunja task management API operations:
+
+| Function | Purpose |
+|----------|--------|
+| `get_vikunja_tasks()` | List tasks with filtering |
+| `update_task_status()` | Update task completion status |
+| `create_subtask()` | Create subtask under a task |
+| `get_task_by_id()` | Get single task details |
+
+### Branch Analysis (`utils/branch_analysis.py`)
+
+Utilities for stale branch detection:
+
+| Function | Purpose |
+|----------|--------|
+| `identify_stale_branches()` | Find branches older than threshold |
+| `delete_stale_branches()` | Delete stale branches |
+| `analyze_repository_branches()` | Full analysis and cleanup |
+
+### Repository Utils (`utils/repository_utils.py`)
+
+| Function | Purpose |
+|----------|--------|
+| `validate_repository()` | Check if directory is a valid git repo |
+
+### File Operations (`utils/file_operations.py`)
+
+| Function | Purpose |
+|----------|--------|
+| `read_file()` / `write_file()` | Safe file read/write operations |
+| `list_files()` | List files in directory |
+
+### Logging Utils (`utils/logging_util.py`)
+
+| Function | Purpose |
+|----------|--------|
+| `add_file_handler()` | Add rotating file handler to logger |
+
 ## 5.4 Data Flow
 
 ```

@@ -98,3 +98,75 @@
 - (+) Cleaner issue context for AI tools
 - (+) Reduced API calls (fewer comments to process)
 - (-) Original comments are deleted (irreversible)
+
+## AD-10: Hardcoded Worker List
+
+**Status**: Accepted
+**Context**: Workers need to be discoverable and configurable without dynamic file scanning.
+**Decision**: Use a hardcoded `ALL_WORKERS` list in `executor.py` with filtering via `AUTO_SLOPP_WORKERS_DISABLED`.
+**Consequences**:
+- (+) Type-safe worker list
+- (+) Explicit dependency between workers
+- (+) Easy to disable specific workers via env var
+- (-) Adding new workers requires code changes (import + list)
+- (-) No auto-discovery from arbitrary paths
+
+## AD-11: Branch-per-Task Isolation with Auto-Cleanup
+
+**Status**: Accepted
+**Context**: Multiple tasks processing the same repository must not interfere with each other.
+**Decision**: Each task creates a dedicated git branch, processes on that branch, and creates a PR. The `StaleBranchCleanupWorker` handles cleanup of orphaned branches.
+**Consequences**:
+- (+) Tasks are fully isolated
+- (+) Main branch stays clean
+- (+) PRs provide natural review points
+- (+) Automatic cleanup of orphaned branches
+- (-) More git operations per task
+- (-) Requires branch naming convention (`ai/issue-<number>-<title>`)
+
+## AD-12: Resilient Git Operations
+
+**Status**: Accepted
+**Context**: Git operations can fail due to network issues, conflicts, or repository state problems.
+**Decision**: Use resilient checkout with retry (reset + clean) and CLI fallback for complex failures.
+**Consequences**:
+- (+) Graceful handling of checkout failures
+- (+] CLI tools can resolve complex merge conflicts
+- (-) Added complexity in error handling
+- (-] CLI fallback adds execution time
+
+## AD-13: Task File Format in .ralph/
+
+**Status**: Accepted
+**Context**: Task plans need to be human-readable, machine-parsable, and survive restarts.
+**Decision**: Use markdown files with checkbox syntax in `.ralph/` directories (gitignored).
+**Consequences**:
+- (+) Human-readable plan files
+- (+) Checkboxes naturally track progress
+- (+) Survives restarts (state in files)
+- (+) `.ralph/` is gitignored (no clutter)
+- (-) Requires markdown parsing logic
+- (-) File format must be maintained across versions
+
+## AD-14: No Dynamic Worker Discovery
+
+**Status**: Accepted
+**Context**: Dynamic discovery could load arbitrary code from unexpected paths.
+**Decision**: Workers are explicitly imported in `workers/__init__.py` and listed in `ALL_WORKERS`.
+**Consequences**:
+- (+) Security: only known workers can run
+- (+) Type safety via explicit imports
+- (+) Easy to audit which workers exist
+- (-) More boilerplate for new workers
+- (-] Cannot add workers without code changes
+
+## AD-15: GitHub Token Isolation via Additional Env File
+
+**Status**: Accepted
+**Context**: CLI tools spawned by auto-slopp should NOT have access to GitHub credentials.
+**Decision**: `GH_TOKEN` goes in a separate `.gh.env` file outside the project, loaded only via `AUTO_SLOPP_ADDITIONAL_ENV_FILE` for GitHub API calls.
+**Consequences**:
+- (+) Security boundary between auto-slopp and CLI tools
+- (+) CLI tools cannot access GitHub API
+- (-) Users must manage a separate token file
+- (-) Extra configuration step required
