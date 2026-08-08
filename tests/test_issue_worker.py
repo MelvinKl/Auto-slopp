@@ -1772,7 +1772,8 @@ class TestIssueWorker:
         assert "None" in source
         # The guard must NOT also check `status == "skipped"` (no duplication)
         assert 'status == "skipped"' not in source
-        assert "status" not in source.split('"""')[0]  # not in docstring either
+        # The guard must NOT use `task_result.get("status")` as a skip signal
+        assert 'task_result.get("status")' not in source
 
         # Verify that a mock result with success=None AND status="skipped"
         # (matching _skip_task() output) is correctly counted as skipped.
