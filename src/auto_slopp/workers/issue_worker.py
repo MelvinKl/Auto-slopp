@@ -289,6 +289,7 @@ class IssueWorker(Worker):
             "task_id": task.id,
             "task_title": task.title,
             "success": False,
+            "status": "success",
             "openagent_executed": False,
             "openagent_executions": 0,
             "task_completed": False,
