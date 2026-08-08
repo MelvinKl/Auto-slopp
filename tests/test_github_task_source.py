@@ -370,9 +370,9 @@ class TestGitHubTaskSource:
         mock_get_issues.return_value = mock_issues
         # Multiple comments from allowed creator + one from other user
         mock_get_comments.return_value = [
-            {"author": "test-user", "body": "Comment 1", "id": 100},
-            {"author": "test-user", "body": "Comment 2", "id": 200},
-            {"author": "other-user", "body": "Other comment", "id": 300},
+            {"author": "test-user", "body": "Comment 1", "databaseId": 100},
+            {"author": "test-user", "body": "Comment 2", "databaseId": 200},
+            {"author": "other-user", "body": "Other comment", "databaseId": 300},
         ]
         mock_execute.return_value = {"stdout": "Condensed summary", "success": True}
 
@@ -847,9 +847,9 @@ class TestGitHubTaskSource:
         task_source = GitHubTaskSource()
 
         mock_get_comments.return_value = [
-            {"author": {"login": "issue-author"}, "body": "Author comment 1", "id": 100},
-            {"author": {"login": "issue-author"}, "body": "Author comment 2", "id": 101},
-            {"author": {"login": "other-user"}, "body": "Other comment", "id": 200},
+            {"author": {"login": "issue-author"}, "body": "Author comment 1", "databaseId": 100},
+            {"author": {"login": "issue-author"}, "body": "Author comment 2", "databaseId": 101},
+            {"author": {"login": "other-user"}, "body": "Other comment", "databaseId": 200},
         ]
 
         result = task_source._condense_comments(Path("/test"), 42, "issue-author", "allowed-creator")
