@@ -140,12 +140,22 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
         GitHubOperationError: If gh command fails
     """
     try:
+        # Use GraphQL API to get comments with databaseId (needed for deletion)
+        # gh issue view --json comments doesn't expose databaseId
+        owner = settings.github_issue_worker_allowed_creator
+        repo = repo_dir.name
+        query = (
+            '{ repository(owner: "' + owner + '", name: "' + repo + '") '
+            '{ issue(number: ' + str(issue_number) + ') '
+            '{ comments(first: 100) '
+            '{ nodes { id databaseId body author { login } createdAt } } } } }'
+        )
         result = _run_gh_command(
             repo_dir,
-            "issue",
-            "view",
-            str(issue_number),
-            "--json=comments",
+            "api",
+            "graphql",
+            "-f",
+            "query=" + query,
             check=False,
         )
 
@@ -155,8 +165,14 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
             return []
 
         data = json.loads(result.stdout)
-        # Extract comments from the issue view response
-        raw_comments = data.get("comments", [])
+        # Extract comments from GraphQL response
+        raw_comments = (
+            data.get("data", {})
+            .get("repository", {})
+            .get("issue", {})
+            .get("comments", {})
+            .get("nodes", [])
+        )
         logger.debug(
             f"[GetComments] Fetched {len(raw_comments)} raw comments for issue #{issue_number} in {repo_dir.name}"
         )
@@ -167,6 +183,7 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
             comments.append(
                 {
                     "id": comment.get("id"),
+                    "databaseId": comment.get("databaseId"),
                     "body": comment.get("body", ""),
                     "author": comment.get("author", {}).get("login") if comment.get("author") else None,
                     "createdAt": comment.get("createdAt"),
@@ -200,10 +217,28 @@ def delete_issue_comment(repo_dir: Path, issue_number: int, comment_id: int) -> 
     """
     try:
         logger.debug(f"[DeleteComment] Deleting comment {comment_id} from issue #{issue_number} in {repo_dir.name}")
+        # Get repo owner/name from the git remote
+        repo_info_result = _run_gh_command(
+            repo_dir,
+            "repo",
+            "view",
+            "--json",
+            "owner,name",
+            check=False,
+        )
+        if repo_info_result.returncode != 0:
+            logger.error(f"Failed to get repo info for {repo_dir.name}")
+            return False
+        repo_info = json.loads(repo_info_result.stdout)
+        owner = repo_info.get("owner", {}).get("login")
+        repo_name = repo_info.get("name")
+        if not owner or not repo_name:
+            logger.error(f"Could not determine owner/repo for {repo_dir.name}")
+            return False
         result = _run_gh_command(
             repo_dir,
             "api",
-            f"repos/{settings.github_owner}/{settings.github_repo}/issues/comments/{comment_id}",
+            f"repos/{owner}/{repo_name}/issues/comments/{comment_id}",
             "-X",
             "DELETE",
             check=False,
