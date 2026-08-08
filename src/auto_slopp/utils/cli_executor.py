@@ -161,7 +161,16 @@ def _execute_command(
     capture_output: bool,
     start_time: Optional[float] = None,
 ) -> Dict[str, Any]:
-    """Execute a fully built command and return standardized result data."""
+    """Execute a fully built command and return standardized result data.
+
+    Args:
+        cli_command: Name of the CLI command being executed.
+        cmd: Full command list to pass to subprocess.run.
+        working_dir: Working directory for command execution.
+        timeout: Timeout in seconds, or None for no timeout.
+        capture_output: Whether to capture stdout/stderr.
+        start_time: Optional start time for measuring execution duration.
+    """
     command_start = start_time if start_time is not None else time.time()
 
     try:
