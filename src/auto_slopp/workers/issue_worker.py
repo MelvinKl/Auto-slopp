@@ -481,6 +481,7 @@ class IssueWorker(Worker):
                     result["error"] = error_msg
                     result["status"] = "failure"
                     result["task_completed"] = False
+                    result["success"] = False
                     self.task_source.on_task_failure(task, error_msg)
                     return result
 
@@ -491,6 +492,7 @@ class IssueWorker(Worker):
                 result["error"] = error_msg
                 result["status"] = "failure"
                 result["task_completed"] = False
+                result["success"] = False
                 self.task_source.on_task_failure(task, error_msg)
                 return result
 
@@ -528,6 +530,7 @@ class IssueWorker(Worker):
                     result["error"] = error_msg
                     result["status"] = "failure"
                     result["task_completed"] = False
+                    result["success"] = False
                     self.task_source.on_task_failure(task, error_msg)
                     return result
 
@@ -538,6 +541,7 @@ class IssueWorker(Worker):
                 result["error"] = error_msg
                 result["status"] = "failure"
                 result["task_completed"] = False
+                result["success"] = False
                 self.task_source.on_task_failure(task, error_msg)
                 return result
 
