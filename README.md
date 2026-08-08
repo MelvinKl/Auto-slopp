@@ -786,7 +786,7 @@ If the final evaluation fails (either after all steps complete or at max iterati
 
 Each processed task produces a result dict containing `status` and `success` fields. The `success` field uses `None` as the canonical signal for a skipped task (in addition to `status="skipped"`).
 
-| Status | Success | Description |
+| status value | Success | Description |
 |--------|---------|-------------|
 | `success` | `True` | Task completed successfully |
 | `failure` | `False` | Task failed due to an error |

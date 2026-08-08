@@ -38,6 +38,7 @@ from auto_slopp.utils.github_operations import (
 from auto_slopp.utils.ralph import RalphExecutor
 from auto_slopp.worker import Worker
 from auto_slopp.workers.task_source import Task, TaskSource
+from auto_slopp.workers.task_types import TaskResult
 from settings.main import settings
 
 
@@ -270,7 +271,7 @@ class IssueWorker(Worker):
         )
         return permanent_indicators
 
-    def _create_base_result(self, repo_dir: Path, task: Task) -> Dict[str, Any]:
+    def _create_base_result(self, repo_dir: Path, task: Task) -> TaskResult:
         """Create a result dict with all fields initialized to defaults.
 
         All result-returning paths in _process_single_task and _skip_task
@@ -299,13 +300,8 @@ class IssueWorker(Worker):
             "ralph_steps_completed": 0,
         }
 
-    def _process_single_task(self, repo_dir: Path, task: Task) -> Dict[str, Any]:
+    def _process_single_task(self, repo_dir: Path, task: Task) -> TaskResult:
         """Process a single task using Ralph loop.
-
-        Note: Result dicts never carry a "pending" status. Only "skipped",
-        "success", or "failure" are used to indicate the final outcome.
-        The initial `success: False` in the dict is a placeholder that gets
-        overwritten by the actual outcome before the dict is returned.
 
         Args:
             repo_dir: Path to the repository directory
@@ -474,6 +470,7 @@ class IssueWorker(Worker):
                     self.logger.error(error_msg)
                     result["error"] = error_msg
                     result["status"] = "failure"
+                    result["task_completed"] = False
                     self.task_source.on_task_failure(task, error_msg)
                     return result
 
@@ -483,6 +480,7 @@ class IssueWorker(Worker):
                 self.logger.error(error_msg)
                 result["error"] = error_msg
                 result["status"] = "failure"
+                result["task_completed"] = False
                 self.task_source.on_task_failure(task, error_msg)
                 return result
 
@@ -519,6 +517,7 @@ class IssueWorker(Worker):
                     self.logger.error(error_msg)
                     result["error"] = error_msg
                     result["status"] = "failure"
+                    result["task_completed"] = False
                     self.task_source.on_task_failure(task, error_msg)
                     return result
 
@@ -528,6 +527,7 @@ class IssueWorker(Worker):
                 self.logger.error(error_msg)
                 result["error"] = error_msg
                 result["status"] = "failure"
+                result["task_completed"] = False
                 self.task_source.on_task_failure(task, error_msg)
                 return result
 
@@ -597,11 +597,12 @@ class IssueWorker(Worker):
             self.logger.error(f"Error processing task #{task_id}: {str(e)}")
             result["error"] = str(e)
             result["status"] = "failure"
+            result["task_completed"] = False
             self.task_source.on_task_failure(task, str(e))
 
         return result
 
-    def _skip_task(self, repo_dir: Path, task: Task, skip_reason: str = "") -> Dict[str, Any]:
+    def _skip_task(self, repo_dir: Path, task: Task, skip_reason: str = "") -> TaskResult:
         """Create a properly structured result dict for a skipped task.
 
         The canonical skip signal is `success=None` (in addition to `status='skipped'`).
