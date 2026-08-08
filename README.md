@@ -35,6 +35,8 @@ Auto-slopp supports configurable CLI tools for automation. By default, it uses [
 
 #### Environment Variables for CLI Configuration
 
+> **⚠️ Breaking Change (v0.2.0):** The CLI configuration field `rating` has been renamed to `capability`. If you have an existing configuration using `"rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 8 }`, replace it with the single-value `"capability": 8` format shown below. The task difficulty ratings (`AUTO_SLOPP_TASK_DIFFICULTIES`) remain unchanged.
+
 Auto-slopp supports a tiered CLI configuration system with capability-based task matching. Each CLI tool has a capability rating (0-10), and tasks specify their requirements (min/max/recommended capabilities). The system automatically selects the most appropriate CLI tool for each task.
 
 ```bash
@@ -948,25 +950,25 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
   {
     "cli_command": "gemini",
     "cli_args": ["--yolo", "-p"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 8 },
+    "capability": 8,
     "cooldown_seconds": 300
   },
   {
     "cli_command": "codex",
     "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
+    "capability": 5,
     "cooldown_seconds": 300
   },
   {
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
+    "capability": 5,
     "cooldown_seconds": 300
   },
   {
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 2 },
+    "capability": 2,
     "cooldown_seconds": 300
   }
 ]'
@@ -992,25 +994,25 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
   {
     "cli_command": "gemini",
     "cli_args": ["--yolo", "-p"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 8 },
+    "capability": 8,
     "cooldown_seconds": 300
   },
   {
     "cli_command": "codex",
     "cli_args": ["--dangerously-bypass-approvals-and-sandbox", "exec"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
+    "capability": 5,
     "cooldown_seconds": 300
   },
   {
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7", "run"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 5 },
+    "capability": 5,
     "cooldown_seconds": 300
   },
   {
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"],
-    "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 2 },
+    "capability": 2,
     "cooldown_seconds": 300
   }
 ]'
