@@ -42,7 +42,7 @@ Auto-slopp supports a tiered CLI configuration system with capability-based task
 ```bash
 # Tiered CLI configurations (JSON array of objects)
 # Each tool has a capability rating (0-10) indicating its sophistication level
-# timeout: seconds before CLI command times out; set to NO_TIMEOUT (-1) to disable timeout (never timeout)
+# timeout: seconds before CLI command times out; use -1 (NO_TIMEOUT) to disable
 #
 # Validation rules for `timeout`:
 #   - `-1` (NO_TIMEOUT): never timeout — the subprocess runs indefinitely
