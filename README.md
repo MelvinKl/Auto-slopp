@@ -48,6 +48,9 @@ Auto-slopp supports a tiered CLI configuration system with capability-based task
 #   - `-1` (NO_TIMEOUT): no timeout (subprocess runs indefinitely)
 #   - Positive integer: seconds before the CLI command is killed
 #   - Zero or negative values other than `-1` are rejected with a validation error
+#
+# Note: `-1` is the sentinel value for `NO_TIMEOUT` (no timeout). It is not an error
+# — it explicitly disables the timeout so the CLI tool can run indefinitely.
 AUTO_SLOPP_CLI_CONFIGURATIONS='[
   {
     "cli_command": "gemini",
