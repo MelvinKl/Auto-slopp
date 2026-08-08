@@ -253,6 +253,35 @@ class IssueWorker(Worker):
         )
         return permanent_indicators
 
+    def _create_base_result(self, repo_dir: Path, task: Task) -> Dict[str, Any]:
+        """Create a result dict with all fields initialized to defaults.
+
+        All result-returning paths in _process_single_task and _skip_task
+        should use this helper to ensure a consistent structure.
+
+        Args:
+            repo_dir: Path to the repository directory
+            task: The task being processed
+
+        Returns:
+            Result dict with all fields set to their default values
+        """
+        return {
+            "repository": repo_dir.name,
+            "task_id": task.id,
+            "task_title": task.title,
+            "success": False,
+            "openagent_executed": False,
+            "openagent_executions": 0,
+            "task_completed": False,
+            "tasks_completed": 0,
+            "pr_created": False,
+            "prs_created": 0,
+            "error": None,
+            "ralph_loops_executed": 0,
+            "ralph_steps_completed": 0,
+        }
+
     def _process_single_task(self, repo_dir: Path, task: Task) -> Dict[str, Any]:
         """Process a single task using Ralph loop.
 
@@ -276,21 +305,7 @@ class IssueWorker(Worker):
 
         self.logger.info(f"Processing task #{task_id}: {task_title}")
 
-        result = {
-            "repository": repo_dir.name,
-            "task_id": task_id,
-            "task_title": task_title,
-            "success": False,
-            "openagent_executed": False,
-            "openagent_executions": 0,
-            "task_completed": False,
-            "tasks_completed": 0,
-            "pr_created": False,
-            "prs_created": 0,
-            "error": None,
-            "ralph_loops_executed": 0,
-            "ralph_steps_completed": 0,
-        }
+        result = self._create_base_result(repo_dir, task)
 
         try:
             branch_name = self.task_source.get_branch_name(task)
@@ -595,22 +610,10 @@ class IssueWorker(Worker):
         Returns:
             Result dict with status='skipped' and success=None (the canonical skip signal)
         """
-        return {
-            "repository": repo_dir.name,
-            "task_id": task.id,
-            "task_title": task.title,
-            "success": None,
-            "status": "skipped",
-            "openagent_executed": False,
-            "openagent_executions": 0,
-            "task_completed": False,
-            "tasks_completed": 0,
-            "pr_created": False,
-            "prs_created": 0,
-            "error": None,
-            "ralph_loops_executed": 0,
-            "ralph_steps_completed": 0,
-        }
+        result = self._create_base_result(repo_dir, task)
+        result["success"] = None
+        result["status"] = "skipped"
+        return result
 
     def _build_instructions(
         self,
