@@ -240,13 +240,12 @@ class TestEnsureIssueLinkInPRBody:
 
     # --- owner/repo#123 format tests ---
 
-    def test_owner_repo_format_not_recognized(self):
-        """Test that 'owner/repo#1' format is NOT recognized by the simple pattern."""
+    def test_owner_repo_format_is_recognized(self):
+        """Test that 'owner/repo#1' format IS recognized by the pattern."""
         body = "Closes owner/repo#1\n\nPR body."
         result = ensure_issue_link_in_pr_body(body, 1)
-        # The simple pattern only matches plain #123, not owner/repo#123
-        assert result != body
-        assert result.startswith("Closes #1\n\n")
+        # The pattern supports owner/repo#123 format
+        assert result == body
 
     def test_owner_repo_format_missing_link(self):
         """Test that body without owner/repo#1 link gets one prepended."""
@@ -261,19 +260,29 @@ class TestEnsureIssueLinkInPRBody:
         assert result != body
         assert result.startswith("Closes #1\n\n")
 
-    def test_owner_repo_format_fixes_not_recognized(self):
-        """Test that 'Fixes myorg/myrepo#42' is NOT recognized by the simple pattern."""
+    def test_owner_repo_format_fixes_is_recognized(self):
+        """Test that 'Fixes myorg/myrepo#42' IS recognized by the pattern."""
         body = "Fixes myorg/myrepo#42\n\nPR body."
         result = ensure_issue_link_in_pr_body(body, 42)
-        assert result != body
-        assert result.startswith("Closes #42\n\n")
+        assert result == body
 
-    def test_owner_repo_format_resolves_not_recognized(self):
-        """Test that 'Resolves some-org/some-repo#7' is NOT recognized by the simple pattern."""
+    def test_owner_repo_format_resolves_is_recognized(self):
+        """Test that 'Resolves some-org/some-repo#7' IS recognized by the pattern."""
         body = "Resolves some-org/some-repo#7\n\nPR body."
         result = ensure_issue_link_in_pr_body(body, 7)
-        assert result != body
-        assert result.startswith("Closes #7\n\n")
+        assert result == body
+
+    def test_nested_path_format_is_recognized(self):
+        """Test that 'org/subteam/repo#1' nested path format IS recognized."""
+        body = "Closes org/subteam/repo#1\n\nPR body."
+        result = ensure_issue_link_in_pr_body(body, 1)
+        assert result == body
+
+    def test_nested_path_format_fixes_is_recognized(self):
+        """Test that 'Fixes a/b/c#99' nested path format IS recognized."""
+        body = "Fixes a/b/c#99\n\nPR body."
+        result = ensure_issue_link_in_pr_body(body, 99)
+        assert result == body
 
     # --- None body test ---
 

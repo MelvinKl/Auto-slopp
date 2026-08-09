@@ -12,8 +12,9 @@ CLOSING_KEYWORDS = ("closes", "fixes", "resolves")
 # Regex pattern with word boundaries to prevent false matches:
 # - Prevents false positives like '#1' matching inside '#1234'
 # - Supports 'owner/repo#123' format in addition to plain '#123'
+# - Supports nested paths like 'org/subteam/repo#123'
 _CLOSING_PATTERN = re.compile(
-    rf"\b({'|'.join(CLOSING_KEYWORDS)})\s+((?:[\w-]+/[\w-]+)?)#{r'(?<!\d)'}(?P<id>\d+)(?<!\d)\b",
+    r"\b(closes|fixes|resolves)\s+(?:(?:[\w-]+/)*[\w-]+)?#(?P<id>\d+)\b",
     re.IGNORECASE,
 )
 
@@ -42,7 +43,11 @@ def ensure_issue_link_in_pr_body(body: str, issue_id: int) -> str:
     if issue_id <= 0:
         raise ValueError(f"issue_id must be a positive integer, got {issue_id}")
 
-    pattern = rf"\b({'|'.join(CLOSING_KEYWORDS)})\s+#{issue_id}\b"
-    if not re.search(pattern, body, re.IGNORECASE):
-        body = f"Closes #{issue_id}\n\n{body}\n"
+    # Check if the issue is already linked using _CLOSING_PATTERN
+    for match in _CLOSING_PATTERN.finditer(body):
+        if int(match.group("id")) == issue_id:
+            return body
+
+    # Not linked, prepend
+    body = f"Closes #{issue_id}\n\n{body}\n"
     return body
