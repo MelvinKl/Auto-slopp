@@ -237,7 +237,7 @@ class VikunjaTaskSource(TaskSource):
             f"**Branch:** {branch_name}{pr_info}\n\n"
             f"Changes have been committed and pushed. The task is ready for review."
         )
-        self._update_task_with_comment_and_status(task.id, success_comment, "done", repo_path)
+        self._update_task_with_comment_and_status(task.id, success_comment, repo_path, "done")
 
     def on_task_failure(self, task: Task, error: str) -> None:
         """Called when a task fails.
