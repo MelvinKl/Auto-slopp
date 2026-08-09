@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from auto_slopp.workers.github_task_source import GitHubTaskSource
-from auto_slopp.workers.issue_worker import IssueWorker
+from auto_slopp.workers.issue_worker import IssueWorker, _ensure_issue_link_in_pr_body
 from auto_slopp.workers.task_source import Task, TaskSource
 from auto_slopp.workers.vikunja_task_source import VikunjaTaskSource
 
@@ -1638,3 +1638,91 @@ class TestIssueWorker:
             assert content.count(".ralph/") == 1
             assert "*.pyc" in content
             assert "__pycache__/" in content
+
+
+class TestEnsureIssueLinkInPRBody:
+    """Unit tests for the _ensure_issue_link_in_pr_body helper function."""
+
+    def test_body_with_closes_keyword(self):
+        """Body already contains 'Closes #1' — should return unchanged."""
+        body = "This PR fixes the bug.\nCloses #1"
+        result = _ensure_issue_link_in_pr_body(body, 1)
+        assert result == body
+
+    def test_body_with_fixes_keyword(self):
+        """Body already contains 'Fixes #1' — should return unchanged."""
+        body = "This PR fixes the bug.\nFixes #1"
+        result = _ensure_issue_link_in_pr_body(body, 1)
+        assert result == body
+
+    def test_body_with_resolves_keyword(self):
+        """Body already contains 'Resolves #1' — should return unchanged."""
+        body = "This PR resolves the issue.\nResolves #1"
+        result = _ensure_issue_link_in_pr_body(body, 1)
+        assert result == body
+
+    def test_body_with_uppercase_closes_keyword(self):
+        """Body contains 'CLOSES #1' (uppercase) — should return unchanged (case-insensitive)."""
+        body = "This PR fixes the bug.\nCLOSES #1"
+        result = _ensure_issue_link_in_pr_body(body, 1)
+        assert result == body
+
+    def test_body_with_mixed_case_closes_keyword(self):
+        """Body contains 'cLoSeS #1' (mixed case) — should return unchanged."""
+        body = "This PR fixes the bug.\ncLoSeS #1"
+        result = _ensure_issue_link_in_pr_body(body, 1)
+        assert result == body
+
+    def test_body_without_any_closing_keyword(self):
+        """Body has no closing keyword — should prepend 'Closes #1'."""
+        body = "This PR fixes the bug.\nChanges made to module X."
+        result = _ensure_issue_link_in_pr_body(body, 1)
+        assert result.startswith("Closes #1\n\n")
+        assert body in result
+
+    def test_body_with_closes_different_issue(self):
+        """Body closes a different issue — should prepend current issue."""
+        body = "This PR fixes the bug.\nCloses #99"
+        result = _ensure_issue_link_in_pr_body(body, 1)
+        assert "Closes #1" in result
+        assert "Closes #99" in result
+
+    def test_body_with_closes_no_space_before_hash(self):
+        """Body has 'Closes#1' (no space) — should prepend 'Closes #1'."""
+        body = "This PR fixes the bug.\nCloses#1"
+        result = _ensure_issue_link_in_pr_body(body, 1)
+        assert result.startswith("Closes #1\n\n")
+
+    def test_empty_body(self):
+        """Empty body — should prepend 'Closes #1'."""
+        result = _ensure_issue_link_in_pr_body("", 1)
+        assert result == "Closes #1\n\n"
+
+    def test_body_with_multiple_closing_keywords_same_issue(self):
+        """Body has multiple closing keywords for the same issue — should return unchanged."""
+        body = "Closes #1\nFixes #1\nResolves #1"
+        result = _ensure_issue_link_in_pr_body(body, 1)
+        assert result == body
+
+    def test_single_digit_issue_id(self):
+        """Issue ID is a single digit — should work correctly."""
+        result = _ensure_issue_link_in_pr_body("Some PR body", 5)
+        assert "Closes #5" in result
+
+    def test_large_issue_id(self):
+        """Issue ID is a large number — should work correctly."""
+        result = _ensure_issue_link_in_pr_body("Some PR body", 99999)
+        assert "Closes #99999" in result
+
+    def test_prepend_format(self):
+        """Prepended link should have correct format: 'Closes #N\n\n{body}'."""
+        body = "Detailed PR description"
+        result = _ensure_issue_link_in_pr_body(body, 42)
+        assert result == "Closes #42\n\nDetailed PR description"
+
+    def test_body_with_fixes_keyword_different_issue(self):
+        """Body closes a different issue with 'Fixes' — should prepend 'Closes #current'."""
+        body = "Fixes #500\nSome changes"
+        result = _ensure_issue_link_in_pr_body(body, 10)
+        assert result.startswith("Closes #10\n\n")
+        assert "Fixes #500" in result
