@@ -7,6 +7,7 @@ for step-based execution.
 
 import logging
 import time
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -40,6 +41,15 @@ from auto_slopp.worker import Worker
 from auto_slopp.workers.task_source import Task, TaskSource
 from auto_slopp.workers.task_types import TaskResult
 from settings.main import settings
+
+
+class TaskStatus(str, Enum):
+    """Possible outcomes for a single task."""
+
+    PENDING = "pending"
+    SUCCESS = "success"
+    SKIPPED = "skipped"
+    FAILURE = "failure"
 
 
 class IssueWorker(Worker):
@@ -271,25 +281,30 @@ class IssueWorker(Worker):
         )
         return permanent_indicators
 
-    def _create_base_result(self, repo_dir: Path, task: Task) -> TaskResult:
+    def _init_result(self, repo_dir: Path, task: Task) -> TaskResult:
         """Create a result dict with all fields initialized to defaults.
 
-        All result-returning paths in _process_single_task and _skip_task
-        should use this helper to ensure a consistent structure.
+        This is the canonical starting point for any task result.  The
+        initial status is ``TaskStatus.PENDING`` (neutral before we know
+        the outcome) and ``success`` is ``True`` (optimistic default that
+        will be flipped to ``None`` for skips or ``False`` for failures).
+
+        All result-returning paths in ``_process_single_task`` should go
+        through this method to ensure a consistent structure.
 
         Args:
             repo_dir: Path to the repository directory
             task: The task being processed
 
         Returns:
-            Result dict with all fields set to their default values
+            Result dict with status='pending' and success=True (neutral state)
         """
         return {
             "repository": repo_dir.name,
             "task_id": task.id,
             "task_title": task.title,
-            "success": False,
-            "status": "success",
+            "success": True,
+            "status": TaskStatus.PENDING,
             "openagent_executed": False,
             "openagent_executions": 0,
             "task_completed": False,
@@ -300,6 +315,21 @@ class IssueWorker(Worker):
             "ralph_loops_executed": 0,
             "ralph_steps_completed": 0,
         }
+
+    def _set_failure(self, result: TaskResult, error: str) -> None:
+        """Mark a result as failed.
+
+        Convenience helper that sets the three fields every failure path
+        must update: ``status``, ``task_completed``, and ``success``.
+
+        Args:
+            result: The result dict to update
+            error: Error message to record
+        """
+        result["error"] = error
+        result["status"] = TaskStatus.FAILURE
+        result["task_completed"] = False
+        result["success"] = False
 
     def _process_single_task(self, repo_dir: Path, task: Task) -> TaskResult:
         """Process a single task using Ralph loop.
@@ -325,7 +355,7 @@ class IssueWorker(Worker):
 
         self.logger.info(f"Processing task #{task_id}: {task_title}")
 
-        result = self._create_base_result(repo_dir, task)
+        result = self._init_result(repo_dir, task)
 
         try:
             branch_name = self.task_source.get_branch_name(task)
@@ -362,7 +392,6 @@ class IssueWorker(Worker):
 
                 if not ralph_result.get("success", False):
                     ralph_error = f"Ralph loop failed: {ralph_result.get('error', 'Unknown error')}"
-                    result["error"] = ralph_error
 
                     if ralph_result.get("max_loops_reached", False):
                         self.logger.warning(f"Ralph loop reached max iterations for task #{task_id}")
@@ -381,9 +410,7 @@ class IssueWorker(Worker):
                     else:
                         self.task_source.on_task_failure(task, ralph_error)
 
-                    result["status"] = "failure"
-                    result["task_completed"] = False
-                    result["success"] = False
+                    self._set_failure(result, ralph_error)
                     return result
 
                 result["openagent_executed"] = True
@@ -411,7 +438,6 @@ class IssueWorker(Worker):
                 if not openagent_result["success"]:
                     cli_tool = get_active_cli_command()
                     error_msg = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
-                    result["error"] = error_msg
                     if self._is_llm_unavailable(error_msg):
                         self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
                         return self._skip_task(repo_dir, task, skip_reason=error_msg)
@@ -421,9 +447,7 @@ class IssueWorker(Worker):
                     else:
                         self.task_source.on_task_failure(task, error_msg)
 
-                    result["status"] = "failure"
-                    result["task_completed"] = False
-                    result["success"] = False
+                    self._set_failure(result, error_msg)
                     return result
 
             current_branch = get_current_branch(repo_dir)
@@ -478,10 +502,7 @@ class IssueWorker(Worker):
                 if not commit_success:
                     error_msg = f"Failed to commit outstanding changes for task #{task_id}"
                     self.logger.error(error_msg)
-                    result["error"] = error_msg
-                    result["status"] = "failure"
-                    result["task_completed"] = False
-                    result["success"] = False
+                    self._set_failure(result, error_msg)
                     self.task_source.on_task_failure(task, error_msg)
                     return result
 
@@ -489,10 +510,7 @@ class IssueWorker(Worker):
             if not push_success:
                 error_msg = f"Failed to push branch '{current_branch}' for task #{task_id}: {push_message}"
                 self.logger.error(error_msg)
-                result["error"] = error_msg
-                result["status"] = "failure"
-                result["task_completed"] = False
-                result["success"] = False
+                self._set_failure(result, error_msg)
                 self.task_source.on_task_failure(task, error_msg)
                 return result
 
@@ -527,10 +545,7 @@ class IssueWorker(Worker):
                 else:
                     error_msg = f"Failed to create pull request for task #{task_id} on branch '{current_branch}'"
                     self.logger.error(error_msg)
-                    result["error"] = error_msg
-                    result["status"] = "failure"
-                    result["task_completed"] = False
-                    result["success"] = False
+                    self._set_failure(result, error_msg)
                     self.task_source.on_task_failure(task, error_msg)
                     return result
 
@@ -538,10 +553,7 @@ class IssueWorker(Worker):
             if not pr_url:
                 error_msg = f"Task #{task_id} processed but no PR URL available for branch '{current_branch}'"
                 self.logger.error(error_msg)
-                result["error"] = error_msg
-                result["status"] = "failure"
-                result["task_completed"] = False
-                result["success"] = False
+                self._set_failure(result, error_msg)
                 self.task_source.on_task_failure(task, error_msg)
                 return result
 
@@ -609,10 +621,7 @@ class IssueWorker(Worker):
 
         except Exception as e:
             self.logger.error(f"Error processing task #{task_id}: {str(e)}")
-            result["error"] = str(e)
-            result["status"] = "failure"
-            result["task_completed"] = False
-            result["success"] = False
+            self._set_failure(result, str(e))
             self.task_source.on_task_failure(task, str(e))
 
         return result
@@ -620,9 +629,10 @@ class IssueWorker(Worker):
     def _skip_task(self, repo_dir: Path, task: Task, skip_reason: str = "") -> TaskResult:
         """Create a properly structured result dict for a skipped task.
 
-        The canonical skip signal is `success=None` (in addition to `status='skipped'`).
-        All intentional skip paths in `_process_single_task` should go through this method
-        to ensure consistent result structure.
+        The canonical skip signal is ``success=None`` (in addition to
+        ``status='skipped'``).  All intentional skip paths in
+        ``_process_single_task`` should go through this method to ensure
+        consistent result structure.
 
         Args:
             repo_dir: Path to the repository directory
@@ -632,9 +642,9 @@ class IssueWorker(Worker):
         Returns:
             Result dict with status='skipped' and success=None (the canonical skip signal)
         """
-        result = self._create_base_result(repo_dir, task)
+        result = self._init_result(repo_dir, task)
         result["success"] = None
-        result["status"] = "skipped"
+        result["status"] = TaskStatus.SKIPPED
         if skip_reason:
             result["skip_reason"] = skip_reason
         self.task_source.on_skip(task)
