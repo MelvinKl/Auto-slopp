@@ -298,7 +298,11 @@ class IssueWorker(Worker):
                 return result
 
             # Ensure .ralph is in .gitignore before Ralph execution
-            ensure_ralph_in_gitignore(repo_dir)
+            if not ensure_ralph_in_gitignore(repo_dir):
+                self.logger.warning(
+                    f"Failed to ensure .ralph in .gitignore for {repo_dir.name}; "
+                    f"generated .ralph files may be committed to the repository"
+                )
 
             if settings.ralph_enabled:
                 ralph_result = self.ralph_executor.execute(

@@ -199,8 +199,9 @@ class VikunjaTaskSource(TaskSource):
             task: The task being started
             branch_name: The branch created for this task
         """
+        repo_path = task.raw.get("_repo_path")
         update_task_status(task.id, "in_progress")
-        commit(task.raw.get("_repo_path"), "Updated task status to 'in_progress'")
+        commit(repo_path, "Updated task status to 'in_progress'")
 
         subtasks = analyze_task(task.id)
         if subtasks:
@@ -212,12 +213,13 @@ class VikunjaTaskSource(TaskSource):
             f"The worker has started processing this task."
         )
         comment_on_task(task.id, start_comment)
-        commit(task.raw.get("_repo_path"), f"Added comment to task {task.id}")
+        commit(repo_path, f"Added comment to task {task.id}")
 
     def on_task_complete(self, task: Task, branch_name: str, pr_url: str, findings: Optional[List[str]] = None) -> None:
         """Called when a task completes successfully.
 
         Updates Vikunja task status to done and adds a comment with the PR URL.
+        Uses a single atomic commit for both the status update and comment.
 
         Args:
             task: The completed task
@@ -225,26 +227,17 @@ class VikunjaTaskSource(TaskSource):
             pr_url: URL of the created pull request
             findings: Optional list of finding strings from PR review (ignored for Vikunja tasks)
         """
-        status_success = update_task_status(task.id, "done")
-        if status_success:
-            commit(task.raw.get("_repo_path"), "Updated task status to 'done'")
+        repo_path = task.raw.get("_repo_path")
 
-        if status_success:
-            pr_info = f"\n\n**Pull Request:** {pr_url}" if pr_url else ""
-            success_comment = (
-                f"✅ **Task Completed Successfully**\n\n"
-                f"**Task:** {task.title}\n\n"
-                f"The task has been implemented and pushed to branch `{branch_name}`.\n\n"
-                f"**Branch:** {branch_name}{pr_info}\n\n"
-                f"Changes have been committed and pushed. The task is ready for review."
-            )
-            comment_success = comment_on_task(task.id, success_comment)
-            if comment_success:
-                commit(task.raw.get("_repo_path"), f"Added comment to task {task.id}")
-            else:
-                logger.warning(f"Failed to add comment to task {task.id}")
-        else:
-            logger.warning(f"Failed to update status for task {task.id}")
+        pr_info = f"\n\n**Pull Request:** {pr_url}" if pr_url else ""
+        success_comment = (
+            f"✅ **Task Completed Successfully**\n\n"
+            f"**Task:** {task.title}\n\n"
+            f"The task has been implemented and pushed to branch `{branch_name}`.\n\n"
+            f"**Branch:** {branch_name}{pr_info}\n\n"
+            f"Changes have been committed and pushed. The task is ready for review."
+        )
+        self._update_task_with_comment_and_status(task.id, success_comment, "done", repo_path)
 
     def on_task_failure(self, task: Task, error: str) -> None:
         """Called when a task fails.

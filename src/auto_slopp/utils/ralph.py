@@ -289,6 +289,10 @@ class RalphExecutor:
         self.commit_fn = commit_fn
         self.max_iterations = max_iterations
         self.file_prefix = file_prefix
+
+        # Error tracking fields.
+        # _last_error: overwritten on every iteration; represents the latest error state.
+        self._last_error: Optional[str] = None
         self.task_planning_name = task_planning_name
         self.implementation_name = implementation_name
         self.validation_name = validation_name
