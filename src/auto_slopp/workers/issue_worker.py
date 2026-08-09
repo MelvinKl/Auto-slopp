@@ -331,6 +331,20 @@ class IssueWorker(Worker):
         result["task_completed"] = False
         result["success"] = False
 
+    def _set_success(self, result: TaskResult) -> None:
+        """Mark a result as successful.
+
+        Convenience helper that sets the fields for a successful outcome:
+        ``status``, ``success``, ``task_completed``, and ``tasks_completed``.
+
+        Args:
+            result: The result dict to update
+        """
+        result["status"] = TaskStatus.SUCCESS
+        result["success"] = True
+        result["task_completed"] = True
+        result["tasks_completed"] = 1
+
     def _process_single_task(self, repo_dir: Path, task: Task) -> TaskResult:
         """Process a single task using Ralph loop.
 
@@ -363,8 +377,7 @@ class IssueWorker(Worker):
             if self.dry_run:
                 self.logger.info(f"DRY RUN: Would create branch {branch_name} and execute with Ralph loop")
                 result["openagent_executed"] = True
-                result["success"] = True
-                result["status"] = "success"
+                self._set_success(result)
                 return result
 
             self.task_source.on_task_start(task, branch_name)
@@ -466,8 +479,7 @@ class IssueWorker(Worker):
                 result["task_completed"] = True
                 result["tasks_completed"] = 1
 
-                result["success"] = True
-                result["status"] = "success"
+                self._set_success(result)
                 result["no_changes"] = True
                 return result
 
@@ -491,8 +503,7 @@ class IssueWorker(Worker):
                 self.task_source.on_no_changes(task)
                 result["task_completed"] = True
                 result["tasks_completed"] = 1
-                result["success"] = True
-                result["status"] = "success"
+                self._set_success(result)
                 result["no_changes"] = True
                 return result
 
@@ -565,10 +576,7 @@ class IssueWorker(Worker):
             if self.dry_run:
                 self.logger.info(f"DRY RUN: Would perform PR review for PR {pr_url}")
                 self.task_source.on_task_complete(task, current_branch, pr_url)
-                result["task_completed"] = True
-                result["tasks_completed"] = 1
-                result["success"] = True
-                result["status"] = "success"
+                self._set_success(result)
                 return result
 
             # Perform PR review to check for findings
@@ -601,8 +609,8 @@ class IssueWorker(Worker):
                 # Mark as successful but not completed (so issue remains open)
                 result["task_completed"] = False
                 result["tasks_completed"] = 0
+                result["status"] = TaskStatus.SUCCESS
                 result["success"] = True
-                result["status"] = "success"
                 result["pr_review_done"] = True
                 return result
             else:
@@ -617,10 +625,7 @@ class IssueWorker(Worker):
                 else:
                     self.logger.warning(f"Failed to remove automatic work label from issue #{task.id}")
 
-                result["task_completed"] = True
-                result["tasks_completed"] = 1
-                result["success"] = True
-                result["status"] = "success"
+                self._set_success(result)
                 result["label_removed"] = True
 
         except Exception as e:
