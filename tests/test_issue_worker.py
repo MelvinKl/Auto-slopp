@@ -361,6 +361,7 @@ class TestIssueWorker:
         assert result["tasks_processed"] == 0
         assert len(result["task_results"]) == 1
         assert result["task_results"][0]["success"] is False
+        assert result["task_results"][0]["status"] == "failure"
         assert task_source.on_task_failure_called is True
 
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
