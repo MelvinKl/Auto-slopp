@@ -635,26 +635,26 @@ Plan:
             f"Check if you need to update the README.md."
         )
 
-    @staticmethod
-    def _ensure_issue_link_in_pr_body(body: str, issue_id: int) -> str:
-        """Ensure the PR body contains at least one valid GitHub closing keyword for the issue.
 
-        Checks for Closes, Fixes, or Resolves followed by the issue number (case-insensitive).
-        If none are found, prepends "Closes #{issue_id}" to the body.
+def _ensure_issue_link_in_pr_body(body: str, issue_id: int) -> str:
+    """Ensure the PR body contains at least one valid GitHub closing keyword for the issue.
 
-        Args:
-            body: The PR body text to check
-            issue_id: The GitHub issue number to link
+    Checks for Closes, Fixes, or Resolves followed by the issue number (case-insensitive).
+    If none are found, prepends "Closes #{issue_id}" to the body.
 
-        Returns:
-            PR body with a valid closing keyword guaranteed to be present
-        """
-        closing_keywords = ("closes", "fixes", "resolves")
-        issue_ref = f"#{issue_id}"
-        body_lower = body.lower()
-        if not any(f"{keyword} {issue_ref}" in body_lower for keyword in closing_keywords):
-            body = f"Closes #{issue_id}\n\n{body}"
-        return body
+    Args:
+        body: The PR body text to check
+        issue_id: The GitHub issue number to link
+
+    Returns:
+        PR body with a valid closing keyword guaranteed to be present
+    """
+    closing_keywords = ("closes", "fixes", "resolves")
+    issue_ref = f"#{issue_id}"
+    body_lower = body.lower()
+    if not any(f"{keyword} {issue_ref}" in body_lower for keyword in closing_keywords):
+        body = f"Closes #{issue_id}\n\n{body}"
+    return body
 
     def _generate_pr_body_from_task_file(
         self,
@@ -688,7 +688,7 @@ Plan:
         if not generated_body:
             return default_body
 
-        return self._ensure_issue_link_in_pr_body(generated_body, task.id)
+        return _ensure_issue_link_in_pr_body(generated_body, task.id)
 
     def _build_review_instructions(self, title: str, body: str, diff: str) -> str:
         """Build instructions for the CLI tool to review a PR.
