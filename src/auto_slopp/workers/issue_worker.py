@@ -844,7 +844,9 @@ Plan:
 def _ensure_issue_link_in_pr_body(body: str, issue_id: int) -> str:
     """Ensure the PR body contains at least one valid GitHub closing keyword for the issue.
 
-    Checks for Closes, Fixes, or Resolves followed by the issue number (case-insensitive).
+    Checks for Closes, Fixes, or Resolves followed by the issue number (case-insensitive),
+    using word boundaries to prevent false negatives (e.g. 'Closes#1' with no space) and
+    false positives (e.g. '#1' matching inside '#1234').
     If none are found, prepends "Closes #{issue_id}" to the body.
 
     Args:
@@ -854,9 +856,9 @@ def _ensure_issue_link_in_pr_body(body: str, issue_id: int) -> str:
     Returns:
         PR body with a valid closing keyword guaranteed to be present
     """
-    closing_keywords = ("closes", "fixes", "resolves")
-    issue_ref = f"#{issue_id}"
-    body_lower = body.lower()
-    if not any(f"{keyword} {issue_ref}" in body_lower for keyword in closing_keywords):
+    import re
+
+    pattern = rf"\b(closes|fixes|resolves)\s+#{issue_id}\b"
+    if not re.search(pattern, body, re.IGNORECASE):
         body = f"Closes #{issue_id}\n\n{body}"
     return body

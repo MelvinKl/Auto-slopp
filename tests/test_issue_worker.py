@@ -1727,6 +1727,30 @@ class TestEnsureIssueLinkInPRBody:
         assert result.startswith("Closes #10\n\n")
         assert "Fixes #500" in result
 
+    def test_no_space_between_keyword_and_hash(self):
+        """Body has 'Closes#1' (no space) — regex requires space, so should prepend."""
+        body = "This PR fixes the bug.\nCloses#1"
+        result = _ensure_issue_link_in_pr_body(body, 1)
+        assert result.startswith("Closes #1\n\n")
+
+    def test_issue_number_as_part_of_larger_number(self):
+        """Body has 'Closes #1234' — should NOT match #1 (word boundary prevents false positive)."""
+        body = "This PR fixes the bug.\nCloses #1234"
+        result = _ensure_issue_link_in_pr_body(body, 1)
+        assert result.startswith("Closes #1\n\n")
+
+    def test_multiple_spaces_between_keyword_and_hash(self):
+        r"""Body has 'Closes  #1' (multiple spaces) — regex \s+ handles this."""
+        body = "This PR fixes the bug.\nCloses  #1"
+        result = _ensure_issue_link_in_pr_body(body, 1)
+        assert result == body
+
+    def test_keyword_as_part_of_larger_word(self):
+        """Body has 'Uncloses #1' — word boundary prevents matching 'closes' inside 'uncloses'."""
+        body = "This PR uncloses #1\nSome changes"
+        result = _ensure_issue_link_in_pr_body(body, 1)
+        assert result.startswith("Closes #1\n\n")
+
 
 class TestPRBodyLinkingIntegration:
     """Integration tests verifying PR bodies contain valid issue links in both code paths."""
