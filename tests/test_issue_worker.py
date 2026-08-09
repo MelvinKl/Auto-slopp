@@ -1775,3 +1775,204 @@ class TestPRBodyLinkingIntegration:
         task = Task(id=99999, title="Test Task", body="Some task body")
         pr_body = GitHubTaskSource().get_default_pr_body(task)
         assert "Closes #99999" in pr_body or "Fixes #99999" in pr_body or "Resolves #99999" in pr_body
+
+
+class TestGeneratePRBodyFromTaskFileIntegration:
+    """Integration tests verifying _generate_pr_body_from_task_file produces valid issue links
+    in both ralph_enabled=True and ralph_enabled=False code paths."""
+
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    def test_ralph_enabled_pr_body_contains_issue_link(
+        self,
+        mock_commits_ahead,
+        mock_cli,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_has_changes,
+        mock_create_branch,
+        mock_checkout,
+        mock_commit_push,
+    ):
+        """When ralph_enabled=True, _generate_pr_body_from_task_file produces a PR body with valid issue link.
+
+        This tests the full flow: Ralph executes, PR body is generated via
+        _generate_pr_body_from_task_file, and the resulting PR body contains a
+        valid closing keyword (Closes/Fixes/Resolves) for the issue.
+
+        We mock _get_issue_task_path to return a non-existent path so that
+        _generate_pr_body_from_task_file falls back to task_source.get_default_pr_body(),
+        which uses _ensure_issue_link_in_pr_body.
+        """
+        mock_commits_ahead.return_value = 1
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_has_changes.return_value = True
+        mock_commit_push.return_value = (True, None)
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_current_branch.return_value = "ai/task-42"
+        mock_push.return_value = (True, "")
+        mock_get_pr.return_value = None
+        mock_create_pr.return_value = {"url": "https://github.com/test/pr/1"}
+
+        task_source = GitHubTaskSource()
+        task_source.get_tasks = lambda _: [Task(id=42, title="Test Task", body="Test body")]
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": True,
+            "loops_executed": 2,
+            "steps_completed": 5,
+            "total_steps": 5,
+        }
+
+        # Mock _get_issue_task_path to return a non-existent path so that
+        # _generate_pr_body_from_task_file falls back to get_default_pr_body
+        worker.ralph_executor._get_issue_task_path = lambda repo_dir, task_id: Path("/nonexistent/task")
+
+        result = worker.run(Path("/tmp"))
+
+        assert result["success"] is True
+        assert result["tasks_processed"] == 1
+        assert result["prs_created"] == 1
+        # Verify the PR body passed to create_pull_request contains a valid issue link
+        call_kwargs = mock_create_pr.call_args
+        pr_body = call_kwargs[1]["body"]
+        assert "Closes #42" in pr_body or "Fixes #42" in pr_body or "Resolves #42" in pr_body
+
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    def test_ralph_disabled_pr_body_contains_issue_link(
+        self,
+        mock_commits_ahead,
+        mock_cli,
+        mock_execute,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_has_changes,
+        mock_create_branch,
+        mock_checkout,
+        mock_commit_push,
+    ):
+        """When ralph_enabled=False, get_default_pr_body produces a PR body with valid issue link.
+
+        This tests the full flow: CLI executes, PR body is generated via
+        task_source.get_default_pr_body(), and the resulting PR body contains a
+        valid closing keyword (Closes/Fixes/Resolves) for the issue.
+        """
+        mock_commits_ahead.return_value = 1
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = False
+        mock_commit_push.return_value = (True, None)
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_execute.return_value = {"success": True}
+        mock_has_changes.return_value = True
+        mock_current_branch.return_value = "ai/task-7"
+        mock_push.return_value = (True, "")
+        mock_get_pr.return_value = None
+        mock_create_pr.return_value = {"url": "https://github.com/test/pr/1"}
+
+        # Use GitHubTaskSource which uses _ensure_issue_link_in_pr_body in get_default_pr_body
+        task_source = GitHubTaskSource()
+        task_source.get_tasks = lambda _: [Task(id=7, title="Test Task", body="Test body")]
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        result = worker.run(Path("/tmp"))
+
+        assert result["success"] is True
+        assert result["tasks_processed"] == 1
+        assert result["prs_created"] == 1
+        # Verify the PR body passed to create_pull_request contains a valid issue link
+        call_kwargs = mock_create_pr.call_args
+        pr_body = call_kwargs[1]["body"]
+        assert "Closes #7" in pr_body or "Fixes #7" in pr_body or "Resolves #7" in pr_body
+
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    def test_ralph_enabled_pr_body_preserves_existing_link(
+        self,
+        mock_commits_ahead,
+        mock_cli,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_has_changes,
+        mock_create_branch,
+        mock_checkout,
+        mock_commit_push,
+    ):
+        """When ralph_enabled=True and the generated body already has a closing keyword, it is preserved.
+
+        This tests that _ensure_issue_link_in_pr_body does NOT duplicate an existing valid link.
+        """
+        mock_commits_ahead.return_value = 1
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_has_changes.return_value = True
+        mock_commit_push.return_value = (True, None)
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_current_branch.return_value = "ai/task-55"
+        mock_push.return_value = (True, "")
+        mock_get_pr.return_value = None
+        mock_create_pr.return_value = {"url": "https://github.com/test/pr/1"}
+
+        task_source = MockTaskSource(tasks=[Task(id=55, title="Test Task", body="Test body")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": True,
+            "loops_executed": 1,
+            "steps_completed": 3,
+            "total_steps": 3,
+        }
+
+        # Mock _generate_pr_body_from_task_file to return a body WITH a closing keyword
+        worker._generate_pr_body_from_task_file = lambda **kwargs: "Implemented the feature.\nFixes #55"
+
+        result = worker.run(Path("/tmp"))
+
+        assert result["success"] is True
+        assert result["tasks_processed"] == 1
+        # Verify the PR body passed to create_pull_request contains exactly one issue link
+        call_kwargs = mock_create_pr.call_args
+        pr_body = call_kwargs[1]["body"]
+        assert pr_body == "Implemented the feature.\nFixes #55"
+        assert pr_body.count("#55") == 1
