@@ -501,7 +501,7 @@ class TestVikunjaTaskSource:
         """Test that on_no_changes updates status and adds no-changes comment."""
         mock_update_status.return_value = True
         source = VikunjaTaskSource()
-        task = Task(id=42, title="Test", body="")
+        task = Task(id=42, title="Test", body="", raw={"_repo_path": Path("/tmp")})
         source.on_no_changes(task)
         mock_update_status.assert_called_once_with(42, "done")
         mock_comment.assert_called_once()
@@ -515,7 +515,7 @@ class TestVikunjaTaskSource:
         """Test that on_max_iterations_reached updates status and adds failure comment."""
         mock_update_status.return_value = True
         source = VikunjaTaskSource()
-        task = Task(id=42, title="Test", body="")
+        task = Task(id=42, title="Test", body="", raw={"_repo_path": Path("/tmp")})
         source.on_max_iterations_reached(task, steps_completed=5, total_steps=10, error="Timeout")
         mock_update_status.assert_called_once_with(42, "failed")
         mock_comment.assert_called_once()

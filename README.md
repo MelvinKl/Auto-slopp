@@ -63,9 +63,32 @@ AUTO_SLOPP_CLI_CONFIGURATIONS='[
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"],
     "capability": 2,
-    "cooldown_seconds": 300
+    "cooldown_seconds": 300,
+    "timeout": -1
   }
 ]'
+
+##### CLI Timeout Configuration
+
+Each CLI configuration supports a `timeout` field to control how long a CLI command can run before being terminated:
+
+- **`-1`** (default): No timeout — the command runs indefinitely
+- **Positive integer**: Timeout in seconds after which the command is killed
+
+```bash
+# Example: Limit opencode to 10 minutes
+AUTO_SLOPP_CLI_CONFIGURATIONS='[
+  {
+    "cli_command": "opencode",
+    "cli_args": ["run"],
+    "capability": 5,
+    "cooldown_seconds": 300,
+    "timeout": 600
+  }
+]'
+```
+
+When a CLI command times out, the task enters a cooldown period and the next available CLI configuration is tried. Set `timeout: -1` to disable this behavior and let commands run indefinitely.
 
 # Task difficulty ratings (JSON object)
 # Each task specifies min/max/recommended capability requirements
@@ -787,6 +810,8 @@ Convenience wrapper around IssueWorker configured with GitHubTaskSource. Handles
 
 **Comment Condensation**: When processing GitHub issues, Auto-slopp condenses comments from the issue author and/or the whitelisted `allowed_creator` into a single summary comment. Comments from other users are ignored. After condensation, the original comments from the author/allowed creator are deleted and replaced with the summary.
 
+**LLM Unavailability Handling**: When the LLM is unavailable (e.g., rate limiting, connection errors, timeouts), Auto-slopp skips the task instead of failing it. A comment is added to the issue/task explaining the skip, and the required label/tag is preserved so the task can be retried when the LLM becomes available. This prevents permanent failures for transient issues.
+
 ```python
 from auto_slopp.workers import GitHubIssueWorker
 
@@ -967,7 +992,8 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"],
     "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 2 },
-    "cooldown_seconds": 300
+    "cooldown_seconds": 300,
+    "timeout": -1
   }
 ]'
 
@@ -1011,7 +1037,8 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
     "cli_command": "opencode",
     "cli_args": ["--agent", "openagent", "--model", "zai-coding-plan/glm-4.7-flash", "run"],
     "rating": { "min_rating": 0, "max_rating": 10, "recommend_rating": 2 },
-    "cooldown_seconds": 300
+    "cooldown_seconds": 300,
+    "timeout": -1
   }
 ]'
 
@@ -1223,6 +1250,13 @@ This provides:
 [License information to be added]
 
 ## Version History
+
+### 0.1.2
+- Added `timeout` field to CLI configurations for per-tool execution limits
+- Added LLM unavailability detection — tasks are now skipped (not failed) when the LLM is unavailable, with comments added to issues/tasks
+- Added default CLI configurations for `opencode gpt-5` and `opencode gpt-5-mini`
+- Improved Vikunja task source to use atomic commits for status updates and comments
+- Removed dead code (`_last_iteration_failure_reason`, `_is_llm_unavailable` before refactor)
 
 ### 0.1.1
 - Added rotating log file for WARNING level and above (configurable via `AUTO_SLOPP_LOG_FILE_DIR`)

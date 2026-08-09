@@ -140,14 +140,18 @@ class TaskSource(ABC):
             error: Last error message
         """
 
-    @abstractmethod
-    def on_skip(self, task: Task, reason: str) -> None:
-        """Called when a task is skipped (e.g., due to LLM unavailability).
+    def on_skip(self, task: Task, ralph_result: Dict[str, Any]) -> None:
+        """Called when a task is skipped (e.g., due to LLM unavailability or other transient failures).
 
-        The task should remain processable for future retries. Do not remove
-        the required label/tag that identifies tasks for processing.
+        This is a hook method with a default no-op implementation. Subclasses may override
+        it to perform source-specific cleanup (e.g., removing labels, updating task status).
+
+        The ``ralph_result`` dict contains execution context such as ``steps_completed``,
+        ``total_steps``, ``error``, and ``max_loops_reached`` so skip comments can be
+        informative.
 
         Args:
-            task: The task being skipped
-            reason: Reason for skipping (e.g., "LLM unavailable")
+            task: The task that was skipped
+            ralph_result: Dictionary with execution context (e.g., steps_completed, total_steps, error)
         """
+        pass  # Default no-op; subclasses may override for source-specific cleanup
