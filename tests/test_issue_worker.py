@@ -2007,3 +2007,48 @@ class TestIssueWorker:
         # on_skip called, on_task_failure NOT called
         assert task_source.on_skip_called is True
         assert task_source.on_task_failure_called is False
+
+    def test_is_task_skipped_helper(self):
+        """Test the is_task_skipped static helper method."""
+        # Skipped task: success=None
+        assert IssueWorker.is_task_skipped({"success": None}) is True
+        assert IssueWorker.is_task_skipped({"success": None, "status": "skipped"}) is True
+
+        # Not skipped: success=True
+        assert IssueWorker.is_task_skipped({"success": True}) is False
+
+        # Not skipped: success=False
+        assert IssueWorker.is_task_skipped({"success": False}) is False
+
+        # Not skipped: missing key
+        assert IssueWorker.is_task_skipped({}) is False
+
+    def test_is_task_failed_helper(self):
+        """Test the is_task_failed static helper method."""
+        # Failed task: success=False
+        assert IssueWorker.is_task_failed({"success": False}) is True
+        assert IssueWorker.is_task_failed({"success": False, "status": "failure"}) is True
+
+        # Not failed: success=True
+        assert IssueWorker.is_task_failed({"success": True}) is False
+
+        # Not failed: success=None (skipped is NOT a failure)
+        assert IssueWorker.is_task_failed({"success": None}) is False
+
+        # Not failed: missing key
+        assert IssueWorker.is_task_failed({}) is False
+
+    def test_is_task_successful_helper(self):
+        """Test the is_task_successful static helper method."""
+        # Successful task: success=True
+        assert IssueWorker.is_task_successful({"success": True}) is True
+        assert IssueWorker.is_task_successful({"success": True, "status": "success"}) is True
+
+        # Not successful: success=False
+        assert IssueWorker.is_task_successful({"success": False}) is False
+
+        # Not successful: success=None (skipped is NOT successful)
+        assert IssueWorker.is_task_successful({"success": None}) is False
+
+        # Not successful: missing key
+        assert IssueWorker.is_task_successful({}) is False

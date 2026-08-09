@@ -918,6 +918,51 @@ Plan:
         """Get elapsed time from start time."""
         return time.time() - start_time
 
+    @staticmethod
+    def is_task_skipped(result: Dict[str, Any]) -> bool:
+        """Check if a task result indicates a skipped task.
+
+        The canonical skip signal is ``success=None`` (distinct from
+        ``success=True`` for success and ``success=False`` for failure).
+
+        Args:
+            result: A task result dict (e.g. from ``task_results``)
+
+        Returns:
+            True if the task was skipped, False otherwise
+        """
+        return result.get("success") is None and "success" in result
+
+    @staticmethod
+    def is_task_failed(result: Dict[str, Any]) -> bool:
+        """Check if a task result indicates a failed task.
+
+        A task is considered failed when ``success`` is explicitly
+        ``False``.  Skipped tasks (``success=None``) are NOT failures.
+
+        Args:
+            result: A task result dict (e.g. from ``task_results``)
+
+        Returns:
+            True if the task failed, False otherwise
+        """
+        return result.get("success") is False and "success" in result
+
+    @staticmethod
+    def is_task_successful(result: Dict[str, Any]) -> bool:
+        """Check if a task result indicates a successful task.
+
+        A task is considered successful when ``success`` is explicitly
+        ``True``.  Skipped tasks (``success=None``) are NOT successful.
+
+        Args:
+            result: A task result dict (e.g. from ``task_results``)
+
+        Returns:
+            True if the task succeeded, False otherwise
+        """
+        return result.get("success") is True and "success" in result
+
     def _log_completion_summary(self, results: Dict[str, Any]) -> None:
         """Log completion summary."""
         cli_tool = get_active_cli_command()
