@@ -1726,3 +1726,52 @@ class TestEnsureIssueLinkInPRBody:
         result = _ensure_issue_link_in_pr_body(body, 10)
         assert result.startswith("Closes #10\n\n")
         assert "Fixes #500" in result
+
+
+class TestPRBodyLinkingIntegration:
+    """Integration tests verifying PR bodies contain valid issue links in both code paths."""
+
+    def test_ralph_disabled_get_default_pr_body_has_link(self):
+        """When ralph_enabled=False, get_default_pr_body produces a body with valid link."""
+        task = Task(id=23, title="Test Task", body="Some task body")
+        pr_body = GitHubTaskSource().get_default_pr_body(task)
+        assert "Closes #23" in pr_body or "Fixes #23" in pr_body or "Resolves #23" in pr_body
+
+    def test_ralph_disabled_get_default_pr_body_empty_body(self):
+        """When ralph_enabled=False and task body is empty, get_default_pr_body still has link."""
+        task = Task(id=5, title="Test Task", body="")
+        pr_body = GitHubTaskSource().get_default_pr_body(task)
+        assert "Closes #5" in pr_body or "Fixes #5" in pr_body or "Resolves #5" in pr_body
+
+    def test_ralph_disabled_get_default_pr_body_with_existing_link(self):
+        """When ralph_enabled=False and task body already has closing keyword, it's preserved."""
+        task = Task(id=10, title="Test Task", body="Fixes #10\nSome changes")
+        pr_body = GitHubTaskSource().get_default_pr_body(task)
+        assert "Fixes #10" in pr_body
+        # Should not have a duplicate link
+        assert pr_body.count("#10") == 1
+
+    def test_ralph_disabled_get_default_pr_body_with_different_link(self):
+        """When ralph_enabled=False and task body closes a different issue, current issue link is added."""
+        task = Task(id=7, title="Test Task", body="Fixes #99\nSome changes")
+        pr_body = GitHubTaskSource().get_default_pr_body(task)
+        assert "Closes #7" in pr_body  # Current issue link added
+        assert "Fixes #99" in pr_body  # Original link preserved
+
+    def test_ralph_disabled_get_default_pr_body_vikunja_no_link(self):
+        """VikunjaTaskSource.get_default_pr_body does NOT use _ensure_issue_link_in_pr_body.
+
+        Note: This is intentional — Step 4 only updated GitHubTaskSource for defense-in-depth.
+        VikunjaTaskSource.get_default_pr_body uses a different format without closing keywords.
+        """
+        task = Task(id=42, title="Test Task", body="Some task body")
+        pr_body = VikunjaTaskSource().get_default_pr_body(task)
+        # Vikunja format uses "Vikunja Task #42:" prefix, not "Closes #42"
+        assert "Vikunja Task #42: Test Task" in pr_body
+        assert "Closes #42" not in pr_body
+
+    def test_ralph_disabled_get_default_pr_body_large_issue_id(self):
+        """When ralph_enabled=False with large issue ID, get_default_pr_body still has valid link."""
+        task = Task(id=99999, title="Test Task", body="Some task body")
+        pr_body = GitHubTaskSource().get_default_pr_body(task)
+        assert "Closes #99999" in pr_body or "Fixes #99999" in pr_body or "Resolves #99999" in pr_body
