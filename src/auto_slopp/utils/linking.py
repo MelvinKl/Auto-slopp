@@ -27,5 +27,5 @@ def ensure_issue_link_in_pr_body(body: str, issue_id: int) -> str:
     """
     pattern = rf"\b({'|'.join(CLOSING_KEYWORDS)})\s+#{issue_id}\b"
     if not re.search(pattern, body, re.IGNORECASE):
-        body = f"Closes #{issue_id}\n\n{body}"
+        body = f"Closes #{issue_id}\n\n{body}\n"
     return body

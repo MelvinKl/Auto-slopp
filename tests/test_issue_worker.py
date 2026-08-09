@@ -1697,7 +1697,7 @@ class TestEnsureIssueLinkInPRBody:
     def test_empty_body(self):
         """Empty body — should prepend 'Closes #1'."""
         result = ensure_issue_link_in_pr_body("", 1)
-        assert result == "Closes #1\n\n"
+        assert result == "Closes #1\n\n\n"
 
     def test_body_with_multiple_closing_keywords_same_issue(self):
         """Body has multiple closing keywords for the same issue — should return unchanged."""
@@ -1716,10 +1716,10 @@ class TestEnsureIssueLinkInPRBody:
         assert "Closes #99999" in result
 
     def test_prepend_format(self):
-        """Prepended link should have correct format: 'Closes #N\n\n{body}'."""
+        """Prepended link should have correct format: 'Closes #N\n\n{body}\n'."""
         body = "Detailed PR description"
         result = ensure_issue_link_in_pr_body(body, 42)
-        assert result == "Closes #42\n\nDetailed PR description"
+        assert result == "Closes #42\n\nDetailed PR description\n"
 
     def test_body_with_fixes_keyword_different_issue(self):
         """Body closes a different issue with 'Fixes' — should prepend 'Closes #current'."""
