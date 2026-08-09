@@ -21,7 +21,7 @@ from auto_slopp.utils.github_operations import (
     get_open_prs,
     remove_label_from_issue,
 )
-from auto_slopp.workers.issue_worker import _ensure_issue_link_in_pr_body
+from auto_slopp.utils.linking import ensure_issue_link_in_pr_body
 from auto_slopp.workers.task_source import Task, TaskSource
 from settings.main import settings
 
@@ -200,7 +200,7 @@ class GitHubTaskSource(TaskSource):
         Returns:
             PR body string in markdown
         """
-        return _ensure_issue_link_in_pr_body(f"{task.body}", task.id)
+        return ensure_issue_link_in_pr_body(f"{task.body}", task.id)
 
     def on_task_start(self, task: Task, branch_name: str) -> None:
         """Called when task processing begins.

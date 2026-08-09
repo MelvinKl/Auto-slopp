@@ -35,6 +35,7 @@ from auto_slopp.utils.github_operations import (
     remove_label_from_issue,
     submit_pr_review,
 )
+from auto_slopp.utils.linking import ensure_issue_link_in_pr_body
 from auto_slopp.utils.ralph import RalphExecutor
 from auto_slopp.worker import Worker
 from auto_slopp.workers.task_source import Task, TaskSource
@@ -667,7 +668,7 @@ Plan:
         if not generated_body:
             return default_body
 
-        return _ensure_issue_link_in_pr_body(generated_body, task.id)
+        return ensure_issue_link_in_pr_body(generated_body, task.id)
 
     def _build_review_instructions(self, title: str, body: str, diff: str) -> str:
         """Build instructions for the CLI tool to review a PR.
@@ -839,26 +840,3 @@ Plan:
             f"Tasks completed: {results['tasks_completed']}, "
             f"Errors: {results['repositories_with_errors']}"
         )
-
-
-def _ensure_issue_link_in_pr_body(body: str, issue_id: int) -> str:
-    """Ensure the PR body contains at least one valid GitHub closing keyword for the issue.
-
-    Checks for Closes, Fixes, or Resolves followed by the issue number (case-insensitive),
-    using word boundaries to prevent false negatives (e.g. 'Closes#1' with no space) and
-    false positives (e.g. '#1' matching inside '#1234').
-    If none are found, prepends "Closes #{issue_id}" to the body.
-
-    Args:
-        body: The PR body text to check
-        issue_id: The GitHub issue number to link
-
-    Returns:
-        PR body with a valid closing keyword guaranteed to be present
-    """
-    import re
-
-    pattern = rf"\b(closes|fixes|resolves)\s+#{issue_id}\b"
-    if not re.search(pattern, body, re.IGNORECASE):
-        body = f"Closes #{issue_id}\n\n{body}"
-    return body
