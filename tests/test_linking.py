@@ -4,6 +4,8 @@ This module tests the `ensure_issue_link_in_pr_body` function and the
 `CLOSING_KEYWORDS` constant from `auto_slopp.utils.linking`.
 """
 
+import pytest
+
 from auto_slopp.utils.linking import CLOSING_KEYWORDS, ensure_issue_link_in_pr_body
 
 
@@ -203,3 +205,79 @@ class TestEnsureIssueLinkInPRBody:
         body = "Closes #1\n\nBody text."
         result = ensure_issue_link_in_pr_body(body, 1)
         assert result == body
+
+    # --- Type validation tests ---
+
+    def test_issue_id_bool_raises_type_error(self):
+        """Test that passing a boolean for issue_id raises TypeError."""
+        body = "PR body."
+        with pytest.raises(TypeError):
+            ensure_issue_link_in_pr_body(body, True)
+
+    def test_issue_id_string_raises_type_error(self):
+        """Test that passing a string for issue_id raises TypeError."""
+        body = "PR body."
+        with pytest.raises(TypeError):
+            ensure_issue_link_in_pr_body(body, "1")
+
+    def test_issue_id_float_raises_type_error(self):
+        """Test that passing a float for issue_id raises TypeError."""
+        body = "PR body."
+        with pytest.raises(TypeError):
+            ensure_issue_link_in_pr_body(body, 1.5)
+
+    def test_issue_id_negative_raises_value_error(self):
+        """Test that passing a negative integer for issue_id raises ValueError."""
+        body = "PR body."
+        with pytest.raises(ValueError, match="must be a positive integer"):
+            ensure_issue_link_in_pr_body(body, -1)
+
+    def test_issue_id_zero_raises_value_error(self):
+        """Test that passing zero for issue_id raises ValueError."""
+        body = "PR body."
+        with pytest.raises(ValueError, match="must be a positive integer"):
+            ensure_issue_link_in_pr_body(body, 0)
+
+    # --- owner/repo#123 format tests ---
+
+    def test_owner_repo_format_not_recognized(self):
+        """Test that 'owner/repo#1' format is NOT recognized by the simple pattern."""
+        body = "Closes owner/repo#1\n\nPR body."
+        result = ensure_issue_link_in_pr_body(body, 1)
+        # The simple pattern only matches plain #123, not owner/repo#123
+        assert result != body
+        assert result.startswith("Closes #1\n\n")
+
+    def test_owner_repo_format_missing_link(self):
+        """Test that body without owner/repo#1 link gets one prepended."""
+        body = "PR body without link."
+        result = ensure_issue_link_in_pr_body(body, 1)
+        assert result.startswith("Closes #1\n\n")
+
+    def test_owner_repo_format_different_repo(self):
+        """Test that 'owner/repo#99' does not match issue_id=1."""
+        body = "Closes owner/repo#99\n\nPR body."
+        result = ensure_issue_link_in_pr_body(body, 1)
+        assert result != body
+        assert result.startswith("Closes #1\n\n")
+
+    def test_owner_repo_format_fixes_not_recognized(self):
+        """Test that 'Fixes myorg/myrepo#42' is NOT recognized by the simple pattern."""
+        body = "Fixes myorg/myrepo#42\n\nPR body."
+        result = ensure_issue_link_in_pr_body(body, 42)
+        assert result != body
+        assert result.startswith("Closes #42\n\n")
+
+    def test_owner_repo_format_resolves_not_recognized(self):
+        """Test that 'Resolves some-org/some-repo#7' is NOT recognized by the simple pattern."""
+        body = "Resolves some-org/some-repo#7\n\nPR body."
+        result = ensure_issue_link_in_pr_body(body, 7)
+        assert result != body
+        assert result.startswith("Closes #7\n\n")
+
+    # --- None body test ---
+
+    def test_none_body_raises_type_error(self):
+        """Test that passing None for body raises TypeError."""
+        with pytest.raises(TypeError):
+            ensure_issue_link_in_pr_body(None, 1)
