@@ -663,6 +663,8 @@ AUTO_SLOPP_TASK_DIFFICULTIES='{
 # Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
 AUTO_SLOPP_SLOP_TIMEOUT=7200
 
+# Use -1 (NO_TIMEOUT) to disable timeout entirely
+
 # Log file directory (default: disabled — set to enable)
 # Logs at WARNING level and above are written to a rotating log file
 AUTO_SLOPP_LOG_FILE_DIR=./logs
@@ -1000,6 +1002,8 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
 
 # Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
 export AUTO_SLOPP_SLOP_TIMEOUT=7200
+
+# Use -1 (NO_TIMEOUT) to disable timeout entirely
 
 # Days after which a local branch without remote is considered stale and deleted (default: 1)
 export AUTO_SLOPP_STALE_BRANCH_DAYS_THRESHOLD=1
