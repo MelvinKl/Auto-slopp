@@ -928,6 +928,33 @@ Options:
   --help               Show help message
 ```
 
+### Issue Linking Utilities
+
+The `auto_slopp.utils.linking` module provides helper functions for ensuring PR bodies contain valid GitHub closing keywords:
+
+```python
+from auto_slopp.utils.linking import ensure_issue_link_in_pr_body, CLOSING_KEYWORDS
+
+# CLOSING_KEYWORDS is a tuple: ("closes", "fixes", "resolves")
+
+# Ensure a PR body has a closing keyword for issue #42
+body = "Fix the login bug"
+linked_body = ensure_issue_link_in_pr_body(body, 42)
+# Returns: "Closes #42\n\nFix the login bug"
+
+# If the body already has a closing keyword, it is preserved
+existing = "Closes #42\n\nFix the login bug"
+result = ensure_issue_link_in_pr_body(existing, 42)
+# Returns: existing body unchanged
+```
+
+**Features:**
+- Uses regex with word boundaries to prevent false matches (e.g., `#42` won't match `#421`)
+- Case-insensitive keyword matching (Closes, closes, CLOSES all work)
+- Supports `owner/repo#123` format
+- Validates `issue_id` is a positive integer
+- Prepends `Closes #<id>` with proper formatting if no valid link exists
+
 ## Development
 
 ### Running Tests
