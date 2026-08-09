@@ -338,16 +338,17 @@ class VikunjaTaskSource(TaskSource):
             logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
             return
 
+        repo_path = task.raw.get("_repo_path")
+        if repo_path is None:
+            logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
+            return
+
         skip_comment = (
             f"⏭️ **Task Skipped**\n\n"
             f"Reason: {reason}\n\n"
             f"This task will be retried when the LLM becomes available."
         )
-        comment_success = comment_on_task(task.id, skip_comment)
-        if comment_success:
-            commit(repo_path, f"Added comment to task {task.id}")
-        else:
-            logger.warning(f"Failed to add skip comment to task {task.id}")
+        comment_on_task(task.id, skip_comment)
         logger.info(f"Added skip comment to task {task.id}: {reason}")
 
     def _filter_tasks_by_tag(self, tasks: List[dict], tag_name: str) -> List[dict]:

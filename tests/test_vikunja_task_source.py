@@ -360,8 +360,8 @@ class TestVikunjaTaskSource:
         assert "Task Skipped" in call_args[1]
         assert "LLM unavailable" in call_args[1]
         assert "retried when the LLM becomes available" in call_args[1]
-        # Status should NOT be updated
-        mock_commit.assert_called_once()
+        # Status should NOT be updated and no commit should be made
+        mock_commit.assert_not_called()
 
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
     def test_on_skip_handles_missing_repo_path(self, mock_comment):

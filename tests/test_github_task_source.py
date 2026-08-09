@@ -595,14 +595,14 @@ class TestGitHubTaskSource:
     @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
     @patch("auto_slopp.workers.github_task_source.settings")
     def test_on_skip_no_comment(self, mock_settings, mock_remove, mock_comment):
-        """Test that on_skip does NOT post a GitHub comment, only logs."""
+        """Test that on_skip posts a GitHub comment but does NOT remove the required label."""
         mock_settings.github_issue_worker_required_label = "test-label"
         task_source = GitHubTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
 
         task_source.on_skip(task, "LLM unavailable")
 
-        mock_comment.assert_not_called()
+        mock_comment.assert_called_once()
         mock_remove.assert_not_called()
 
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")

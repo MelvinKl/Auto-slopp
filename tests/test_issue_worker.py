@@ -1523,13 +1523,17 @@ class TestIssueWorker:
         caplog,
     ):
         """Test that on_skip is called when LLM unavailable and no commits ahead of main."""
-        mock_cli.return_value = "opencode"
-        mock_settings.ralph_enabled = True
-        mock_settings.github_issue_step_max_iterations = 10
-        mock_commits_ahead.return_value = 0
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        mock_current_branch.return_value = "ai/task-1"
+        mock_cli.return_value = True  # ensure_ralph_in_gitignore
+        mock_commits_ahead.return_value = "opencode"  # get_active_cli_command
+        mock_checkout.return_value = True  # create_and_checkout_branch
+        mock_create_branch.return_value = True  # has_changes
+        mock_has_changes.return_value = "ai/task-1"  # get_current_branch
+        mock_current_branch.ralph_enabled = True  # settings
+        mock_current_branch.github_issue_step_max_iterations = 10  # settings
+        mock_settings.return_value = (True, "")  # push_to_remote
+        mock_push.return_value = 0  # get_commits_ahead_of_branch
+        mock_commit_push.return_value = (True, "")  # checkout_branch_resilient
+        mock_ensure_gitignore.return_value = (True, "")  # commit_and_push_changes
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
         worker.ralph_executor.execute = lambda *args, **kwargs: {
@@ -1554,7 +1558,7 @@ class TestIssueWorker:
         assert task_source.on_skip_called is True
         assert task_source.on_no_changes_called is False
         # Verify ensure_ralph_in_gitignore was called
-        mock_ensure_gitignore.assert_called_once()
+        mock_cli.assert_called_once()
         # Verify no warning was logged
         gitignore_warnings = [r for r in caplog.records if "Failed to ensure .ralph in .gitignore" in r.message]
         assert len(gitignore_warnings) == 0
