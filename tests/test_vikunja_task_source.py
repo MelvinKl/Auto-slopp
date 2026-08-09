@@ -485,3 +485,79 @@ class TestVikunjaTaskSource:
 
         mock_comment.assert_called_once()
         mock_commit.assert_not_called()
+
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_update_task_with_comment_and_status_commits_when_both_succeed(
+        self, mock_comment, mock_update, mock_commit
+    ):
+        """Test that commit is called when both comment_on_task and update_task_status succeed."""
+        mock_comment.return_value = True
+        mock_update.return_value = True
+        task_source = VikunjaTaskSource()
+        repo_path = Path("/test/repo")
+
+        task_source._update_task_with_comment_and_status(42, "Comment text", "done", repo_path)
+
+        mock_comment.assert_called_once_with(42, "Comment text")
+        mock_update.assert_called_once_with(42, "done")
+        mock_commit.assert_called_once_with(repo_path, "Updated task 42 status to 'done' and added comment")
+
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_update_task_with_comment_and_status_skips_commit_when_comment_fails(
+        self, mock_comment, mock_update, mock_commit, caplog
+    ):
+        """Test that commit is NOT called when comment_on_task fails."""
+        mock_comment.return_value = False
+        mock_update.return_value = True
+        task_source = VikunjaTaskSource()
+        repo_path = Path("/test/repo")
+
+        task_source._update_task_with_comment_and_status(42, "Comment text", "done", repo_path)
+
+        mock_comment.assert_called_once()
+        mock_update.assert_called_once()
+        mock_commit.assert_not_called()
+        assert "Failed to add comment to task 42" in caplog.text
+
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_update_task_with_comment_and_status_skips_commit_when_status_fails(
+        self, mock_comment, mock_update, mock_commit, caplog
+    ):
+        """Test that commit is NOT called when update_task_status fails."""
+        mock_comment.return_value = True
+        mock_update.return_value = False
+        task_source = VikunjaTaskSource()
+        repo_path = Path("/test/repo")
+
+        task_source._update_task_with_comment_and_status(42, "Comment text", "done", repo_path)
+
+        mock_comment.assert_called_once()
+        mock_update.assert_called_once()
+        mock_commit.assert_not_called()
+        assert "Failed to update status to 'done' for task 42" in caplog.text
+
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_update_task_with_comment_and_status_skips_commit_when_both_fail(
+        self, mock_comment, mock_update, mock_commit, caplog
+    ):
+        """Test that commit is NOT called when both operations fail."""
+        mock_comment.return_value = False
+        mock_update.return_value = False
+        task_source = VikunjaTaskSource()
+        repo_path = Path("/test/repo")
+
+        task_source._update_task_with_comment_and_status(42, "Comment text", "done", repo_path)
+
+        mock_comment.assert_called_once()
+        mock_update.assert_called_once()
+        mock_commit.assert_not_called()
+        assert "Failed to add comment to task 42" in caplog.text
+        assert "Failed to update status to 'done' for task 42" in caplog.text
