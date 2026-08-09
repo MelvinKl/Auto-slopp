@@ -1434,6 +1434,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.ensure_ralph_in_gitignore")
     def test_no_commits_ahead_llm_unavailable_calls_on_skip(
         self,
+        mock_ensure_gitignore,
         mock_cli,
         mock_commits_ahead,
         mock_push,
@@ -1443,7 +1444,6 @@ class TestIssueWorker:
         mock_create_branch,
         mock_checkout,
         mock_commit_push,
-        mock_ensure_gitignore,
         caplog,
     ):
         """Test that on_skip is called when LLM unavailable and no commits ahead of main."""
