@@ -6,6 +6,7 @@ for step-based execution.
 """
 
 import logging
+import re
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -202,7 +203,12 @@ class IssueWorker(Worker):
             or "too many requests" in error_lower
             or "service unavailable" in error_lower
             or "gateway timeout" in error_lower
-            or "llm unavailable" in error_lower
+            or re.search(r"\bllm unavailable\b", error_lower) is not None
+            or "no active cli" in error_lower
+            or "all cli" in error_lower
+            or "exhausted" in error_lower
+            or "cooldown" in error_lower
+            or "no configuration meets" in error_lower
             or "503" in error_lower
             or "502" in error_lower
             or "504" in error_lower
@@ -340,7 +346,7 @@ class IssueWorker(Worker):
                         )
                     elif self._is_llm_unavailable(ralph_error):
                         self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                        self.task_source.on_skip(task)
+                        self.task_source.on_skip(task, ralph_error)
                         result["success"] = True
                         result["skipped"] = True
                         result["skip_reason"] = ralph_error
@@ -381,7 +387,7 @@ class IssueWorker(Worker):
                     result["error"] = error_msg
                     if self._is_llm_unavailable(error_msg):
                         self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                        self.task_source.on_skip(task)
+                        self.task_source.on_skip(task, error_msg)
                         result["success"] = True
                         result["skipped"] = True
                         result["skip_reason"] = error_msg
@@ -397,7 +403,7 @@ class IssueWorker(Worker):
             if current_branch in ("main", "master"):
                 if self._is_llm_unavailable(""):
                     self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                    self.task_source.on_skip(task)
+                    self.task_source.on_skip(task, "LLM unavailable - no changes made")
                     result["success"] = True
                     result["skipped"] = True
                     result["skip_reason"] = "LLM unavailable - no changes made"
@@ -421,10 +427,10 @@ class IssueWorker(Worker):
             if ahead_count == 0:
                 if self._is_llm_unavailable(""):
                     self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                    self.task_source.on_skip(task)
+                    self.task_source.on_skip(task, "LLM unavailable - no commits ahead")
                     result["success"] = True
                     result["skipped"] = True
-                    result["skip_reason"] = "LLM unavailable - no changes made"
+                    result["skip_reason"] = "LLM unavailable - no commits ahead"
                     return result
 
                 self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue")
