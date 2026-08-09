@@ -218,6 +218,12 @@ class RalphExecutor:
 
     This class encapsulates the logic for creating, refining, and executing
     task plans defined in markdown files with step-by-step checkboxes.
+
+    Error tracking fields:
+        - ``_last_error``: The most recent error encountered during execution.
+          This is overwritten on every iteration (successful or not) and represents
+          the latest error state.
+
     """
 
     def __init__(
@@ -259,6 +265,10 @@ class RalphExecutor:
         self.commit_fn = commit_fn
         self.max_iterations = max_iterations
         self.file_prefix = file_prefix
+
+        # Error tracking fields.
+        # _last_error: overwritten on every iteration; represents the latest error state.
+        self._last_error: Optional[str] = None
         self.task_planning_name = task_planning_name
         self.implementation_name = implementation_name
         self.validation_name = validation_name

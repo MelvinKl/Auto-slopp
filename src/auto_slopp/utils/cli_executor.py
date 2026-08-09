@@ -16,6 +16,8 @@ from settings.main import CLIConfiguration, TaskRating, settings
 
 logger = logging.getLogger(__name__)
 _active_cli_configuration_index = 0
+NO_TIMEOUT = -1
+
 _PROBE_INSTRUCTIONS = "are you working?"
 # 600 seconds (10 minutes) balances catching hung tools without waiting too long.
 # CLI tools like Claude Code or Codex can take minutes to cold-start, so we
@@ -48,8 +50,9 @@ def _check_startup_health(working_dir: Path) -> None:
     for index, config in enumerate(settings.cli_configurations):
         state = _get_cli_state(index)
         c_dict = _config_to_dict(config)
+        probe_timeout = config.timeout if config.timeout != NO_TIMEOUT else _PROBE_TIMEOUT_SECONDS
         try:
-            if _probe_configuration(c_dict, working_dir):
+            if _probe_configuration(c_dict, working_dir, timeout=probe_timeout):
                 logger.info(f"CLI tool {config.name} is healthy.")
                 state["active"] = True
             else:
@@ -76,8 +79,9 @@ def _check_cooldowns(working_dir: Path) -> None:
         if not state["active"] and now >= state["cooldown_until"]:
             logger.info(f"Checking if CLI tool {config.name} has recovered...")
             c_dict = _config_to_dict(config)
+            probe_timeout = config.timeout if config.timeout != NO_TIMEOUT else _PROBE_TIMEOUT_SECONDS
             try:
-                if _probe_configuration(c_dict, working_dir):
+                if _probe_configuration(c_dict, working_dir, timeout=probe_timeout):
                     logger.info(f"CLI tool {config.name} successfully recovered.")
                     with _cli_lock:
                         if index not in _cli_states:
@@ -238,8 +242,8 @@ def _execute_command(
         }
 
 
-def _probe_configuration(config: Dict[str, Any], working_dir: Path) -> bool:
-    """Run quick health probe for one configuration."""
+def _probe_configuration(config: Dict[str, Any], working_dir: Path, timeout: int = NO_TIMEOUT) -> bool:
+    """Run quick health probe for one configuration using the provided timeout."""
     cmd = _build_command(
         cli_command=config["cli_command"],
         cli_base_args=config["cli_args"],
@@ -250,7 +254,7 @@ def _probe_configuration(config: Dict[str, Any], working_dir: Path) -> bool:
         cli_command=config["cli_command"],
         cmd=cmd,
         working_dir=working_dir,
-        timeout=_PROBE_TIMEOUT_SECONDS,
+        timeout=timeout,
         capture_output=True,
     )
     return result["success"]
