@@ -21,6 +21,8 @@ from settings.main import (
 
 logger = logging.getLogger(__name__)
 _active_cli_configuration_index = 0
+NO_TIMEOUT = -1
+
 _PROBE_INSTRUCTIONS = "are you working?"
 # 600 seconds (10 minutes) balances catching hung tools without waiting too long.
 # CLI tools like Claude Code or Codex can take minutes to cold-start, so we
@@ -51,8 +53,9 @@ def _check_startup_health(working_dir: Path) -> None:
     for index, config in enumerate(settings.cli_configurations):
         state = _get_cli_state(index)
         c_dict = _config_to_dict(config)
+        probe_timeout = config.timeout if config.timeout != NO_TIMEOUT else _PROBE_TIMEOUT_SECONDS
         try:
-            if _probe_configuration(c_dict, working_dir, timeout=config.timeout):
+            if _probe_configuration(c_dict, working_dir, timeout=probe_timeout):
                 logger.info(f"CLI tool {config.name} is healthy.")
                 state["active"] = True
             else:
@@ -77,8 +80,9 @@ def _check_cooldowns(working_dir: Path) -> None:
         if not state["active"] and now >= state["cooldown_until"]:
             logger.info(f"Checking if CLI tool {config.name} has recovered...")
             c_dict = _config_to_dict(config)
+            probe_timeout = config.timeout if config.timeout != NO_TIMEOUT else _PROBE_TIMEOUT_SECONDS
             try:
-                if _probe_configuration(c_dict, working_dir, timeout=config.timeout):
+                if _probe_configuration(c_dict, working_dir, timeout=probe_timeout):
                     logger.info(f"CLI tool {config.name} successfully recovered.")
                     state["active"] = True
                 else:

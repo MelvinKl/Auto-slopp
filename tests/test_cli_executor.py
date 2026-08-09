@@ -530,6 +530,35 @@ def test_startup_health_cooldown_seconds_applied(mock_run, monkeypatch):
     assert _cli_states[1]["cooldown_until"] == 0
 
 
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_startup_health_uses_config_timeout(mock_run, monkeypatch):
+    """Startup health check should use the timeout from CLIConfiguration."""
+    success_result = MagicMock()
+    success_result.returncode = 0
+    success_result.stdout = "ok"
+    success_result.stderr = ""
+    mock_run.return_value = success_result
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(
+                cli_command="tool-1",
+                cli_args=["run"],
+                name="tool-1",
+                timeout=30,
+            ),
+        ],
+    )
+
+    _check_startup_health(Path.cwd())
+
+    assert mock_run.call_count == 1
+    call_kwargs = mock_run.call_args.kwargs
+    assert call_kwargs["timeout"] == 30
+
+
 def test_config_to_dict():
     """_config_to_dict returns the expected keys and values."""
     cfg = CLIConfiguration(cli_command="cc", cli_args=["--x", "--y"], name="my-cc")
