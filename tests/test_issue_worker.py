@@ -1783,17 +1783,18 @@ class TestPRBodyLinkingIntegration:
         assert "Closes #7" in pr_body  # Current issue link added
         assert "Fixes #99" in pr_body  # Original link preserved
 
-    def test_ralph_disabled_get_default_pr_body_vikunja_no_link(self):
-        """VikunjaTaskSource.get_default_pr_body does NOT use ensure_issue_link_in_pr_body.
+    def test_ralph_disabled_get_default_pr_body_vikunja_has_link(self):
+        """VikunjaTaskSource.get_default_pr_body uses ensure_issue_link_in_pr_body.
 
-        Note: This is intentional — Step 4 only updated GitHubTaskSource for defense-in-depth.
-        VikunjaTaskSource.get_default_pr_body uses a different format without closing keywords.
+        The PR body should contain both the Vikunja format prefix AND a valid
+        closing keyword for the issue to ensure proper GitHub issue linking.
         """
         task = Task(id=42, title="Test Task", body="Some task body")
         pr_body = VikunjaTaskSource().get_default_pr_body(task)
-        # Vikunja format uses "Vikunja Task #42:" prefix, not "Closes #42"
+        # Vikunja format uses "Vikunja Task #42:" prefix
         assert "Vikunja Task #42: Test Task" in pr_body
-        assert "Closes #42" not in pr_body
+        # Should also contain a valid closing keyword for proper GitHub linking
+        assert "Closes #42" in pr_body
 
     def test_ralph_disabled_get_default_pr_body_large_issue_id(self):
         """When ralph_enabled=False with large issue ID, get_default_pr_body still has valid link."""
