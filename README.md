@@ -784,15 +784,22 @@ If the final evaluation fails (either after all steps complete or at max iterati
 
 #### TaskResult Structure
 
-Each processed task produces a `TaskResult` dict. The `success` field uses `None` as the canonical signal for a skipped task (in addition to `status="skipped"`). All result-returning paths use `_create_base_result()` to ensure a consistent structure.
+Each processed task produces a `TaskResult` dict. The `success` field uses `None` as the canonical signal for a skipped task (in addition to `status="skipped"`). All result-returning paths use `_init_result()` to ensure a consistent structure.
 
-**Status values:**
+**Status values (`TaskStatus` enum):**
 
 | `status` value | `success` value | Description |
 |---|---|---|
+| `pending` | `True` (initial) | Task was initialised but not yet processed |
 | `success` | `True` | Task completed successfully |
 | `failure` | `False` | Task failed due to an error (logged as warning) |
 | `skipped` | `None` | Task was skipped intentionally — **not** counted as a failure |
+
+**Helper methods:**
+
+- `_init_result()` — Creates the base result with `status=TaskStatus.PENDING` and `success=True` (neutral pending state).
+- `_skip_task()` — Sets canonical skip signal: `success=None`, `status=TaskStatus.SKIPPED`, and calls `task_source.on_skip(task)`.
+- `_set_failure()` — Sets `status=TaskStatus.FAILURE`, `success=False`, and `task_completed=False`.
 
 **Result dict fields:**
 
@@ -802,7 +809,7 @@ Each processed task produces a `TaskResult` dict. The `success` field uses `None
 | `task_id` | `int` | Task/issue ID |
 | `task_title` | `str` | Task title |
 | `success` | `bool \| None` | `True`=success, `False`=failure, `None`=skipped (canonical skip signal) |
-| `status` | `str` | Outcome label: `'success'`, `'failure'`, or `'skipped'` |
+| `status` | `str` | Outcome label: `'pending'`, `'success'`, `'failure'`, or `'skipped'` |
 | `openagent_executed` | `bool` | Whether an agent was executed |
 | `openagent_executions` | `int` | Number of agent executions |
 | `task_completed` | `bool` | Whether the task was fully completed |
@@ -812,7 +819,7 @@ Each processed task produces a `TaskResult` dict. The `success` field uses `None
 | `error` | `str \| None` | Error message (if any) |
 | `ralph_loops_executed` | `int` | Number of Ralph loops executed |
 | `ralph_steps_completed` | `int` | Number of Ralph steps completed |
-| `skip_reason` | `str` | Reason for skipping (optional, set when skipped) |
+| `skip_reason` | `str \| None` | Reason for skipping (present only when `status == "skipped"`) |
 | `no_changes` | `bool` | True when task required no changes (optional) |
 | `pr_url` | `str` | URL of the created PR (optional) |
 | `pr_review_done` | `bool` | True when PR review was performed (optional) |
