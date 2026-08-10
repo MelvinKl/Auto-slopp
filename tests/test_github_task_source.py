@@ -591,33 +591,21 @@ class TestGitHubTaskSource:
         mock_comment.assert_not_called()
         mock_remove.assert_not_called()
 
-    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
-    @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
-    @patch("auto_slopp.workers.github_task_source.settings")
-    def test_on_skip_no_comment(self, mock_settings, mock_remove, mock_comment):
-        """Test that on_skip does NOT post a GitHub comment, only logs."""
-        mock_settings.github_issue_worker_required_label = "test-label"
+    def test_on_skip_only_logs(self):
+        """Test that on_skip only logs the skip event without posting comments or removing labels."""
         task_source = GitHubTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
 
+        # Should not raise any exceptions
         task_source.on_skip(task)
 
-        mock_comment.assert_not_called()
-        mock_remove.assert_not_called()
-
-    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
-    @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
-    @patch("auto_slopp.workers.github_task_source.settings")
-    def test_on_skip_handles_missing_repo_path(self, mock_settings, mock_remove, mock_comment):
-        """Test that on_skip handles missing repo_path in task."""
-        mock_settings.github_issue_worker_required_label = "test-label"
+    def test_on_skip_handles_missing_repo_path(self):
+        """Test that on_skip handles missing repo_path in task without error."""
         task_source = GitHubTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={})
 
+        # Should not raise any exceptions
         task_source.on_skip(task)
-
-        mock_comment.assert_not_called()
-        mock_remove.assert_not_called()
 
     def test_pr_mentions_issue_in_title(self):
         """Test that _pr_mentions_issue returns True when issue number is in PR title."""

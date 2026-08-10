@@ -20,9 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **IssueWorker**: Skipped tasks (e.g., when branch creation fails) are no longer recorded as failures. A new `status` field on task results distinguishes between `success`, `failure`, and `skipped`. The summary now reports skipped task counts separately from failures.
+- **GitHubTaskSource**: Simplified `on_skip` to only log skip events without posting GitHub comments, reducing issue clutter.
 
 ### Documentation
 - Updated README.md to reflect removal of intermediate checks and new final acceptance check behavior
+- Updated README.md to document `on_skip` behavior (GitHub tasks log-only, Vikunja tasks post comments) and TaskSource lifecycle hooks
+- Updated `test_github_task_source.py` to reflect simplified `on_skip` behavior (removed unnecessary mocks)
 
 ## [0.1.0] - 2024-01-01
 

@@ -859,7 +859,7 @@ Convenience wrapper around IssueWorker configured with GitHubTaskSource. Handles
 
 **Comment Condensation**: When processing GitHub issues, Auto-slopp condenses comments from the issue author and/or the whitelisted `allowed_creator` into a single summary comment. Comments from other users are ignored. After condensation, the original comments from the author/allowed creator are deleted and replaced with the summary.
 
-**LLM Unavailability Handling**: When the LLM is unavailable (e.g., rate limiting, connection errors, timeouts), Auto-slopp skips the task instead of failing it. A comment is added to the issue/task explaining the skip, and the required label/tag is preserved so the task can be retried when the LLM becomes available. This prevents permanent failures for transient issues.
+**LLM Unavailability Handling**: When the LLM is unavailable (e.g., rate limiting, connection errors, timeouts), Auto-slopp skips the task instead of failing it. The required label/tag is preserved so the task can be retried when the LLM becomes available. This prevents permanent failures for transient issues. Note: For GitHub tasks, skip events are logged only (no comment posted to avoid cluttering issues). For Vikunja tasks, a skip comment is added to the task.
 
 ```python
 from auto_slopp.workers import GitHubIssueWorker
@@ -891,6 +891,14 @@ Base class and implementations for loading tasks from different sources:
 - `TaskSource`: Abstract base class for task loading
 - `GitHubTaskSource`: Loads tasks from GitHub issues
 - `VikunjaTaskSource`: Loads tasks from Vikunja project
+
+The `TaskSource` interface defines lifecycle hooks for task processing:
+- `on_task_start(task, branch_name)`: Called when task processing begins
+- `on_task_complete(task, branch_name, pr_url, findings)`: Called on successful completion
+- `on_task_failure(task, error)`: Called when a task fails
+- `on_no_changes(task)`: Called when no changes were needed
+- `on_skip(task)`: Called when a task is skipped (e.g., LLM unavailable). Skips are logged but do not post comments to GitHub issues (to avoid cluttering issues).
+- `on_max_iterations_reached(task, steps_completed, total_steps, error)`: Called when max iterations are reached
 
 ## API Reference
 
