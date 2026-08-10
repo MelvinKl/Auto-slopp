@@ -98,6 +98,10 @@ def ensure_issue_link_in_pr_body(body: str, issue_id: int) -> str:
     Raises:
         TypeError: If issue_id is not a positive integer (rejects bools, strings, floats, negatives, zero)
     """
+    # Type validation: reject non-string body
+    if not isinstance(body, str):
+        raise TypeError(f"body must be a string, got {type(body).__name__}: {body!r}")
+
     # Type validation: reject booleans, strings, floats, negatives, and zero
     if isinstance(issue_id, bool) or not isinstance(issue_id, int):
         raise TypeError(f"issue_id must be a positive integer, got {type(issue_id).__name__}: {issue_id!r}")
