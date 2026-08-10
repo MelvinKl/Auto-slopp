@@ -108,6 +108,6 @@ def ensure_issue_link_in_pr_body(body: str, issue_id: int) -> str:
     if _find_existing_link(body, issue_id):
         return body
 
-    # Not linked, prepend
-    body = f"Closes #{issue_id}\n\n{body}\n"
+    # Not linked, prepend — normalize trailing whitespace before appending
+    body = f"Closes #{issue_id}\n\n{body.rstrip()}\n"
     return body
