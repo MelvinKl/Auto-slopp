@@ -587,7 +587,7 @@ class RalphExecutor:
             f"Keep your implementation simple. Only implement what is required. "
             f"Check if there are components you can reuse. "
             f"Ensure that 'make test' runs successful. Only push if ALL tests are successful. "
-            f"Check if you need to update the README.md."
+            f"Check if you need to update the README.md and any documentation in docs/ if it exists."
         )
 
     def _build_progress_info(self, plan: Plan) -> str:
@@ -604,6 +604,197 @@ class RalphExecutor:
             status = "\u2713" if step.is_closed else "\u25cb"
             lines.append(f"{status} Step {step.number}: {step.description}")
         return "\n".join(lines)
+
+    def _build_all_steps_instructions(
+        self,
+        plan: Plan,
+        issue_title: str,
+        issue_body: str,
+        comment_texts: List[str],
+        branch_name: str,
+    ) -> str:
+        """Build instructions for implementing ALL remaining open steps at once.
+
+        Args:
+            plan: Current plan with all steps
+            issue_title: Issue title
+            issue_body: Issue body
+            comment_texts: Comment texts
+            branch_name: Branch name
+
+        Returns:
+            Instructions string for implementing all remaining steps
+        """
+        body_text = f"\n{issue_body}" if issue_body else ""
+        comments_text = ""
+        if comment_texts:
+            comments_text = "\nComments:\n" + "\n".join(f"- {comment}" for comment in comment_texts if comment)
+
+        open_steps = plan.get_open_steps()
+        if not open_steps:
+            return ""
+
+        # Build step list with acceptance criteria
+        steps_text = ""
+        for step in plan.steps:
+            checkbox = "[x]" if step.is_closed else "[ ]"
+            steps_text += f"{checkbox} {step.number}. {step.description}\n"
+            # Include acceptance criteria if present
+            # Acceptance criteria are typically indented bullets after the step
+
+        return (
+            f"You are already on branch '{branch_name}'. "
+            f"Work on this branch, implement the changes for ALL remaining open steps, commit them, and push.\n"
+            f"Implement the following:\n"
+            f"Title: {issue_title}\n"
+            f"Description:{body_text}\n"
+            f"{comments_text}\n\n"
+            f"## All Steps to Implement\n\n"
+            f"{steps_text}\n"
+            f"Focus on implementing ALL open steps listed above. Once done, mark them as complete in your work. "
+            f"Keep your implementation simple. Only implement what is required. "
+            f"Check if there are components you can reuse. "
+            f"Ensure that 'make test' runs successful. Only push if ALL tests are successful. "
+            f"Check if you need to update the README.md."
+        )
+
+    def _execute_all_steps(
+        self,
+        plan: Plan,
+        repo_dir: Path,
+        issue_title: str,
+        issue_body: str,
+        comment_texts: List[str],
+        branch_name: str,
+    ) -> Dict[str, Any]:
+        """Execute ALL remaining open steps in a single CLI call.
+
+        Args:
+            plan: The full plan containing all steps
+            repo_dir: Repository directory
+            issue_title: GitHub issue title
+            issue_body: GitHub issue body
+            comment_texts: List of comment texts from the issue
+            branch_name: Git branch name
+
+        Returns:
+            Execution result dictionary
+        """
+        open_steps = plan.get_open_steps()
+        if not open_steps:
+            return {"success": True, "message": "No open steps to execute"}
+
+        step_instructions = self._build_all_steps_instructions(
+            plan=plan,
+            issue_title=issue_title,
+            issue_body=issue_body,
+            comment_texts=comment_texts,
+            branch_name=branch_name,
+        )
+
+        if not step_instructions:
+            return {"success": True, "message": "No steps to execute"}
+
+        self.logger.info(f"Executing {len(open_steps)} remaining steps in a single call")
+
+        result = self.execute_fn(
+            step_instructions,
+            repo_dir,
+            self.agent_args,
+            self.timeout,
+            task_name=self.implementation_name,
+        )
+
+        if result.get("success", False):
+            self.logger.info(f"All {len(open_steps)} steps completed successfully")
+        else:
+            self.logger.warning(f"Step execution failed: {result.get('error', 'Unknown error')}")
+
+        return result
+
+    def _execute_step(
+        self,
+        step: Step,
+        plan: Plan,
+        repo_dir: Path,
+        issue_title: str,
+        issue_body: str,
+        comment_texts: List[str],
+        branch_name: str,
+    ) -> Dict[str, Any]:
+        """Execute a single step from the plan.
+
+        Args:
+            step: Step to execute
+            plan: The full plan containing all steps
+            repo_dir: Repository directory
+            issue_title: GitHub issue title
+            issue_body: GitHub issue body
+            comment_texts: List of comment texts from the issue
+            branch_name: Git branch name
+
+        Returns:
+            Execution result dictionary
+        """
+        step_instructions = self._build_step_instructions(
+            step=step,
+            plan=plan,
+            issue_title=issue_title,
+            issue_body=issue_body,
+            comment_texts=comment_texts,
+            branch_name=branch_name,
+        )
+
+        self.logger.info(f"Executing step {step.number}: {step.description}")
+
+        result = self.execute_fn(
+            step_instructions,
+            repo_dir,
+            self.agent_args,
+            self.timeout,
+            task_name=self.implementation_name,
+        )
+
+        if result.get("success", False):
+            self.logger.info(f"Step {step.number} completed successfully")
+        else:
+            self.logger.warning(f"Step {step.number} failed: {result.get('error', 'Unknown error')}")
+
+        return result
+
+    def _execute_all_steps_batch(
+        self,
+        plan: Plan,
+        repo_dir: Path,
+        issue_title: str,
+        issue_body: str,
+        comment_texts: List[str],
+        branch_name: str,
+    ) -> Dict[str, Any]:
+        """Execute ALL remaining open steps in a single CLI call (batch mode).
+
+        This replaces the per-step loop with a single CLI invocation that handles
+        all remaining steps at once.
+
+        Args:
+            plan: The full plan containing all steps
+            repo_dir: Repository directory
+            issue_title: GitHub issue title
+            issue_body: GitHub issue body
+            comment_texts: List of comment texts from the issue
+            branch_name: Git branch name
+
+        Returns:
+            Execution result dictionary
+        """
+        return self._execute_all_steps(
+            plan=plan,
+            repo_dir=repo_dir,
+            issue_title=issue_title,
+            issue_body=issue_body,
+            comment_texts=comment_texts,
+            branch_name=branch_name,
+        )
 
     def _build_final_acceptance_check_instructions(
         self,
@@ -871,7 +1062,13 @@ class RalphExecutor:
         branch_name: str,
         issue_number: int = 0,
     ) -> Dict[str, Any]:
-        """Iterate through task steps, implementing and validating acceptance criteria."""
+        """Execute all remaining steps in a single batched CLI call, with retry on failure.
+
+        Instead of calling the CLI once per step, this method calls the CLI once with
+        ALL remaining open steps. If the batch execution fails, it retries up to
+        max_iterations times (useful for transient errors). After successful execution,
+        a final acceptance check validates all steps.
+        """
         max_iterations = self.max_iterations
         result: Dict[str, Any] = {
             "success": False,
@@ -895,10 +1092,11 @@ class RalphExecutor:
                 }
 
             result["total_steps"] = len(plan.steps)
-            next_step = plan.get_next_open_step()
-            if not next_step:
-                result["steps_completed"] = len([step for step in plan.steps if step.is_closed])
+            result["steps_completed"] = len([step for step in plan.steps if step.is_closed])
 
+            open_steps = plan.get_open_steps()
+            if not open_steps:
+                # No open steps - run final acceptance check
                 final_check_result = self._execute_final_acceptance_check(
                     repo_dir=repo_dir,
                     task_path=task_path,
@@ -919,8 +1117,8 @@ class RalphExecutor:
                 result["error"] = final_check_result.get("error", "Final acceptance check failed")
                 return result
 
-            step_result = self._execute_step(
-                step=next_step,
+            # Execute ALL remaining open steps in a single batched CLI call
+            step_result = self._execute_all_steps_batch(
                 plan=plan,
                 repo_dir=repo_dir,
                 issue_title=issue_title,
@@ -928,42 +1126,28 @@ class RalphExecutor:
                 comment_texts=comment_texts,
                 branch_name=branch_name,
             )
+            result["loops_executed"] = iteration
+
             if not step_result.get("success", False):
-                self._last_error = step_result.get("error", "Step implementation failed")
+                result["last_error"] = step_result.get("error", "Step implementation failed")
+                self._last_error = result["last_error"]
                 self._last_iteration_failure_reason = self._last_error
-                result["last_error"] = self._last_error
-                result["loops_executed"] = iteration
+                self.logger.warning(f"Batch step execution failed on iteration {iteration}: {step_result.get('error', 'Unknown error')}")
                 continue
 
-            if not self._step_is_closed(task_path, next_step.number):
-                self._mark_step_completed_in_file(task_path, next_step.number)
+            # After batch execution, check if all steps are now closed
+            try:
+                updated_plan = PlanParser.parse_file(task_path)
+                result["steps_completed"] = len([step for step in updated_plan.steps if step.is_closed])
+            except Exception:
+                pass
 
-            if not self._step_is_closed(task_path, next_step.number):
-                self._last_iteration_failure_reason = f"Step {next_step.number} is still open after execution"
-                result["last_error"] = self._last_iteration_failure_reason
-                result["loops_executed"] = iteration
-                continue
-
+            # Commit any changes made during batch execution
             repo_has_changes = False
             try:
                 repo_has_changes = self.has_changes_fn(repo_dir)
             except Exception as e:
-                self.logger.warning(f"Could not determine git changes for step commit: {str(e)}")
-
-            if repo_has_changes:
-                commit_message = f"Complete issue step {next_step.number}: {next_step.description}"
-                commit_success, _ = self.commit_fn(repo_dir, commit_message, False)
-                if not commit_success:
-                    self._last_iteration_failure_reason = f"Failed to commit changes for step {next_step.number}"
-                    return {
-                        "success": False,
-                        "error": f"Failed to commit changes for step {next_step.number}",
-                        "loops_executed": iteration,
-                        "steps_completed": result["steps_completed"],
-                        "total_steps": result["total_steps"],
-                        "max_loops_reached": False,
-                    }
-
+                self.logger.warning(f"Could not determine git changes after batch execution: {str(e)}")
             try:
                 updated_plan = PlanParser.parse_file(task_path)
                 result["steps_completed"] = len([step for step in updated_plan.steps if step.is_closed])
@@ -976,8 +1160,16 @@ class RalphExecutor:
 
             result["loops_executed"] = iteration
 
+            if repo_has_changes:
+                commit_message = f"Complete issue steps {result['steps_completed']}/{result['total_steps']}"
+                commit_success, _ = self.commit_fn(repo_dir, commit_message, False)
+                if not commit_success:
+                    result["error"] = "Failed to commit changes after batch execution"
+                    self.logger.error(result["error"])
+                    continue
+
+        # Max iterations reached
         result["max_loops_reached"] = True
-        result["loops_executed"] = max_iterations
         result["error"] = f"Maximum iterations ({max_iterations}) reached before all steps completed"
 
         # Validate whatever work was accomplished before the budget ran out so
@@ -992,8 +1184,7 @@ class RalphExecutor:
             )
             if final_check_result.get("success", False):
                 if result["steps_completed"] >= result["total_steps"]:
-                    # All steps were completed on the final iteration and pass
-                    # validation, so the task is actually complete.
+                    # All steps were completed and pass validation
                     result["success"] = True
                     result["max_loops_reached"] = False
                     result.pop("error", None)

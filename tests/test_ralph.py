@@ -1328,11 +1328,18 @@ class TestRalphExecutor:
             ralph_executor.has_changes_fn = lambda path: False
 
             validation_calls = [0]
+            implementation_calls = [0]
 
             def tracking_execute_fn(*args, **kwargs):
-                if kwargs.get("task_name") == "task_implementation_validation":
+                task_name = kwargs.get("task_name", "unknown")
+                if task_name == "task_implementation_validation":
                     validation_calls[0] += 1
                     return {"success": True, "stdout": "ACCEPTANCE_STATUS: fail"}
+                if task_name == "implementation":
+                    implementation_calls[0] += 1
+                    # Simulate the CLI marking all steps as closed in the task file
+                    task_path.write_text("# Test\n\n## Steps\n\n- [x] 1. First step\n- [x] 2. Second step\n")
+                    return {"success": True}
                 return {"success": True, "stdout": "Done"}
 
             ralph_executor.execute_fn = tracking_execute_fn
@@ -1347,11 +1354,12 @@ class TestRalphExecutor:
                 issue_number=1,
             )
 
+            # With batch execution, all steps are executed in one CLI call
             assert result["success"] is False
-            assert result["max_loops_reached"] is True
-            assert "Maximum iterations" in result["error"]
+            assert result["max_loops_reached"] is False, "Batch execution completes in 1 iteration"
             assert result["steps_completed"] == 2
-            assert result["loops_executed"] == 2
+            assert result["loops_executed"] == 1
+            assert implementation_calls[0] == 1, "Expected 1 batched implementation call"
             assert validation_calls[0] == 1
             assert result["last_error"] == "Final acceptance criteria were not fulfilled"
 
@@ -1366,10 +1374,18 @@ class TestRalphExecutor:
             ralph_executor.max_iterations = 2
             ralph_executor.has_changes_fn = lambda path: False
 
-            ralph_executor.execute_fn = lambda *args, **kwargs: {
-                "success": True,
-                "stdout": "ACCEPTANCE_STATUS: fail",
-            }
+            validation_calls = [0]
+
+            def tracking_execute_fn(*args, **kwargs):
+                task_name = kwargs.get("task_name", "unknown")
+                if task_name == "task_implementation_validation":
+                    validation_calls[0] += 1
+                    return {"success": True, "stdout": "ACCEPTANCE_STATUS: fail"}
+                # Implementation call - mark all steps as closed
+                task_path.write_text("# Test\n\n## Steps\n\n- [x] 1. First step\n- [x] 2. Second step\n")
+                return {"success": True}
+
+            ralph_executor.execute_fn = tracking_execute_fn
 
             result = ralph_executor._run_refined_task_loop(
                 repo_dir=repo_dir,
@@ -1382,11 +1398,13 @@ class TestRalphExecutor:
             )
 
             assert result["success"] is False
-            assert result["max_loops_reached"] is True
+            assert result["max_loops_reached"] is False, "Batch execution completes in 1 iteration"
+            assert result["loops_executed"] == 1
             assert not task_path.exists(), "Task file should be deleted on failed evaluation at max iterations"
+            assert validation_calls[0] == 1
 
     def test_run_refined_task_loop_no_intermediate_checks(self, ralph_executor):
-        """Test that refined task loop executes steps without intermediate checks."""
+        """Test that refined task loop executes steps in a single batch call with final validation."""
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_dir = Path(tmpdir)
             task_path = repo_dir / "task.md"
@@ -1410,7 +1428,17 @@ class TestRalphExecutor:
                 call_log.append(task_name)
                 if task_name == "task_implementation_validation":
                     return {"success": True, "stdout": "ACCEPTANCE_STATUS: pass"}
-                return {"success": True, "stdout": "Done"}
+                # Implementation call - mark all steps as closed
+                task_path.write_text(
+                    "# Test\n"
+                    "\n"
+                    "## Steps\n"
+                    "\n"
+                    "- [x] 1. First step\n"
+                    "- [x] 2. Second step\n"
+                    "- [x] 3. Run make test\n"
+                )
+                return {"success": True}
 
             ralph_executor.execute_fn = tracking_execute_fn
             ralph_executor.commit_fn = lambda path, msg, push: (True, None)
@@ -1430,9 +1458,9 @@ class TestRalphExecutor:
 
             implementation_calls = [c for c in call_log if c == "implementation"]
             validation_calls = [c for c in call_log if c == "task_implementation_validation"]
-            remaining_steps_calls = [c for c in call_log if c == "remaining_steps_update"]
 
-            assert len(implementation_calls) == 3, f"Expected 3 implementation calls, got {len(implementation_calls)}"
+            # With batch execution, all steps are implemented in a single CLI call
+            assert len(implementation_calls) == 1, f"Expected 1 batched implementation call, got {len(implementation_calls)}"
             assert len(validation_calls) == 1, f"Expected 1 final validation call, got {len(validation_calls)}"
             assert (
                 len(remaining_steps_calls) == 0
