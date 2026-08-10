@@ -16,6 +16,12 @@ class TaskRating(BaseModel):
     recommended_rating: int = Field(default=5, ge=0, le=10, description="Preferred capability level")
 
 
+NO_TIMEOUT = -1
+"""Sentinel value for timeout: -1 means never timeout (subprocess runs indefinitely)."""
+
+_MAX_TIMEOUT_SECONDS = 31_536_000  # ~1 year in seconds
+
+
 class CLIConfiguration(BaseModel):
     """Single CLI configuration entry for tiered failover."""
 
@@ -48,6 +54,27 @@ class CLIConfiguration(BaseModel):
         default_factory=list,
         description="Task names for which this CLI configuration should not be used",
     )
+    timeout: int = Field(
+        default=NO_TIMEOUT,
+        description=(
+            "Timeout in seconds for CLI command execution. "
+            "Set to NO_TIMEOUT to disable timeout (never timeout). "
+            "When NO_TIMEOUT, the caller-provided timeout is ignored for this configuration."
+        ),
+    )
+
+    @field_validator("timeout")
+    @classmethod
+    def validate_timeout(cls, v: int) -> int:
+        """Only allow -1 (NO_TIMEOUT) or positive integers up to 1 year for timeout."""
+        if v == NO_TIMEOUT:
+            return v
+        if 0 < v <= _MAX_TIMEOUT_SECONDS:
+            return v
+        raise ValueError(
+            f"timeout must be -1 (NO_TIMEOUT) or a positive integer up to {_MAX_TIMEOUT_SECONDS} seconds "
+            f"(~1 year), got {v}. A value of -1 means never timeout; positive values specify seconds."
+        )
 
     @field_validator("timeout")
     @classmethod
@@ -181,7 +208,9 @@ class Settings(BaseSettings):
 
     slop_timeout: int = Field(
         default=10000,
-        description="Timeout for slopmachine execution in seconds (default: 2 hours)",
+        ge=1,
+        le=30 * 24 * 60 * 60,
+        description="Timeout for slopmachine execution in seconds (1 to 30 days)",
     )
 
     github_issue_worker_required_label: str = Field(
