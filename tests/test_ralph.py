@@ -1458,9 +1458,12 @@ class TestRalphExecutor:
 
             implementation_calls = [c for c in call_log if c == "implementation"]
             validation_calls = [c for c in call_log if c == "task_implementation_validation"]
+            remaining_steps_calls = [c for c in call_log if c == "remaining_steps_update"]
 
             # With batch execution, all steps are implemented in a single CLI call
-            assert len(implementation_calls) == 1, f"Expected 1 batched implementation call, got {len(implementation_calls)}"
+            assert (
+                len(implementation_calls) == 1
+            ), f"Expected 1 batched implementation call, got {len(implementation_calls)}"
             assert len(validation_calls) == 1, f"Expected 1 final validation call, got {len(validation_calls)}"
             assert (
                 len(remaining_steps_calls) == 0
