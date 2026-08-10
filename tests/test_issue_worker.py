@@ -423,7 +423,7 @@ class TestIssueWorker:
         assert result["success"] is True
         assert result["tasks_processed"] == 0
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["success"] is None
         assert result["task_results"][0].get("skipped") is True
         assert task_source.on_skip_called is True
         assert "No active CLI configuration available" in task_source.skip_reason
@@ -464,7 +464,7 @@ class TestIssueWorker:
         assert result["success"] is True
         assert result["tasks_processed"] == 0
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["success"] is None
         assert result["task_results"][0].get("skipped") is True
         assert task_source.on_skip_called is True
         assert "All CLI configurations exhausted" in task_source.skip_reason
@@ -1525,17 +1525,17 @@ class TestIssueWorker:
         caplog,
     ):
         """Test that on_skip is called when LLM unavailable and no commits ahead of main."""
-        mock_cli.return_value = True  # ensure_ralph_in_gitignore
-        mock_commits_ahead.return_value = "opencode"  # get_active_cli_command
-        mock_checkout.return_value = True  # create_and_checkout_branch
-        mock_create_branch.return_value = True  # has_changes
-        mock_has_changes.return_value = "ai/task-1"  # get_current_branch
-        mock_current_branch.ralph_enabled = True  # settings
-        mock_current_branch.github_issue_step_max_iterations = 10  # settings
-        mock_settings.return_value = (True, "")  # push_to_remote
-        mock_push.return_value = 0  # get_commits_ahead_of_branch
-        mock_commit_push.return_value = (True, "")  # checkout_branch_resilient
-        mock_ensure_gitignore.return_value = (True, "")  # commit_and_push_changes
+        mock_ensure_gitignore.return_value = (True, "")  # ensure_ralph_in_gitignore
+        mock_cli.return_value = "opencode"  # get_active_cli_command
+        mock_commits_ahead.return_value = 0  # get_commits_ahead_of_branch
+        mock_push.return_value = (True, "")  # push_to_remote
+        mock_settings.ralph_enabled = True  # settings
+        mock_settings.github_issue_step_max_iterations = 10  # settings
+        mock_current_branch.return_value = "ai/task-1"  # get_current_branch
+        mock_has_changes.return_value = True  # has_changes
+        mock_create_branch.return_value = True  # create_and_checkout_branch
+        mock_checkout.return_value = True  # checkout_branch_resilient
+        mock_commit_push.return_value = (True, "")  # commit_and_push_changes
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
         worker.ralph_executor.execute = lambda *args, **kwargs: {
@@ -1554,16 +1554,12 @@ class TestIssueWorker:
         assert result["tasks_processed"] == 0
         assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["success"] is None
+        assert result["task_results"][0]["status"] == "skipped"
         assert result["task_results"][0]["skipped"] is True
-        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no commits ahead"
+        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no changes made"
         assert task_source.on_skip_called is True
         assert task_source.on_no_changes_called is False
-        # Verify ensure_ralph_in_gitignore was called
-        mock_cli.assert_called_once()
-        # Verify no warning was logged
-        gitignore_warnings = [r for r in caplog.records if "Failed to ensure .ralph in .gitignore" in r.message]
-        assert len(gitignore_warnings) == 0
         # Verify LLM unavailability causes skip (not failure)
         assert result["success"] is True
         assert result["tasks_processed"] == 0

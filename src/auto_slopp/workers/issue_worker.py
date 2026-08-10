@@ -660,6 +660,7 @@ class IssueWorker(Worker):
         result = self._init_result(repo_dir, task)
         result["success"] = None
         result["status"] = TaskStatus.SKIPPED
+        result["skipped"] = True
         if skip_reason:
             result["skip_reason"] = skip_reason
         self.task_source.on_skip(task, skip_reason or "")
