@@ -13,8 +13,10 @@ CLOSING_KEYWORDS = ("closes", "fixes", "resolves")
 # - Prevents false positives like '#1' matching inside '#1234'
 # - Supports 'owner/repo#123' format in addition to plain '#123'
 # - Supports nested paths like 'org/subteam/repo#123'
+# Keywords are dynamically joined from CLOSING_KEYWORDS so adding/removing
+# keywords in CLOSING_KEYWORDS automatically updates the pattern.
 _CLOSING_PATTERN = re.compile(
-    r"\b(closes|fixes|resolves)\s+(?:(?:[\w-]+/)*[\w-]+)?#(?P<id>\d+)\b",
+    r"\b(" + "|".join(CLOSING_KEYWORDS) + r")\s+(?:(?:[\w-]+/)*[\w-]+)?#(?P<id>\d+)\b",
     re.IGNORECASE,
 )
 
