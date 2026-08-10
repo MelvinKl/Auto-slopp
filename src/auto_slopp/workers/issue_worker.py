@@ -639,7 +639,7 @@ Plan:
             f"Keep your implementation simple. Only implement what is required. "
             f"Check if there are components you can reuse. "
             f"Ensure that 'make test' runs successful. Push after you are done. "
-            f"Check if you need to update the README.md."
+            f"Check if you need to update the README.md and any documentation in docs/ if it exists."
         )
 
     def _generate_pr_body_from_task_file(
