@@ -299,7 +299,7 @@ class GitHubTaskSource(TaskSource):
         comment_on_issue(repo_path, task.id, no_changes_comment)
         close_issue(repo_path, task.id)
 
-    def on_skip(self, task: Task) -> None:
+    def on_skip(self, task: Task, reason: str = "") -> None:
         """Called when a task should be skipped (e.g., when LLM is unavailable).
 
         No comment is posted to the issue - skip information is only recorded
@@ -311,6 +311,7 @@ class GitHubTaskSource(TaskSource):
 
         Args:
             task: The task that should be skipped
+            reason: Optional reason for skipping (e.g., "LLM unavailable")
         """
         repo_path = task.raw.get("_repo_path")
         if repo_path is None:
@@ -320,7 +321,8 @@ class GitHubTaskSource(TaskSource):
         # No GitHub comment is posted for skips — skip events are logged-only
         # to avoid cluttering issues with skip notifications. The label is preserved
         # so the task can be retried when the LLM becomes available.
-        logger.info(f"Skipped issue #{task.id} - LLM unavailable, label preserved for retry")
+        reason_str = f" - {reason}" if reason else ""
+        logger.info(f"Skipped issue #{task.id} - LLM unavailable{reason_str}, label preserved for retry")
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.

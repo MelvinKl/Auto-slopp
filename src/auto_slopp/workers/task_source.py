@@ -120,13 +120,14 @@ class TaskSource(ABC):
         """
 
     @abstractmethod
-    def on_skip(self, task: Task) -> None:
+    def on_skip(self, task: Task, reason: str = "") -> None:
         """Called when a task should be skipped (e.g., when LLM is unavailable).
 
         The task remains open/active and can be retried later when conditions improve.
 
         Args:
             task: The task that should be skipped
+            reason: Optional reason for skipping (e.g., "LLM unavailable")
         """
 
     @abstractmethod

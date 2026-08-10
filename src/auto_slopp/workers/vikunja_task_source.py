@@ -270,7 +270,7 @@ class VikunjaTaskSource(TaskSource):
         if comment_success and status_success:
             commit(repo_path, f"Updated task {task_id} status to '{status}' and added comment")
 
-    def on_skip(self, task: Task) -> None:
+    def on_skip(self, task: Task, reason: str = "") -> None:
         """Called when a task should be skipped (e.g., when LLM is unavailable).
 
         Comments on the task explaining the skip. The required tag is NOT
@@ -278,17 +278,19 @@ class VikunjaTaskSource(TaskSource):
 
         Args:
             task: The task that should be skipped
+            reason: Optional reason for skipping (e.g., "LLM unavailable")
         """
         repo_path = task.raw.get("_repo_path")
         if repo_path is None:
             logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
             return
 
+        reason_str = f"\n\n**Reason:** {reason}" if reason else ""
         skip_comment = (
             f"⏭️ **Task Skipped: LLM Unavailable**\n\n"
             f"This task has been skipped for this iteration because the LLM is currently unavailable. "
             f"The task will be retried when the LLM becomes available.\n\n"
-            f"**Task:** {task.title}"
+            f"**Task:** {task.title}{reason_str}"
         )
         comment_success = comment_on_task(task.id, skip_comment)
         if not comment_success:

@@ -449,12 +449,13 @@ class TestVikunjaTaskSource:
         task_source = VikunjaTaskSource()
         task = Task(id=42, title="Test Task", body="", comments=[], raw={"_repo_path": Path("/test")})
 
-        task_source.on_skip(task)
+        task_source.on_skip(task, "LLM unavailable")
 
         mock_comment.assert_called_once()
         comment_args = mock_comment.call_args[0]
         assert comment_args[0] == 42
-        assert "Skipped: LLM Unavailable" in comment_args[1]
+        assert "Task Skipped" in comment_args[1]
+        assert "LLM unavailable" in comment_args[1]
         assert "test-tag" not in comment_args[1].lower()  # Tag should not be mentioned as removed
 
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
@@ -467,7 +468,7 @@ class TestVikunjaTaskSource:
         task = Task(id=42, title="Test Task", body="", comments=[], raw={})
 
         # Should not raise an exception
-        task_source.on_skip(task)
+        task_source.on_skip(task, "LLM unavailable")
 
         mock_comment.assert_not_called()
 
@@ -481,7 +482,7 @@ class TestVikunjaTaskSource:
         task_source = VikunjaTaskSource()
         task = Task(id=42, title="Test Task", body="", comments=[], raw={"_repo_path": Path("/test")})
 
-        task_source.on_skip(task)
+        task_source.on_skip(task, "LLM unavailable")
 
         mock_comment.assert_called_once()
         mock_commit.assert_not_called()

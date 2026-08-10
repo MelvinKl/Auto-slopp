@@ -656,7 +656,7 @@ class IssueWorker(Worker):
         result["status"] = TaskStatus.SKIPPED
         if skip_reason:
             result["skip_reason"] = skip_reason
-        self.task_source.on_skip(task)
+        self.task_source.on_skip(task, skip_reason or "")
         return result
 
     def _build_instructions(

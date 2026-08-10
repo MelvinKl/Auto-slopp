@@ -52,8 +52,9 @@ class MockTaskSource(TaskSource):
     def on_no_changes(self, task: Task) -> None:
         self.on_no_changes_called = True
 
-    def on_skip(self, task: Task) -> None:
+    def on_skip(self, task: Task, reason: str = "") -> None:
         self.on_skip_called = True
+        self.skip_reason = reason
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         self.on_max_iterations_called = True

@@ -821,7 +821,7 @@ Each processed task produces a `TaskResult` dict. The `success` field uses `None
 **Helper methods:**
 
 - `_init_result()` — Creates the base result with `status=TaskStatus.PENDING` and `success=True` (neutral pending state).
-- `_skip_task()` — Sets canonical skip signal: `success=None`, `status=TaskStatus.SKIPPED`, and calls `task_source.on_skip(task)`.
+- `_skip_task()` — Sets canonical skip signal: `success=None`, `status=TaskStatus.SKIPPED`, and calls `task_source.on_skip(task, reason)`.
 - `_set_failure()` — Sets `status=TaskStatus.FAILURE`, `success=False`, and `task_completed=False`.
 
 **Result dict fields:**
@@ -897,7 +897,7 @@ The `TaskSource` interface defines lifecycle hooks for task processing:
 - `on_task_complete(task, branch_name, pr_url, findings)`: Called on successful completion
 - `on_task_failure(task, error)`: Called when a task fails
 - `on_no_changes(task)`: Called when no changes were needed
-- `on_skip(task)`: Called when a task is skipped (e.g., LLM unavailable). Skips are logged but do not post comments to GitHub issues (to avoid cluttering issues).
+- `on_skip(task, reason="")`: Called when a task is skipped (e.g., LLM unavailable). For GitHub tasks, skips are logged only (no comment posted). For Vikunja tasks, a skip comment is added to the task. The `reason` parameter provides context for the skip.
 - `on_max_iterations_reached(task, steps_completed, total_steps, error)`: Called when max iterations are reached
 
 ## API Reference

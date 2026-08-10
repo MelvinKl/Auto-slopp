@@ -596,16 +596,16 @@ class TestGitHubTaskSource:
         task_source = GitHubTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
 
-        # Should not raise any exceptions
-        task_source.on_skip(task)
+        # Should not raise any exceptions - on_skip is now simplified to only log
+        task_source.on_skip(task, "LLM unavailable")
 
     def test_on_skip_handles_missing_repo_path(self):
         """Test that on_skip handles missing repo_path in task without error."""
         task_source = GitHubTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={})
 
-        # Should not raise any exceptions
-        task_source.on_skip(task)
+        # Should not raise any exceptions - on_skip is now simplified to only log
+        task_source.on_skip(task, "LLM unavailable")
 
     def test_pr_mentions_issue_in_title(self):
         """Test that _pr_mentions_issue returns True when issue number is in PR title."""
