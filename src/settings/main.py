@@ -271,6 +271,12 @@ class Settings(BaseSettings):
         description="Maximum step-iteration attempts for GitHub issue Ralph execution (default: 50)",
     )
 
+    github_issue_pr_review_max_iterations: int | None = Field(
+        default=5,
+        ge=1,
+        description="Maximum PR review iterations to fix issues before giving up (default: 5)",
+    )
+
     ralph_enabled: bool = Field(
         default=True,
         description="Enable Ralph loop-based step execution for GitHub issues",
