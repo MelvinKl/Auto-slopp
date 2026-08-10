@@ -468,7 +468,6 @@ class TestIssueWorker:
         # No LLM unavailability – genuine iteration exhaustion
         worker.ralph_executor._last_iteration_failure_reason = None
         worker.ralph_executor._last_error = "Step implementation failed: syntax error in code"
->>>>>>> 3a3ce112ee574cec2b681e87d3bc6c3687ce0b65
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0

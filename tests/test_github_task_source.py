@@ -633,7 +633,7 @@ class TestGitHubTaskSource:
         task_source.on_skip(task, "test reason")
 
         mock_comment.assert_called_once()
-        mock_remove.assert_called_once()
+        mock_remove.assert_not_called()
 
     def test_pr_mentions_issue_in_title(self):
         """Test that _pr_mentions_issue returns True when issue number is in PR title."""
