@@ -9,7 +9,7 @@ from auto_slopp.utils.cli_executor import (
     _config_to_dict,
     run_cli_executor,
 )
-from settings.main import CLIConfiguration, TaskRating
+from settings.main import NO_TIMEOUT, CLIConfiguration, TaskRating
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
@@ -32,7 +32,7 @@ def test_codex_uses_exec_subcommand_by_default(mock_run, monkeypatch):
 
     run_cli_executor(additional_instructions="Do work", working_directory=Path.cwd())
 
-    cmd = mock_run.call_args.kwargs["args"] if "args" in mock_run.call_args.kwargs else mock_run.call_args.args[0]
+    cmd = mock_run.call_args.args[0]
     # Check that it uses the provided args from CLIConfiguration
     assert cmd[0] == "codex"
     assert "--dangerously-bypass-approvals-and-sandbox" in cmd
@@ -55,7 +55,7 @@ def test_codex_preserves_existing_subcommand(mock_run, monkeypatch):
 
     run_cli_executor(additional_instructions="Review this", working_directory=Path.cwd())
 
-    cmd = mock_run.call_args.kwargs["args"] if "args" in mock_run.call_args.kwargs else mock_run.call_args.args[0]
+    cmd = mock_run.call_args.args[0]
     assert cmd[:2] == ["codex", "review"]
     assert "exec" not in cmd
 
@@ -82,9 +82,9 @@ def test_timeout_falls_back_to_next_configuration(mock_run, monkeypatch):
     result = run_cli_executor(additional_instructions="Do work", working_directory=Path.cwd(), timeout=30)
 
     assert result["success"] is True
-    called_commands = [call.args[0] for call in mock_run.call_args_list]
-    assert called_commands[0][0] == "opencode"
-    assert called_commands[1][0] == "codex"
+    called_commands = [call.args[0][0] for call in mock_run.call_args_list]
+    assert called_commands[0] == "opencode"
+    assert called_commands[1] == "codex"
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
@@ -162,9 +162,9 @@ def test_high_min_rating_skips_low_capability_tools(mock_run, monkeypatch):
     )
 
     assert result["success"] is True
-    called_commands = [call.args[0] for call in mock_run.call_args_list]
-    assert called_commands[0][0] == "strong-tool"
-    assert "weak-tool" not in called_commands[0]
+    called_commands = [call.args[0][0] for call in mock_run.call_args_list]
+    assert called_commands[0] == "strong-tool"
+    assert "weak-tool" not in called_commands
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
@@ -198,9 +198,9 @@ def test_min_rating_respects_max_rating_boundary(mock_run, monkeypatch):
     )
 
     assert result["success"] is True
-    called_commands = [call.args[0] for call in mock_run.call_args_list]
-    assert called_commands[0][0] == "perfect-tool"
-    assert "low-tool" not in called_commands[0]
+    called_commands = [call.args[0][0] for call in mock_run.call_args_list]
+    assert called_commands[0] == "perfect-tool"
+    assert "low-tool" not in called_commands
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
@@ -238,9 +238,9 @@ def test_blacklist_tasks_skips_configuration(mock_run, monkeypatch):
     )
 
     assert result["success"] is True
-    called_commands = [call.args[0] for call in mock_run.call_args_list]
-    assert called_commands[0][0] == "fallback-tool"
-    assert "blacklisted-tool" not in called_commands[0]
+    called_commands = [call.args[0][0] for call in mock_run.call_args_list]
+    assert called_commands[0] == "fallback-tool"
+    assert "blacklisted-tool" not in called_commands
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
@@ -280,8 +280,8 @@ def test_blacklist_tasks_does_not_affect_other_tasks(mock_run, monkeypatch):
     )
 
     assert result["success"] is True
-    called_commands = [call.args[0] for call in mock_run.call_args_list]
-    assert called_commands[0][0] == "preferred-tool"
+    called_commands = [call.args[0][0] for call in mock_run.call_args_list]
+    assert called_commands[0] == "preferred-tool"
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
@@ -576,3 +576,249 @@ def test_config_to_dict_mutation_safe():
     d = _config_to_dict(cfg)
     d["cli_args"].append("--mutated")
     assert "--mutated" not in cfg.cli_args
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_custom_timeout_from_config(mock_run, monkeypatch):
+    """A positive timeout in the config should override the caller-provided timeout."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [CLIConfiguration(cli_command="tool", cli_args=[], timeout=42)],
+    )
+
+    result = run_cli_executor(
+        additional_instructions="Do work",
+        working_directory=Path.cwd(),
+        timeout=7200,
+    )
+
+    assert result["success"] is True
+    # Verify the timeout passed to subprocess.run is the config's value, not the caller's
+    call_kwargs = mock_run.call_args.kwargs
+    assert call_kwargs["timeout"] == 42
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_timeout_negative_one_means_no_timeout(mock_run, monkeypatch):
+    """NO_TIMEOUT in config should result in timeout=None passed to subprocess (never timeout)."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [CLIConfiguration(cli_command="tool", cli_args=[], timeout=NO_TIMEOUT)],
+    )
+
+    result = run_cli_executor(
+        additional_instructions="Do work",
+        working_directory=Path.cwd(),
+        timeout=30,
+    )
+
+    assert result["success"] is True
+    call_kwargs = mock_run.call_args.kwargs
+    assert call_kwargs["timeout"] is None
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_default_timeout_is_never_timeout(mock_run, monkeypatch):
+    """When config timeout defaults to -1, subprocess receives None (never timeout)."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [CLIConfiguration(cli_command="tool", cli_args=[])],  # timeout defaults to -1
+    )
+
+    result = run_cli_executor(
+        additional_instructions="Do work",
+        working_directory=Path.cwd(),
+        timeout=1800,
+    )
+
+    assert result["success"] is True
+    call_kwargs = mock_run.call_args.kwargs
+    assert call_kwargs["timeout"] is None
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_config_timeout_overrides_fallback(mock_run, monkeypatch):
+    """Config timeout should take priority over fallback timeout when both could apply."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._active_cli_configuration_index", 0)
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="fast-tool", cli_args=[], timeout=60),
+            CLIConfiguration(cli_command="slow-tool", cli_args=[], timeout=3600),
+        ],
+    )
+
+    result = run_cli_executor(
+        additional_instructions="Do work",
+        working_directory=Path.cwd(),
+        timeout=7200,
+    )
+
+    assert result["success"] is True
+    # First config (fast-tool) should be used with its own timeout of 60
+    call_kwargs = mock_run.call_args.kwargs
+    assert call_kwargs["timeout"] == 60
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_probe_uses_config_timeout_positive(mock_run, monkeypatch):
+    """Probe should use the config's positive timeout value."""
+    from auto_slopp.utils.cli_executor import _probe_configuration
+
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    config = {"cli_command": "tool", "cli_args": []}
+    _probe_configuration(config, Path.cwd(), timeout=30)
+
+    call_kwargs = mock_run.call_args.kwargs
+    assert call_kwargs["timeout"] == 30
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_probe_uses_config_timeout_negative_one(mock_run, monkeypatch):
+    """Probe with NO_TIMEOUT should pass None to subprocess (never timeout)."""
+    from auto_slopp.utils.cli_executor import _probe_configuration
+
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    config = {"cli_command": "tool", "cli_args": []}
+    _probe_configuration(config, Path.cwd(), timeout=NO_TIMEOUT)
+
+    call_kwargs = mock_run.call_args.kwargs
+    assert call_kwargs["timeout"] is None
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_probe_falls_back_to_default_timeout(mock_run, monkeypatch):
+    """Probe with no timeout specified should fall back to _PROBE_TIMEOUT_SECONDS."""
+    from auto_slopp.utils.cli_executor import (
+        _PROBE_TIMEOUT_SECONDS,
+        _probe_configuration,
+    )
+
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    config = {"cli_command": "tool", "cli_args": []}
+    _probe_configuration(config, Path.cwd())
+
+    call_kwargs = mock_run.call_args.kwargs
+    assert call_kwargs["timeout"] == _PROBE_TIMEOUT_SECONDS
+
+
+@patch("auto_slopp.utils.cli_executor.subprocess.run")
+def test_startup_health_uses_config_timeout(mock_run, monkeypatch):
+    """Startup health check should pass config timeout to probe."""
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = "ok"
+    mock_run.return_value.stderr = ""
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [
+            CLIConfiguration(cli_command="tool-1", cli_args=[], name="tool-1", timeout=30),
+            CLIConfiguration(cli_command="tool-2", cli_args=[], name="tool-2", timeout=NO_TIMEOUT),
+        ],
+    )
+
+    _check_startup_health(Path.cwd())
+
+    assert mock_run.call_count == 2
+    # First call should use timeout=30
+    timeout_0 = mock_run.call_args_list[0].kwargs.get("timeout")
+    # Second call should use timeout=None (never timeout)
+    timeout_1 = mock_run.call_args_list[1].kwargs.get("timeout")
+    assert timeout_0 == 30
+    assert timeout_1 is None
+
+
+def test_resolve_timeout_no_timeout_returns_none():
+    """NO_TIMEOUT (-1) should resolve to None (no timeout)."""
+    from auto_slopp.utils.cli_executor import _resolve_timeout
+
+    assert _resolve_timeout(NO_TIMEOUT) is None
+    assert _resolve_timeout(NO_TIMEOUT, fallback=30) is None
+
+
+def test_resolve_timeout_positive_returns_value():
+    """A positive timeout should be returned as-is."""
+    from auto_slopp.utils.cli_executor import _resolve_timeout
+
+    assert _resolve_timeout(30) == 30
+    assert _resolve_timeout(3600) == 3600
+    assert _resolve_timeout(3600, fallback=60) == 3600
+
+
+def test_resolve_timeout_none_with_fallback():
+    """When raw_timeout is None and fallback is provided, use fallback."""
+    from auto_slopp.utils.cli_executor import _resolve_timeout
+
+    assert _resolve_timeout(None, fallback=120) == 120
+
+
+def test_resolve_timeout_none_without_fallback():
+    """When raw_timeout is None and no fallback, use _PROBE_TIMEOUT_SECONDS."""
+    from auto_slopp.utils.cli_executor import _PROBE_TIMEOUT_SECONDS, _resolve_timeout
+
+    assert _resolve_timeout(None) == _PROBE_TIMEOUT_SECONDS
+
+
+def test_resolve_timeout_none_explicit_fallback_none():
+    """When raw_timeout is None and fallback is explicitly None, still use _PROBE_TIMEOUT_SECONDS."""
+    from auto_slopp.utils.cli_executor import _PROBE_TIMEOUT_SECONDS, _resolve_timeout
+
+    assert _resolve_timeout(None, fallback=None) == _PROBE_TIMEOUT_SECONDS
+
+
+def test_resolve_timeout_zero_uses_fallback():
+    """A zero or negative (non-NO_TIMEOUT) timeout should use fallback."""
+    from auto_slopp.utils.cli_executor import _PROBE_TIMEOUT_SECONDS, _resolve_timeout
+
+    assert _resolve_timeout(0, fallback=45) == 45
+    assert _resolve_timeout(-5, fallback=45) == 45
+    assert _resolve_timeout(0) == _PROBE_TIMEOUT_SECONDS
+
+
+def test_resolve_timeout_with_invalid_positive_uses_fallback():
+    """A timeout exceeding the maximum should use fallback."""
+    from auto_slopp.utils.cli_executor import _MAX_TIMEOUT_SECONDS, _resolve_timeout
+
+    assert _resolve_timeout(_MAX_TIMEOUT_SECONDS + 1, fallback=100) == 100
+    assert _resolve_timeout(99999999, fallback=100) == 100
+
+
+def test_resolve_timeout_max_boundary():
+    """The maximum timeout boundary value should be accepted as-is."""
+    from auto_slopp.utils.cli_executor import _MAX_TIMEOUT_SECONDS, _resolve_timeout
+
+    assert _resolve_timeout(_MAX_TIMEOUT_SECONDS) == _MAX_TIMEOUT_SECONDS
+    assert _resolve_timeout(_MAX_TIMEOUT_SECONDS, fallback=100) == _MAX_TIMEOUT_SECONDS

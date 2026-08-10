@@ -345,6 +345,34 @@ class TestVikunjaTaskSource:
         assert "8/15" in comment_args[1]
         assert "Max iterations reached" in comment_args[1]
 
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_on_skip_adds_comment_and_does_not_change_status(self, mock_comment, mock_commit):
+        """Test that on_skip adds a skip comment but does NOT change the task status."""
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
+
+        task_source.on_skip(task, "LLM unavailable")
+
+        mock_comment.assert_called_once()
+        call_args = mock_comment.call_args[0]
+        assert call_args[0] == 42
+        assert "Task Skipped" in call_args[1]
+        assert "LLM unavailable" in call_args[1]
+        assert "retried when the LLM becomes available" in call_args[1]
+        # Status should NOT be updated and no commit should be made
+        mock_commit.assert_not_called()
+
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_on_skip_handles_missing_repo_path(self, mock_comment):
+        """Test that on_skip handles missing repo_path in task gracefully."""
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={})
+
+        task_source.on_skip(task, "LLM unavailable")
+
+        mock_comment.assert_not_called()
+
     @patch("auto_slopp.workers.vikunja_task_source.find_or_create_project")
     @patch("auto_slopp.workers.vikunja_task_source.get_open_tasks_by_project")
     @patch("auto_slopp.workers.vikunja_task_source.verify_blocking_closed")
@@ -440,21 +468,23 @@ class TestVikunjaTaskSource:
                 expected_prefix
             ), f"Identifier {identifier} doesn't start with prefix {expected_prefix}"
 
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
     @patch("auto_slopp.workers.vikunja_task_source.settings")
-    def test_on_skip_adds_comment_and_preserves_tag(self, mock_settings, mock_comment):
+    def test_on_skip_adds_comment_and_preserves_tag(self, mock_settings, mock_comment, mock_commit):
         """Test that on_skip adds a comment but does NOT remove the required tag."""
         mock_settings.github_issue_worker_required_label = "test-tag"
         mock_comment.return_value = True
         task_source = VikunjaTaskSource()
         task = Task(id=42, title="Test Task", body="", comments=[], raw={"_repo_path": Path("/test")})
 
-        task_source.on_skip(task)
+        task_source.on_skip(task, "LLM unavailable")
 
         mock_comment.assert_called_once()
         comment_args = mock_comment.call_args[0]
         assert comment_args[0] == 42
-        assert "Skipped: LLM Unavailable" in comment_args[1]
+        assert "Task Skipped" in comment_args[1]
+        assert "LLM unavailable" in comment_args[1]
         assert "test-tag" not in comment_args[1].lower()  # Tag should not be mentioned as removed
 
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
@@ -467,7 +497,7 @@ class TestVikunjaTaskSource:
         task = Task(id=42, title="Test Task", body="", comments=[], raw={})
 
         # Should not raise an exception
-        task_source.on_skip(task)
+        task_source.on_skip(task, "LLM unavailable")
 
         mock_comment.assert_not_called()
 
@@ -475,13 +505,13 @@ class TestVikunjaTaskSource:
     @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.settings")
     def test_on_skip_does_not_call_commit(self, mock_settings, mock_commit, mock_comment):
-        """Test that on_skip does not call commit for remote API operations."""
+        """Test that on_skip does not change task status via API operations."""
         mock_settings.github_issue_worker_required_label = "test-tag"
         mock_comment.return_value = True
         task_source = VikunjaTaskSource()
         task = Task(id=42, title="Test Task", body="", comments=[], raw={"_repo_path": Path("/test")})
 
-        task_source.on_skip(task)
+        task_source.on_skip(task, "LLM unavailable")
 
         mock_comment.assert_called_once()
         mock_commit.assert_not_called()
