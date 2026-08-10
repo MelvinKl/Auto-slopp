@@ -295,6 +295,97 @@ class TestEnsureIssueLinkInPRBody:
         with pytest.raises(TypeError):
             ensure_issue_link_in_pr_body(None, 1)
 
+    def test_integer_body_raises_type_error(self):
+        """Test that passing an integer for body raises TypeError."""
+        with pytest.raises(TypeError, match="body must be a string"):
+            ensure_issue_link_in_pr_body(123, 1)
+
+    def test_list_body_raises_type_error(self):
+        """Test that passing a list for body raises TypeError."""
+        with pytest.raises(TypeError, match="body must be a string"):
+            ensure_issue_link_in_pr_body(["Closes #1"], 1)
+
+    def test_dict_body_raises_type_error(self):
+        """Test that passing a dict for body raises TypeError."""
+        with pytest.raises(TypeError, match="body must be a string"):
+            ensure_issue_link_in_pr_body({"body": "Closes #1"}, 1)
+
+    def test_float_body_raises_type_error(self):
+        """Test that passing a float for body raises TypeError."""
+        with pytest.raises(TypeError, match="body must be a string"):
+            ensure_issue_link_in_pr_body(1.5, 1)
+
+    def test_body_with_leading_whitespace(self):
+        """Test that body with leading whitespace gets link prepended correctly."""
+        body = "   This is the PR body."
+        result = ensure_issue_link_in_pr_body(body, 1)
+        assert result.startswith("Closes #1\n\n   This is the PR body.\n")
+
+    def test_body_with_leading_newlines(self):
+        """Test that body with leading newlines gets link prepended correctly."""
+        body = "\n\nThis is the PR body."
+        result = ensure_issue_link_in_pr_body(body, 1)
+        assert result.startswith("Closes #1\n\n\n\nThis is the PR body.\n")
+
+    def test_body_with_bom_character(self):
+        """Test that body with BOM character (U+FEFF) gets link prepended correctly."""
+        body = "\ufeffThis is the PR body with BOM."
+        result = ensure_issue_link_in_pr_body(body, 1)
+        assert result.startswith("Closes #1\n\n")
+        assert "\ufeff" in result
+        assert "This is the PR body with BOM." in result
+
+    def test_body_with_bom_and_whitespace(self):
+        """Test that body with BOM followed by whitespace gets link prepended correctly."""
+        body = "\ufeff   This is the PR body."
+        result = ensure_issue_link_in_pr_body(body, 1)
+        assert result.startswith("Closes #1\n\n")
+        assert "\ufeff   This is the PR body." in result
+
+    def test_keyword_reuse_preserves_fixes_when_prepending_closes(self):
+        """Test that 'Fixes #42' is preserved when 'Closes #1' is prepended."""
+        body = "This PR fixes a bug.\n\nFixes #42"
+        result = ensure_issue_link_in_pr_body(body, 1)
+        assert result.startswith("Closes #1\n\n")
+        assert "Fixes #42" in result
+
+    def test_keyword_reuse_preserves_resolves_when_prepending_closes(self):
+        """Test that 'Resolves #7' is preserved when 'Closes #1' is prepended."""
+        body = "This PR resolves an issue.\n\nResolves #7"
+        result = ensure_issue_link_in_pr_body(body, 1)
+        assert result.startswith("Closes #1\n\n")
+        assert "Resolves #7" in result
+
+    def test_keyword_reuse_preserves_multiple_keywords(self):
+        """Test that multiple existing keywords are all preserved."""
+        body = "Closes #99\n\nFixes #42\n\nResolves #7"
+        result = ensure_issue_link_in_pr_body(body, 1)
+        assert result.startswith("Closes #1\n\n")
+        assert "Closes #99" in result
+        assert "Fixes #42" in result
+        assert "Resolves #7" in result
+
+    def test_body_ending_with_multiple_newlines(self):
+        """Test that body ending with multiple newlines is normalized."""
+        body = "This is the PR body.\n\n\n\n"
+        result = ensure_issue_link_in_pr_body(body, 1)
+        # Trailing whitespace should be stripped before appending
+        assert result == "Closes #1\n\nThis is the PR body.\n"
+
+    def test_body_ending_with_whitespace(self):
+        """Test that body ending with trailing whitespace is normalized."""
+        body = "This is the PR body.   "
+        result = ensure_issue_link_in_pr_body(body, 1)
+        assert result == "Closes #1\n\nThis is the PR body.\n"
+
+    def test_body_with_carriage_return(self):
+        """Test that body with carriage return (\r) gets link prepended correctly."""
+        body = "This is the PR body.\r\nWith line breaks."
+        result = ensure_issue_link_in_pr_body(body, 1)
+        assert result.startswith("Closes #1\n\n")
+        assert "This is the PR body." in result
+        assert "With line breaks." in result
+
 
 class TestValidateIssueLink:
     """Tests for the validate_issue_link function."""
