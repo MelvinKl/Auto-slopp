@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **`auto_slopp.utils.linking`**: New module with `ensure_issue_link_in_pr_body()` function and `CLOSING_KEYWORDS` constant for reliable PR-to-issue linking
 - **`tests/test_linking.py`**: Comprehensive test suite for the linking utilities (42 tests)
+- **`auto_slopp.utils.linking`**: Supports `owner/repo#123` format (including nested paths like `org/subteam/repo#123`) in existing-link detection
 
 ### Changed
 - **IssueWorker/RalphExecutor**: Removed intermediate per-step acceptance checks; now only a single final acceptance check runs after all steps complete
