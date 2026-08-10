@@ -561,7 +561,7 @@ class RalphExecutor:
             f"Keep your implementation simple. Only implement what is required. "
             f"Check if there are components you can reuse. "
             f"Ensure that 'make test' runs successful. Only push if ALL tests are successful. "
-            f"Check if you need to update the README.md."
+            f"Check if you need to update the README.md and any documentation in docs/ if it exists."
         )
 
     def _build_progress_info(self, plan: Plan) -> str:
