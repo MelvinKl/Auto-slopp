@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from settings.main import Settings
+from settings.main import NO_TIMEOUT, CLIConfiguration, Settings
 
 
 class TestSettings:
@@ -257,6 +257,26 @@ class TestSettings:
             "git_checkout",
             "default",
         }
+
+    def test_cli_configuration_timeout_default_is_no_timeout(self):
+        """Test that CLIConfiguration timeout defaults to NO_TIMEOUT (-1)."""
+        config = CLIConfiguration(cli_command="tool")
+        assert config.timeout == NO_TIMEOUT
+
+    def test_cli_configuration_timeout_positive(self):
+        """Test that CLIConfiguration accepts positive timeout values."""
+        config = CLIConfiguration(cli_command="tool", timeout=300)
+        assert config.timeout == 300
+
+    def test_cli_configuration_timeout_zero_rejected(self):
+        """Test that CLIConfiguration rejects timeout of 0."""
+        with pytest.raises(ValidationError):
+            CLIConfiguration(cli_command="tool", timeout=0)
+
+    def test_cli_configuration_timeout_negative_rejected(self):
+        """Test that CLIConfiguration rejects negative timeout values other than -1."""
+        with pytest.raises(ValidationError):
+            CLIConfiguration(cli_command="tool", timeout=-5)
 
     def test_pr_review_worker_settings_defaults(self):
         """Test that PR review worker settings have correct defaults."""

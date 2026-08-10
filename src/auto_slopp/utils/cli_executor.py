@@ -11,7 +11,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from settings.main import CLIConfiguration, TaskRating, settings
+from settings.main import (
+    _MAX_TIMEOUT_SECONDS,
+    NO_TIMEOUT,
+    CLIConfiguration,
+    TaskRating,
+    settings,
+)
 
 logger = logging.getLogger(__name__)
 _active_cli_configuration_index = 0
@@ -47,9 +53,8 @@ def _check_startup_health(working_dir: Path) -> None:
     for index, config in enumerate(settings.cli_configurations):
         state = _get_cli_state(index)
         c_dict = _config_to_dict(config)
-        probe_timeout = config.timeout if config.timeout != NO_TIMEOUT else _PROBE_TIMEOUT_SECONDS
         try:
-            if _probe_configuration(c_dict, working_dir, timeout=probe_timeout):
+            if _probe_configuration(c_dict, working_dir, timeout=config.timeout):
                 logger.info(f"CLI tool {config.name} is healthy.")
                 state["active"] = True
             else:
@@ -74,9 +79,8 @@ def _check_cooldowns(working_dir: Path) -> None:
         if not state["active"] and now >= state["cooldown_until"]:
             logger.info(f"Checking if CLI tool {config.name} has recovered...")
             c_dict = _config_to_dict(config)
-            probe_timeout = config.timeout if config.timeout != NO_TIMEOUT else _PROBE_TIMEOUT_SECONDS
             try:
-                if _probe_configuration(c_dict, working_dir, timeout=probe_timeout):
+                if _probe_configuration(c_dict, working_dir, timeout=config.timeout):
                     logger.info(f"CLI tool {config.name} successfully recovered.")
                     state["active"] = True
                 else:
@@ -159,18 +163,27 @@ def _build_command(
 
 def _execute_command(
     cli_command: str,
-    cmd: List[str],
+    args: List[str],
     working_dir: Path,
-    timeout: int,
+    timeout: Optional[int],
     capture_output: bool,
     start_time: Optional[float] = None,
 ) -> Dict[str, Any]:
-    """Execute a fully built command and return standardized result data."""
+    """Execute a fully built command and return standardized result data.
+
+    Args:
+        cli_command: Name of the CLI command being executed.
+        args: Full command list to pass to subprocess.run.
+        working_dir: Working directory for command execution.
+        timeout: Timeout in seconds, or None for no timeout.
+        capture_output: Whether to capture stdout/stderr.
+        start_time: Optional start time for measuring execution duration.
+    """
     command_start = start_time if start_time is not None else time.time()
 
     try:
         result = subprocess.run(
-            cmd,
+            args,
             cwd=working_dir,
             capture_output=capture_output,
             text=True,
@@ -185,7 +198,7 @@ def _execute_command(
             "execution_time": execution_time,
             "timestamp": datetime.now().isoformat(),
             "working_directory": str(working_dir),
-            "command": " ".join(cmd),
+            "command": " ".join(args),
             "return_code": result.returncode,
             "timeout": False,
         }
@@ -219,26 +232,67 @@ def _execute_command(
             "execution_time": execution_time,
             "timestamp": datetime.now().isoformat(),
             "working_directory": str(working_dir),
-            "command": " ".join(cmd),
+            "command": " ".join(args),
             "return_code": -1,
             "timeout": True,
             "error": error_msg,
         }
 
 
-def _probe_configuration(config: Dict[str, Any], working_dir: Path, timeout: int = NO_TIMEOUT) -> bool:
-    """Run quick health probe for one configuration using the provided timeout."""
+def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None) -> Optional[int]:
+    """Resolve a raw timeout value to an effective timeout.
+
+    Handles the NO_TIMEOUT sentinel (-1), validates range (0 < timeout ≤ 30 days),
+    and falls back to _PROBE_TIMEOUT_SECONDS when the value is invalid.
+
+    Args:
+        raw_timeout: The timeout value (None for unspecified, -1 for NO_TIMEOUT, or a positive integer).
+        fallback: Default timeout in seconds to use when raw_timeout is None, non-positive,
+                  or exceeds the maximum. Defaults to None; when None, falls back to
+                  _PROBE_TIMEOUT_SECONDS (600s).
+
+    Returns:
+        None if raw_timeout is NO_TIMEOUT (-1), the raw_timeout value if positive and within range,
+        or the fallback value (or _PROBE_TIMEOUT_SECONDS if fallback is None) otherwise.
+    """
+    if raw_timeout == NO_TIMEOUT:
+        return None
+    if raw_timeout is not None and 0 < raw_timeout <= _MAX_TIMEOUT_SECONDS:
+        return raw_timeout
+    return fallback if fallback is not None else _PROBE_TIMEOUT_SECONDS
+
+
+def _probe_configuration(config: Dict[str, Any], working_dir: Path, timeout: Optional[int] = None) -> bool:
+    """Run quick health probe for one configuration.
+
+    Uses the provided timeout:
+      - :data:`NO_TIMEOUT` (-1) means no timeout (effective timeout is ``None``).
+      - A positive integer uses that value as the timeout in seconds.
+      - ``None`` or any other value falls back to :data:`_PROBE_TIMEOUT_SECONDS`
+        (600 seconds / 10 minutes).
+
+    Note:
+        Internal callers (:func:`_check_startup_health` and
+        :func:`_check_cooldowns`) always pass a validated config timeout
+        (never ``None``). The fallback to ``_PROBE_TIMEOUT_SECONDS`` is
+        intentionally exposed for external callers that invoke this function
+        directly without providing a timeout, allowing them to probe
+        configurations with a sensible default.
+    """
     cmd = _build_command(
         cli_command=config["cli_command"],
         cli_base_args=config["cli_args"],
         agent_args=[],
         additional_instructions=_PROBE_INSTRUCTIONS,
     )
+
+    effective_timeout = _resolve_timeout(timeout)
+
     result = _execute_command(
         cli_command=config["cli_command"],
-        cmd=cmd,
+        args=cmd,
         working_dir=working_dir,
-        timeout=timeout,
+        timeout=effective_timeout,
         capture_output=True,
     )
     return result["success"]
@@ -247,7 +301,7 @@ def _probe_configuration(config: Dict[str, Any], working_dir: Path, timeout: int
 def run_cli_executor(
     additional_instructions: Optional[str] = None,
     working_directory: Optional[Path] = None,
-    timeout: int = 7200,
+    timeout: Optional[int] = None,
     agent_args: Optional[List[str]] = None,
     capture_output: bool = True,
     task_name: str = "default",
@@ -260,7 +314,8 @@ def run_cli_executor(
     Args:
         additional_instructions: Additional instructions to pass to the CLI
         working_directory: Directory where the CLI should be executed
-        timeout: Command execution timeout in seconds (default: 7200)
+        timeout: Command execution timeout in seconds (default: None = per-config timeout).
+                 Use ``NO_TIMEOUT`` (-1) to disable timeout entirely.
         agent_args: Additional arguments to pass to the CLI
         capture_output: Whether to capture stdout/stderr (default: True)
         task_name: Name of the task type for difficulty matching (default: "default")
@@ -316,9 +371,17 @@ def run_cli_executor(
     working_dir = working_directory or Path.cwd()
     cli_configurations = _get_cli_configurations()
 
+    resolved = _resolve_timeout(timeout)
+    if resolved is None and timeout == NO_TIMEOUT:
+        timeout_display = "disabled (NO_TIMEOUT)"
+    elif resolved is None:
+        timeout_display = "disabled (no timeout)"
+    else:
+        timeout_display = f"{resolved}s"
+
     logger.info(f"Executing with instructions: {additional_instructions if additional_instructions else 'None'}...")
     logger.info(f"Working directory: {working_dir}")
-    logger.info(f"Timeout: {timeout}s")
+    logger.info(f"Timeout: {timeout_display}")
     logger.info(f"Agent args: {agent_args}")
 
     task_rating = settings.task_difficulties.get(task_name, settings.task_difficulties["default"])
@@ -363,11 +426,16 @@ def run_cli_executor(
         )
 
         logger.info(f"Using CLI configuration: {config['name']} for task {task_name}")
+
+        # Use per-config timeout: NO_TIMEOUT means never timeout, positive value overrides caller timeout
+        _cfg = settings.cli_configurations[config_index]
+        config_timeout = _resolve_timeout(_cfg.timeout)
+
         result = _execute_command(
             cli_command=cli_command,
-            cmd=cmd,
+            args=cmd,
             working_dir=working_dir,
-            timeout=timeout,
+            timeout=config_timeout,
             capture_output=capture_output,
             start_time=start_time,
         )
@@ -407,7 +475,7 @@ def execute_with_instructions(
     instructions: str,
     work_dir: Path,
     agent_args: Optional[List[str]] = None,
-    timeout: int = 7200,
+    timeout: Optional[int] = None,
     task_name: str = "default",
 ) -> Dict[str, Any]:
     """Execute CLI with specific instructions.
@@ -416,7 +484,7 @@ def execute_with_instructions(
         instructions: The instructions to pass to the CLI
         work_dir: Working directory for command execution
         agent_args: Additional arguments to pass to the CLI
-        timeout: Command execution timeout in seconds
+        timeout: Command execution timeout in seconds (default: None). Use ``NO_TIMEOUT`` (-1) to disable timeout.
         task_name: Name of the task type for difficulty matching
 
     Returns:
