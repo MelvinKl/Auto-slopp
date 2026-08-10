@@ -21,6 +21,31 @@ _CLOSING_PATTERN = re.compile(
 )
 
 
+def validate_issue_link(body: str, issue_id: int) -> bool:
+    """Validate whether a PR body contains a valid closing keyword link for the given issue.
+
+    Checks for Closes, Fixes, or Resolves followed by the issue number (case-insensitive),
+    using the same pattern as `ensure_issue_link_in_pr_body`.
+
+    Args:
+        body: The PR body text to validate
+        issue_id: The GitHub issue number to check for (must be a positive integer)
+
+    Returns:
+        True if a valid closing keyword link for the issue is found, False otherwise.
+        Returns False for empty or non-string bodies.
+
+    Raises:
+        TypeError: If issue_id is not a positive integer (rejects bools, strings, floats, negatives, zero)
+    """
+    if not isinstance(body, str):
+        return False
+    if not body.strip():
+        return False
+
+    return any(int(match.group("id")) == issue_id for match in _CLOSING_PATTERN.finditer(body))
+
+
 def ensure_issue_link_in_pr_body(body: str, issue_id: int) -> str:
     """Ensure the PR body contains at least one valid GitHub closing keyword for the issue.
 

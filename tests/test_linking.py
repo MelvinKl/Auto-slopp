@@ -6,7 +6,11 @@ This module tests the `ensure_issue_link_in_pr_body` function and the
 
 import pytest
 
-from auto_slopp.utils.linking import CLOSING_KEYWORDS, ensure_issue_link_in_pr_body
+from auto_slopp.utils.linking import (
+    CLOSING_KEYWORDS,
+    ensure_issue_link_in_pr_body,
+    validate_issue_link,
+)
 
 
 class TestClosingKeywords:
@@ -290,3 +294,91 @@ class TestEnsureIssueLinkInPRBody:
         """Test that passing None for body raises TypeError."""
         with pytest.raises(TypeError):
             ensure_issue_link_in_pr_body(None, 1)
+
+
+class TestValidateIssueLink:
+    """Tests for the validate_issue_link function."""
+
+    def test_valid_closes_link(self):
+        """Test that 'Closes #1' returns True for issue_id=1."""
+        body = "Closes #1\n\nPR body."
+        assert validate_issue_link(body, 1) is True
+
+    def test_valid_fixes_link(self):
+        """Test that 'Fixes #42' returns True for issue_id=42."""
+        body = "Fixes #42\n\nPR body."
+        assert validate_issue_link(body, 42) is True
+
+    def test_valid_resolves_link(self):
+        """Test that 'Resolves #7' returns True for issue_id=7."""
+        body = "Resolves #7\n\nPR body."
+        assert validate_issue_link(body, 7) is True
+
+    def test_case_insensitive_match(self):
+        """Test that 'closes #1' (lowercase) is recognized."""
+        body = "closes #1\n\nPR body."
+        assert validate_issue_link(body, 1) is True
+
+    def test_no_link_returns_false(self):
+        """Test that body without a link returns False."""
+        body = "This PR fixes a bug."
+        assert validate_issue_link(body, 1) is False
+
+    def test_wrong_issue_id_returns_false(self):
+        """Test that body with different issue_id returns False."""
+        body = "Closes #99\n\nPR body."
+        assert validate_issue_link(body, 1) is False
+
+    def test_empty_body_returns_false(self):
+        """Test that empty body returns False."""
+        assert validate_issue_link("", 1) is False
+
+    def test_whitespace_only_body_returns_false(self):
+        """Test that whitespace-only body returns False."""
+        assert validate_issue_link("   \n  ", 1) is False
+
+    def test_none_body_returns_false(self):
+        """Test that None body returns False."""
+        assert validate_issue_link(None, 1) is False
+
+    def test_int_body_returns_false(self):
+        """Test that integer body returns False."""
+        assert validate_issue_link(123, 1) is False
+
+    def test_list_body_returns_false(self):
+        """Test that list body returns False."""
+        assert validate_issue_link(["Closes #1"], 1) is False
+
+    def test_dict_body_returns_false(self):
+        """Test that dict body returns False."""
+        assert validate_issue_link({"body": "Closes #1"}, 1) is False
+
+    def test_link_in_middle_of_body(self):
+        """Test that link anywhere in body is recognized."""
+        body = "Some text\n\nFixes #42\n\nMore text here."
+        assert validate_issue_link(body, 42) is True
+
+    def test_owner_repo_format(self):
+        """Test that 'owner/repo#1' format is recognized."""
+        body = "Closes myorg/myrepo#42\n\nPR body."
+        assert validate_issue_link(body, 42) is True
+
+    def test_nested_path_format(self):
+        """Test that 'org/subteam/repo#1' format is recognized."""
+        body = "Fixes a/b/c#99\n\nPR body."
+        assert validate_issue_link(body, 99) is True
+
+    def test_no_space_between_keyword_and_hash(self):
+        """Test that 'Closes#1' (no space) does NOT match."""
+        body = "Closes#1\n\nPR body."
+        assert validate_issue_link(body, 1) is False
+
+    def test_hash_number_inside_larger_number(self):
+        """Test that '#1' inside '#1234' does NOT match."""
+        body = "Closes #1234\n\nPR body."
+        assert validate_issue_link(body, 1) is False
+
+    def test_keyword_as_part_of_larger_word(self):
+        """Test that 'Discloses #1' does NOT match."""
+        body = "Discloses #1\n\nPR body."
+        assert validate_issue_link(body, 1) is False
