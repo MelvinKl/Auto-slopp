@@ -1061,7 +1061,9 @@ class RalphExecutor:
 
             if not step_result.get("success", False):
                 result["last_error"] = step_result.get("error", "Step implementation failed")
-                self.logger.warning(f"Batch step execution failed on iteration {iteration}: {step_result.get('error', 'Unknown error')}")
+                self.logger.warning(
+                    f"Batch step execution failed on iteration {iteration}: {step_result.get('error', 'Unknown error')}"
+                )
                 continue
 
             # After batch execution, check if all steps are now closed
