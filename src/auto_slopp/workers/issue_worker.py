@@ -6,6 +6,7 @@ for step-based execution.
 """
 
 import logging
+import re
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -345,6 +346,16 @@ class IssueWorker(Worker):
                                 ralph_result.get("total_steps", 0),
                                 ralph_result.get("error", "Unknown error"),
                             )
+                    elif self._is_llm_unavailable(ralph_error):
+                        self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
+                        self.task_source.on_skip(task, ralph_error)
+                        result["success"] = True
+                        result["skipped"] = True
+                        result["skip_reason"] = ralph_error
+                        return result
+                    elif self._is_permanent_error(ralph_error):
+                        self.logger.error(f"Permanent error detected for task #{task_id}: {ralph_error}")
+                        self.task_source.on_task_failure(task, ralph_error)
                     else:
                         # Non-max-loops-reached Ralph failure – check for LLM
                         # unavailability before falling back to permanent failure.
@@ -437,7 +448,7 @@ class IssueWorker(Worker):
                     self.task_source.on_skip(task, "LLM unavailable - no changes made")
                     result["success"] = True
                     result["skipped"] = True
-                    result["skip_reason"] = "LLM unavailable - no changes made"
+                    result["skip_reason"] = "LLM unavailable - no commits ahead"
                     return result
 
                 self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue")
