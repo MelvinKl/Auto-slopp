@@ -6,6 +6,7 @@ for step-based execution.
 """
 
 import logging
+import re
 import time
 from enum import Enum
 from pathlib import Path
@@ -230,7 +231,12 @@ class IssueWorker(Worker):
             or "too many requests" in error_lower
             or "service unavailable" in error_lower
             or "gateway timeout" in error_lower
-            or "llm unavailable" in error_lower
+            or re.search(r"\bllm unavailable\b", error_lower) is not None
+            or "no active cli" in error_lower
+            or "all cli" in error_lower
+            or "exhausted" in error_lower
+            or "cooldown" in error_lower
+            or "no configuration meets" in error_lower
             or "503" in error_lower
             or "502" in error_lower
             or "504" in error_lower
