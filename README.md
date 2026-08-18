@@ -956,7 +956,7 @@ Options:
 The `auto_slopp.utils.linking` module provides helper functions for ensuring PR bodies contain valid GitHub closing keywords:
 
 ```python
-from auto_slopp.utils.linking import ensure_issue_link_in_pr_body, CLOSING_KEYWORDS
+from auto_slopp.utils.linking import ensure_issue_link_in_pr_body, validate_issue_link, CLOSING_KEYWORDS
 
 # CLOSING_KEYWORDS is a tuple: ("closes", "fixes", "resolves")
 
@@ -969,14 +969,19 @@ linked_body = ensure_issue_link_in_pr_body(body, 42)
 existing = "Closes #42\n\nFix the login bug"
 result = ensure_issue_link_in_pr_body(existing, 42)
 # Returns: existing body unchanged
+
+# Check whether a PR body already links an issue (without modifying it)
+validate_issue_link("Fixes #42\n\nDetails", 42)  # Returns: True
+validate_issue_link("No link here", 42)          # Returns: False
 ```
 
 **Features:**
 - Uses regex with word boundaries to prevent false matches (e.g., `#42` won't match `#421`)
 - Case-insensitive keyword matching (Closes, closes, CLOSES all work)
-- Supports `owner/repo#123` format
-- Validates `issue_id` is a positive integer
-- Prepends `Closes #<id>` with proper formatting if no valid link exists
+- Supports `owner/repo#123` format (cross-repo references require at least one slash)
+- Validates `issue_id` is a positive integer (raises `TypeError` for non-integers, `ValueError` for non-positive values)
+- `ensure_issue_link_in_pr_body` prepends `Closes #<id>` with proper formatting (including a trailing newline) if no valid link exists
+- `validate_issue_link` returns `True`/`False` without modifying the body
 
 ## Development
 
