@@ -473,3 +473,30 @@ class TestValidateIssueLink:
         """Test that 'Discloses #1' does NOT match."""
         body = "Discloses #1\n\nPR body."
         assert validate_issue_link(body, 1) is False
+
+    # --- Type validation tests ---
+
+    def test_issue_id_bool_raises_type_error(self):
+        """Test that passing a boolean for issue_id raises TypeError."""
+        with pytest.raises(TypeError):
+            validate_issue_link("Closes #1", True)
+
+    def test_issue_id_string_raises_type_error(self):
+        """Test that passing a string for issue_id raises TypeError."""
+        with pytest.raises(TypeError):
+            validate_issue_link("Closes #1", "1")
+
+    def test_issue_id_float_raises_type_error(self):
+        """Test that passing a float for issue_id raises TypeError."""
+        with pytest.raises(TypeError):
+            validate_issue_link("Closes #1", 1.5)
+
+    def test_issue_id_negative_raises_value_error(self):
+        """Test that passing a negative integer for issue_id raises ValueError."""
+        with pytest.raises(ValueError, match="must be a positive integer"):
+            validate_issue_link("Closes #1", -1)
+
+    def test_issue_id_zero_raises_value_error(self):
+        """Test that passing zero for issue_id raises ValueError."""
+        with pytest.raises(ValueError, match="must be a positive integer"):
+            validate_issue_link("Closes #1", 0)

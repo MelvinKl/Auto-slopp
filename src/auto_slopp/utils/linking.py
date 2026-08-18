@@ -40,21 +40,6 @@ def _find_existing_link(body: str, issue_id: int) -> re.Match | None:
     return None
 
 
-def _get_matching_keyword(match: re.Match) -> str:
-    """Extract the closing keyword text from a regex match.
-
-    Extracts the keyword portion (e.g. "Closes", "fixes", "Resolves")
-    from a _CLOSING_PATTERN match object.
-
-    Args:
-        match: A regex match object from _CLOSING_PATTERN
-
-    Returns:
-        The matched keyword string (preserving original case)
-    """
-    return match.group(0).split()[0]
-
-
 def validate_issue_link(body: str, issue_id: int) -> bool:
     """Validate whether a PR body contains a valid closing keyword link for the given issue.
 
@@ -70,8 +55,15 @@ def validate_issue_link(body: str, issue_id: int) -> bool:
         Returns False for empty or non-string bodies.
 
     Raises:
-        TypeError: If issue_id is not a positive integer (rejects bools, strings, floats, negatives, zero)
+        TypeError: If issue_id is not an integer (rejects bools, strings, floats)
+        ValueError: If issue_id is not positive (rejects negatives and zero)
     """
+    # Type validation: reject booleans, strings, floats, negatives, and zero
+    if isinstance(issue_id, bool) or not isinstance(issue_id, int):
+        raise TypeError(f"issue_id must be a positive integer, got {type(issue_id).__name__}: {issue_id!r}")
+    if issue_id <= 0:
+        raise ValueError(f"issue_id must be a positive integer, got {issue_id}")
+
     if not isinstance(body, str):
         return False
     if not body.strip():
