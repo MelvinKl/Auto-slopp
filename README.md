@@ -963,7 +963,7 @@ from auto_slopp.utils.linking import ensure_issue_link_in_pr_body, CLOSING_KEYWO
 # Ensure a PR body has a closing keyword for issue #42
 body = "Fix the login bug"
 linked_body = ensure_issue_link_in_pr_body(body, 42)
-# Returns: "Closes #42\n\nFix the login bug"
+# Returns: "Closes #42\n\nFix the login bug\n"
 
 # If the body already has a closing keyword, it is preserved
 existing = "Closes #42\n\nFix the login bug"
