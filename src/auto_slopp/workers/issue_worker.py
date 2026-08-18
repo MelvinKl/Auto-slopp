@@ -36,6 +36,7 @@ from auto_slopp.utils.github_operations import (
     remove_label_from_issue,
     submit_pr_review,
 )
+from auto_slopp.utils.linking import ensure_issue_link_in_pr_body
 from auto_slopp.utils.ralph import RalphExecutor
 from auto_slopp.worker import Worker
 from auto_slopp.workers.task_source import Task, TaskSource
@@ -673,10 +674,7 @@ Plan:
         if not generated_body:
             return default_body
 
-        if f"closes #{task.id}" not in generated_body.lower():
-            generated_body = f"Closes #{task.id}\n\n{generated_body}"
-
-        return generated_body
+        return ensure_issue_link_in_pr_body(generated_body, task.id)
 
     def _build_review_instructions(self, title: str, body: str, diff: str) -> str:
         """Build instructions for the CLI tool to review a PR.
