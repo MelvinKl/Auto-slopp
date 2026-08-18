@@ -314,11 +314,6 @@ class VikunjaTaskSource(TaskSource):
             logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
             return
 
-        repo_path = task.raw.get("_repo_path")
-        if repo_path is None:
-            logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
-            return
-
         skip_comment = (
             f"⏭️ **Task Skipped**\n\n"
             f"Reason: {reason}\n\n"
