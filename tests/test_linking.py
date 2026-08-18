@@ -288,6 +288,21 @@ class TestEnsureIssueLinkInPRBody:
         result = ensure_issue_link_in_pr_body(body, 99)
         assert result == body
 
+    def test_single_segment_before_hash_is_not_recognized(self):
+        """Test that 'Closes docs#1' (no slash) is NOT a valid GitHub reference."""
+        body = "Closes docs#1\n\nPR body."
+        result = ensure_issue_link_in_pr_body(body, 1)
+        # 'docs#1' is not a valid issue reference, so a link is prepended
+        assert result != body
+        assert result.startswith("Closes #1\n\n")
+
+    def test_single_segment_before_hash_different_issue(self):
+        """Test that 'Fixes docs#99' (no slash) does not match issue_id=1."""
+        body = "Fixes docs#99\n\nPR body."
+        result = ensure_issue_link_in_pr_body(body, 1)
+        assert result != body
+        assert result.startswith("Closes #1\n\n")
+
     # --- None body test ---
 
     def test_none_body_raises_type_error(self):
@@ -458,6 +473,11 @@ class TestValidateIssueLink:
         """Test that 'org/subteam/repo#1' format is recognized."""
         body = "Fixes a/b/c#99\n\nPR body."
         assert validate_issue_link(body, 99) is True
+
+    def test_single_segment_before_hash_returns_false(self):
+        """Test that 'Closes docs#1' (no slash) is NOT recognized as a link."""
+        body = "Closes docs#1\n\nPR body."
+        assert validate_issue_link(body, 1) is False
 
     def test_no_space_between_keyword_and_hash(self):
         """Test that 'Closes#1' (no space) does NOT match."""

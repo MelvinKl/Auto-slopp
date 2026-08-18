@@ -13,10 +13,13 @@ CLOSING_KEYWORDS = ("closes", "fixes", "resolves")
 # - Prevents false positives like '#1' matching inside '#1234'
 # - Supports 'owner/repo#123' format in addition to plain '#123'
 # - Supports nested paths like 'org/subteam/repo#123'
+# - Cross-repo references require at least one slash: a single segment like
+#   'docs#123' is not a valid GitHub issue reference, so it is not treated
+#   as an existing link (a closing keyword is prepended instead)
 # Keywords are dynamically joined from CLOSING_KEYWORDS so adding/removing
 # keywords in CLOSING_KEYWORDS automatically updates the pattern.
 _CLOSING_PATTERN = re.compile(
-    r"\b(" + "|".join(CLOSING_KEYWORDS) + r")\s+(?:(?:[\w-]+/)*[\w-]+)?#(?P<id>\d+)\b",
+    r"\b(" + "|".join(CLOSING_KEYWORDS) + r")\s+(?:(?:[\w-]+/)+[\w-]+)?#(?P<id>\d+)\b",
     re.IGNORECASE,
 )
 
