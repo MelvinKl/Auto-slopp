@@ -391,7 +391,7 @@ class IssueWorker(Worker):
             branch_created = create_and_checkout_branch(repo_dir, branch_name, base_branch="main")
             if not branch_created:
                 self.logger.info(f"Skipping task #{task_id}: could not create branch '{branch_name}'")
-                return self._skip_task(repo_dir, task)
+                return self._skip_task(repo_dir, task, skip_reason=f"Could not create branch '{branch_name}'")
 
             # Ensure .ralph is in .gitignore before Ralph execution
             if not ensure_ralph_in_gitignore(repo_dir):

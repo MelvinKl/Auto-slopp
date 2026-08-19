@@ -1887,6 +1887,7 @@ class TestIssueWorker:
         task_result = result["task_results"][0]
         assert task_result["success"] is None, "Skip signal must be success=None"
         assert task_result["status"] == "skipped"
+        assert "skip_reason" in task_result
 
         # Counted in tasks_skipped, NOT in tasks_processed or tasks_completed
         assert result["tasks_skipped"] == 1
