@@ -32,10 +32,6 @@ class CLIConfiguration(BaseModel):
         default_factory=list,
         description="Arguments to pass to the CLI command",
     )
-    timeout: int = Field(
-        default=-1,
-        description="Timeout in seconds for CLI execution. Set to -1 to disable timeout (never timeout). Must be -1 or a positive integer.",
-    )
     capability: int = Field(
         default=5,
         ge=0,
@@ -75,14 +71,6 @@ class CLIConfiguration(BaseModel):
             f"timeout must be -1 (NO_TIMEOUT) or a positive integer up to {_MAX_TIMEOUT_SECONDS} seconds "
             f"(~1 year), got {v}. A value of -1 means never timeout; positive values specify seconds."
         )
-
-    @field_validator("timeout")
-    @classmethod
-    def validate_timeout(cls, v: int) -> int:
-        """Validate that timeout is either -1 (no timeout) or a positive integer."""
-        if v == -1 or v > 0:
-            return v
-        raise ValueError("timeout must be -1 (no timeout) or a positive integer")
 
 
 class Settings(BaseSettings):

@@ -5,6 +5,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from auto_slopp.utils.linking import ensure_issue_link_in_pr_body
 from auto_slopp.workers.github_task_source import GitHubTaskSource
 from auto_slopp.workers.issue_worker import IssueWorker
@@ -76,6 +78,12 @@ class CapturingTaskSourceWithFindings(MockTaskSource):
 
 class TestIssueWorker:
     """Tests for the unified IssueWorker."""
+
+    @pytest.fixture(autouse=True)
+    def _mock_pr_review_no_findings(self):
+        """Stub the PR review loop so tests focus on the behavior under test."""
+        with patch.object(IssueWorker, "_review_pull_request", return_value=(False, "", [])):
+            yield
 
     def test_initialization_with_task_source(self):
         """Test that IssueWorker can be initialized with a TaskSource."""
@@ -323,6 +331,7 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -582,6 +591,7 @@ class TestIssueWorker:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
+        mock_settings.github_issue_pr_review_max_iterations = 1
         # has_changes returns False because Ralph already committed everything
         mock_has_changes.return_value = False
         # But there ARE commits ahead of main (committed during Ralph loop)
@@ -687,6 +697,7 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -850,6 +861,7 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -901,6 +913,7 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -1065,6 +1078,7 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -1120,6 +1134,7 @@ class TestIssueWorker:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -1638,6 +1653,7 @@ class TestIssueWorker:
         """Integration test: .ralph is added to .gitignore when missing."""
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commits_ahead.return_value = 1
         mock_push.return_value = (True, "")
         mock_get_pr.return_value = None
@@ -1688,6 +1704,7 @@ class TestIssueWorker:
         """Integration test: .ralph is not duplicated when already in .gitignore."""
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commits_ahead.return_value = 1
         mock_push.return_value = (True, "")
         mock_get_pr.return_value = None
@@ -1895,6 +1912,12 @@ class TestGeneratePRBodyFromTaskFileIntegration:
     """Integration tests verifying _generate_pr_body_from_task_file produces valid issue links
     in both ralph_enabled=True and ralph_enabled=False code paths."""
 
+    @pytest.fixture(autouse=True)
+    def _mock_pr_review_no_findings(self):
+        """Stub the PR review loop so tests focus on the behavior under test."""
+        with patch.object(IssueWorker, "_review_pull_request", return_value=(False, "", [])):
+            yield
+
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
@@ -1934,6 +1957,7 @@ class TestGeneratePRBodyFromTaskFileIntegration:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -2003,6 +2027,7 @@ class TestGeneratePRBodyFromTaskFileIntegration:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -2060,6 +2085,7 @@ class TestGeneratePRBodyFromTaskFileIntegration:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
