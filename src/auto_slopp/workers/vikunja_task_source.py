@@ -325,34 +325,6 @@ class VikunjaTaskSource(TaskSource):
 
         self._update_task_with_comment_and_status(task.id, failure_comment, "failed", repo_path)
 
-    def on_skip(self, task: Task, reason: str) -> None:
-        """Called when a task is skipped (e.g., due to LLM unavailability).
-
-        Adds a skip comment to the task but does NOT change the task status,
-        so the task remains eligible for future processing.
-
-        Args:
-            task: The task being skipped
-            reason: Reason for skipping (e.g., "LLM unavailable")
-        """
-        repo_path = task.raw.get("_repo_path")
-        if repo_path is None:
-            logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
-            return
-
-        repo_path = task.raw.get("_repo_path")
-        if repo_path is None:
-            logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
-            return
-
-        skip_comment = (
-            f"⏭️ **Task Skipped**\n\n"
-            f"Reason: {reason}\n\n"
-            f"This task will be retried when the LLM becomes available."
-        )
-        comment_on_task(task.id, skip_comment)
-        logger.info(f"Added skip comment to task {task.id}: {reason}")
-
     def _filter_tasks_by_tag(self, tasks: List[dict], tag_name: str) -> List[dict]:
         """Filter tasks to only those whose labels contain a label with a matching title.
 

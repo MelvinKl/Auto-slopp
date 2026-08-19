@@ -475,10 +475,6 @@ class IssueWorker(Worker):
 
             current_branch = get_current_branch(repo_dir)
             if current_branch in ("main", "master"):
-                if self._is_llm_unavailable(""):
-                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                    return self._skip_task(repo_dir, task, skip_reason="LLM unavailable - no changes made")
-
                 self.logger.info(f"No changes made for task #{task_id}, closing task")
                 self.task_source.on_no_changes(task)
 
@@ -495,10 +491,6 @@ class IssueWorker(Worker):
             # to ensure everything is committed before proceeding.
             ahead_count = get_commits_ahead_of_branch(repo_dir, base_branch="main")
             if ahead_count == 0:
-                if self._is_llm_unavailable(""):
-                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                    return self._skip_task(repo_dir, task, skip_reason="LLM unavailable - no changes made")
-
                 self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue")
                 # Clean up the branch since no work was done
                 try:

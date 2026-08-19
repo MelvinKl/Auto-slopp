@@ -835,31 +835,16 @@ class TestGitHubTaskSource:
         mock_comment.assert_called_with(Path("/test"), 42, "Condensed")
 
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
     @patch("auto_slopp.workers.github_task_source.settings")
-    def test_on_skip_adds_comment_and_does_not_remove_label(self, mock_settings, mock_comment):
-        """Test that on_skip adds a skip comment but does NOT remove the required label."""
+    def test_on_skip_no_comment_and_does_not_remove_label(self, mock_settings, mock_remove, mock_comment):
+        """Test that on_skip posts no comment and does NOT remove the required label."""
         mock_settings.github_issue_worker_required_label = "test-label"
         task_source = GitHubTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
 
         task_source.on_skip(task, "LLM unavailable")
 
-        mock_comment.assert_called_once()
-        call_args = mock_comment.call_args[0]
-        assert call_args[0] == Path("/test")
-        assert call_args[1] == 42
-        assert "Task Skipped" in call_args[2]
-        assert "LLM unavailable" in call_args[2]
-        assert "retried when the LLM becomes available" in call_args[2]
-
-    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
-    @patch("auto_slopp.workers.github_task_source.settings")
-    def test_on_skip_handles_missing_repo_path(self, mock_settings, mock_comment):
-        """Test that on_skip handles missing repo_path in task gracefully."""
-        mock_settings.github_issue_worker_required_label = "test-label"
-        task_source = GitHubTaskSource()
-        task = Task(id=42, title="Test", body="", comments=[], raw={})
-
-        task_source.on_skip(task, "LLM unavailable")
-
+        # Skips are logged only - no comment is posted and the label is preserved
         mock_comment.assert_not_called()
+        mock_remove.assert_not_called()

@@ -125,6 +125,10 @@ class TaskSource(ABC):
 
         The task remains open/active and can be retried later when conditions improve.
 
+        Note: This signature changed from ``on_skip(task, ralph_result: Dict[str, Any])``
+        to ``on_skip(task, reason: str = "")``. Implementations must accept the new
+        ``reason`` parameter.
+
         Args:
             task: The task that should be skipped
             reason: Optional reason for skipping (e.g., "LLM unavailable")

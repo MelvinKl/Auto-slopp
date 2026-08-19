@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Final acceptance check**: Now requires explicit `acceptance_status: pass` in output; empty/unknown output is treated as failure
 - **Loop behavior**: `loops_executed` now consistently reports `iteration - 1` on both success and final-check failure paths; final check runs on max-iterations with partial work and result recorded in `last_error`
 - **TaskSource.on_skip**: Updated signature from `on_skip(task)` to `on_skip(task, reason="")` to pass skip reason to task sources
+- **IssueWorker**: Removed unreachable LLM-unavailability checks in the no-changes and no-commits-ahead code paths (a successful execution already implies the LLM was available)
 
 ### Removed
 - Per-step acceptance criteria validation after each step

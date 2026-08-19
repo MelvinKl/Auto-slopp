@@ -22,7 +22,6 @@ class MockTaskSource(TaskSource):
         self.on_no_changes_called = False
         self.on_skip_called = False
         self.on_max_iterations_called = False
-        self.on_skip_called = False
         self.skip_reason = None
         self.findings = None  # To store findings passed to on_task_complete
 
@@ -60,10 +59,6 @@ class MockTaskSource(TaskSource):
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         self.on_max_iterations_called = True
-
-    def on_skip(self, task: Task, reason: str) -> None:
-        self.on_skip_called = True
-        self.skip_reason = reason
 
 
 class CapturingTaskSourceWithFindings(MockTaskSource):
@@ -1459,117 +1454,6 @@ class TestIssueWorker:
         assert worker._is_permanent_error("Connection refused") is False
         assert worker._is_permanent_error("Rate limit exceeded") is False
         assert worker._is_permanent_error("") is False
-
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.has_changes")
-    @patch("auto_slopp.workers.issue_worker.get_current_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
-    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
-    def test_no_changes_llm_unavailable_calls_on_skip(
-        self,
-        mock_execute,
-        mock_cli,
-        mock_settings,
-        mock_current_branch,
-        mock_has_changes,
-        mock_create_branch,
-        mock_checkout,
-    ):
-        """Test that on_skip is called when LLM unavailable and no changes made (has_changes=False)."""
-        mock_cli.return_value = "opencode"
-        mock_settings.ralph_enabled = False
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        mock_execute.return_value = {"success": True}
-        mock_has_changes.return_value = False
-        mock_current_branch.return_value = "main"
-        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-        # Mock _is_llm_unavailable to return True
-        worker._is_llm_unavailable = lambda _: True
-        result = worker.run(Path("/tmp"))
-        assert result["success"] is True
-        assert result["tasks_processed"] == 0
-        assert result["tasks_skipped"] == 1
-        assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is None
-        assert result["task_results"][0]["status"] == "skipped"
-        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no changes made"
-        assert task_source.on_skip_called is True
-        assert task_source.on_no_changes_called is False
-
-    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.has_changes")
-    @patch("auto_slopp.workers.issue_worker.get_current_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    @patch("auto_slopp.workers.issue_worker.push_to_remote")
-    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
-    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
-    @patch("auto_slopp.workers.issue_worker.ensure_ralph_in_gitignore")
-    def test_no_commits_ahead_llm_unavailable_calls_on_skip(
-        self,
-        mock_ensure_gitignore,
-        mock_cli,
-        mock_commits_ahead,
-        mock_push,
-        mock_settings,
-        mock_current_branch,
-        mock_has_changes,
-        mock_create_branch,
-        mock_checkout,
-        mock_commit_push,
-        caplog,
-    ):
-        """Test that on_skip is called when LLM unavailable and no commits ahead of main."""
-        mock_ensure_gitignore.return_value = (True, "")  # ensure_ralph_in_gitignore
-        mock_cli.return_value = "opencode"  # get_active_cli_command
-        mock_commits_ahead.return_value = 0  # get_commits_ahead_of_branch
-        mock_push.return_value = (True, "")  # push_to_remote
-        mock_settings.ralph_enabled = True  # settings
-        mock_settings.github_issue_step_max_iterations = 10  # settings
-        mock_current_branch.return_value = "ai/task-1"  # get_current_branch
-        mock_has_changes.return_value = True  # has_changes
-        mock_create_branch.return_value = True  # create_and_checkout_branch
-        mock_checkout.return_value = True  # checkout_branch_resilient
-        mock_commit_push.return_value = (True, "")  # commit_and_push_changes
-        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-        worker.ralph_executor.execute = lambda *args, **kwargs: {
-            "success": True,
-            "loops_executed": 1,
-            "steps_completed": 3,
-            "total_steps": 3,
-        }
-        # Mock _is_llm_unavailable to return True
-        worker._is_llm_unavailable = lambda _: True
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with caplog.at_level("WARNING"):
-                result = worker.run(Path(temp_dir))
-
-        assert result["success"] is True
-        assert result["tasks_processed"] == 0
-        assert result["tasks_skipped"] == 1
-        assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is None
-        assert result["task_results"][0]["status"] == "skipped"
-        assert result["task_results"][0]["skipped"] is True
-        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no changes made"
-        assert task_source.on_skip_called is True
-        assert task_source.on_no_changes_called is False
-        # Verify LLM unavailability causes skip (not failure)
-        assert result["success"] is True
-        assert result["tasks_processed"] == 0
-        assert result["tasks_skipped"] == 1
-        assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is None
-        assert result["task_results"][0]["status"] == "skipped"
-        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no changes made"
-        assert task_source.on_skip_called is True
-        assert task_source.on_no_changes_called is False
 
     @patch("auto_slopp.workers.issue_worker.ensure_ralph_in_gitignore")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")

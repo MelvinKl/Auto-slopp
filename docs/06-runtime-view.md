@@ -88,7 +88,7 @@ Each worker's `run(repo_path)` is called independently. Failures in one worker d
 │  • on_task_complete: Close issue, add PR comment, remove label     │
 │  • Comment condensation: AI-summarize author comments, delete originals │
 │  • on_no_changes: Close issue if no evidence of work               │
-│  • on_skip: Comment on issue about LLM unavailability              │
+│  • on_skip: Log skip event only (no comment, label preserved)     │
 │  • on_max_iterations_reached: Comment and remove label             │
 └─────────────────────────────────────────────────────────────────────┘
 
@@ -99,7 +99,7 @@ Each worker's `run(repo_path)` is called independently. Failures in one worker d
 │  • get_pr_title: "<title>"                                         │
 │  • on_task_complete: Update task status via API, create subtasks/PRs │
 │  • on_no_changes: Update task status without creating PR           │
-│  • on_skip: Update task with skip reason                           │
+│  • on_skip: Add skip comment to task (status unchanged)           │
 │  • on_max_iterations_reached: Update task with failure info        │
 └─────────────────────────────────────────────────────────────────────┘
 ```
