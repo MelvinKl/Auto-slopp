@@ -7,28 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`auto_slopp.utils.linking`**: New module with `ensure_issue_link_in_pr_body()` function and `CLOSING_KEYWORDS` constant for reliable PR-to-issue linking
+- **`tests/test_linking.py`**: Comprehensive test suite for the linking utilities (82 tests)
+- **`auto_slopp.utils.linking`**: Supports `owner/repo#123` format (including nested paths like `org/subteam/repo#123`) in existing-link detection
+- **TaskSource**: New `on_skip()` lifecycle callback for skipping issues that should be retried later (e.g., LLM unavailability). Both `GitHubTaskSource` and `VikunjaTaskSource` implement this by committing a skip comment and updating issue status.
+
 ### Changed
 - **IssueWorker/RalphExecutor**: Removed intermediate per-step acceptance checks; now only a single final acceptance check runs after all steps complete
 - **RalphExecutor**: Removed `remaining_steps_update_name` constructor parameter and associated dead code (`_execute_step_acceptance_check`, `_update_remaining_steps`, `_build_acceptance_check_instructions`, `_build_remaining_steps_update_instructions`, `_extract_step_block`, `_find_step_description`)
 - **Final acceptance check**: Now requires explicit `acceptance_status: pass` in output; empty/unknown output is treated as failure
 - **Loop behavior**: `loops_executed` now consistently reports `iteration - 1` on both success and final-check failure paths; final check runs on max-iterations with partial work and result recorded in `last_error`
+- **`checkout_branch_resilient`**: Replaced `git reset --hard` fallback with `git stash`/`git stash pop` to preserve uncommitted local changes when branch checkout fails due to conflicting modifications
+
+### Fixed
+- **Git checkout**: Uncommitted local changes are no longer silently discarded when switching branches. Changes are now stashed before checkout and restored afterward, preventing data loss from previous worker operations leaving temporary files in the working directory
+- **PR-to-issue linking**: Pull requests now always contain a valid GitHub closing keyword (`Closes`, `Fixes`, or `Resolves`) linking to the source issue. The `ensure_issue_link_in_pr_body` helper function guarantees at least one closing keyword is present in the PR body, preventing issues from remaining open after PR creation.
+- **`validate_issue_link`**: Now validates `issue_id` (raises `TypeError` for non-integers and `ValueError` for non-positive values), matching the documented contract and the behavior of `ensure_issue_link_in_pr_body`
+- **Linking pattern**: Cross-repo references now require at least one slash (e.g. `owner/repo#123`). A single segment like `Closes docs#123` is not a valid GitHub issue reference and is no longer treated as an existing link, so a closing keyword is reliably prepended
+- **IssueWorker class structure**: Moved orphaned class methods (`_generate_pr_body_from_task_file`, `_build_review_instructions`, `_review_pull_request`, `_build_pr_description_instructions`, `_create_error_result`, `_get_current_time`, `_get_elapsed_time`, `_log_completion_summary`) back inside the `IssueWorker` class where they were incorrectly defined outside the class.
 
 ### Removed
 - Per-step acceptance criteria validation after each step
 - Per-step remaining steps update after each step
 - `remaining_steps_update_name` parameter from `RalphExecutor` constructor and `IssueWorker` call site
 
-### Documentation
-- Updated README.md to reflect removal of intermediate checks and new final acceptance check behavior
-
-### Added
-- **TaskSource**: New `on_skip()` lifecycle callback for skipping issues that should be retried later (e.g., LLM unavailability). Both `GitHubTaskSource` and `VikunjaTaskSource` implement this by committing a skip comment and updating issue status.
-
 ### Migration Notes
 - **TaskSource.on_skip()**: Custom `TaskSource` implementations must now implement the `on_skip()` method with signature `on_skip(self, task: Task, reason: str)`. This is a breaking change for any external implementations of the `TaskSource` interface. The method receives the task and a reason string, and should persist the skip state (e.g., by updating issue status and leaving a comment explaining the skip).
 - **TaskSource.on_no_changes()**: Changed from abstract to non-abstract with a default no-op implementation. Custom `TaskSource` implementations no longer need to override this method unless they want custom behavior.
 - **RalphExecutor._last_iteration_failure_reason**: Renamed from `_last_iteration_error` for clarity. The field captures the failure reason from the last loop iteration so `_is_llm_unavailable()` can inspect it.
 - **UNAVAILABILITY_PATTERNS**: Extracted to shared constant in `auto_slopp.constants`. Both `IssueWorker` and `RalphExecutor` now use the same source of truth for LLM unavailability detection. The pattern set is the union of both previous sets.
+
+### Documentation
+- Updated README.md to reflect removal of intermediate checks and new final acceptance check behavior
 
 ## [0.1.0] - 2024-01-01
 

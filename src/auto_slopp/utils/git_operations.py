@@ -256,10 +256,80 @@ def has_changes(repo_dir: Path) -> bool:
     return bool(result.stdout.strip())
 
 
+def stash_changes(repo_dir: Path) -> bool:
+    """Stash uncommitted changes in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+
+    Returns:
+        True if stashing was successful (changes were stashed),
+        False if there were no changes or if stashing failed.
+    """
+    if not has_changes(repo_dir):
+        logger.debug(f"No uncommitted changes to stash in {repo_dir.name}")
+        return False
+
+    # Get current branch name for the stash message
+    branch_result = _run_git_command(repo_dir, "rev-parse", "--abbrev-ref", "HEAD", check=False)
+    current_branch = branch_result.stdout.strip() if branch_result.returncode == 0 else "unknown"
+
+    # Get timestamp for the stash message
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+    logger.info(f"Stashing uncommitted changes in {repo_dir.name}")
+    stash_result = _run_git_command(
+        repo_dir,
+        "stash",
+        "push",
+        "-m",
+        f"auto-slopp: stash before checkout on {current_branch} at {timestamp}",
+        check=False,
+    )
+
+    if stash_result.returncode == 0:
+        logger.info(f"Successfully stashed changes in {repo_dir.name}")
+        return True
+
+    stash_error = stash_result.stderr.strip() or stash_result.stdout.strip()
+    logger.warning(f"Failed to stash changes in {repo_dir.name}: {stash_error}")
+    return False
+
+
+def restore_stashed_changes(repo_dir: Path) -> bool:
+    """Restore stashed changes in the repository.
+
+    Args:
+        repo_dir: Path to the git repository
+
+    Returns:
+        True if restoring was successful or there were no stashed changes,
+        False if restoring failed.
+    """
+    logger.info(f"Restoring stashed changes in {repo_dir.name}")
+
+    # Use apply + drop instead of pop for safety: pop can fail mid-way
+    # (e.g., due to conflicts) leaving the stash entry in an inconsistent state.
+    apply_result = _run_git_command(repo_dir, "stash", "apply", check=False)
+    if apply_result.returncode != 0:
+        apply_error = apply_result.stderr.strip() or apply_result.stdout.strip()
+        logger.warning(f"Failed to apply stashed changes in {repo_dir.name}: {apply_error}")
+        return False
+
+    drop_result = _run_git_command(repo_dir, "stash", "drop", check=False)
+    if drop_result.returncode != 0:
+        drop_error = drop_result.stderr.strip() or drop_result.stdout.strip()
+        logger.warning(f"Failed to drop stash after applying in {repo_dir.name}: {drop_error}")
+        return False
+
+    logger.info(f"Successfully restored stashed changes in {repo_dir.name}")
+    return True
+
+
 def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = True, timeout: int = 60) -> bool:
     """Checkout a git branch with enhanced resilience.
 
-    If checkout fails, performs a git reset --hard and retries.
+    If checkout fails, stashes uncommitted changes and retries.
 
     Args:
         repo_dir: Path to the git repository
@@ -302,25 +372,41 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
 
         checkout_error = checkout_result.stderr.strip() or checkout_result.stdout.strip()
         logger.warning(f"Initial checkout failed for '{branch}' in {repo_dir.name}: {checkout_error}")
-        logger.info(f"Attempting git reset --hard and retry for '{branch}' in {repo_dir.name}")
+        logger.info(f"Attempting git stash and retry for '{branch}' in {repo_dir.name}")
 
-        reset_result = _run_git_command(repo_dir, "reset", "--hard", check=False, timeout=timeout)
-        if reset_result.returncode != 0:
-            reset_error = reset_result.stderr.strip() or reset_result.stdout.strip()
-            error_msg = f"Git reset --hard failed: {reset_error}"
-            logger.error(f"Git reset --hard failed in {repo_dir.name}: {reset_error}")
-            _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
-            return False
+        # Track whether a stash was created so we only restore when needed
+        stashed = False
 
-        clean_result = _run_git_command(repo_dir, "clean", "-fd", check=False, timeout=timeout)
-        if clean_result.returncode != 0:
-            clean_error = clean_result.stderr.strip() or clean_result.stdout.strip()
-            logger.warning(f"Git clean failed in {repo_dir.name}: {clean_error}")
+        # Only attempt stash if there are uncommitted changes
+        if has_changes(repo_dir):
+            if not stash_changes(repo_dir):
+                error_msg = "Failed to stash changes before retrying checkout"
+                logger.error(f"Stash failed in {repo_dir.name}: {error_msg}")
+                _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
+                return False
+            stashed = True
+        else:
+            logger.debug(f"No uncommitted changes to stash in {repo_dir.name}")
 
-        retry_checkout_result = _run_git_command(repo_dir, "checkout", branch, check=False, timeout=timeout)
+        # Use try/finally to guarantee stash restoration even if an exception
+        # occurs between stash and restore (e.g., from pull or future changes)
+        restored = False
+        try:
+            retry_checkout_result = _run_git_command(repo_dir, "checkout", branch, check=False, timeout=timeout)
 
-        if retry_checkout_result.returncode == 0:
-            logger.info(f"Successfully checked out '{branch}' in {repo_dir.name} after reset")
+            if retry_checkout_result.returncode != 0:
+                retry_error = retry_checkout_result.stderr.strip() or retry_checkout_result.stdout.strip()
+                error_msg = f"Failed to checkout '{branch}' even after stash: {retry_error}"
+                logger.error(f"Failed to checkout '{branch}' in {repo_dir.name} even after stash: {retry_error}")
+                _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
+                return False
+
+            # Restore stashed changes after successful checkout
+            if stashed:
+                restore_stashed_changes(repo_dir)
+                restored = True
+
+            logger.info(f"Successfully checked out '{branch}' in {repo_dir.name} after stash")
 
             pull_result = _run_git_command(
                 repo_dir,
@@ -336,12 +422,10 @@ def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = T
                 logger.warning(f"Pull failed for branch '{branch}' in {repo_dir.name}: {pull_error}")
 
             return True
-        else:
-            retry_error = retry_checkout_result.stderr.strip() or retry_checkout_result.stdout.strip()
-            error_msg = f"Failed to checkout '{branch}' even after reset: {retry_error}"
-            logger.error(f"Failed to checkout '{branch}' in {repo_dir.name} even after reset: {retry_error}")
-            _handle_git_operation_failure("checkout_branch_resilient", repo_dir, error_msg)
-            return False
+        finally:
+            # Guarantee stash restoration if we stashed changes, even on exception
+            if stashed and not restored:
+                restore_stashed_changes(repo_dir)
 
     except GitOperationError as e:
         error_msg = f"Error checking out '{branch}': {str(e)}"
