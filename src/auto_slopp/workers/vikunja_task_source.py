@@ -285,10 +285,15 @@ class VikunjaTaskSource(TaskSource):
             f"After analyzing the requirements and exploring the codebase, "
             f"the task was determined to be already complete or not applicable."
         )
+        repo_path = task.raw.get("_repo_path")
+        if repo_path is None:
+            logger.warning(f"No repo_path found in task #{task.id}, skipping no-changes handling")
+            return
+
         self._update_task_with_comment_and_status(
             task_id=task.id,
             comment=no_changes_comment,
-            repo_path=task.raw.get("_repo_path"),
+            repo_path=repo_path,
             status="done",
             commit_message="Updated task status to 'done'",
         )
