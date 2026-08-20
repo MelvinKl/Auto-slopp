@@ -265,7 +265,7 @@ class TestGitHubTaskSource:
         source = GitHubTaskSource()
         task = Task(id=42, title="Fix Bug", body="This is the issue body")
         pr_body = source.get_default_pr_body(task)
-        assert pr_body == "Closes #42\n\nThis is the issue body"
+        assert pr_body == "Closes #42\n\nThis is the issue body\n"
 
     @patch("auto_slopp.workers.github_task_source.close_issue")
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
