@@ -357,7 +357,7 @@ class GitHubTaskSource(TaskSource):
             f"This issue will be retried when the LLM becomes available."
         )
         comment_on_issue(repo_path, task.id, skip_comment)
-        logger.info(f"Added skip comment to issue #{task.id}: {reason}")
+        logger.error(f"Task skipped for issue #{task.id}: {reason}")
 
     def _filter_renovate_issues(self, issues: List[dict]) -> List[dict]:
         """Filter out issues created by Renovate.

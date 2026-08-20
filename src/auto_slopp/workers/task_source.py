@@ -124,19 +124,19 @@ class TaskSource(ABC):
         """
         pass  # noqa: B027 (intentional no-op hook for sources that don't track no-changes)
 
-    @abstractmethod
     def on_skip(self, task: Task, reason: str) -> None:
         """Called when a task should be skipped (e.g., when LLM is unavailable).
 
-        Custom `TaskSource` implementations must implement this method with
-        signature `on_skip(self, task: Task, reason: str)`. The method receives
-        the task and a reason string, and should persist the skip state
-        (e.g., by updating issue status and leaving a comment explaining the skip).
+        This is a non-abstract hook so that subclasses which do not need to
+        annotate skip state (e.g., purely internal task lists) can rely on
+        the default no-op. Sources that do track skip state (GitHub, Vikunja)
+        override this method to add a comment / update the task status.
 
         Args:
             task: The task that should be skipped
             reason: Reason for skipping (e.g., "LLM unavailable")
         """
+        pass  # noqa: B027 (intentional no-op hook for sources that don't track skip state)
 
     @abstractmethod
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
