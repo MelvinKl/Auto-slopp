@@ -471,6 +471,24 @@ def run_cli_executor(
     return final_result
 
 
+def is_any_cli_available() -> bool:
+    """Check if any CLI configuration is currently available (active or cooldown expired).
+
+    This is a public API to avoid tight coupling with the private _cli_states module variable.
+    Used by RalphExecutor and IssueWorker to detect LLM unavailability.
+
+    Returns:
+        True if at least one CLI configuration is available, False otherwise.
+    """
+    now = time.time()
+    for index in range(len(settings.cli_configurations)):
+        state = _get_cli_state(index)
+        # CLI is available if active, or if inactive but cooldown has expired
+        if state.get("active", True) or now >= state.get("cooldown_until", 0.0):
+            return True
+    return False
+
+
 def execute_with_instructions(
     instructions: str,
     work_dir: Path,

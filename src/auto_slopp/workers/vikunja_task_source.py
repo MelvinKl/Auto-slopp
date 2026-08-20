@@ -301,7 +301,7 @@ class VikunjaTaskSource(TaskSource):
     def on_skip(self, task: Task, reason: str) -> None:
         """Called when a task is skipped (e.g., due to LLM unavailability).
 
-        Adds a skip comment to the task but does NOT change the task status,
+        Adds a skip comment to the task and updates the task status to "skipped",
         so the task remains eligible for future processing.
 
         Args:
@@ -320,7 +320,9 @@ class VikunjaTaskSource(TaskSource):
         )
         try:
             comment_on_task(task.id, skip_comment)
-            logger.info(f"Added skip comment to task {task.id}: {reason}")
+            update_task_status(task.id, "skipped")
+            commit(repo_path, f"Updated task {task.id} status to 'skipped'")
+            logger.info(f"Added skip comment and set status to 'skipped' for task {task.id}: {reason}")
         except Exception as e:
             logger.error(f"Failed to add skip comment to task {task.id}: {e}")
 

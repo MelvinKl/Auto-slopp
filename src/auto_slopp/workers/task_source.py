@@ -127,10 +127,11 @@ class TaskSource(ABC):
     def on_skip(self, task: Task, reason: str) -> None:
         """Called when a task should be skipped (e.g., when LLM is unavailable).
 
-        This is a non-abstract hook so that subclasses which do not need to
-        annotate skip state (e.g., purely internal task lists) can rely on
-        the default no-op. Sources that do track skip state (GitHub, Vikunja)
-        override this method to add a comment / update the task status.
+        This is a non-abstract hook with a default no-op implementation, so that
+        subclasses which do not need to annotate skip state (e.g., purely internal
+        task lists) can rely on the default. Sources that do track skip state
+        (GitHub, Vikunja) override this method to add a comment / update the task
+        status.
 
         Args:
             task: The task that should be skipped

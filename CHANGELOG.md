@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `remaining_steps_update_name` parameter from `RalphExecutor` constructor and `IssueWorker` call site
 
 ### Migration Notes
-- **TaskSource.on_skip()**: Custom `TaskSource` implementations must now implement the `on_skip()` method with signature `on_skip(self, task: Task, reason: str)`. This is a breaking change for any external implementations of the `TaskSource` interface. The method receives the task and a reason string, and should persist the skip state (e.g., by updating issue status and leaving a comment explaining the skip).
+- **TaskSource.on_skip()**: New optional lifecycle callback for skipping tasks that should be retried later (e.g., LLM unavailability). The method has a default no-op implementation, so this is **NOT a breaking change** for custom `TaskSource` implementations. Sources that track skip state (GitHub, Vikunja) override this method to add a comment and update issue status.
 - **TaskSource.on_no_changes()**: Changed from abstract to non-abstract with a default no-op implementation. Custom `TaskSource` implementations no longer need to override this method unless they want custom behavior.
 - **RalphExecutor._last_iteration_failure_reason**: Renamed from `_last_iteration_error` for clarity. The field captures the failure reason from the last loop iteration so `_is_llm_unavailable()` can inspect it.
 - **UNAVAILABILITY_PATTERNS**: Extracted to shared constant in `auto_slopp.constants`. Both `IssueWorker` and `RalphExecutor` now use the same source of truth for LLM unavailability detection. The pattern set is the union of both previous sets.

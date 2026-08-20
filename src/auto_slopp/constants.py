@@ -1,6 +1,7 @@
 """Shared constants for auto_slopp."""
 
 # Lowercase substrings that indicate the LLM/CLI tool is unavailable.
+# Patterns are matched case-insensitively via .lower() on the error message.
 # Used by :class:`IssueWorker` and :class:`RalphExecutor` to distinguish
 # temporary outages (which should trigger a skip for retry) from genuine
 # iteration exhaustion (which should drop the task).

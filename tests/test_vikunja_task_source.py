@@ -346,9 +346,10 @@ class TestVikunjaTaskSource:
         assert "Max iterations reached" in comment_args[1]
 
     @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_on_skip_adds_comment_and_does_not_change_status(self, mock_comment, mock_commit):
-        """Test that on_skip adds a skip comment but does NOT change the task status."""
+    def test_on_skip_adds_comment_and_sets_skipped_status(self, mock_comment, mock_update, mock_commit):
+        """Test that on_skip adds a skip comment and sets the task status to 'skipped'."""
         task_source = VikunjaTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
 
@@ -360,8 +361,10 @@ class TestVikunjaTaskSource:
         assert "Task Skipped" in call_args[1]
         assert "LLM unavailable" in call_args[1]
         assert "retried when the LLM becomes available" in call_args[1]
-        # Status should NOT be updated and no commit should be made
-        mock_commit.assert_not_called()
+        # Status should be updated to 'skipped' and a commit should be made
+        mock_update.assert_called_once_with(42, "skipped")
+        mock_commit.assert_called_once()
+        assert "skipped" in mock_commit.call_args[0][1]
 
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
     def test_on_skip_handles_missing_repo_path(self, mock_comment):
@@ -499,11 +502,12 @@ class TestVikunjaTaskSource:
 
         mock_comment.assert_not_called()
 
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
     @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.settings")
-    def test_on_skip_does_not_call_commit(self, mock_settings, mock_commit, mock_comment):
-        """Test that on_skip does not change task status via API operations."""
+    def test_on_skip_updates_status_and_commits(self, mock_settings, mock_commit, mock_comment, mock_update):
+        """Test that on_skip updates the task status to 'skipped' and commits."""
         mock_settings.github_issue_worker_required_label = "test-tag"
         mock_comment.return_value = True
         task_source = VikunjaTaskSource()
@@ -512,4 +516,5 @@ class TestVikunjaTaskSource:
         task_source.on_skip(task, "test reason")
 
         mock_comment.assert_called_once()
-        mock_commit.assert_not_called()
+        mock_update.assert_called_once_with(42, "skipped")
+        mock_commit.assert_called_once()

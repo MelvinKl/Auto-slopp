@@ -8,15 +8,13 @@ This module provides a mechanism for:
 
 import logging
 import re
-import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from auto_slopp.constants import UNAVAILABILITY_PATTERNS as _UNAVAILABILITY_PATTERNS
-from auto_slopp.utils.cli_executor import _cli_states
-from settings.main import settings
+from auto_slopp.utils.cli_executor import is_any_cli_available
 
 logger = logging.getLogger(__name__)
 
@@ -898,21 +896,8 @@ class RalphExecutor:
         error_indicates_unavailable = any(pattern in error_lower for pattern in self.UNAVAILABILITY_PATTERNS)
 
         # Also check if all CLI configurations are inactive (in cooldown) and
-        # cooldown hasn't expired — aligns with IssueWorker._is_llm_unavailable.
-        all_clis_inactive = False
-        cli_configs = settings.cli_configurations
-        if cli_configs and _cli_states:
-            now = time.time()
-            num_configs = len(cli_configs)
-            if num_configs > 0:
-                all_clis_inactive = True
-                for i in range(num_configs):
-                    state = _cli_states.get(i, {"active": True, "cooldown_until": 0.0})
-                    # CLI is available if active, or if inactive but cooldown
-                    # has expired
-                    if state.get("active", True) or now >= state.get("cooldown_until", 0.0):
-                        all_clis_inactive = False
-                        break
+        # cooldown hasn't expired — uses public API to avoid tight coupling.
+        all_clis_inactive = not is_any_cli_available()
 
         return error_indicates_unavailable or all_clis_inactive
 

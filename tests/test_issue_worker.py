@@ -1410,8 +1410,9 @@ class TestIssueWorker:
         assert worker._is_llm_unavailable("LLM is unavailable") is True  # Shared pattern from constants
         assert worker._is_llm_unavailable("") is False
 
+    @patch("auto_slopp.utils.cli_executor.settings")
     @patch("auto_slopp.workers.issue_worker.settings")
-    def test_is_llm_unavailable_via_cli_states(self, mock_settings):
+    def test_is_llm_unavailable_via_cli_states(self, mock_settings, mock_cli_settings):
         """Test that _is_llm_unavailable checks _cli_states against cli_configurations."""
         import time
 
@@ -1422,6 +1423,8 @@ class TestIssueWorker:
 
         num_configs = 3
         mock_settings.cli_configurations = [type("Config", (), {"name": f"config{i}"}) for i in range(num_configs)]
+        # is_any_cli_available() reads settings from the cli_executor module
+        mock_cli_settings.cli_configurations = mock_settings.cli_configurations
 
         # Save original _cli_states
         original_cli_states = _cli_states.copy()

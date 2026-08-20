@@ -12,9 +12,9 @@ from typing import Any, Dict, List, Optional
 
 from auto_slopp.constants import UNAVAILABILITY_PATTERNS
 from auto_slopp.utils.cli_executor import (
-    _cli_states,
     execute_with_instructions,
     get_active_cli_command,
+    is_any_cli_available,
     run_cli_executor,
 )
 from auto_slopp.utils.git_operations import (
@@ -199,20 +199,10 @@ class IssueWorker(Worker):
         """
         error_lower = error_msg.lower()
         error_indicates_unavailable = any(pattern in error_lower for pattern in self.UNAVAILABILITY_PATTERNS)
-        # Also check if all CLI configurations are inactive (in cooldown) and cooldown hasn't expired
-        all_clis_inactive = False
-        cli_configs = settings.cli_configurations
-        if cli_configs and _cli_states:
-            now = time.time()
-            num_configs = len(cli_configs)
-            if num_configs > 0:
-                all_clis_inactive = True
-                for i in range(num_configs):
-                    state = _cli_states.get(i, {"active": True, "cooldown_until": 0.0})
-                    # CLI is available if active, or if inactive but cooldown has expired
-                    if state.get("active", True) or now >= state.get("cooldown_until", 0.0):
-                        all_clis_inactive = False
-                        break
+
+        # Also check if all CLI configurations are inactive (in cooldown) and
+        # cooldown hasn't expired — uses public API to avoid tight coupling.
+        all_clis_inactive = not is_any_cli_available()
 
         return error_indicates_unavailable or all_clis_inactive
 
