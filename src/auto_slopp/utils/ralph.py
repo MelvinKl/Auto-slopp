@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from auto_slopp.constants import UNAVAILABILITY_PATTERNS as _UNAVAILABILITY_PATTERNS
+from auto_slopp.constants import error_indicates_llm_unavailability
 from auto_slopp.utils.cli_executor import is_any_cli_available
 
 logger = logging.getLogger(__name__)
@@ -892,14 +893,20 @@ class RalphExecutor:
         if not error:
             return False
 
-        error_lower = error.lower()
-        error_indicates_unavailable = any(pattern in error_lower for pattern in self.UNAVAILABILITY_PATTERNS)
+        error_indicates_unavailable = error_indicates_llm_unavailability(error)
+        if error_indicates_unavailable:
+            return True
 
-        # Also check if all CLI configurations are inactive (in cooldown) and
-        # cooldown hasn't expired — uses public API to avoid tight coupling.
-        all_clis_inactive = not is_any_cli_available()
-
-        return error_indicates_unavailable or all_clis_inactive
+        # CLI unavailability is treated only as a secondary confirmation, never
+        # an independent trigger. A genuine code error (e.g. "syntax error in
+        # code") must not be misclassified as "LLM unavailable" just because all
+        # CLIs happen to be in a transient cooldown window.
+        if not is_any_cli_available():
+            logger.debug(
+                f"Error did not match unavailability patterns and all CLIs are "
+                f"inactive; not treating as LLM unavailable: {error!r}"
+            )
+        return False
 
     def _step_is_closed(self, task_path: Path, step_number: int) -> bool:
         """Check whether a step is marked as completed in the task file."""

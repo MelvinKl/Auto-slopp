@@ -451,7 +451,10 @@ class TestIssueWorker:
         assert len(result["task_results"]) == 1
         assert result["task_results"][0]["success"] is False
         assert result["task_results"][0]["skipped"] is True
-        assert "skip_reason" in result["task_results"][0]
+        # The skip reason must reflect the actual LLM-unavailability reason from
+        # the last iteration, not the generic "Maximum iterations reached" message.
+        assert result["task_results"][0]["skip_reason"] == "timed out waiting for response"
+        assert task_source.skip_reason == "timed out waiting for response"
         # on_skip should be called, NOT on_max_iterations_reached
         assert task_source.on_skip_called is True
         assert task_source.on_max_iterations_called is False
@@ -1409,11 +1412,17 @@ class TestIssueWorker:
         assert worker._is_llm_unavailable("no cli configuration found") is False
         assert worker._is_llm_unavailable("LLM is unavailable") is True  # Shared pattern from constants
         assert worker._is_llm_unavailable("") is False
+        # Bare status codes are matched with word boundaries so incidental
+        # numbers embedded in a larger token do not trigger a false positive.
+        assert worker._is_llm_unavailable("HTTP 503") is True
+        assert worker._is_llm_unavailable("status 429 returned") is True
+        assert worker._is_llm_unavailable("line 5035 in file") is False
+        assert worker._is_llm_unavailable("process_503x failed") is False
 
     @patch("auto_slopp.utils.cli_executor.settings")
     @patch("auto_slopp.workers.issue_worker.settings")
     def test_is_llm_unavailable_via_cli_states(self, mock_settings, mock_cli_settings):
-        """Test that _is_llm_unavailable checks _cli_states against cli_configurations."""
+        """Test that CLI unavailability is only a secondary confirmation, never an independent trigger."""
         import time
 
         from auto_slopp.utils.cli_executor import _cli_states
@@ -1430,42 +1439,29 @@ class TestIssueWorker:
         original_cli_states = _cli_states.copy()
 
         try:
-            # Test 1: All configs inactive, cooldown not expired -> True
             now = time.time()
+
+            # Test 1: All configs inactive, cooldown not expired, but no error
+            # pattern match -> False. CLI unavailability alone must not trigger.
             _cli_states.clear()
             _cli_states.update({i: {"active": False, "cooldown_until": now + 3600} for i in range(num_configs)})
-            assert worker._is_llm_unavailable("") is True
+            assert worker._is_llm_unavailable("") is False
 
-            # Test 2: All configs active -> False
+            # Test 2: A genuine code error while all CLIs are in a transient
+            # cooldown window must NOT be misclassified as LLM unavailable.
+            assert worker._is_llm_unavailable("syntax error in code") is False
+
+            # Test 3: A genuine unavailability error is detected even when all
+            # CLIs are inactive (error pattern match is the required signal).
+            assert worker._is_llm_unavailable("timed out waiting for response") is True
+
+            # Test 4: All configs active -> False for a non-unavailability error
             _cli_states.clear()
             _cli_states.update({i: {"active": True, "cooldown_until": 0.0} for i in range(num_configs)})
             assert worker._is_llm_unavailable("") is False
+            assert worker._is_llm_unavailable("Git push failed") is False
 
-            # Test 3: One config active, others inactive -> False
-            _cli_states.clear()
-            _cli_states.update(
-                {
-                    0: {"active": True, "cooldown_until": 0.0},
-                    1: {"active": False, "cooldown_until": now + 3600},
-                    2: {"active": False, "cooldown_until": now + 3600},
-                }
-            )
-            assert worker._is_llm_unavailable("") is False
-
-            # Test 4: All inactive but one cooldown expired -> False
-            _cli_states.clear()
-            _cli_states.update(
-                {
-                    0: {"active": False, "cooldown_until": now - 3600},
-                    1: {"active": False, "cooldown_until": now + 3600},
-                    2: {"active": False, "cooldown_until": now + 3600},
-                }
-            )
-            assert worker._is_llm_unavailable("") is False
-
-            # Test 5: String matching still works alongside cli_states check
-            _cli_states.clear()
-            _cli_states.update({i: {"active": True, "cooldown_until": 0.0} for i in range(num_configs)})
+            # Test 5: String matching works regardless of CLI state
             assert worker._is_llm_unavailable("LLM timed out") is True
             assert worker._is_llm_unavailable("Git push failed") is False
         finally:

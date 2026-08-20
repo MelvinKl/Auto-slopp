@@ -115,7 +115,6 @@ extend-ignore = [
     "D401",
     "I100",
     "I201",
-    "B027",
 ]
 ban-relative-imports = true
 per-file-ignores = """

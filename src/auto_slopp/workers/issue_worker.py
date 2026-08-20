@@ -10,7 +10,10 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from auto_slopp.constants import UNAVAILABILITY_PATTERNS
+from auto_slopp.constants import (
+    UNAVAILABILITY_PATTERNS,
+    error_indicates_llm_unavailability,
+)
 from auto_slopp.utils.cli_executor import (
     execute_with_instructions,
     get_active_cli_command,
@@ -197,14 +200,20 @@ class IssueWorker(Worker):
         Returns:
             True if the error indicates LLM is unavailable, False otherwise
         """
-        error_lower = error_msg.lower()
-        error_indicates_unavailable = any(pattern in error_lower for pattern in self.UNAVAILABILITY_PATTERNS)
+        error_indicates_unavailable = error_indicates_llm_unavailability(error_msg)
+        if error_indicates_unavailable:
+            return True
 
-        # Also check if all CLI configurations are inactive (in cooldown) and
-        # cooldown hasn't expired — uses public API to avoid tight coupling.
-        all_clis_inactive = not is_any_cli_available()
-
-        return error_indicates_unavailable or all_clis_inactive
+        # CLI unavailability is treated only as a secondary confirmation, never
+        # an independent trigger. A genuine code error (e.g. "syntax error in
+        # code") must not be misclassified as "LLM unavailable" just because all
+        # CLIs happen to be in a transient cooldown window.
+        if not is_any_cli_available():
+            self.logger.debug(
+                f"Error did not match unavailability patterns and all CLIs are "
+                f"inactive; not treating as LLM unavailable: {error_msg!r}"
+            )
+        return False
 
     def _is_permanent_error(self, error_msg: str) -> bool:
         """Check if the error indicates a permanent configuration/setup issue.
@@ -320,13 +329,17 @@ class IssueWorker(Worker):
                                 f"Ralph loop hit max iterations but LLM was unavailable "
                                 f"during execution – skipping task #{task_id} for retry"
                             )
-                            self.task_source.on_skip(
-                                task,
-                                ralph_result.get("error", "LLM unavailable during Ralph loop"),
+                            # Use the actual iteration failure reason (e.g. "timed
+                            # out waiting for response") rather than the generic
+                            # "Maximum iterations reached" message, which would
+                            # mislead the skip comment posted to the issue.
+                            skip_reason = self.ralph_executor._last_iteration_failure_reason or ralph_result.get(
+                                "error", "LLM unavailable during Ralph loop"
                             )
+                            self.task_source.on_skip(task, skip_reason)
                             result["success"] = False
                             result["skipped"] = True
-                            result["skip_reason"] = ralph_result.get("error", "LLM unavailable during Ralph loop")
+                            result["skip_reason"] = skip_reason
                         else:
                             self.logger.warning(f"Ralph loop reached max iterations for task #{task_id}")
                             self.task_source.on_max_iterations_reached(
