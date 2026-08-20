@@ -982,7 +982,7 @@ class RalphExecutor:
                 branch_name=branch_name,
             )
             if not update_result.get("success", False):
-                self._last_error = update_result.get("error", "Failed to update issue task file")
+                self._last_error = update_result.get("error") or "Failed to update issue task file"
                 return {
                     "success": False,
                     "error": update_result.get("error", "Failed to update issue task file"),
@@ -1009,7 +1009,7 @@ class RalphExecutor:
                 branch_name=branch_name,
             )
             if not refinement_result.get("success", False):
-                self._last_error = refinement_result.get("error", "Failed to refine issue task")
+                self._last_error = refinement_result.get("error") or "Failed to refine issue task"
                 return {
                     "success": False,
                     "error": refinement_result.get("error", "Failed to refine issue task"),

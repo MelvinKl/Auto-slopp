@@ -122,7 +122,7 @@ class TaskSource(ABC):
         Args:
             task: The task that required no changes
         """
-        pass  # noqa: B027 (intentional no-op hook for sources that don't track no-changes)
+        pass
 
     def on_skip(self, task: Task, reason: str) -> None:
         """Called when a task should be skipped (e.g., when LLM is unavailable).
@@ -136,7 +136,7 @@ class TaskSource(ABC):
             task: The task that should be skipped
             reason: Reason for skipping (e.g., "LLM unavailable")
         """
-        pass  # noqa: B027 (intentional no-op hook for sources that don't track skip state)
+        pass
 
     @abstractmethod
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:

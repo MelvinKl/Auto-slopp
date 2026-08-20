@@ -318,8 +318,11 @@ class VikunjaTaskSource(TaskSource):
             f"Reason: {reason}\n\n"
             f"This task will be retried when the LLM becomes available."
         )
-        comment_on_task(task.id, skip_comment)
-        logger.info(f"Added skip comment to task {task.id}: {reason}")
+        try:
+            comment_on_task(task.id, skip_comment)
+            logger.info(f"Added skip comment to task {task.id}: {reason}")
+        except Exception as e:
+            logger.error(f"Failed to add skip comment to task {task.id}: {e}")
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.
