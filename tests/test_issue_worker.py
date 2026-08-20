@@ -1528,7 +1528,10 @@ class TestIssueWorker:
         assert len(result["task_results"]) == 1
         assert result["task_results"][0]["success"] is False
         assert result["task_results"][0]["skipped"] is True
-        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no changes made"
+        assert (
+            result["task_results"][0]["skip_reason"]
+            == "LLM unavailable - no changes made: timed out waiting for response"
+        )
         assert task_source.on_skip_called is True
         assert task_source.on_no_changes_called is False
 
@@ -1588,7 +1591,10 @@ class TestIssueWorker:
         assert len(result["task_results"]) == 1
         assert result["task_results"][0]["success"] is False
         assert result["task_results"][0]["skipped"] is True
-        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no commits ahead"
+        assert (
+            result["task_results"][0]["skip_reason"]
+            == "LLM unavailable - no commits ahead: timed out waiting for response"
+        )
         assert task_source.on_skip_called is True
         assert task_source.on_no_changes_called is False
         # Verify ensure_ralph_in_gitignore was called

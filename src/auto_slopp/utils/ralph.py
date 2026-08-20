@@ -227,8 +227,11 @@ class RalphExecutor:
         _last_error: Stores the most recent error message from any Ralph
             operation (e.g., refinement, parsing, final acceptance check).
             This field is set early in the run (before the step loop) and
-            persists as a "stale" error until overwritten. It is used as a
-            fallback by :meth:`_is_llm_unavailable` when no per-iteration
+            persists as a "stale" error until overwritten or cleared. It is
+            cleared after a successful iteration and on successful
+            completion so it cannot be mistaken for the cause of a later
+            skip decision. It is used as a fallback by
+            :meth:`_is_llm_unavailable` when no per-iteration
             error is available.
         _last_iteration_failure_reason: Stores the error reason from the
             most recent iteration inside the step loop. This is cleared
@@ -873,6 +876,21 @@ class RalphExecutor:
 
         return {"success": True}
 
+    def _current_failure_reason(self) -> Optional[str]:
+        """Return the most relevant recent failure reason.
+
+        The per-iteration reason is preferred over the run-level
+        :attr:`_last_error` because it reflects the failure that actually
+        caused the loop to stop (e.g., an LLM outage mid-loop) rather than
+        a stale error from an earlier phase. Both :meth:`_is_llm_unavailable`
+        and :meth:`get_skip_reason` use this helper so the precedence rule
+        stays in one place.
+
+        Returns:
+            The most recent failure reason, or ``None`` if no error is set.
+        """
+        return self._last_iteration_failure_reason or self._last_error
+
     def _is_llm_unavailable(self) -> bool:
         """Check if the last error indicates the LLM/CLI tool is unavailable.
 
@@ -888,7 +906,7 @@ class RalphExecutor:
         # Prefer the error from the last iteration (most accurate for
         # distinguishing LLM unavailability during the loop from stale
         # errors set earlier in the run).
-        error = self._last_iteration_failure_reason or self._last_error
+        error = self._current_failure_reason()
         if not error:
             return False
 
@@ -921,7 +939,7 @@ class RalphExecutor:
             The most recent failure reason if it indicates the LLM/CLI tool is
             unavailable, ``None`` otherwise.
         """
-        error = self._last_iteration_failure_reason or self._last_error
+        error = self._current_failure_reason()
         if not error:
             return None
         if self._is_llm_unavailable():
@@ -1117,6 +1135,11 @@ class RalphExecutor:
                     branch_name=branch_name,
                 )
                 if final_check_result.get("success", False):
+                    # Successful completion – clear any stale error state so
+                    # post-success paths (e.g. "no changes made") cannot
+                    # misclassify the task as LLM-unavailable.
+                    self._last_error = None
+                    self._last_iteration_failure_reason = None
                     result["success"] = True
                     result["loops_executed"] = iteration - 1
                     return result
@@ -1168,9 +1191,12 @@ class RalphExecutor:
             except Exception:
                 pass
 
-            # Successful iteration – clear the last-iteration error so it
-            # cannot be confused with a later failure.
+            # Successful iteration – clear the last-iteration error and any
+            # stale run-level error so a transient failure in an earlier
+            # iteration (e.g. a timeout) cannot be confused with the state
+            # of a later successful one.
             self._last_iteration_failure_reason = None
+            self._last_error = None
 
             result["loops_executed"] = iteration
 
@@ -1198,7 +1224,11 @@ class RalphExecutor:
             )
             if final_check_result.get("success", False):
                 if result["steps_completed"] >= result["total_steps"]:
-                    # All steps were completed and pass validation
+                    # All steps were completed and pass validation – clear
+                    # any stale error state so post-success paths cannot
+                    # misclassify the task as LLM-unavailable.
+                    self._last_error = None
+                    self._last_iteration_failure_reason = None
                     result["success"] = True
                     result["max_loops_reached"] = False
                     result.pop("error", None)

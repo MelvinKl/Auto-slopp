@@ -421,10 +421,13 @@ class IssueWorker(Worker):
                 skip_reason = self.ralph_executor.get_skip_reason()
                 if skip_reason is not None:
                     self.logger.warning(f"LLM unavailable, skipping task #{task_id}: {skip_reason}")
-                    self.task_source.on_skip(task, "LLM unavailable - no changes made")
+                    # Include the underlying failure reason so the issue
+                    # comment reflects the real cause (e.g. a timeout).
+                    skip_message = f"LLM unavailable - no changes made: {skip_reason}"
+                    self.task_source.on_skip(task, skip_message)
                     result["success"] = False
                     result["skipped"] = True
-                    result["skip_reason"] = "LLM unavailable - no changes made"
+                    result["skip_reason"] = skip_message
                     return result
 
                 self.logger.info(f"No changes made for task #{task_id}, closing task")
@@ -446,10 +449,13 @@ class IssueWorker(Worker):
                 skip_reason = self.ralph_executor.get_skip_reason()
                 if skip_reason is not None:
                     self.logger.warning(f"LLM unavailable, skipping task #{task_id}: {skip_reason}")
-                    self.task_source.on_skip(task, "LLM unavailable - no commits ahead")
+                    # Include the underlying failure reason so the issue
+                    # comment reflects the real cause (e.g. a timeout).
+                    skip_message = f"LLM unavailable - no commits ahead: {skip_reason}"
+                    self.task_source.on_skip(task, skip_message)
                     result["success"] = False
                     result["skipped"] = True
-                    result["skip_reason"] = "LLM unavailable - no commits ahead"
+                    result["skip_reason"] = skip_message
                     return result
 
                 self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue")
@@ -542,9 +548,7 @@ class IssueWorker(Worker):
 
             # PR Review Loop: Review PR, fix issues, and re-review until clean
             # This loop counts towards the overall iterations for the issue
-            max_pr_review_iterations = getattr(settings, "github_issue_pr_review_max_iterations", 5)
-            if not isinstance(max_pr_review_iterations, int):
-                max_pr_review_iterations = 5
+            max_pr_review_iterations = settings.github_issue_pr_review_max_iterations or 5
             pr_review_iteration = 0
             pr_number = int(pr_url.split("/")[-1])
 

@@ -1621,3 +1621,75 @@ class TestRalphExecutor:
             # (it was cleared), then set again on the second failure
             assert ralph_executor._last_iteration_failure_reason is not None
             assert "timed out" in ralph_executor._last_iteration_failure_reason
+
+    def test_run_refined_task_loop_clears_last_error_after_successful_iteration(self, ralph_executor):
+        """Test that a stale _last_error is cleared after a successful iteration."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Second step that fails\n")
+
+            ralph_executor.max_iterations = 5
+            # Simulate a transient timeout from an earlier phase of the run.
+            ralph_executor._last_error = "timed out waiting for response"
+            call_count = [0]
+            error_after_success = []
+
+            def success_then_fail(*args, **kwargs):
+                call_count[0] += 1
+                if call_count[0] == 1:
+                    return {"success": True, "stdout": "Done"}
+                # The stale error must have been cleared by the successful
+                # first iteration before the second iteration runs.
+                error_after_success.append(ralph_executor._last_error)
+                return {"success": False, "error": "timed out waiting for response"}
+
+            ralph_executor.execute_fn = success_then_fail
+            ralph_executor.has_changes_fn = lambda path: True
+            ralph_executor.commit_fn = lambda path, msg, push: (True, None)
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is False
+            # The first call after the successful iteration must see a cleared
+            # _last_error (later failures set it again).
+            assert error_after_success[0] is None
+
+    def test_run_refined_task_loop_clears_error_state_on_successful_completion(self, ralph_executor):
+        """Test that both error fields are cleared when the run completes successfully."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [x] 1. Completed step\n- [x] 2. Also completed\n")
+
+            # Simulate a transient timeout that occurred in an earlier run/phase.
+            ralph_executor._last_error = "timed out waiting for response"
+            ralph_executor._last_iteration_failure_reason = "timed out waiting for response"
+
+            ralph_executor.execute_fn = lambda *args, **kwargs: {
+                "success": True,
+                "stdout": "acceptance_status: pass",
+            }
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+                issue_number=1,
+            )
+
+            assert result["success"] is True
+            assert ralph_executor._last_error is None
+            assert ralph_executor._last_iteration_failure_reason is None
+            # A successful completion must not be misclassified as LLM-unavailable.
+            assert ralph_executor.get_skip_reason() is None
