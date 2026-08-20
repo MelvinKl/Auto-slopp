@@ -21,6 +21,7 @@ from auto_slopp.utils.github_operations import (
     get_open_prs,
     remove_label_from_issue,
 )
+from auto_slopp.utils.linking import ensure_issue_link_in_pr_body
 from auto_slopp.workers.task_source import Task, TaskSource
 from settings.main import settings
 
@@ -199,7 +200,7 @@ class GitHubTaskSource(TaskSource):
         Returns:
             PR body string in markdown
         """
-        return f"Closes #{task.id}\n\n{task.body}"
+        return ensure_issue_link_in_pr_body(f"{task.body}", task.id)
 
     def on_task_start(self, task: Task, branch_name: str) -> None:
         """Called when task processing begins.
@@ -298,29 +299,6 @@ class GitHubTaskSource(TaskSource):
         )
         comment_on_issue(repo_path, task.id, no_changes_comment)
         close_issue(repo_path, task.id)
-
-    def on_skip(self, task: Task) -> None:
-        """Called when a task should be skipped (e.g., when LLM is unavailable).
-
-        No comment is posted to the issue - skip information is only recorded
-        in the logs. The required label is NOT removed so
-        the task can be retried when the LLM becomes available.
-
-        Skip events are still logged for observability, so future maintainers
-        understand the information isn't lost, just moved to logs.
-
-        Args:
-            task: The task that should be skipped
-        """
-        repo_path = task.raw.get("_repo_path")
-        if repo_path is None:
-            logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
-            return
-
-        # No GitHub comment is posted for skips — skip events are logged-only
-        # to avoid cluttering issues with skip notifications. The label is preserved
-        # so the task can be retried when the LLM becomes available.
-        logger.info(f"Skipped issue #{task.id} - LLM unavailable, label preserved for retry")
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.
