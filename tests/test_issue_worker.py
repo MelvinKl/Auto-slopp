@@ -1318,7 +1318,8 @@ class TestIssueWorker:
             "max_loops_reached": True,
             "error": "LLM timed out waiting for response",
         }
-        worker.ralph_executor._is_llm_unavailable = lambda: True
+        # Simulate LLM unavailability during the loop via the public accessor.
+        worker.ralph_executor.get_skip_reason = lambda: "LLM timed out waiting for response"
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
@@ -1518,8 +1519,8 @@ class TestIssueWorker:
         mock_current_branch.return_value = "main"
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
-        # Mock _is_llm_unavailable to return True
-        worker._is_llm_unavailable = lambda _: True
+        # Simulate LLM unavailability detected from the executor's error state.
+        worker.ralph_executor.get_skip_reason = lambda: "timed out waiting for response"
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
@@ -1575,8 +1576,8 @@ class TestIssueWorker:
             "steps_completed": 3,
             "total_steps": 3,
         }
-        # Mock _is_llm_unavailable to return True
-        worker._is_llm_unavailable = lambda _: True
+        # Simulate LLM unavailability detected from the executor's error state.
+        worker.ralph_executor.get_skip_reason = lambda: "timed out waiting for response"
         with tempfile.TemporaryDirectory() as temp_dir:
             with caplog.at_level("WARNING"):
                 result = worker.run(Path(temp_dir))

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`tests/test_linking.py`**: Comprehensive test suite for the linking utilities (82 tests)
 - **`auto_slopp.utils.linking`**: Supports `owner/repo#123` format (including nested paths like `org/subteam/repo#123`) in existing-link detection
 - **TaskSource**: New `on_skip()` lifecycle callback for skipping issues that should be retried later (e.g., LLM unavailability). Both `GitHubTaskSource` and `VikunjaTaskSource` implement this by committing a skip comment and updating issue status.
+- **`RalphExecutor.get_skip_reason()`**: New public accessor returning the last failure reason when it indicates LLM unavailability (`None` otherwise), so callers no longer need to reach into the executor's private error-tracking fields.
 
 ### Changed
 - **IssueWorker/RalphExecutor**: Removed intermediate per-step acceptance checks; now only a single final acceptance check runs after all steps complete
@@ -21,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`checkout_branch_resilient`**: Replaced `git reset --hard` fallback with `git stash`/`git stash pop` to preserve uncommitted local changes when branch checkout fails due to conflicting modifications
 
 ### Fixed
+- **`VikunjaTaskSource.on_skip`**: Now uses the shared `_update_task_with_comment_and_status` helper like the other lifecycle hooks, giving it the same error-handling behavior
+- **IssueWorker skip detection**: The "no changes made" and "no commits ahead" skip paths now use `ralph_executor.get_skip_reason()` (the actual last failure reason) instead of a check on an empty error string that could never fire
+- **README**: Merged the duplicated `PR-to-Issue Linking` sections into a single section
+- **`UNAVAILABILITY_PATTERNS`**: Removed the redundant `"503 service unavailable"` and `"502 bad gateway"` entries, already covered by the word-boundary status-code match and the standalone `"service unavailable"` pattern
 - **Git checkout**: Uncommitted local changes are no longer silently discarded when switching branches. Changes are now stashed before checkout and restored afterward, preventing data loss from previous worker operations leaving temporary files in the working directory
 - **PR-to-issue linking**: Pull requests now always contain a valid GitHub closing keyword (`Closes`, `Fixes`, or `Resolves`) linking to the source issue. The `ensure_issue_link_in_pr_body` helper function guarantees at least one closing keyword is present in the PR body, preventing issues from remaining open after PR creation.
 - **`validate_issue_link`**: Now validates `issue_id` (raises `TypeError` for non-integers and `ValueError` for non-positive values), matching the documented contract and the behavior of `ensure_issue_link_in_pr_body`

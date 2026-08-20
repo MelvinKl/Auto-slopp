@@ -471,12 +471,15 @@ class TestVikunjaTaskSource:
                 expected_prefix
             ), f"Identifier {identifier} doesn't start with prefix {expected_prefix}"
 
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
     @patch("auto_slopp.workers.vikunja_task_source.settings")
-    def test_on_skip_adds_comment_and_preserves_tag(self, mock_settings, mock_comment):
+    def test_on_skip_adds_comment_and_preserves_tag(self, mock_settings, mock_comment, mock_update, mock_commit):
         """Test that on_skip adds a comment but does NOT remove the required tag."""
         mock_settings.github_issue_worker_required_label = "test-tag"
         mock_comment.return_value = True
+        mock_update.return_value = True
         task_source = VikunjaTaskSource()
         task = Task(id=42, title="Test Task", body="", comments=[], raw={"_repo_path": Path("/test")})
 

@@ -324,7 +324,8 @@ class IssueWorker(Worker):
                         # Distinguish between genuine iteration exhaustion and
                         # LLM unavailability during the loop. The latter should
                         # trigger a skip (retry later), not a permanent failure.
-                        if self.ralph_executor._is_llm_unavailable():
+                        skip_reason = self.ralph_executor.get_skip_reason()
+                        if skip_reason is not None:
                             self.logger.warning(
                                 f"Ralph loop hit max iterations but LLM was unavailable "
                                 f"during execution – skipping task #{task_id} for retry"
@@ -333,9 +334,6 @@ class IssueWorker(Worker):
                             # out waiting for response") rather than the generic
                             # "Maximum iterations reached" message, which would
                             # mislead the skip comment posted to the issue.
-                            skip_reason = self.ralph_executor._last_iteration_failure_reason or ralph_result.get(
-                                "error", "LLM unavailable during Ralph loop"
-                            )
                             self.task_source.on_skip(task, skip_reason)
                             result["success"] = False
                             result["skipped"] = True
@@ -355,26 +353,25 @@ class IssueWorker(Worker):
                         result["skipped"] = True
                         result["skip_reason"] = ralph_error
                         return result
-                    elif self._is_permanent_error(ralph_error):
-                        self.logger.error(f"Permanent error detected for task #{task_id}: {ralph_error}")
-                        self.task_source.on_task_failure(task, ralph_error)
                     else:
-                        # Non-max-loops-reached Ralph failure – check for LLM
-                        # unavailability before falling back to permanent failure.
-                        if self.ralph_executor._is_llm_unavailable():
+                        # Non-max-loops-reached Ralph failure (e.g. refinement/parse
+                        # phase) – check the executor's own error state for LLM
+                        # unavailability before falling back to a failure.
+                        skip_reason = self.ralph_executor.get_skip_reason()
+                        if skip_reason is not None:
                             self.logger.warning(
                                 f"Ralph loop failed but LLM appears unavailable "
                                 f"(refinement/parse phase) – skipping task #{task_id} for retry"
                             )
-                            self.task_source.on_skip(task, ralph_error)
+                            self.task_source.on_skip(task, skip_reason)
                             result["success"] = False
                             result["skipped"] = True
-                            result["skip_reason"] = ralph_error
-                        elif self._is_permanent_error(ralph_error):
-                            self.logger.error(f"Permanent error detected for task #{task_id}: {ralph_error}")
-                            self.task_source.on_task_failure(task, ralph_error)
+                            result["skip_reason"] = skip_reason
                         else:
-                            self.logger.error(f"Ralph loop failed for task #{task_id}: {ralph_error}")
+                            if self._is_permanent_error(ralph_error):
+                                self.logger.error(f"Permanent error detected for task #{task_id}: {ralph_error}")
+                            else:
+                                self.logger.error(f"Ralph loop failed for task #{task_id}: {ralph_error}")
                             self.task_source.on_task_failure(task, ralph_error)
 
                     return result
@@ -421,8 +418,9 @@ class IssueWorker(Worker):
 
             current_branch = get_current_branch(repo_dir)
             if current_branch in ("main", "master"):
-                if self._is_llm_unavailable(""):
-                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
+                skip_reason = self.ralph_executor.get_skip_reason()
+                if skip_reason is not None:
+                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}: {skip_reason}")
                     self.task_source.on_skip(task, "LLM unavailable - no changes made")
                     result["success"] = False
                     result["skipped"] = True
@@ -445,9 +443,10 @@ class IssueWorker(Worker):
             # to ensure everything is committed before proceeding.
             ahead_count = get_commits_ahead_of_branch(repo_dir, base_branch="main")
             if ahead_count == 0:
-                if self._is_llm_unavailable(""):
-                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                    self.task_source.on_skip(task, "LLM unavailable - no changes made")
+                skip_reason = self.ralph_executor.get_skip_reason()
+                if skip_reason is not None:
+                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}: {skip_reason}")
+                    self.task_source.on_skip(task, "LLM unavailable - no commits ahead")
                     result["success"] = False
                     result["skipped"] = True
                     result["skip_reason"] = "LLM unavailable - no commits ahead"

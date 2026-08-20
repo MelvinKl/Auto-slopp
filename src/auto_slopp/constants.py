@@ -32,8 +32,6 @@ UNAVAILABILITY_PATTERNS: tuple[str, ...] = (
     "no response",
     "not responding",
     "unreachable",
-    "503 service unavailable",
-    "502 bad gateway",
     "gateway timeout",
     "internal server error",
 )

@@ -318,13 +318,14 @@ class VikunjaTaskSource(TaskSource):
             f"Reason: {reason}\n\n"
             f"This task will be retried when the LLM becomes available."
         )
-        try:
-            comment_on_task(task.id, skip_comment)
-            update_task_status(task.id, "skipped")
-            commit(repo_path, f"Updated task {task.id} status to 'skipped'")
-            logger.info(f"Added skip comment and set status to 'skipped' for task {task.id}: {reason}")
-        except Exception as e:
-            logger.error(f"Failed to add skip comment to task {task.id}: {e}")
+        self._update_task_with_comment_and_status(
+            task_id=task.id,
+            comment=skip_comment,
+            repo_path=repo_path,
+            status="skipped",
+            commit_message=f"Updated task {task.id} status to 'skipped'",
+        )
+        logger.info(f"Added skip comment and set status to 'skipped' for task {task.id}: {reason}")
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.

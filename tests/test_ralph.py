@@ -1536,6 +1536,26 @@ class TestRalphExecutor:
         ralph_executor._last_iteration_failure_reason = None
         assert ralph_executor._is_llm_unavailable() is False
 
+    def test_get_skip_reason_no_error(self, ralph_executor):
+        """Test get_skip_reason returns None when no error is set."""
+        assert ralph_executor.get_skip_reason() is None
+
+    def test_get_skip_reason_returns_reason_when_unavailable(self, ralph_executor):
+        """Test get_skip_reason returns the error message when it indicates LLM unavailability."""
+        ralph_executor._last_error = "LLM timed out waiting for response"
+        assert ralph_executor.get_skip_reason() == "LLM timed out waiting for response"
+
+    def test_get_skip_reason_prefers_last_iteration_failure_reason(self, ralph_executor):
+        """Test get_skip_reason prefers _last_iteration_failure_reason over _last_error."""
+        ralph_executor._last_error = "stale error from earlier phase"
+        ralph_executor._last_iteration_failure_reason = "connection refused"
+        assert ralph_executor.get_skip_reason() == "connection refused"
+
+    def test_get_skip_reason_none_for_non_unavailable_error(self, ralph_executor):
+        """Test get_skip_reason returns None for errors that do not indicate LLM unavailability."""
+        ralph_executor._last_error = "Step implementation failed: syntax error"
+        assert ralph_executor.get_skip_reason() is None
+
     def test_run_refined_task_loop_sets_last_iteration_failure_reason_on_failure(self, ralph_executor):
         """Test that _last_iteration_failure_reason is set during the loop on step failure."""
         with tempfile.TemporaryDirectory() as tmpdir:

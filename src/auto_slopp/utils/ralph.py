@@ -291,7 +291,6 @@ class RalphExecutor:
 
         # Error tracking fields.
         # _last_error: overwritten on every iteration; represents the latest error state.
-        self._last_error: Optional[str] = None
         self.task_planning_name = task_planning_name
         self.implementation_name = implementation_name
         self.validation_name = validation_name
@@ -907,6 +906,27 @@ class RalphExecutor:
                 f"inactive; not treating as LLM unavailable: {error!r}"
             )
         return False
+
+    def get_skip_reason(self) -> Optional[str]:
+        """Return the last failure reason if it indicates LLM unavailability.
+
+        Public accessor so callers (e.g. :class:`IssueWorker`) do not need to
+        reach into the executor's private error-tracking fields. It wraps
+        :meth:`_is_llm_unavailable` and returns the underlying error message
+        (per-iteration reason preferred over the stale run-level error) so the
+        caller can surface the actual failure (e.g. "timed out waiting for
+        response") in skip comments.
+
+        Returns:
+            The most recent failure reason if it indicates the LLM/CLI tool is
+            unavailable, ``None`` otherwise.
+        """
+        error = self._last_iteration_failure_reason or self._last_error
+        if not error:
+            return None
+        if self._is_llm_unavailable():
+            return error
+        return None
 
     def _step_is_closed(self, task_path: Path, step_number: int) -> bool:
         """Check whether a step is marked as completed in the task file."""
