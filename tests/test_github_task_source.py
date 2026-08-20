@@ -501,7 +501,7 @@ class TestGitHubTaskSource:
 
         pr_body = task_source.get_default_pr_body(task)
 
-        assert pr_body == "Closes #42\n\nTest Body"
+        assert pr_body == "Closes #42\n\nTest Body\n"
 
     @patch("auto_slopp.workers.github_task_source.settings")
     def test_on_task_start_is_noop(self, mock_settings):
