@@ -5,11 +5,31 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from auto_slopp.utils.linking import ensure_issue_link_in_pr_body
 from auto_slopp.workers.github_task_source import GitHubTaskSource
 from auto_slopp.workers.issue_worker import IssueWorker
 from auto_slopp.workers.task_source import Task, TaskSource
 from auto_slopp.workers.vikunja_task_source import VikunjaTaskSource
+
+
+@pytest.fixture(autouse=True)
+def _disable_pr_review_loop():
+    """Neutralize the PR review loop for tests that don't exercise it.
+
+    Most tests in this module mock ``settings`` opaquely and only assert on
+    PR creation/completion, so the iterative PR review loop is stubbed out:
+    the review reports no findings, and review submission/label removal
+    succeed. Tests that specifically cover the review loop should override
+    these patches.
+    """
+    with (
+        patch.object(IssueWorker, "_review_pull_request", return_value=(False, "", [])),
+        patch("auto_slopp.workers.issue_worker.submit_pr_review", return_value=True),
+        patch("auto_slopp.workers.issue_worker.remove_label_from_issue", return_value=True),
+    ):
+        yield
 
 
 class MockTaskSource(TaskSource):
@@ -323,6 +343,7 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -590,6 +611,7 @@ class TestIssueWorker:
         """Test that PR is created when commits are made during Ralph loop (has_changes=False but commits ahead)."""
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_settings.github_issue_step_max_iterations = 10
         # has_changes returns False because Ralph already committed everything
         mock_has_changes.return_value = False
@@ -696,6 +718,7 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -859,6 +882,7 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -910,6 +934,7 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -1074,6 +1099,7 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -1128,6 +1154,7 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_settings.github_issue_step_max_iterations = 10
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
@@ -1647,6 +1674,7 @@ class TestIssueWorker:
     ):
         """Integration test: .ralph is added to .gitignore when missing."""
         mock_settings.ralph_enabled = True
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_settings.github_issue_step_max_iterations = 10
         mock_commits_ahead.return_value = 1
         mock_push.return_value = (True, "")
@@ -1697,6 +1725,7 @@ class TestIssueWorker:
     ):
         """Integration test: .ralph is not duplicated when already in .gitignore."""
         mock_settings.ralph_enabled = True
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_settings.github_issue_step_max_iterations = 10
         mock_commits_ahead.return_value = 1
         mock_push.return_value = (True, "")
@@ -1943,6 +1972,7 @@ class TestGeneratePRBodyFromTaskFileIntegration:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_settings.github_issue_step_max_iterations = 10
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
@@ -2013,6 +2043,7 @@ class TestGeneratePRBodyFromTaskFileIntegration:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -2069,6 +2100,7 @@ class TestGeneratePRBodyFromTaskFileIntegration:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_settings.github_issue_step_max_iterations = 10
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
