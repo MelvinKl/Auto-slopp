@@ -572,7 +572,9 @@ class IssueWorker(Worker):
                     return result
 
                 # Findings found - fix them by calling CLI tool with the PR review results
-                self.logger.info(f"PR review found {len(finding_lines)} issue(s) requiring fixes for task #{task_id}")
+                self.logger.info(
+                    f"PR review found {len(finding_lines)} issue(s) requiring fixes for task #{task_id}",
+                )
 
                 # Build instructions for the CLI tool to fix the PR review issues
                 fix_instructions = self._build_pr_fix_instructions(
@@ -622,7 +624,9 @@ class IssueWorker(Worker):
                     # Push the fixes to the PR branch
                     push_success, push_message = push_to_remote(repo_dir, remote="origin", branch=current_branch)
                     if not push_success:
-                        self.logger.error(f"Failed to push PR review fixes for task #{task_id}: {push_message}")
+                        self.logger.error(
+                            f"Failed to push PR review fixes for task #{task_id}: {push_message}",
+                        )
                         result["task_completed"] = False
                         result["tasks_completed"] = 0
                         result["success"] = True
@@ -634,7 +638,9 @@ class IssueWorker(Worker):
                 self.logger.info(f"PR review fixes applied, re-reviewing PR #{pr_number}")
 
             # Max PR review iterations reached
-            self.logger.warning(f"PR review reached max iterations ({max_pr_review_iterations}) for task #{task_id}")
+            self.logger.warning(
+                f"PR review reached max iterations ({max_pr_review_iterations}) for task #{task_id}",
+            )
             # Mark as successful but not completed - issue stays open for next task iteration
             result["task_completed"] = False
             result["tasks_completed"] = 0
