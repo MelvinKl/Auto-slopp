@@ -711,7 +711,7 @@ class IssueWorker(Worker):
 
         return result
 
-    def _skip_task(self, result: TaskResult, task: Task, skip_reason: str = "") -> TaskResult:
+    def _skip_task(self, result: TaskResult, task: Task, skip_reason: str) -> TaskResult:
         """Mark an in-progress task result as skipped.
 
         **Mutates the existing ``result`` dict in place** (rather than rebuilding
@@ -727,7 +727,7 @@ class IssueWorker(Worker):
         Args:
             result: The in-progress result dict to mark as skipped
             task: The task that was skipped
-            skip_reason: Optional reason for skipping the task
+            skip_reason: Reason for skipping the task (empty string if no specific reason)
 
         Returns:
             The same result dict with status='skipped' and success=None (the canonical skip signal)
@@ -738,7 +738,7 @@ class IssueWorker(Worker):
         # Always store skip_reason (even when empty) so it is present
         # whenever status == "skipped", as documented in the README.
         result["skip_reason"] = skip_reason
-        self.task_source.on_skip(task, skip_reason or "")
+        self.task_source.on_skip(task, skip_reason)
         validate_task_result(result)
         return result
 

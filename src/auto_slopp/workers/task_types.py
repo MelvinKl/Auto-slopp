@@ -107,18 +107,26 @@ class TaskResult(TypedDict):
 
 
 def validate_task_result(result: TaskResult) -> None:
-    """Validate that skipped field is consistent with status.
+    """Validate that skipped field is consistent with status and success field.
 
     Args:
         result: The TaskResult to validate.
 
     Raises:
-        ValueError: If skipped field is inconsistent with status.
+        ValueError: If skipped field is inconsistent with status, or if
+            success=None is inconsistent with status=SKIPPED.
     """
     skipped = result.get("skipped")
     status = result.get("status")
+    success = result.get("success")
 
     if status == TaskStatus.SKIPPED and skipped is not True:
         raise ValueError("When status is SKIPPED, skipped must be True")
     if status != TaskStatus.SKIPPED and skipped is True:
         raise ValueError("skipped can only be True when status is SKIPPED")
+
+    # Validate canonical skip signal: success=None <-> status=SKIPPED
+    if success is None and status != TaskStatus.SKIPPED:
+        raise ValueError("When success is None, status must be SKIPPED")
+    if status == TaskStatus.SKIPPED and success is not None:
+        raise ValueError("When status is SKIPPED, success must be None")

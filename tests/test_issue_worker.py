@@ -1632,9 +1632,10 @@ class TestIssueWorker:
         task_source = MockTaskSource()
         worker = IssueWorker(task_source=task_source)
         task = Task(id=42, title="Skipped Task", body="Test body")
-        result = worker._skip_task(worker._init_result(Path("/tmp"), task), task)
+        result = worker._skip_task(worker._init_result(Path("/tmp"), task), task, skip_reason="LLM unavailable")
 
         assert result["repository"] == "tmp"
+        assert result["skip_reason"] == "LLM unavailable"
         assert result["task_id"] == 42
         assert result["task_title"] == "Skipped Task"
         assert result["success"] is None

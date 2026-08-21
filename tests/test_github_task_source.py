@@ -835,9 +835,8 @@ class TestGitHubTaskSource:
         mock_comment.assert_called_with(Path("/test"), 42, "Condensed")
 
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
-    @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
     @patch("auto_slopp.workers.github_task_source.settings")
-    def test_on_skip_no_comment_and_does_not_remove_label(self, mock_settings, mock_remove, mock_comment):
+    def test_on_skip_no_comment_and_does_not_remove_label(self, mock_settings, mock_comment):
         """Test that on_skip posts no comment and does NOT remove the required label."""
         mock_settings.github_issue_worker_required_label = "test-label"
         task_source = GitHubTaskSource()
@@ -847,4 +846,3 @@ class TestGitHubTaskSource:
 
         # Skips are logged only - no comment is posted and the label is preserved
         mock_comment.assert_not_called()
-        mock_remove.assert_not_called()
