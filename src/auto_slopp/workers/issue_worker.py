@@ -8,7 +8,6 @@ for step-based execution.
 import logging
 import re
 import time
-from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -40,17 +39,8 @@ from auto_slopp.utils.linking import ensure_issue_link_in_pr_body
 from auto_slopp.utils.ralph import RalphExecutor
 from auto_slopp.worker import Worker
 from auto_slopp.workers.task_source import Task, TaskSource
-from auto_slopp.workers.task_types import TaskResult
+from auto_slopp.workers.task_types import TaskResult, TaskStatus
 from settings.main import settings
-
-
-class TaskStatus(str, Enum):
-    """Possible outcomes for a single task."""
-
-    PENDING = "pending"
-    SUCCESS = "success"
-    SKIPPED = "skipped"
-    FAILURE = "failure"
 
 
 class IssueWorker(Worker):
@@ -115,8 +105,11 @@ class IssueWorker(Worker):
           ``"Failed to process task"``. Happens on branch creation failures,
           permanent errors, push failures, or PR creation failures.
 
-        The guard in the main loop checks ``success is None`` first to
-        distinguish skips from failures cleanly.
+        The guard in the main loop checks ``success is None`` first
+        (before checking ``success`` truthiness) to correctly distinguish
+        skips (``success=None``) from failures (``success=False``), since
+        ``None`` is falsy in Python and would otherwise be treated as a
+        failure if checked via ``if not success``.
 
         Args:
             repo_path: Path to the repository directory
