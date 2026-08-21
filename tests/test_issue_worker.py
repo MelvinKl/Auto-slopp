@@ -1,4 +1,11 @@
-"""Tests for unified IssueWorker."""
+"""Tests for unified IssueWorker.
+
+Note: the autouse ``_mock_pr_review_no_findings`` fixture below stubs
+``IssueWorker._review_pull_request`` for every test in this module. Tests that
+want to exercise the real PR review loop must override this fixture (e.g. via
+``pytest.fixture(autouse=False)`` or by patching it back in) so they do not
+silently inherit the stub.
+"""
 
 import subprocess
 import tempfile

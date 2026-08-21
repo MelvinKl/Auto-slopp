@@ -85,8 +85,8 @@ AUTO_SLOPP_CLI_CONFIGURATIONS='[
 
 Each CLI configuration supports a `timeout` field to control how long a CLI command can run before being terminated:
 
-- **`-1`** (default): No timeout — the command runs indefinitely
-- **Positive integer**: Timeout in seconds after which the command is killed
+- **`-1`** (the `NO_TIMEOUT` sentinel; default): No timeout — the command runs indefinitely
+- **Positive integer**: Timeout in seconds after which the command is killed (values above 31,536,000 seconds, ~1 year, are rejected)
 
 ```bash
 # Example: Limit opencode to 10 minutes

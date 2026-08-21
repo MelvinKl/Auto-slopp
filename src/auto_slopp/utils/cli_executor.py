@@ -241,7 +241,7 @@ def _execute_command(
 def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None) -> Optional[int]:
     """Resolve a raw timeout value to an effective timeout.
 
-    Handles the NO_TIMEOUT sentinel (-1), validates range (0 < timeout ≤ 30 days),
+    Handles the NO_TIMEOUT sentinel (-1), validates range (0 < timeout ≤ MAX_TIMEOUT_SECONDS, ~1 year),
     and falls back to _PROBE_TIMEOUT_SECONDS when the value is invalid.
 
     Args:
