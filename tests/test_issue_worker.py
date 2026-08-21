@@ -2,9 +2,9 @@
 
 Note: the autouse ``_mock_pr_review_no_findings`` fixture below stubs
 ``IssueWorker._review_pull_request`` for every test in this module. Tests that
-want to exercise the real PR review loop must override this fixture (e.g. via
-``pytest.fixture(autouse=False)`` or by patching it back in) so they do not
-silently inherit the stub.
+want to exercise the real PR review loop must override this fixture by
+redefining it in a closer scope (e.g. inside a test class) or by patching it
+back in so they do not silently inherit the stub.
 """
 
 import subprocess
