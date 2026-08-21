@@ -1,13 +1,21 @@
 """Tests for Pydantic settings validation."""
 
 import os
+import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 from pydantic import ValidationError
 
-from settings.main import MAX_TIMEOUT_SECONDS, NO_TIMEOUT, CLIConfiguration, Settings
+from settings.main import (
+    MAX_TIMEOUT_SECONDS,
+    NO_TIMEOUT,
+    CLIConfiguration,
+    Settings,
+    settings,
+)
 
 
 class TestSettings:
@@ -106,10 +114,29 @@ class TestSettings:
 
     def test_global_settings_instance(self):
         """Test that global settings instance is available."""
-        from settings.main import settings
-
         assert isinstance(settings, Settings)
         assert hasattr(settings, "base_repo_path")
+
+    def test_import_settings_main_emits_no_user_warning(self):
+        """Importing settings.main must not emit a UserWarning.
+
+        Regression test: duplicate field/validator definitions in
+        CLIConfiguration made Pydantic emit a UserWarning at class-definition
+        time (i.e. on import). Running the import in a subprocess with
+        warnings escalated to errors so the bug cannot silently return.
+        """
+        env = os.environ.copy()
+        src_dir = Path(__file__).resolve().parent.parent / "src"
+        env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(src_dir), env.get("PYTHONPATH")]))
+        code = "import warnings; warnings.simplefilter('error'); import settings.main  # noqa: F401"
+        proc = subprocess.run(
+            [sys.executable, "-c", code],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert proc.returncode == 0, f"importing settings.main failed:\n{proc.stderr}"
 
     def test_workers_disabled_default(self):
         """Test that workers_disabled has correct default value."""

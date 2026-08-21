@@ -7,6 +7,15 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
 
+__all__ = [
+    "CLIConfiguration",
+    "MAX_TIMEOUT_SECONDS",
+    "NO_TIMEOUT",
+    "Settings",
+    "TaskRating",
+    "settings",
+]
+
 
 class TaskRating(BaseModel):
     """Rating configuration for a task type."""
@@ -20,6 +29,8 @@ NO_TIMEOUT = -1
 """Sentinel value for timeout: -1 means never timeout (subprocess runs indefinitely)."""
 
 MAX_TIMEOUT_SECONDS = 31_536_000  # ~1 year in seconds
+"""Canonical upper bound (in seconds) for CLI timeouts, shared by
+``CLIConfiguration.validate_timeout`` and ``auto_slopp.utils.cli_executor._resolve_timeout``."""
 
 
 class CLIConfiguration(BaseModel):

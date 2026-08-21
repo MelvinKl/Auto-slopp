@@ -2118,3 +2118,273 @@ class TestGeneratePRBodyFromTaskFileIntegration:
         pr_body = call_kwargs[1]["body"]
         assert pr_body == "Implemented the feature.\nFixes #55"
         assert pr_body.count("#55") == 1
+
+
+class TestPRReviewLoop:
+    """Tests for the PR review loop (findings -> fix -> re-review).
+
+    The module-level autouse ``_mock_pr_review_no_findings`` fixture stubs
+    ``IssueWorker._review_pull_request`` for every test in this module. This
+    class redefines that fixture (as a no-op) in a closer scope so the real
+    review loop runs; each test then patches ``_review_pull_request`` to
+    script the review outcomes it wants to exercise.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _mock_pr_review_no_findings(self):
+        """Override the module-level stub so the PR review loop is exercised."""
+
+    def _setup_common_mocks(
+        self,
+        mock_commits_ahead,
+        mock_cli,
+        mock_execute,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_has_changes,
+        mock_create_branch,
+        mock_checkout,
+        mock_commit_push,
+        max_iterations,
+    ):
+        """Configure the shared mocks needed to reach the PR review loop.
+
+        Returns:
+            Tuple of (worker, task_source) ready to run against a scripted review.
+        """
+        mock_commits_ahead.return_value = 1
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = max_iterations
+        mock_commit_push.return_value = (True, None)
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_execute.return_value = {"success": True}
+        mock_has_changes.return_value = True
+        # Return task branch instead of main so PR can be created
+        mock_current_branch.return_value = "ai/task-1"
+        mock_push.return_value = (True, "")
+        mock_get_pr.return_value = None
+        mock_create_pr.return_value = {"url": "https://github.com/test/repo/pull/7"}
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        return IssueWorker(task_source=task_source, dry_run=False), task_source
+
+    @patch("auto_slopp.workers.issue_worker.remove_label_from_issue")
+    @patch("auto_slopp.workers.issue_worker.submit_pr_review")
+    @patch("auto_slopp.workers.issue_worker.run_cli_executor")
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    def test_pr_review_findings_fixed_then_clean(
+        self,
+        mock_commits_ahead,
+        mock_cli,
+        mock_execute,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_has_changes,
+        mock_create_branch,
+        mock_checkout,
+        mock_commit_push,
+        mock_run_cli,
+        mock_submit_review,
+        mock_remove_label,
+    ):
+        """Findings found -> CLI fix executed -> re-review clean -> task completed."""
+        mock_run_cli.return_value = {"success": True}
+        mock_submit_review.return_value = True
+        mock_remove_label.return_value = True
+        worker, task_source = self._setup_common_mocks(
+            mock_commits_ahead,
+            mock_cli,
+            mock_execute,
+            mock_get_pr,
+            mock_create_pr,
+            mock_push,
+            mock_settings,
+            mock_current_branch,
+            mock_has_changes,
+            mock_create_branch,
+            mock_checkout,
+            mock_commit_push,
+            max_iterations=2,
+        )
+        with patch.object(
+            IssueWorker,
+            "_review_pull_request",
+            side_effect=[
+                (True, "issue: fix the bug", ["issue: fix the bug"]),
+                (False, "No actionable issues found.", []),
+            ],
+        ):
+            result = worker.run(Path("/tmp"))
+
+        task_result = result["task_results"][0]
+        assert result["success"] is True
+        assert task_result["success"] is True
+        assert task_result["task_completed"] is True
+        assert task_result["pr_review_iterations"] == 2
+        assert task_source.on_task_complete_called is True
+        # The fix ran exactly once, with the findings baked into the instructions
+        assert mock_run_cli.call_count == 1
+        fix_kwargs = mock_run_cli.call_args.kwargs
+        assert fix_kwargs["task_name"] == "pr_review_fix"
+        assert "issue: fix the bug" in fix_kwargs["additional_instructions"]
+        # The review was submitted on both iterations and the work label removed on completion
+        assert mock_submit_review.call_count == 2
+        assert mock_remove_label.called
+
+    @patch("auto_slopp.workers.issue_worker.remove_label_from_issue")
+    @patch("auto_slopp.workers.issue_worker.submit_pr_review")
+    @patch("auto_slopp.workers.issue_worker.run_cli_executor")
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    def test_pr_review_max_iterations_reached(
+        self,
+        mock_commits_ahead,
+        mock_cli,
+        mock_execute,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_has_changes,
+        mock_create_branch,
+        mock_checkout,
+        mock_commit_push,
+        mock_run_cli,
+        mock_submit_review,
+        mock_remove_label,
+    ):
+        """Persistent findings -> loop exits at max iterations without completing the task."""
+        mock_run_cli.return_value = {"success": True}
+        mock_submit_review.return_value = True
+        worker, task_source = self._setup_common_mocks(
+            mock_commits_ahead,
+            mock_cli,
+            mock_execute,
+            mock_get_pr,
+            mock_create_pr,
+            mock_push,
+            mock_settings,
+            mock_current_branch,
+            mock_has_changes,
+            mock_create_branch,
+            mock_checkout,
+            mock_commit_push,
+            max_iterations=2,
+        )
+        with patch.object(
+            IssueWorker,
+            "_review_pull_request",
+            return_value=(True, "issue: still broken", ["issue: still broken"]),
+        ):
+            result = worker.run(Path("/tmp"))
+
+        task_result = result["task_results"][0]
+        assert result["success"] is True
+        assert task_result["success"] is True
+        # Issue stays open for the next task iteration: not completed, not failed
+        assert task_result["task_completed"] is False
+        assert task_result["pr_review_done"] is True
+        assert task_result["pr_review_iterations"] == 2
+        assert task_source.on_task_complete_called is False
+        assert task_source.on_task_failure_called is False
+        # Reviewed and attempted a fix on every iteration
+        assert mock_run_cli.call_count == 2
+        assert mock_remove_label.called is False
+
+    @patch("auto_slopp.workers.issue_worker.remove_label_from_issue")
+    @patch("auto_slopp.workers.issue_worker.submit_pr_review")
+    @patch("auto_slopp.workers.issue_worker.run_cli_executor")
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.create_pull_request")
+    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    def test_pr_review_fix_failure_stops_loop(
+        self,
+        mock_commits_ahead,
+        mock_cli,
+        mock_execute,
+        mock_get_pr,
+        mock_create_pr,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_has_changes,
+        mock_create_branch,
+        mock_checkout,
+        mock_commit_push,
+        mock_run_cli,
+        mock_submit_review,
+        mock_remove_label,
+    ):
+        """Findings found but the CLI fix fails -> loop stops after the first iteration."""
+        mock_run_cli.return_value = {"success": False, "error": "CLI fix failed"}
+        mock_submit_review.return_value = True
+        worker, task_source = self._setup_common_mocks(
+            mock_commits_ahead,
+            mock_cli,
+            mock_execute,
+            mock_get_pr,
+            mock_create_pr,
+            mock_push,
+            mock_settings,
+            mock_current_branch,
+            mock_has_changes,
+            mock_create_branch,
+            mock_checkout,
+            mock_commit_push,
+            max_iterations=3,
+        )
+        with patch.object(
+            IssueWorker,
+            "_review_pull_request",
+            return_value=(True, "issue: fix the bug", ["issue: fix the bug"]),
+        ):
+            result = worker.run(Path("/tmp"))
+
+        task_result = result["task_results"][0]
+        assert result["success"] is True
+        # Issue stays open for the next task iteration: not completed, not failed
+        assert task_result["task_completed"] is False
+        assert task_result["pr_review_done"] is True
+        assert task_result["pr_review_iterations"] == 1
+        assert task_source.on_task_complete_called is False
+        assert task_source.on_task_failure_called is False
+        assert mock_run_cli.call_count == 1
+        assert mock_remove_label.called is False

@@ -242,8 +242,9 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
     """Resolve a raw timeout value to an effective timeout.
 
     Handles the NO_TIMEOUT sentinel (-1), rejects out-of-range values
-    (valid range: 0 < timeout ≤ MAX_TIMEOUT_SECONDS, ~1 year), and falls back
-    to _PROBE_TIMEOUT_SECONDS when the value is invalid.
+    (valid range: 0 < timeout ≤ MAX_TIMEOUT_SECONDS, ~1 year), and resolves
+    None (unspecified) or invalid values to the provided fallback (or
+    _PROBE_TIMEOUT_SECONDS when no fallback is given).
 
     Args:
         raw_timeout: The timeout value (None for unspecified, -1 for NO_TIMEOUT, or a positive integer).
