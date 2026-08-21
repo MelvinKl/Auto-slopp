@@ -26,11 +26,16 @@ class TaskRating(BaseModel):
 
 
 NO_TIMEOUT = -1
-"""Sentinel value for timeout: -1 means never timeout (subprocess runs indefinitely)."""
+"""Sentinel value for timeout: -1 means never timeout (subprocess runs indefinitely).
+
+This constant is exported in ``__all__`` and is the public API for disabling
+timeouts in CLI configurations and executor calls.
+"""
 
 MAX_TIMEOUT_SECONDS = 31_536_000  # ~1 year in seconds
 """Canonical upper bound (in seconds) for CLI timeouts, shared by
-``CLIConfiguration.validate_timeout`` and the CLI executor's timeout resolution."""
+:data:`CLIConfiguration.validate_timeout` and the CLI executor's
+:func:`_resolve_timeout <auto_slopp.utils.cli_executor._resolve_timeout>`."""
 
 
 class CLIConfiguration(BaseModel):
@@ -79,8 +84,8 @@ class CLIConfiguration(BaseModel):
         if 0 < v <= MAX_TIMEOUT_SECONDS:
             return v
         raise ValueError(
-            f"timeout must be -1 (NO_TIMEOUT) or a positive integer up to {MAX_TIMEOUT_SECONDS} seconds "
-            f"(~1 year), got {v}. A value of -1 means never timeout; positive values specify seconds."
+            f"timeout must be {NO_TIMEOUT} (NO_TIMEOUT) or a positive integer up to {MAX_TIMEOUT_SECONDS} seconds "
+            f"(~1 year), got {v}. A value of {NO_TIMEOUT} means never timeout; positive values specify seconds."
         )
 
 

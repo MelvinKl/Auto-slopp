@@ -8,6 +8,7 @@ from auto_slopp.utils.cli_executor import (
     _check_startup_health,
     _config_to_dict,
     _resolve_timeout,
+    clear_timeout_warnings,
     run_cli_executor,
 )
 from settings.main import MAX_TIMEOUT_SECONDS, NO_TIMEOUT, CLIConfiguration, TaskRating
@@ -829,9 +830,9 @@ def test_resolve_timeout_warns_once_per_distinct_value():
     """
     from auto_slopp.utils import cli_executor
 
-    # The warned-values set is module-level and persists across tests; start
+    # The warned-values tracker is module-level and persists across tests; start
     # from a clean slate so this test is order-independent.
-    cli_executor._warned_out_of_range_timeouts.clear()
+    clear_timeout_warnings()
     with (
         patch.object(cli_executor.logger, "warning") as mock_warning,
         patch.object(cli_executor.logger, "debug") as mock_debug,
