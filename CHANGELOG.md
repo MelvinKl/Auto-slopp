@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 - Updated README.md to reflect removal of intermediate checks and new final acceptance check behavior
+- Updated README.md `LLM Unavailability Handling` section to document the `max_loops_reached` distinction between genuine iteration exhaustion (failed via `on_max_iterations_reached`) and mid-loop LLM unavailability (skipped via `on_skip` for retry)
 
 ### Fixed
 - **PR-to-issue linking**: Pull requests now always contain a valid GitHub closing keyword (`Closes`, `Fixes`, or `Resolves`) linking to the source issue. The `ensure_issue_link_in_pr_body` helper function guarantees at least one closing keyword is present in the PR body, preventing issues from remaining open after PR creation.
