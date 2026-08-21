@@ -15,6 +15,7 @@ skipped, ``test_run_with_successful_execution`` patches
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Any, NamedTuple
 from unittest.mock import patch
 
 import pytest
@@ -2196,91 +2197,71 @@ def _pr_review_loop_patches():
     return decorator
 
 
+class _PRReviewMocks(NamedTuple):
+    """Named view of the mocks injected by ``_pr_review_loop_patches``.
+
+    Fields follow ``_PR_REVIEW_LOOP_PATCH_TARGETS`` order, which is also the
+    order in which the mocks arrive as positional arguments (``*mocks``).
+    """
+
+    commits_ahead: Any
+    cli: Any
+    execute: Any
+    get_pr: Any
+    create_pr: Any
+    push: Any
+    settings: Any
+    current_branch: Any
+    has_changes: Any
+    create_branch: Any
+    checkout: Any
+    commit_push: Any
+    run_cli: Any
+    submit_review: Any
+    remove_label: Any
+
+
 class TestPRReviewLoop:
     """Tests for the PR review loop (findings -> fix -> re-review).
 
     The module-level ``_mock_pr_review_no_findings`` fixture is not autouse,
     so the real review loop runs here; each test patches
     ``_review_pull_request`` to script the review outcomes it wants to
-    exercise. The shared mock stack comes from ``_pr_review_loop_patches``.
+    exercise. The shared mock stack comes from ``_pr_review_loop_patches``
+    and is viewed through the ``_PRReviewMocks`` named tuple.
     """
 
-    def _setup_common_mocks(
-        self,
-        mock_commits_ahead,
-        mock_cli,
-        mock_execute,
-        mock_get_pr,
-        mock_create_pr,
-        mock_push,
-        mock_settings,
-        mock_current_branch,
-        mock_has_changes,
-        mock_create_branch,
-        mock_checkout,
-        mock_commit_push,
-        max_iterations,
-    ):
+    def _setup_common_mocks(self, mocks: _PRReviewMocks, max_iterations: int):
         """Configure the shared mocks needed to reach the PR review loop.
 
         Returns:
             Tuple of (worker, task_source) ready to run against a scripted review.
         """
-        mock_commits_ahead.return_value = 1
-        mock_cli.return_value = "opencode"
-        mock_settings.ralph_enabled = False
-        mock_settings.github_issue_pr_review_max_iterations = max_iterations
-        mock_commit_push.return_value = (True, None)
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        mock_execute.return_value = {"success": True}
-        mock_has_changes.return_value = True
+        mocks.commits_ahead.return_value = 1
+        mocks.cli.return_value = "opencode"
+        mocks.settings.ralph_enabled = False
+        mocks.settings.github_issue_pr_review_max_iterations = max_iterations
+        mocks.commit_push.return_value = (True, None)
+        mocks.checkout.return_value = True
+        mocks.create_branch.return_value = True
+        mocks.execute.return_value = {"success": True}
+        mocks.has_changes.return_value = True
         # Return task branch instead of main so PR can be created
-        mock_current_branch.return_value = "ai/task-1"
-        mock_push.return_value = (True, "")
-        mock_get_pr.return_value = None
-        mock_create_pr.return_value = {"url": "https://github.com/test/repo/pull/7"}
+        mocks.current_branch.return_value = "ai/task-1"
+        mocks.push.return_value = (True, "")
+        mocks.get_pr.return_value = None
+        mocks.create_pr.return_value = {"url": "https://github.com/test/repo/pull/7"}
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         return IssueWorker(task_source=task_source, dry_run=False), task_source
 
     @_pr_review_loop_patches()
-    def test_pr_review_findings_fixed_then_clean(
-        self,
-        mock_commits_ahead,
-        mock_cli,
-        mock_execute,
-        mock_get_pr,
-        mock_create_pr,
-        mock_push,
-        mock_settings,
-        mock_current_branch,
-        mock_has_changes,
-        mock_create_branch,
-        mock_checkout,
-        mock_commit_push,
-        mock_run_cli,
-        mock_submit_review,
-        mock_remove_label,
-    ):
+    def test_pr_review_findings_fixed_then_clean(self, *mocks):
         """Findings found -> CLI fix executed -> re-review clean -> task completed."""
-        mock_run_cli.return_value = {"success": True}
-        mock_submit_review.return_value = True
-        mock_remove_label.return_value = True
-        worker, task_source = self._setup_common_mocks(
-            mock_commits_ahead,
-            mock_cli,
-            mock_execute,
-            mock_get_pr,
-            mock_create_pr,
-            mock_push,
-            mock_settings,
-            mock_current_branch,
-            mock_has_changes,
-            mock_create_branch,
-            mock_checkout,
-            mock_commit_push,
-            max_iterations=2,
-        )
+        m = _PRReviewMocks(*mocks)
+        m.run_cli.return_value = {"success": True}
+        m.submit_review.return_value = True
+        m.remove_label.return_value = True
+        worker, task_source = self._setup_common_mocks(m, max_iterations=2)
         with patch.object(
             IssueWorker,
             "_review_pull_request",
@@ -2298,51 +2279,21 @@ class TestPRReviewLoop:
         assert task_result["pr_review_iterations"] == 2
         assert task_source.on_task_complete_called is True
         # The fix ran exactly once, with the findings baked into the instructions
-        assert mock_run_cli.call_count == 1
-        fix_kwargs = mock_run_cli.call_args.kwargs
+        assert m.run_cli.call_count == 1
+        fix_kwargs = m.run_cli.call_args.kwargs
         assert fix_kwargs["task_name"] == "pr_review_fix"
         assert "issue: fix the bug" in fix_kwargs["additional_instructions"]
         # The review was submitted on both iterations and the work label removed on completion
-        assert mock_submit_review.call_count == 2
-        assert mock_remove_label.called
+        assert m.submit_review.call_count == 2
+        assert m.remove_label.called
 
     @_pr_review_loop_patches()
-    def test_pr_review_max_iterations_reached(
-        self,
-        mock_commits_ahead,
-        mock_cli,
-        mock_execute,
-        mock_get_pr,
-        mock_create_pr,
-        mock_push,
-        mock_settings,
-        mock_current_branch,
-        mock_has_changes,
-        mock_create_branch,
-        mock_checkout,
-        mock_commit_push,
-        mock_run_cli,
-        mock_submit_review,
-        mock_remove_label,
-    ):
+    def test_pr_review_max_iterations_reached(self, *mocks):
         """Persistent findings -> loop exits at max iterations without completing the task."""
-        mock_run_cli.return_value = {"success": True}
-        mock_submit_review.return_value = True
-        worker, task_source = self._setup_common_mocks(
-            mock_commits_ahead,
-            mock_cli,
-            mock_execute,
-            mock_get_pr,
-            mock_create_pr,
-            mock_push,
-            mock_settings,
-            mock_current_branch,
-            mock_has_changes,
-            mock_create_branch,
-            mock_checkout,
-            mock_commit_push,
-            max_iterations=2,
-        )
+        m = _PRReviewMocks(*mocks)
+        m.run_cli.return_value = {"success": True}
+        m.submit_review.return_value = True
+        worker, task_source = self._setup_common_mocks(m, max_iterations=2)
         with patch.object(
             IssueWorker,
             "_review_pull_request",
@@ -2360,46 +2311,16 @@ class TestPRReviewLoop:
         assert task_source.on_task_complete_called is False
         assert task_source.on_task_failure_called is False
         # Reviewed and attempted a fix on every iteration
-        assert mock_run_cli.call_count == 2
-        assert mock_remove_label.called is False
+        assert m.run_cli.call_count == 2
+        assert m.remove_label.called is False
 
     @_pr_review_loop_patches()
-    def test_pr_review_fix_failure_stops_loop(
-        self,
-        mock_commits_ahead,
-        mock_cli,
-        mock_execute,
-        mock_get_pr,
-        mock_create_pr,
-        mock_push,
-        mock_settings,
-        mock_current_branch,
-        mock_has_changes,
-        mock_create_branch,
-        mock_checkout,
-        mock_commit_push,
-        mock_run_cli,
-        mock_submit_review,
-        mock_remove_label,
-    ):
+    def test_pr_review_fix_failure_stops_loop(self, *mocks):
         """Findings found but the CLI fix fails -> loop stops after the first iteration."""
-        mock_run_cli.return_value = {"success": False, "error": "CLI fix failed"}
-        mock_submit_review.return_value = True
-        worker, task_source = self._setup_common_mocks(
-            mock_commits_ahead,
-            mock_cli,
-            mock_execute,
-            mock_get_pr,
-            mock_create_pr,
-            mock_push,
-            mock_settings,
-            mock_current_branch,
-            mock_has_changes,
-            mock_create_branch,
-            mock_checkout,
-            mock_commit_push,
-            max_iterations=3,
-        )
+        m = _PRReviewMocks(*mocks)
+        m.run_cli.return_value = {"success": False, "error": "CLI fix failed"}
+        m.submit_review.return_value = True
+        worker, task_source = self._setup_common_mocks(m, max_iterations=3)
         with patch.object(
             IssueWorker,
             "_review_pull_request",
@@ -2415,5 +2336,5 @@ class TestPRReviewLoop:
         assert task_result["pr_review_iterations"] == 1
         assert task_source.on_task_complete_called is False
         assert task_source.on_task_failure_called is False
-        assert mock_run_cli.call_count == 1
-        assert mock_remove_label.called is False
+        assert m.run_cli.call_count == 1
+        assert m.remove_label.called is False

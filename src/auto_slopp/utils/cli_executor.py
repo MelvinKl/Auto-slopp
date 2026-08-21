@@ -264,7 +264,17 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
         return None
     if raw_timeout is not None and 0 < raw_timeout <= MAX_TIMEOUT_SECONDS:
         return raw_timeout
-    return fallback if fallback is not None else _PROBE_TIMEOUT_SECONDS
+    effective = fallback if fallback is not None else _PROBE_TIMEOUT_SECONDS
+    if raw_timeout is not None:
+        # raw_timeout was present but out of range (0 < t <= MAX_TIMEOUT_SECONDS);
+        # log the discarded value so configuration mistakes are diagnosable.
+        logger.warning(
+            "Discarding out-of-range timeout %r (valid range: 0 < timeout <= %d seconds); " "using fallback %r instead",
+            raw_timeout,
+            MAX_TIMEOUT_SECONDS,
+            effective,
+        )
+    return effective
 
 
 def _probe_configuration(config: Dict[str, Any], working_dir: Path, timeout: Optional[int] = None) -> bool:

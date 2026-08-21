@@ -145,6 +145,10 @@ class TestSettings:
             timeout=30,
         )
         assert proc.returncode == 0, f"importing settings.main failed:\n{proc.stderr}"
+        # Belt and braces: a duplicate-field warning (as opposed to a duplicate
+        # validator) could be attributed to a different module and slip past the
+        # settings.main filter, so assert no UserWarning leaked to stderr at all.
+        assert "UserWarning" not in proc.stderr, f"unexpected UserWarning during import:\n{proc.stderr}"
 
     def test_workers_disabled_default(self):
         """Test that workers_disabled has correct default value."""

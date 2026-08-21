@@ -30,7 +30,7 @@ NO_TIMEOUT = -1
 
 MAX_TIMEOUT_SECONDS = 31_536_000  # ~1 year in seconds
 """Canonical upper bound (in seconds) for CLI timeouts, shared by
-``CLIConfiguration.validate_timeout`` and ``auto_slopp.utils.cli_executor._resolve_timeout``."""
+``CLIConfiguration.validate_timeout`` and the CLI executor's timeout resolution."""
 
 
 class CLIConfiguration(BaseModel):
