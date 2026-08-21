@@ -2164,33 +2164,45 @@ class TestGeneratePRBodyFromTaskFileIntegration:
         assert pr_body.count("#55") == 1
 
 
-# Patch targets for the PR review loop tests, listed in decorator-application
-# order (first = bottom-most decorator = first mock argument). Adding a new
-# patch target only requires appending it here.
-_PR_REVIEW_LOOP_PATCH_TARGETS = [
-    "auto_slopp.workers.issue_worker.get_commits_ahead_of_branch",
-    "auto_slopp.workers.issue_worker.get_active_cli_command",
-    "auto_slopp.workers.issue_worker.execute_with_instructions",
-    "auto_slopp.workers.issue_worker.get_pr_for_branch",
-    "auto_slopp.workers.issue_worker.create_pull_request",
-    "auto_slopp.workers.issue_worker.push_to_remote",
-    "auto_slopp.workers.issue_worker.settings",
-    "auto_slopp.workers.issue_worker.get_current_branch",
-    "auto_slopp.workers.issue_worker.has_changes",
-    "auto_slopp.workers.issue_worker.create_and_checkout_branch",
-    "auto_slopp.workers.issue_worker.checkout_branch_resilient",
-    "auto_slopp.workers.issue_worker.commit_and_push_changes",
-    "auto_slopp.workers.issue_worker.run_cli_executor",
-    "auto_slopp.workers.issue_worker.submit_pr_review",
-    "auto_slopp.workers.issue_worker.remove_label_from_issue",
-]
+# Patch targets for the PR review loop tests, keyed by the ``_PRReviewMocks``
+# field that receives each mock. Insertion order is the decorator-application
+# order (first = bottom-most decorator = first positional mock argument), so
+# each target string is tied to the named field that consumes its mock; see
+# the sync check in ``_pr_review_loop_patches``.
+_PR_REVIEW_LOOP_PATCH_TARGETS = {
+    "commits_ahead": "auto_slopp.workers.issue_worker.get_commits_ahead_of_branch",
+    "cli": "auto_slopp.workers.issue_worker.get_active_cli_command",
+    "execute": "auto_slopp.workers.issue_worker.execute_with_instructions",
+    "get_pr": "auto_slopp.workers.issue_worker.get_pr_for_branch",
+    "create_pr": "auto_slopp.workers.issue_worker.create_pull_request",
+    "push": "auto_slopp.workers.issue_worker.push_to_remote",
+    "settings": "auto_slopp.workers.issue_worker.settings",
+    "current_branch": "auto_slopp.workers.issue_worker.get_current_branch",
+    "has_changes": "auto_slopp.workers.issue_worker.has_changes",
+    "create_branch": "auto_slopp.workers.issue_worker.create_and_checkout_branch",
+    "checkout": "auto_slopp.workers.issue_worker.checkout_branch_resilient",
+    "commit_push": "auto_slopp.workers.issue_worker.commit_and_push_changes",
+    "run_cli": "auto_slopp.workers.issue_worker.run_cli_executor",
+    "submit_review": "auto_slopp.workers.issue_worker.submit_pr_review",
+    "remove_label": "auto_slopp.workers.issue_worker.remove_label_from_issue",
+}
 
 
 def _pr_review_loop_patches():
     """Decorator factory applying the shared PR review loop ``@patch`` stack."""
+    # Fail fast if the patch targets and ``_PRReviewMocks`` fields drift apart:
+    # the positional mock order (``*mocks``) is only valid when every target
+    # has a matching field name and vice versa.
+    missing = set(_PRReviewMocks._fields) - set(_PR_REVIEW_LOOP_PATCH_TARGETS)
+    extra = set(_PR_REVIEW_LOOP_PATCH_TARGETS) - set(_PRReviewMocks._fields)
+    if missing or extra:
+        raise RuntimeError(
+            "_PR_REVIEW_LOOP_PATCH_TARGETS and _PRReviewMocks fields out of sync: "
+            f"missing={sorted(missing)}, extra={sorted(extra)}"
+        )
 
     def decorator(func):
-        for target in _PR_REVIEW_LOOP_PATCH_TARGETS:
+        for target in _PR_REVIEW_LOOP_PATCH_TARGETS.values():
             func = patch(target)(func)
         return func
 
@@ -2200,8 +2212,10 @@ def _pr_review_loop_patches():
 class _PRReviewMocks(NamedTuple):
     """Named view of the mocks injected by ``_pr_review_loop_patches``.
 
-    Fields follow ``_PR_REVIEW_LOOP_PATCH_TARGETS`` order, which is also the
-    order in which the mocks arrive as positional arguments (``*mocks``).
+    Field names must match the keys of ``_PR_REVIEW_LOOP_PATCH_TARGETS``
+    (validated by the decorator factory); field order follows the mapping's
+    insertion order, which is also the order in which the mocks arrive as
+    positional arguments (``*mocks``).
     """
 
     commits_ahead: Any

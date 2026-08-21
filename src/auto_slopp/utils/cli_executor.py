@@ -21,6 +21,10 @@ from settings.main import (
 
 logger = logging.getLogger(__name__)
 _active_cli_configuration_index = 0
+# Distinct raw timeout values for which the out-of-range warning has already
+# been emitted. Prevents log spam when a misconfigured timeout is resolved
+# repeatedly (e.g., during probe/failover loops).
+_warned_out_of_range_timeouts: set = set()
 
 _PROBE_INSTRUCTIONS = "are you working?"
 # 600 seconds (10 minutes) balances catching hung tools without waiting too long.
@@ -268,12 +272,25 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
     if raw_timeout is not None:
         # raw_timeout was present but out of range (0 < t <= MAX_TIMEOUT_SECONDS);
         # log the discarded value so configuration mistakes are diagnosable.
-        logger.warning(
-            "Discarding out-of-range timeout %r (valid range: 0 < timeout <= %d seconds); " "using fallback %r instead",
-            raw_timeout,
-            MAX_TIMEOUT_SECONDS,
-            effective,
-        )
+        # Warn once per distinct value; repeated resolutions of the same
+        # misconfigured value (e.g., probe/failover loops) log at debug only.
+        if raw_timeout in _warned_out_of_range_timeouts:
+            logger.debug(
+                "Discarding out-of-range timeout %r (valid range: 0 < timeout <= %d seconds); "
+                "using fallback %r instead (already warned)",
+                raw_timeout,
+                MAX_TIMEOUT_SECONDS,
+                effective,
+            )
+        else:
+            _warned_out_of_range_timeouts.add(raw_timeout)
+            logger.warning(
+                "Discarding out-of-range timeout %r (valid range: 0 < timeout <= %d seconds); "
+                "using fallback %r instead",
+                raw_timeout,
+                MAX_TIMEOUT_SECONDS,
+                effective,
+            )
     return effective
 
 

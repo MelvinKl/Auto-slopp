@@ -819,3 +819,25 @@ def test_resolve_timeout_max_boundary():
     """The maximum timeout boundary value should be accepted as-is."""
     assert _resolve_timeout(MAX_TIMEOUT_SECONDS) == MAX_TIMEOUT_SECONDS
     assert _resolve_timeout(MAX_TIMEOUT_SECONDS, fallback=100) == MAX_TIMEOUT_SECONDS
+
+
+def test_resolve_timeout_warns_once_per_distinct_value():
+    """Out-of-range timeouts warn once per distinct value, then log at debug.
+
+    Guards against log spam when a misconfigured timeout is resolved
+    repeatedly (e.g., during probe/failover loops).
+    """
+    from auto_slopp.utils import cli_executor
+
+    # The warned-values set is module-level and persists across tests; start
+    # from a clean slate so this test is order-independent.
+    cli_executor._warned_out_of_range_timeouts.clear()
+    with (
+        patch.object(cli_executor.logger, "warning") as mock_warning,
+        patch.object(cli_executor.logger, "debug") as mock_debug,
+    ):
+        _resolve_timeout(99999999, fallback=100)
+        _resolve_timeout(99999999, fallback=100)  # same value: debug, not warning
+        _resolve_timeout(0, fallback=100)  # distinct value: warns again
+    assert mock_warning.call_count == 2
+    assert mock_debug.call_count == 1

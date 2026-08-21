@@ -128,6 +128,12 @@ class TestSettings:
         in the import chain are intentionally ignored).
         """
         env = os.environ.copy()
+        # Layout assumption: this test lives in <repo>/tests/ and the package
+        # sources live in <repo>/src/, so parent.parent / "src" points at the
+        # exact source tree under test. If the package is ever installed
+        # non-editable or the layout changes, the subprocess could import a
+        # different `settings` than the one being tested; update this path
+        # (or drop it and rely on the installed package) accordingly.
         src_dir = Path(__file__).resolve().parent.parent / "src"
         env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(src_dir), env.get("PYTHONPATH")]))
         code = (
