@@ -46,6 +46,10 @@ class TaskResult(TypedDict, total=False):
                 ``"failure"``).
 
     Conditionally set:
+        skipped: Legacy convenience flag, ``True`` when
+                 ``status == "skipped"``.  The canonical skip signal remains
+                 ``success=None`` + ``status == "skipped"``; ``skipped`` is
+                 kept for backward compatibility only.
         skip_reason: Reason for skipping (``Optional[str]``; present when
                      ``status == "skipped"``).
         no_changes: True when task required no changes.
@@ -68,6 +72,7 @@ class TaskResult(TypedDict, total=False):
     ralph_loops_executed: int
     ralph_steps_completed: int
     status: str  # 'pending', 'success', 'failure', or 'skipped'
+    skipped: bool  # Legacy flag; True when status == "skipped" (canonical signal: success=None)
     skip_reason: Optional[str]  # Present only when status == "skipped"
     no_changes: bool
     pr_url: str

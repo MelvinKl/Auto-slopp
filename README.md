@@ -866,6 +866,7 @@ Each processed task produces a `TaskResult` dict. The `success` field uses `None
 | `ralph_loops_executed` | `int` | Number of Ralph loops executed |
 | `ralph_steps_completed` | `int` | Number of Ralph steps completed |
 | `skip_reason` | `str \| None` | Reason for skipping (present only when `status == "skipped"`) |
+| `skipped` | `bool` | Legacy flag, `True` when `status == "skipped"`. The canonical skip signal is `success=None` + `status="skipped"`; this field is kept for backward compatibility |
 | `no_changes` | `bool` | True when task required no changes (optional) |
 | `pr_url` | `str` | URL of the created PR (optional) |
 | `pr_review_done` | `bool` | True when PR review was performed (optional) |

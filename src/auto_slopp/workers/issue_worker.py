@@ -110,11 +110,10 @@ class IssueWorker(Worker):
           (``no_changes=True``); they are closed via ``on_no_changes``.
         * **Skipped** — ``success=None``, ``status='skipped'``. This is the
           canonical skip signal. Counted in ``tasks_skipped``. No warning is
-          logged. Happens when branch creation fails or the LLM is
-          unavailable.
+          logged. Happens when the LLM is unavailable.
         * **Failure** — ``success=False``. A warning is logged via
-          ``"Failed to process task"``. Happens on permanent errors, push
-          failures, or PR creation failures.
+          ``"Failed to process task"``. Happens on branch creation failures,
+          permanent errors, push failures, or PR creation failures.
 
         The guard in the main loop checks ``success is None`` first to
         distinguish skips from failures cleanly.
@@ -391,8 +390,14 @@ class IssueWorker(Worker):
 
             branch_created = create_and_checkout_branch(repo_dir, branch_name, base_branch="main")
             if not branch_created:
-                self.logger.info(f"Skipping task #{task_id}: could not create branch '{branch_name}'")
-                return self._skip_task(repo_dir, task, skip_reason=f"Could not create branch '{branch_name}'")
+                # Branch creation failure is an operational error, not an
+                # intentional skip - report it as a failure so the task
+                # source can react to and track it.
+                error_msg = f"Could not create branch '{branch_name}' for task #{task_id}"
+                self.logger.error(error_msg)
+                self._set_failure(result, error_msg)
+                self.task_source.on_task_failure(task, error_msg)
+                return result
 
             # Ensure .ralph is in .gitignore before Ralph execution
             if not ensure_ralph_in_gitignore(repo_dir):
@@ -427,7 +432,7 @@ class IssueWorker(Worker):
                         )
                     elif self._is_llm_unavailable(ralph_error):
                         self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                        return self._skip_task(repo_dir, task, skip_reason=ralph_error)
+                        return self._skip_task(result, task, skip_reason=ralph_error)
                     elif self._is_permanent_error(ralph_error):
                         self.logger.error(f"Permanent error detected for task #{task_id}: {ralph_error}")
                         self.task_source.on_task_failure(task, ralph_error)
@@ -464,7 +469,7 @@ class IssueWorker(Worker):
                     error_msg = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
                     if self._is_llm_unavailable(error_msg):
                         self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                        return self._skip_task(repo_dir, task, skip_reason=error_msg)
+                        return self._skip_task(result, task, skip_reason=error_msg)
                     elif self._is_permanent_error(error_msg):
                         self.logger.error(f"Permanent error detected for task #{task_id}: {error_msg}")
                         self.task_source.on_task_failure(task, error_msg)
@@ -705,8 +710,11 @@ class IssueWorker(Worker):
 
         return result
 
-    def _skip_task(self, repo_dir: Path, task: Task, skip_reason: str = "") -> TaskResult:
-        """Create a properly structured result dict for a skipped task.
+    def _skip_task(self, result: TaskResult, task: Task, skip_reason: str = "") -> TaskResult:
+        """Mark an in-progress task result as skipped.
+
+        Mutates the existing ``result`` dict (rather than rebuilding it from
+        scratch) so that any state accumulated before the skip is preserved.
 
         The canonical skip signal is ``success=None`` (in addition to
         ``status='skipped'``).  All intentional skip paths in
@@ -714,14 +722,13 @@ class IssueWorker(Worker):
         consistent result structure.
 
         Args:
-            repo_dir: Path to the repository directory
+            result: The in-progress result dict to mark as skipped
             task: The task that was skipped
             skip_reason: Optional reason for skipping the task
 
         Returns:
-            Result dict with status='skipped' and success=None (the canonical skip signal)
+            The same result dict with status='skipped' and success=None (the canonical skip signal)
         """
-        result = self._init_result(repo_dir, task)
         result["success"] = None
         result["status"] = TaskStatus.SKIPPED
         result["skipped"] = True

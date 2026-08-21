@@ -23,7 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Git checkout**: Uncommitted local changes are no longer silently discarded when switching branches. Changes are now stashed before checkout and restored afterward, preventing data loss from previous worker operations leaving temporary files in the working directory
-- **IssueWorker**: Skipped tasks (e.g., when branch creation fails) are no longer recorded as failures. A new `status` field on task results distinguishes between `success`, `failure`, and `skipped`. The summary now reports skipped task counts separately from failures.
+- **IssueWorker**: Skipped tasks (e.g., when the LLM is unavailable) are no longer recorded as failures. A new `status` field on task results distinguishes between `success`, `failure`, and `skipped`. The summary now reports skipped task counts separately from failures.
+- **IssueWorker**: Branch creation failures are recorded as failures again (with `on_task_failure` invoked and an error-level log) instead of skips, since they are operational errors rather than intentional skips.
+- **IssueWorker**: `_skip_task` now mutates the existing result dict instead of rebuilding it, so state accumulated before a skip is preserved. The legacy `skipped` result field is now documented in the `TaskResult` TypedDict and README.
+- **VikunjaTaskSource**: Skip comment no longer repeats the skip reason in both the title and the body.
 - **GitHubTaskSource**: Simplified `on_skip` to only log skip events without posting GitHub comments, reducing issue clutter.
 - **PR-to-issue linking**: Pull requests now always contain a valid GitHub closing keyword (`Closes`, `Fixes`, or `Resolves`) linking to the source issue. The `ensure_issue_link_in_pr_body` helper function guarantees at least one closing keyword is present in the PR body, preventing issues from remaining open after PR creation.
 - **`validate_issue_link`**: Now validates `issue_id` (raises `TypeError` for non-integers and `ValueError` for non-positive values), matching the documented contract and the behavior of `ensure_issue_link_in_pr_body`
