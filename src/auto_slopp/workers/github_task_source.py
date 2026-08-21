@@ -305,7 +305,7 @@ class GitHubTaskSource(TaskSource):
 
         No comment is posted to the issue - skip information is only recorded
         in the logs. The required label is NOT removed so
-        the task can be retried when the LLM becomes available.
+        the task can be retried in a future run.
 
         Skip events are still logged for observability, so future maintainers
         understand the information isn't lost, just moved to logs.
@@ -321,9 +321,9 @@ class GitHubTaskSource(TaskSource):
 
         # No GitHub comment is posted for skips — skip events are logged-only
         # to avoid cluttering issues with skip notifications. The label is preserved
-        # so the task can be retried when the LLM becomes available.
+        # so the task can be retried in a future run.
         reason_str = f" - {reason}" if reason else ""
-        logger.info(f"Skipped issue #{task.id} - LLM unavailable{reason_str}, label preserved for retry")
+        logger.info(f"Skipped issue #{task.id}{reason_str}, label preserved for retry")
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.

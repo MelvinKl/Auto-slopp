@@ -1809,15 +1809,6 @@ class TestIssueWorker:
         assert result["tasks_processed"] == 0
         assert result["tasks_completed"] == 0
 
-        # Structural assertion: verify the guard behavior by testing that
-        # `success is None` is the sole skip condition. A result with
-        # success=False AND status="skipped" should NOT be counted as skipped
-        # — it falls through to the failure path because `success is None`
-        # is the canonical skip signal.
-        mock_buggy_result = {"success": False, "status": "skipped"}
-        assert mock_buggy_result.get("success") is not None  # NOT caught by guard
-        assert mock_buggy_result["success"] is False  # Would be logged as failure
-
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.settings")

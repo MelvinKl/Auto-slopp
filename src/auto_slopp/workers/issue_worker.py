@@ -106,11 +106,12 @@ class IssueWorker(Worker):
 
         * **Success** — ``success=True``, ``status='success'``. Counted in
           ``tasks_processed`` and ``tasks_completed`` (if the task finished
-          all its work).
+          all its work). Tasks that produced no changes are also successes
+          (``no_changes=True``); they are closed via ``on_no_changes``.
         * **Skipped** — ``success=None``, ``status='skipped'``. This is the
           canonical skip signal. Counted in ``tasks_skipped``. No warning is
-          logged. Happens when branch creation fails, the LLM is unavailable,
-          or the task produced no changes.
+          logged. Happens when branch creation fails or the LLM is
+          unavailable.
         * **Failure** — ``success=False``. A warning is logged via
           ``"Failed to process task"``. Happens on permanent errors, push
           failures, or PR creation failures.
@@ -724,8 +725,9 @@ class IssueWorker(Worker):
         result["success"] = None
         result["status"] = TaskStatus.SKIPPED
         result["skipped"] = True
-        if skip_reason:
-            result["skip_reason"] = skip_reason
+        # Always store skip_reason (even when empty) so it is present
+        # whenever status == "skipped", as documented in the README.
+        result["skip_reason"] = skip_reason
         self.task_source.on_skip(task, skip_reason or "")
         return result
 

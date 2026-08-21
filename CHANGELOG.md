@@ -23,26 +23,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Git checkout**: Uncommitted local changes are no longer silently discarded when switching branches. Changes are now stashed before checkout and restored afterward, preventing data loss from previous worker operations leaving temporary files in the working directory
+- **IssueWorker**: Skipped tasks (e.g., when branch creation fails) are no longer recorded as failures. A new `status` field on task results distinguishes between `success`, `failure`, and `skipped`. The summary now reports skipped task counts separately from failures.
+- **GitHubTaskSource**: Simplified `on_skip` to only log skip events without posting GitHub comments, reducing issue clutter.
+- **PR-to-issue linking**: Pull requests now always contain a valid GitHub closing keyword (`Closes`, `Fixes`, or `Resolves`) linking to the source issue. The `ensure_issue_link_in_pr_body` helper function guarantees at least one closing keyword is present in the PR body, preventing issues from remaining open after PR creation.
+- **`validate_issue_link`**: Now validates `issue_id` (raises `TypeError` for non-integers and `ValueError` for non-positive values), matching the documented contract and the behavior of `ensure_issue_link_in_pr_body`
+- **Linking pattern**: Cross-repo references now require at least one slash (e.g. `owner/repo#123`). A single segment like `Closes docs#123` is not a valid GitHub issue reference and is no longer treated as an existing link, so a closing keyword is reliably prepended
+- **IssueWorker class structure**: Moved orphaned class methods (`_generate_pr_body_from_task_file`, `_build_review_instructions`, `_review_pull_request`, `_build_pr_description_instructions`, `_create_error_result`, `_get_current_time`, `_get_elapsed_time`, `_log_completion_summary`) back inside the `IssueWorker` class where they were incorrectly defined outside the class.
 
 ### Removed
 - Per-step acceptance criteria validation after each step
 - Per-step remaining steps update after each step
 - `remaining_steps_update_name` parameter from `RalphExecutor` constructor and `IssueWorker` call site
 
-### Fixed
-- **IssueWorker**: Skipped tasks (e.g., when branch creation fails) are no longer recorded as failures. A new `status` field on task results distinguishes between `success`, `failure`, and `skipped`. The summary now reports skipped task counts separately from failures.
-- **GitHubTaskSource**: Simplified `on_skip` to only log skip events without posting GitHub comments, reducing issue clutter.
-
 ### Documentation
 - Updated README.md to reflect removal of intermediate checks and new final acceptance check behavior
 - Updated README.md to document `on_skip` behavior (GitHub tasks log-only, Vikunja tasks post comments) and TaskSource lifecycle hooks
 - Updated `test_github_task_source.py` to reflect simplified `on_skip` behavior (removed unnecessary mocks)
-
-### Fixed
-- **PR-to-issue linking**: Pull requests now always contain a valid GitHub closing keyword (`Closes`, `Fixes`, or `Resolves`) linking to the source issue. The `ensure_issue_link_in_pr_body` helper function guarantees at least one closing keyword is present in the PR body, preventing issues from remaining open after PR creation.
-- **`validate_issue_link`**: Now validates `issue_id` (raises `TypeError` for non-integers and `ValueError` for non-positive values), matching the documented contract and the behavior of `ensure_issue_link_in_pr_body`
-- **Linking pattern**: Cross-repo references now require at least one slash (e.g. `owner/repo#123`). A single segment like `Closes docs#123` is not a valid GitHub issue reference and is no longer treated as an existing link, so a closing keyword is reliably prepended
-- **IssueWorker class structure**: Moved orphaned class methods (`_generate_pr_body_from_task_file`, `_build_review_instructions`, `_review_pull_request`, `_build_pr_description_instructions`, `_create_error_result`, `_get_current_time`, `_get_elapsed_time`, `_log_completion_summary`) back inside the `IssueWorker` class where they were incorrectly defined outside the class.
 
 ## [0.1.0] - 2024-01-01
 
