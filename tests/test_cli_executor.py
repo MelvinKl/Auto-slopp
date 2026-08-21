@@ -810,15 +810,15 @@ def test_resolve_timeout_zero_uses_fallback():
 
 def test_resolve_timeout_with_invalid_positive_uses_fallback():
     """A timeout exceeding the maximum should use fallback."""
-    from auto_slopp.utils.cli_executor import _MAX_TIMEOUT_SECONDS, _resolve_timeout
+    from auto_slopp.utils.cli_executor import MAX_TIMEOUT_SECONDS, _resolve_timeout
 
-    assert _resolve_timeout(_MAX_TIMEOUT_SECONDS + 1, fallback=100) == 100
+    assert _resolve_timeout(MAX_TIMEOUT_SECONDS + 1, fallback=100) == 100
     assert _resolve_timeout(99999999, fallback=100) == 100
 
 
 def test_resolve_timeout_max_boundary():
     """The maximum timeout boundary value should be accepted as-is."""
-    from auto_slopp.utils.cli_executor import _MAX_TIMEOUT_SECONDS, _resolve_timeout
+    from auto_slopp.utils.cli_executor import MAX_TIMEOUT_SECONDS, _resolve_timeout
 
-    assert _resolve_timeout(_MAX_TIMEOUT_SECONDS) == _MAX_TIMEOUT_SECONDS
-    assert _resolve_timeout(_MAX_TIMEOUT_SECONDS, fallback=100) == _MAX_TIMEOUT_SECONDS
+    assert _resolve_timeout(MAX_TIMEOUT_SECONDS) == MAX_TIMEOUT_SECONDS
+    assert _resolve_timeout(MAX_TIMEOUT_SECONDS, fallback=100) == MAX_TIMEOUT_SECONDS

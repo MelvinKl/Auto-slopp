@@ -19,7 +19,7 @@ class TaskRating(BaseModel):
 NO_TIMEOUT = -1
 """Sentinel value for timeout: -1 means never timeout (subprocess runs indefinitely)."""
 
-_MAX_TIMEOUT_SECONDS = 31_536_000  # ~1 year in seconds
+MAX_TIMEOUT_SECONDS = 31_536_000  # ~1 year in seconds
 
 
 class CLIConfiguration(BaseModel):
@@ -65,10 +65,10 @@ class CLIConfiguration(BaseModel):
         """Only allow -1 (NO_TIMEOUT) or positive integers up to 1 year for timeout."""
         if v == NO_TIMEOUT:
             return v
-        if 0 < v <= _MAX_TIMEOUT_SECONDS:
+        if 0 < v <= MAX_TIMEOUT_SECONDS:
             return v
         raise ValueError(
-            f"timeout must be -1 (NO_TIMEOUT) or a positive integer up to {_MAX_TIMEOUT_SECONDS} seconds "
+            f"timeout must be -1 (NO_TIMEOUT) or a positive integer up to {MAX_TIMEOUT_SECONDS} seconds "
             f"(~1 year), got {v}. A value of -1 means never timeout; positive values specify seconds."
         )
 

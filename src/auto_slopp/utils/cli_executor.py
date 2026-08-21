@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from settings.main import (
-    _MAX_TIMEOUT_SECONDS,
+    MAX_TIMEOUT_SECONDS,
     NO_TIMEOUT,
     CLIConfiguration,
     TaskRating,
@@ -21,7 +21,6 @@ from settings.main import (
 
 logger = logging.getLogger(__name__)
 _active_cli_configuration_index = 0
-NO_TIMEOUT = -1
 
 _PROBE_INSTRUCTIONS = "are you working?"
 # 600 seconds (10 minutes) balances catching hung tools without waiting too long.
@@ -257,7 +256,7 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
     """
     if raw_timeout == NO_TIMEOUT:
         return None
-    if raw_timeout is not None and 0 < raw_timeout <= _MAX_TIMEOUT_SECONDS:
+    if raw_timeout is not None and 0 < raw_timeout <= MAX_TIMEOUT_SECONDS:
         return raw_timeout
     return fallback if fallback is not None else _PROBE_TIMEOUT_SECONDS
 

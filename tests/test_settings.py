@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from settings.main import _MAX_TIMEOUT_SECONDS, NO_TIMEOUT, CLIConfiguration, Settings
+from settings.main import MAX_TIMEOUT_SECONDS, NO_TIMEOUT, CLIConfiguration, Settings
 
 
 class TestSettings:
@@ -279,11 +279,11 @@ class TestSettings:
             CLIConfiguration(cli_command="tool", timeout=-5)
 
     def test_cli_configuration_timeout_max_boundary(self):
-        """Test that CLIConfiguration accepts _MAX_TIMEOUT_SECONDS and rejects values above it."""
-        config = CLIConfiguration(cli_command="tool", timeout=_MAX_TIMEOUT_SECONDS)
-        assert config.timeout == _MAX_TIMEOUT_SECONDS
+        """Test that CLIConfiguration accepts MAX_TIMEOUT_SECONDS and rejects values above it."""
+        config = CLIConfiguration(cli_command="tool", timeout=MAX_TIMEOUT_SECONDS)
+        assert config.timeout == MAX_TIMEOUT_SECONDS
         with pytest.raises(ValidationError):
-            CLIConfiguration(cli_command="tool", timeout=_MAX_TIMEOUT_SECONDS + 1)
+            CLIConfiguration(cli_command="tool", timeout=MAX_TIMEOUT_SECONDS + 1)
 
     def test_pr_review_worker_settings_defaults(self):
         """Test that PR review worker settings have correct defaults."""

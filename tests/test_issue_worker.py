@@ -76,14 +76,15 @@ class CapturingTaskSourceWithFindings(MockTaskSource):
         self.captured_findings = findings
 
 
+@pytest.fixture(autouse=True)
+def _mock_pr_review_no_findings():
+    """Stub the PR review loop so tests focus on the behavior under test."""
+    with patch.object(IssueWorker, "_review_pull_request", return_value=(False, "", [])):
+        yield
+
+
 class TestIssueWorker:
     """Tests for the unified IssueWorker."""
-
-    @pytest.fixture(autouse=True)
-    def _mock_pr_review_no_findings(self):
-        """Stub the PR review loop so tests focus on the behavior under test."""
-        with patch.object(IssueWorker, "_review_pull_request", return_value=(False, "", [])):
-            yield
 
     def test_initialization_with_task_source(self):
         """Test that IssueWorker can be initialized with a TaskSource."""
@@ -1911,12 +1912,6 @@ class TestPRBodyLinkingIntegration:
 class TestGeneratePRBodyFromTaskFileIntegration:
     """Integration tests verifying _generate_pr_body_from_task_file produces valid issue links
     in both ralph_enabled=True and ralph_enabled=False code paths."""
-
-    @pytest.fixture(autouse=True)
-    def _mock_pr_review_no_findings(self):
-        """Stub the PR review loop so tests focus on the behavior under test."""
-        with patch.object(IssueWorker, "_review_pull_request", return_value=(False, "", [])):
-            yield
 
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
