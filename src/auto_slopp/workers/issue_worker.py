@@ -39,7 +39,11 @@ from auto_slopp.utils.linking import ensure_issue_link_in_pr_body
 from auto_slopp.utils.ralph import RalphExecutor
 from auto_slopp.worker import Worker
 from auto_slopp.workers.task_source import Task, TaskSource
-from auto_slopp.workers.task_types import TaskResult, TaskStatus
+from auto_slopp.workers.task_types import (
+    TaskResult,
+    TaskStatus,
+    validate_task_result,
+)
 from settings.main import settings
 
 
@@ -298,7 +302,7 @@ class IssueWorker(Worker):
         Returns:
             Result dict with status='pending' and success=True (neutral state)
         """
-        return {
+        result: TaskResult = {
             "repository": repo_dir.name,
             "task_id": task.id,
             "task_title": task.title,
@@ -314,6 +318,8 @@ class IssueWorker(Worker):
             "ralph_loops_executed": 0,
             "ralph_steps_completed": 0,
         }
+        validate_task_result(result)
+        return result
 
     def _set_failure(self, result: TaskResult, error: str) -> None:
         """Mark a result as failed.
@@ -329,6 +335,7 @@ class IssueWorker(Worker):
         result["status"] = TaskStatus.FAILURE
         result["task_completed"] = False
         result["success"] = False
+        validate_task_result(result)
 
     def _set_success(self, result: TaskResult) -> None:
         """Mark a result as successful.
@@ -343,6 +350,7 @@ class IssueWorker(Worker):
         result["success"] = True
         result["task_completed"] = True
         result["tasks_completed"] = 1
+        validate_task_result(result)
 
     def _process_single_task(self, repo_dir: Path, task: Task) -> TaskResult:
         """Process a single task using Ralph loop.
@@ -706,8 +714,10 @@ class IssueWorker(Worker):
     def _skip_task(self, result: TaskResult, task: Task, skip_reason: str = "") -> TaskResult:
         """Mark an in-progress task result as skipped.
 
-        Mutates the existing ``result`` dict (rather than rebuilding it from
-        scratch) so that any state accumulated before the skip is preserved.
+        **Mutates the existing ``result`` dict in place** (rather than rebuilding
+        it from scratch) so that any state accumulated before the skip is
+        preserved. **Callers do not need to reassign the return value** — the
+        same ``result`` dict is returned for convenience.
 
         The canonical skip signal is ``success=None`` (in addition to
         ``status='skipped'``).  All intentional skip paths in
@@ -729,6 +739,7 @@ class IssueWorker(Worker):
         # whenever status == "skipped", as documented in the README.
         result["skip_reason"] = skip_reason
         self.task_source.on_skip(task, skip_reason or "")
+        validate_task_result(result)
         return result
 
     def _build_instructions(

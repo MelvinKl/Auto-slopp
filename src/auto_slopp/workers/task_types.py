@@ -4,17 +4,32 @@ Provides TypedDict and dataclass definitions for structured data used
 across worker implementations.
 """
 
-from enum import Enum
+from enum import Enum, unique
 from typing import NotRequired, Optional, Required, TypedDict
 
 
+@unique
 class TaskStatus(str, Enum):
-    """Possible outcomes for a single task."""
+    """Possible outcomes for a single task.
+
+    Python enums are effectively immutable by design; this decorator
+    additionally ensures no duplicate values exist.
+    """
 
     PENDING = "pending"
     SUCCESS = "success"
     SKIPPED = "skipped"
     FAILURE = "failure"
+
+
+TaskOutcome = bool | None
+"""Type alias for task outcome signal.
+
+* ``True``  – Task succeeded.
+* ``False`` – Task failed.
+* ``None``  – Task was skipped (non-error outcome; always paired with
+              ``status == TaskStatus.SKIPPED`` and a descriptive ``skip_reason``).
+"""
 
 
 class TaskResult(TypedDict):
@@ -29,7 +44,7 @@ class TaskResult(TypedDict):
         ``"skipped"``   – Task was intentionally skipped (``success=None``).
         ``"failure"``   – Task encountered an error (``success=False``).
 
-    Skip signal semantics (``success`` field):
+    Skip signal semantics (``success`` field) — see :data:`TaskOutcome`:
         ``True``  – Task succeeded.
         ``False`` – Task failed.
         ``None``  – Task was skipped (non-error outcome; always paired with
@@ -70,7 +85,7 @@ class TaskResult(TypedDict):
     repository: Required[str]
     task_id: Required[int]
     task_title: Required[str]
-    success: Required[Optional[bool]]  # None = skipped, True = success, False = failure
+    success: Required[TaskOutcome]
     openagent_executed: Required[bool]
     openagent_executions: Required[int]
     task_completed: Required[bool]
