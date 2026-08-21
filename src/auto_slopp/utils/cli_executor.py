@@ -246,6 +246,10 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
     None (unspecified) or invalid values to the provided fallback (or
     _PROBE_TIMEOUT_SECONDS when no fallback is given).
 
+    Note: the NO_TIMEOUT sentinel takes precedence over the provided
+    fallback: when raw_timeout is NO_TIMEOUT, None is returned even if a
+    fallback is given.
+
     Args:
         raw_timeout: The timeout value (None for unspecified, -1 for NO_TIMEOUT, or a positive integer).
         fallback: Default timeout in seconds to use when raw_timeout is None, non-positive,

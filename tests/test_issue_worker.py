@@ -5,6 +5,10 @@ Note: the autouse ``_mock_pr_review_no_findings`` fixture below stubs
 want to exercise the real PR review loop must override this fixture by
 redefining it in a closer scope (e.g. inside a test class) or by patching it
 back in so they do not silently inherit the stub.
+
+To guard against the stub silently hiding an integration regression in the
+review loop itself, ``test_run_with_successful_execution`` patches
+``_review_pull_request`` back in and asserts the loop was actually reached.
 """
 
 import subprocess
@@ -902,8 +906,10 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @patch("auto_slopp.workers.issue_worker.IssueWorker._review_pull_request")
     def test_run_with_successful_execution(
         self,
+        mock_review,
         mock_commits_ahead,
         mock_cli,
         mock_execute,
@@ -917,7 +923,13 @@ class TestIssueWorker:
         mock_checkout,
         mock_commit_push,
     ):
-        """Test that run handles successful execution with PR creation."""
+        """Test that run handles successful execution with PR creation.
+
+        ``_review_pull_request`` is patched back in (overriding the module-level
+        autouse stub) and asserted to be called, so this test also verifies
+        that the PR review loop is actually reached during a successful run.
+        """
+        mock_review.return_value = (False, "", [])
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
@@ -940,6 +952,8 @@ class TestIssueWorker:
         assert result["tasks_completed"] == 1
         assert task_source.on_task_complete_called is True
         mock_create_pr.assert_called_once()
+        # The PR review loop must have been reached (not silently stubbed away).
+        mock_review.assert_called_once()
 
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")

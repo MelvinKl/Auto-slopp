@@ -814,7 +814,9 @@ Plan:
             f"After fixing, ensure that 'make lint' and 'make test' both pass successfully."
         )
 
-    def _review_pull_request(self, repo_dir: Path, pr_url: str, title: str, body: str) -> tuple[bool, str, List[str]]:
+    def _review_pull_request(
+        self, repo_dir: Path, pr_url: str, title: str, body: str
+    ) -> tuple[bool, str, List[str]]:  # fmt: skip
         """Review a pull request and check for actionable findings.
 
         Args:

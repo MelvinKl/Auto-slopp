@@ -123,12 +123,18 @@ class TestSettings:
         Regression test: duplicate field/validator definitions in
         CLIConfiguration made Pydantic emit a UserWarning at class-definition
         time (i.e. on import). Running the import in a subprocess with
-        warnings escalated to errors so the bug cannot silently return.
+        UserWarnings raised from settings.main itself escalated to errors so
+        the bug cannot silently return (warnings from unrelated dependencies
+        in the import chain are intentionally ignored).
         """
         env = os.environ.copy()
         src_dir = Path(__file__).resolve().parent.parent / "src"
         env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(src_dir), env.get("PYTHONPATH")]))
-        code = "import warnings; warnings.simplefilter('error'); import settings.main  # noqa: F401"
+        code = (
+            "import warnings; "
+            "warnings.filterwarnings('error', category=UserWarning, module=r'^settings\\.main$'); "
+            "import settings.main  # noqa: F401"
+        )
         proc = subprocess.run(
             [sys.executable, "-c", code],
             env=env,
