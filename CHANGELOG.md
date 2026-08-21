@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`checkout_branch_resilient`**: Replaced `git reset --hard` fallback with `git stash`/`git stash pop` to preserve uncommitted local changes when branch checkout fails due to conflicting modifications
 
 ### Fixed
+- **IssueWorker `max_loops_reached` handling (Ralph path)**: An LLM outage inside the Ralph step loop previously surfaced only as `max_loops_reached` after exhausting all iterations, which was handled by `on_max_iterations_reached` and permanently dropped the issue. The worker now checks `ralph_executor.get_skip_reason()` in the `max_loops_reached` branch and calls `on_skip` (with the actual iteration failure reason) when the LLM was unavailable during the loop, so the issue is preserved for retry. Genuine iteration exhaustion still goes through `on_max_iterations_reached`, and the two cases are logged distinctly.
 - **`VikunjaTaskSource.on_skip`**: Now uses the shared `_update_task_with_comment_and_status` helper like the other lifecycle hooks, giving it the same error-handling behavior
 - **IssueWorker skip detection**: The "no changes made" and "no commits ahead" skip paths now use `ralph_executor.get_skip_reason()` (the actual last failure reason) instead of a check on an empty error string that could never fire
 - **README**: Merged the duplicated `PR-to-Issue Linking` sections into a single section
