@@ -815,8 +815,12 @@ Plan:
         )
 
     def _review_pull_request(
-        self, repo_dir: Path, pr_url: str, title: str, body: str
-    ) -> tuple[bool, str, List[str]]:  # fmt: skip
+        self,
+        repo_dir: Path,
+        pr_url: str,
+        title: str,
+        body: str,
+    ) -> tuple[bool, str, List[str]]:
         """Review a pull request and check for actionable findings.
 
         Args:
@@ -835,7 +839,10 @@ Plan:
             # Extract PR number from URL
             # PR URL format: https://github.com/owner/repo/pull/123
             pr_number = int(pr_url.split("/")[-1])
-        except (ValueError, IndexError):  # fmt: skip
+        except (
+            ValueError,
+            IndexError,
+        ):
             self.logger.error(f"Could not extract PR number from URL: {pr_url}")
             return False, "Failed to extract PR number from URL.", []
 

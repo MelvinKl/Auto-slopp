@@ -1,14 +1,17 @@
 """Tests for unified IssueWorker.
 
-Note: the autouse ``_mock_pr_review_no_findings`` fixture below stubs
-``IssueWorker._review_pull_request`` for every test in this module. Tests that
-want to exercise the real PR review loop must override this fixture by
-redefining it in a closer scope (e.g. inside a test class) or by patching it
-back in so they do not silently inherit the stub.
+The ``_mock_pr_review_no_findings`` fixture in this module stubs
+``IssueWorker._review_pull_request`` (which shells out to ``gh``) so tests
+can focus on the behavior under test. It is intentionally NOT autouse: only
+the tests that drive the worker through the PR review loop request it
+explicitly (via ``@pytest.mark.usefixtures``), so the stub's blast radius is
+visible in each test's decorators and future tests do not silently inherit it.
 
-To guard against the stub silently hiding an integration regression in the
-review loop itself, ``test_run_with_successful_execution`` patches
-``_review_pull_request`` back in and asserts the loop was actually reached.
+Tests that want to exercise the real PR review loop simply do not request the
+fixture and patch ``_review_pull_request`` themselves to script the review
+outcomes (see ``TestPRReviewLoop``). To guard against the loop being silently
+skipped, ``test_run_with_successful_execution`` patches
+``_review_pull_request`` and asserts the loop was actually reached.
 """
 
 import subprocess
@@ -87,9 +90,16 @@ class CapturingTaskSourceWithFindings(MockTaskSource):
         self.captured_findings = findings
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def _mock_pr_review_no_findings():
-    """Stub the PR review loop so tests focus on the behavior under test."""
+    """Stub the PR review loop so tests focus on the behavior under test.
+
+    This fixture is NOT autouse: it must be requested explicitly (via
+    ``@pytest.mark.usefixtures``) by the tests that drive the worker through
+    the PR review loop and want to avoid the real ``_review_pull_request``
+    implementation (which shells out to ``gh``). Tests that do not request it
+    exercise the real code path.
+    """
     with patch.object(IssueWorker, "_review_pull_request", return_value=(False, "", [])):
         yield
 
@@ -324,6 +334,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_multiple_tasks_processing(
         self,
         mock_commits_ahead,
@@ -585,6 +596,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_commits_during_ralph_loop_still_creates_pr(
         self,
         mock_cli,
@@ -684,6 +696,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_process_single_task_passes_condensed_comments_directly(
         self,
         mock_commits_ahead,
@@ -854,6 +867,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_existing_open_pr_reused(
         self,
         mock_commits_ahead,
@@ -925,9 +939,9 @@ class TestIssueWorker:
     ):
         """Test that run handles successful execution with PR creation.
 
-        ``_review_pull_request`` is patched back in (overriding the module-level
-        autouse stub) and asserted to be called, so this test also verifies
-        that the PR review loop is actually reached during a successful run.
+        ``_review_pull_request`` is patched and asserted to be called, so this
+        test also verifies that the PR review loop is actually reached during a
+        successful run.
         """
         mock_review.return_value = (False, "", [])
         mock_commits_ahead.return_value = 1
@@ -1081,6 +1095,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_on_task_complete_receives_correct_pr_url(
         self,
         mock_commits_ahead,
@@ -1137,6 +1152,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_ralph_enabled_success_with_push_and_pr(
         self,
         mock_commits_ahead,
@@ -1669,8 +1685,14 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.create_pull_request")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_gitignore_integration_ralph_added_when_missing(
-        self, mock_settings, mock_commits_ahead, mock_create_pr, mock_get_pr, mock_push
+        self,
+        mock_settings,
+        mock_commits_ahead,
+        mock_create_pr,
+        mock_get_pr,
+        mock_push,
     ):
         """Integration test: .ralph is added to .gitignore when missing."""
         mock_settings.ralph_enabled = True
@@ -1720,8 +1742,14 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.create_pull_request")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_gitignore_integration_ralph_not_duplicated(
-        self, mock_settings, mock_commits_ahead, mock_create_pr, mock_get_pr, mock_push
+        self,
+        mock_settings,
+        mock_commits_ahead,
+        mock_create_pr,
+        mock_get_pr,
+        mock_push,
     ):
         """Integration test: .ralph is not duplicated when already in .gitignore."""
         mock_settings.ralph_enabled = True
@@ -1945,6 +1973,7 @@ class TestGeneratePRBodyFromTaskFileIntegration:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_ralph_enabled_pr_body_contains_issue_link(
         self,
         mock_commits_ahead,
@@ -2019,6 +2048,7 @@ class TestGeneratePRBodyFromTaskFileIntegration:
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_ralph_disabled_pr_body_contains_issue_link(
         self,
         mock_commits_ahead,
@@ -2079,6 +2109,7 @@ class TestGeneratePRBodyFromTaskFileIntegration:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_ralph_enabled_pr_body_preserves_existing_link(
         self,
         mock_commits_ahead,
@@ -2137,16 +2168,11 @@ class TestGeneratePRBodyFromTaskFileIntegration:
 class TestPRReviewLoop:
     """Tests for the PR review loop (findings -> fix -> re-review).
 
-    The module-level autouse ``_mock_pr_review_no_findings`` fixture stubs
-    ``IssueWorker._review_pull_request`` for every test in this module. This
-    class redefines that fixture (as a no-op) in a closer scope so the real
-    review loop runs; each test then patches ``_review_pull_request`` to
-    script the review outcomes it wants to exercise.
+    The module-level ``_mock_pr_review_no_findings`` fixture is not autouse,
+    so the real review loop runs here; each test patches
+    ``_review_pull_request`` to script the review outcomes it wants to
+    exercise.
     """
-
-    @pytest.fixture(autouse=True)
-    def _mock_pr_review_no_findings(self):
-        """Override the module-level stub so the PR review loop is exercised."""
 
     def _setup_common_mocks(
         self,

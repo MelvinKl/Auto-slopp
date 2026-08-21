@@ -140,7 +140,9 @@ class TestSettings:
             env=env,
             capture_output=True,
             text=True,
-            timeout=120,
+            # 30s is ample for a plain import; keep it tight so a hung import
+            # fails fast instead of stalling the suite.
+            timeout=30,
         )
         assert proc.returncode == 0, f"importing settings.main failed:\n{proc.stderr}"
 

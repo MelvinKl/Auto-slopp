@@ -209,7 +209,11 @@ class Settings(BaseSettings):
         default=10000,
         ge=1,
         le=30 * 24 * 60 * 60,
-        description="Timeout for slopmachine execution in seconds (1 to 30 days)",
+        description=(
+            "Timeout for slopmachine execution in seconds (1 to 30 days). "
+            "Note: this 30-day ceiling is intentionally a different (tighter) "
+            "bound than MAX_TIMEOUT_SECONDS (~1 year), which caps CLI timeouts."
+        ),
     )
 
     github_issue_worker_required_label: str = Field(
