@@ -2,10 +2,8 @@
 
 The ``_mock_pr_review_no_findings`` fixture in this module stubs
 ``IssueWorker._review_pull_request`` (which shells out to ``gh``) so tests
-can focus on the behavior under test. It is intentionally NOT autouse: only
-the tests that drive the worker through the PR review loop request it
-explicitly (via ``@pytest.mark.usefixtures``), so the stub's blast radius is
-visible in each test's decorators and future tests do not silently inherit it.
+can focus on the behavior under test; see the fixture's docstring for why it
+is intentionally not autouse.
 
 Tests that want to exercise the real PR review loop simply do not request the
 fixture and patch ``_review_pull_request`` themselves to script the review
@@ -2165,13 +2163,46 @@ class TestGeneratePRBodyFromTaskFileIntegration:
         assert pr_body.count("#55") == 1
 
 
+# Patch targets for the PR review loop tests, listed in decorator-application
+# order (first = bottom-most decorator = first mock argument). Adding a new
+# patch target only requires appending it here.
+_PR_REVIEW_LOOP_PATCH_TARGETS = [
+    "auto_slopp.workers.issue_worker.get_commits_ahead_of_branch",
+    "auto_slopp.workers.issue_worker.get_active_cli_command",
+    "auto_slopp.workers.issue_worker.execute_with_instructions",
+    "auto_slopp.workers.issue_worker.get_pr_for_branch",
+    "auto_slopp.workers.issue_worker.create_pull_request",
+    "auto_slopp.workers.issue_worker.push_to_remote",
+    "auto_slopp.workers.issue_worker.settings",
+    "auto_slopp.workers.issue_worker.get_current_branch",
+    "auto_slopp.workers.issue_worker.has_changes",
+    "auto_slopp.workers.issue_worker.create_and_checkout_branch",
+    "auto_slopp.workers.issue_worker.checkout_branch_resilient",
+    "auto_slopp.workers.issue_worker.commit_and_push_changes",
+    "auto_slopp.workers.issue_worker.run_cli_executor",
+    "auto_slopp.workers.issue_worker.submit_pr_review",
+    "auto_slopp.workers.issue_worker.remove_label_from_issue",
+]
+
+
+def _pr_review_loop_patches():
+    """Decorator factory applying the shared PR review loop ``@patch`` stack."""
+
+    def decorator(func):
+        for target in _PR_REVIEW_LOOP_PATCH_TARGETS:
+            func = patch(target)(func)
+        return func
+
+    return decorator
+
+
 class TestPRReviewLoop:
     """Tests for the PR review loop (findings -> fix -> re-review).
 
     The module-level ``_mock_pr_review_no_findings`` fixture is not autouse,
     so the real review loop runs here; each test patches
     ``_review_pull_request`` to script the review outcomes it wants to
-    exercise.
+    exercise. The shared mock stack comes from ``_pr_review_loop_patches``.
     """
 
     def _setup_common_mocks(
@@ -2212,21 +2243,7 @@ class TestPRReviewLoop:
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         return IssueWorker(task_source=task_source, dry_run=False), task_source
 
-    @patch("auto_slopp.workers.issue_worker.remove_label_from_issue")
-    @patch("auto_slopp.workers.issue_worker.submit_pr_review")
-    @patch("auto_slopp.workers.issue_worker.run_cli_executor")
-    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.has_changes")
-    @patch("auto_slopp.workers.issue_worker.get_current_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    @patch("auto_slopp.workers.issue_worker.push_to_remote")
-    @patch("auto_slopp.workers.issue_worker.create_pull_request")
-    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
-    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
-    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
-    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @_pr_review_loop_patches()
     def test_pr_review_findings_fixed_then_clean(
         self,
         mock_commits_ahead,
@@ -2289,21 +2306,7 @@ class TestPRReviewLoop:
         assert mock_submit_review.call_count == 2
         assert mock_remove_label.called
 
-    @patch("auto_slopp.workers.issue_worker.remove_label_from_issue")
-    @patch("auto_slopp.workers.issue_worker.submit_pr_review")
-    @patch("auto_slopp.workers.issue_worker.run_cli_executor")
-    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.has_changes")
-    @patch("auto_slopp.workers.issue_worker.get_current_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    @patch("auto_slopp.workers.issue_worker.push_to_remote")
-    @patch("auto_slopp.workers.issue_worker.create_pull_request")
-    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
-    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
-    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
-    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @_pr_review_loop_patches()
     def test_pr_review_max_iterations_reached(
         self,
         mock_commits_ahead,
@@ -2360,21 +2363,7 @@ class TestPRReviewLoop:
         assert mock_run_cli.call_count == 2
         assert mock_remove_label.called is False
 
-    @patch("auto_slopp.workers.issue_worker.remove_label_from_issue")
-    @patch("auto_slopp.workers.issue_worker.submit_pr_review")
-    @patch("auto_slopp.workers.issue_worker.run_cli_executor")
-    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.has_changes")
-    @patch("auto_slopp.workers.issue_worker.get_current_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    @patch("auto_slopp.workers.issue_worker.push_to_remote")
-    @patch("auto_slopp.workers.issue_worker.create_pull_request")
-    @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
-    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
-    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
-    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @_pr_review_loop_patches()
     def test_pr_review_fix_failure_stops_loop(
         self,
         mock_commits_ahead,

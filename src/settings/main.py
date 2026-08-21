@@ -43,6 +43,14 @@ class CLIConfiguration(BaseModel):
         default_factory=list,
         description="Arguments to pass to the CLI command",
     )
+    timeout: int = Field(
+        default=NO_TIMEOUT,
+        description=(
+            "Timeout in seconds for CLI command execution. "
+            "Set to NO_TIMEOUT to disable timeout (never timeout). "
+            "When NO_TIMEOUT, the caller-provided timeout is ignored for this configuration."
+        ),
+    )
     capability: int = Field(
         default=5,
         ge=0,
@@ -60,14 +68,6 @@ class CLIConfiguration(BaseModel):
     blacklist_tasks: List[str] = Field(
         default_factory=list,
         description="Task names for which this CLI configuration should not be used",
-    )
-    timeout: int = Field(
-        default=NO_TIMEOUT,
-        description=(
-            "Timeout in seconds for CLI command execution. "
-            "Set to NO_TIMEOUT to disable timeout (never timeout). "
-            "When NO_TIMEOUT, the caller-provided timeout is ignored for this configuration."
-        ),
     )
 
     @field_validator("timeout")
