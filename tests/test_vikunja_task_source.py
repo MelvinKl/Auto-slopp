@@ -362,10 +362,14 @@ class TestVikunjaTaskSource:
         assert "8/15" in comment_args[1]
         assert "Max iterations reached" in comment_args[1]
 
+    @patch("auto_slopp.workers.vikunja_task_source.get_task_details")
     @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_on_skip_adds_comment_and_keeps_task_eligible(self, mock_comment, mock_update, mock_commit):
+    def test_on_skip_adds_comment_and_keeps_task_eligible(
+        self, mock_comment, mock_update, mock_commit, mock_task_details
+    ):
+        mock_task_details.return_value = None
         """Test that on_skip adds a skip comment but does NOT change the task status.
 
         Vikunja statuses are per-project and user-defined (the project may not
@@ -388,6 +392,50 @@ class TestVikunjaTaskSource:
         # status, and the task must remain eligible for future processing.
         mock_update.assert_not_called()
         mock_commit.assert_called_once()
+
+    @patch("auto_slopp.workers.vikunja_task_source.get_task_details")
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_on_skip_does_not_post_duplicate_skip_comment(self, mock_comment, mock_commit, mock_task_details):
+        """Test that on_skip does not post another skip comment (or commit) when the latest comment is already one."""
+        mock_task_details.return_value = {
+            "id": 42,
+            "comments": [
+                {"content": "some earlier comment", "created_time": "2024-01-01T00:00:00Z"},
+                {
+                    "content": "⏭️ **Task Skipped**\n\nReason: LLM unavailable\n\nThis task will be retried when the LLM becomes available.",
+                    "created_time": "2024-01-02T00:00:00Z",
+                },
+            ],
+        }
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
+
+        task_source.on_skip(task, "LLM unavailable")
+
+        mock_comment.assert_not_called()
+        mock_commit.assert_not_called()
+
+    @patch("auto_slopp.workers.vikunja_task_source.get_task_details")
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_on_skip_posts_when_latest_comment_is_not_a_skip_comment(
+        self, mock_comment, mock_commit, mock_task_details
+    ):
+        """Test that on_skip still posts when the latest comment is not a skip comment."""
+        mock_task_details.return_value = {
+            "id": 42,
+            "comments": [
+                {"content": "⏭️ **Task Skipped**\n\nReason: LLM unavailable", "created_time": "2024-01-01T00:00:00Z"},
+                {"content": "a newer non-skip comment", "created_time": "2024-01-02T00:00:00Z"},
+            ],
+        }
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
+
+        task_source.on_skip(task, "LLM unavailable")
+
+        mock_comment.assert_called_once()
 
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
     def test_on_skip_handles_missing_repo_path(self, mock_comment):

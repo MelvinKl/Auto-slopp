@@ -591,12 +591,14 @@ class TestGitHubTaskSource:
         mock_comment.assert_not_called()
         mock_remove.assert_not_called()
 
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
     @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
     @patch("auto_slopp.workers.github_task_source.settings")
-    def test_on_skip_no_comment(self, mock_settings, mock_remove, mock_comment):
+    def test_on_skip_no_comment(self, mock_settings, mock_remove, mock_comment, mock_get_comments):
         """Test that on_skip posts a GitHub comment but does NOT remove the required label."""
         mock_settings.github_issue_worker_required_label = "test-label"
+        mock_get_comments.return_value = []
         task_source = GitHubTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
 
@@ -606,6 +608,70 @@ class TestGitHubTaskSource:
         comment_body = mock_comment.call_args[0][2]
         assert "Task Skipped" in comment_body
         assert "test reason" in comment_body
+
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_on_skip_does_not_post_duplicate_skip_comment(
+        self, mock_settings, mock_remove, mock_comment, mock_get_comments
+    ):
+        """Test that on_skip does not post another skip comment when the latest comment is already one."""
+        mock_settings.github_issue_worker_required_label = "test-label"
+        mock_get_comments.return_value = [
+            {
+                "id": 1,
+                "databaseId": 1,
+                "body": "some earlier comment",
+                "author": "user",
+                "createdAt": "2024-01-01T00:00:00Z",
+            },
+            {
+                "id": 2,
+                "databaseId": 2,
+                "body": "⏭️ **Task Skipped**\n\nReason: LLM unavailable\n\nThis issue will be retried when the LLM becomes available.",
+                "author": "user",
+                "createdAt": "2024-01-02T00:00:00Z",
+            },
+        ]
+        task_source = GitHubTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
+
+        task_source.on_skip(task, "LLM unavailable")
+
+        mock_comment.assert_not_called()
+
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_on_skip_posts_when_latest_comment_is_not_a_skip_comment(
+        self, mock_settings, mock_remove, mock_comment, mock_get_comments
+    ):
+        """Test that on_skip still posts when the latest comment is not a skip comment."""
+        mock_settings.github_issue_worker_required_label = "test-label"
+        mock_get_comments.return_value = [
+            {
+                "id": 2,
+                "databaseId": 2,
+                "body": "⏭️ **Task Skipped**\n\nReason: LLM unavailable",
+                "author": "user",
+                "createdAt": "2024-01-01T00:00:00Z",
+            },
+            {
+                "id": 1,
+                "databaseId": 1,
+                "body": "a newer non-skip comment",
+                "author": "user",
+                "createdAt": "2024-01-02T00:00:00Z",
+            },
+        ]
+        task_source = GitHubTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
+
+        task_source.on_skip(task, "LLM unavailable")
+
+        mock_comment.assert_called_once()
 
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
     @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
@@ -621,10 +687,12 @@ class TestGitHubTaskSource:
         mock_comment.assert_not_called()
         mock_remove.assert_not_called()
 
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
     @patch("auto_slopp.workers.github_task_source.remove_label_from_issue")
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
     @patch("auto_slopp.workers.github_task_source.settings")
-    def test_on_skip_does_not_remove_label(self, mock_settings, mock_comment, mock_remove):
+    def test_on_skip_does_not_remove_label(self, mock_settings, mock_comment, mock_remove, mock_get_comments):
+        mock_get_comments.return_value = []
         """Test that on_skip does not call remove_label_from_issue."""
         mock_settings.github_issue_worker_required_label = "test-label"
         task_source = GitHubTaskSource()
@@ -862,11 +930,13 @@ class TestGitHubTaskSource:
         # Summary should be posted
         mock_comment.assert_called_with(Path("/test"), 42, "Condensed")
 
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
     @patch("auto_slopp.workers.github_task_source.settings")
-    def test_on_skip_adds_comment_and_does_not_remove_label(self, mock_settings, mock_comment):
+    def test_on_skip_adds_comment_and_does_not_remove_label(self, mock_settings, mock_comment, mock_get_comments):
         """Test that on_skip adds a skip comment but does NOT remove the required label."""
         mock_settings.github_issue_worker_required_label = "test-label"
+        mock_get_comments.return_value = []
         task_source = GitHubTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
 

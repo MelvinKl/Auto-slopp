@@ -13,9 +13,9 @@ from typing import Any, Dict, List, Optional
 
 from auto_slopp.constants import error_indicates_llm_unavailability
 from auto_slopp.utils.cli_executor import (
+    are_all_clis_in_cooldown,
     execute_with_instructions,
     get_active_cli_command,
-    is_any_cli_available,
     run_cli_executor,
 )
 from auto_slopp.utils.git_operations import (
@@ -192,10 +192,10 @@ class IssueWorker(Worker):
         positives from unrelated errors. HTTP status codes are matched with
         word boundaries via the shared constant.
 
-        CLI unavailability (all CLIs in cooldown) is treated only as a
-        secondary confirmation via the shared :func:`is_any_cli_available`
-        helper, never as an independent trigger (mirrors
-        :meth:`RalphExecutor._is_llm_unavailable`).
+        CLI unavailability (all configured CLIs in cooldown) is treated only
+        as a secondary confirmation via the shared
+        :func:`are_all_clis_in_cooldown` helper, never as an independent
+        trigger (mirrors :meth:`RalphExecutor._is_llm_unavailable`).
 
         Args:
             error_msg: The error message to check
@@ -211,10 +211,10 @@ class IssueWorker(Worker):
         # an independent trigger. A genuine code error (e.g. "syntax error in
         # code") must not be misclassified as "LLM unavailable" just because all
         # CLIs happen to be in a transient cooldown window.
-        if not is_any_cli_available():
+        if are_all_clis_in_cooldown():
             self.logger.debug(
-                f"Error did not match unavailability patterns and all CLIs are "
-                f"inactive; not treating as LLM unavailable: {error_msg!r}"
+                f"Error did not match unavailability patterns and all configured CLIs "
+                f"are in cooldown; not treating as LLM unavailable: {error_msg!r}"
             )
         return False
 
@@ -407,10 +407,11 @@ class IssueWorker(Worker):
                 # A run that reaches this point has succeeded, which clears the
                 # executor's error state (get_skip_reason() can only return None
                 # here), so the skip trigger is the CLI state itself: if all
-                # CLIs are inactive the task is skipped for retry instead of
-                # being closed as "no changes".
-                if not is_any_cli_available():
-                    self.logger.warning(f"All CLIs inactive, skipping task #{task_id}: no changes made")
+                # configured CLIs are in cooldown the task is skipped for retry
+                # instead of being closed as "no changes" (a deployment with no
+                # configured CLIs is a misconfiguration, not an outage).
+                if are_all_clis_in_cooldown():
+                    self.logger.warning(f"All CLIs in cooldown, skipping task #{task_id}: no changes made")
                     self.task_source.on_skip(task, "LLM unavailable - no changes made")
                     result["success"] = True
                     result["skipped"] = True
@@ -435,10 +436,10 @@ class IssueWorker(Worker):
             if ahead_count == 0:
                 # See the "no changes made" branch above: a run that reaches
                 # this point has succeeded, so the skip trigger is the CLI
-                # state itself (all CLIs inactive), not the executor's
-                # (cleared) failure reason.
-                if not is_any_cli_available():
-                    self.logger.warning(f"All CLIs inactive, skipping task #{task_id}: no commits ahead")
+                # state itself (all configured CLIs in cooldown), not the
+                # executor's (cleared) failure reason.
+                if are_all_clis_in_cooldown():
+                    self.logger.warning(f"All CLIs in cooldown, skipping task #{task_id}: no commits ahead")
                     self.task_source.on_skip(task, "LLM unavailable - no commits ahead")
                     result["success"] = True
                     result["skipped"] = True

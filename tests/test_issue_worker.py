@@ -536,7 +536,7 @@ class TestIssueWorker:
         assert task_source.on_max_iterations_called is False
         assert task_source.on_task_failure_called is False
 
-    @patch("auto_slopp.constants.is_any_cli_available")
+    @patch("auto_slopp.constants.are_all_clis_in_cooldown")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
@@ -558,9 +558,10 @@ class TestIssueWorker:
         """Test that on_skip is called when direct CLI execution fails due to LLM unavailability."""
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
-        # "exhausted"/"all cli" are weak patterns: corroboration by all CLIs
-        # being inactive is required for the error to classify as unavailable.
-        mock_is_any_cli.return_value = False
+        # "exhausted"/"all cli" are weak patterns: corroboration by all
+        # configured CLIs being in cooldown is required for the error to
+        # classify as unavailable.
+        mock_is_any_cli.return_value = True
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute.return_value = {
@@ -1491,14 +1492,14 @@ class TestIssueWorker:
         )  # Matched via the shared UNAVAILABILITY_PATTERNS
         assert worker._is_llm_unavailable("") is False
 
-    @patch("auto_slopp.workers.issue_worker.is_any_cli_available")
+    @patch("auto_slopp.workers.issue_worker.are_all_clis_in_cooldown")
     def test_is_llm_unavailable_cli_state_is_secondary_confirmation(self, mock_is_any_cli):
-        """Test that all-CLIs-inactive is only a secondary confirmation, never an independent trigger."""
+        """Test that all-CLIs-in-cooldown is only a secondary confirmation, never an independent trigger."""
         task_source = MockTaskSource()
         worker = IssueWorker(task_source=task_source)
 
-        # All CLIs in cooldown: a pattern-matching error is still unavailable...
-        mock_is_any_cli.return_value = False
+        # All configured CLIs in cooldown: a pattern-matching error is still unavailable...
+        mock_is_any_cli.return_value = True
         assert worker._is_llm_unavailable("LLM timed out waiting for response") is True
         # ...but a non-matching error is NOT classified as unavailable just because
         # all CLIs happen to be in a transient cooldown window
@@ -1506,7 +1507,7 @@ class TestIssueWorker:
         assert worker._is_llm_unavailable("") is False
 
         # At least one CLI available: only the error text matters
-        mock_is_any_cli.return_value = True
+        mock_is_any_cli.return_value = False
         assert worker._is_llm_unavailable("LLM timed out") is True
         assert worker._is_llm_unavailable("Git push failed") is False
 
@@ -1559,8 +1560,8 @@ class TestIssueWorker:
         mock_current_branch.return_value = "main"
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
-        # All CLIs inactive so the no-changes skip path fires
-        with patch("auto_slopp.workers.issue_worker.is_any_cli_available", return_value=False):
+        # All configured CLIs in cooldown so the no-changes skip path fires
+        with patch("auto_slopp.workers.issue_worker.are_all_clis_in_cooldown", return_value=True):
             result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
@@ -1616,8 +1617,8 @@ class TestIssueWorker:
             "steps_completed": 3,
             "total_steps": 3,
         }
-        # All CLIs inactive so the no-commits-ahead skip path fires
-        with patch("auto_slopp.workers.issue_worker.is_any_cli_available", return_value=False):
+        # All configured CLIs in cooldown so the no-commits-ahead skip path fires
+        with patch("auto_slopp.workers.issue_worker.are_all_clis_in_cooldown", return_value=True):
             with tempfile.TemporaryDirectory() as temp_dir:
                 with caplog.at_level("WARNING"):
                     result = worker.run(Path(temp_dir))

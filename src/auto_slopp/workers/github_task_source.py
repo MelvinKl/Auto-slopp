@@ -31,6 +31,11 @@ logger = logging.getLogger(__name__)
 class GitHubTaskSource(TaskSource):
     """Task source that loads tasks from GitHub Issues."""
 
+    # Marker shared by all skip comments; used to detect an already-posted
+    # skip comment so repeated retries during a prolonged outage do not spam
+    # the issue with identical comments.
+    SKIP_COMMENT_MARKER = "⏭️ **Task Skipped**"
+
     def get_tasks(self, repo_path: Path) -> List[Task]:
         """Fetch and filter tasks from GitHub Issues.
 
@@ -351,13 +356,41 @@ class GitHubTaskSource(TaskSource):
             logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
             return
 
+        if self._latest_comment_is_skip_comment(repo_path, task.id):
+            logger.info(f"Issue #{task.id} already ends with a skip comment; not posting another: {reason}")
+            return
+
         skip_comment = (
-            f"⏭️ **Task Skipped**\n\n"
+            f"{self.SKIP_COMMENT_MARKER}\n\n"
             f"Reason: {reason}\n\n"
             f"This issue will be retried when the LLM becomes available."
         )
         comment_on_issue(repo_path, task.id, skip_comment)
         logger.info(f"Task skipped for issue #{task.id}: {reason}")
+
+    def _latest_comment_is_skip_comment(self, repo_path: Path, issue_number: int) -> bool:
+        """Return True if the most recent comment on the issue is a skip comment.
+
+        Used by :meth:`on_skip` to avoid posting a duplicate skip comment on
+        every retry cycle of a prolonged outage.
+
+        Args:
+            repo_path: Path to the repository.
+            issue_number: Issue number to check.
+
+        Returns:
+            True if the latest comment is a skip comment, False otherwise
+            (including when the comments cannot be fetched).
+        """
+        try:
+            comments = get_issue_comments(repo_path, issue_number)
+        except Exception as e:
+            logger.warning(f"Failed to check existing comments for issue #{issue_number}: {e}")
+            return False
+        if not comments:
+            return False
+        latest = max(comments, key=lambda c: c.get("createdAt") or "")
+        return self.SKIP_COMMENT_MARKER in (latest.get("body") or "")
 
     def _filter_renovate_issues(self, issues: List[dict]) -> List[dict]:
         """Filter out issues created by Renovate.

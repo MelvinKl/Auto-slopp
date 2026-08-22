@@ -822,3 +822,82 @@ def test_resolve_timeout_max_boundary():
 
     assert _resolve_timeout(_MAX_TIMEOUT_SECONDS) == _MAX_TIMEOUT_SECONDS
     assert _resolve_timeout(_MAX_TIMEOUT_SECONDS, fallback=100) == _MAX_TIMEOUT_SECONDS
+
+
+def test_has_cli_configurations_and_are_all_clis_in_cooldown_no_configurations(monkeypatch):
+    """Zero configured CLIs is a misconfiguration, not an all-in-cooldown outage."""
+    from auto_slopp.utils.cli_executor import (
+        are_all_clis_in_cooldown,
+        has_cli_configurations,
+        is_any_cli_available,
+    )
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor.settings.cli_configurations", [])
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+
+    assert is_any_cli_available() is False
+    assert has_cli_configurations() is False
+    # Must NOT be treated as a transient outage (no retry would ever help)
+    assert are_all_clis_in_cooldown() is False
+
+
+def test_are_all_clis_in_cooldown_true_when_all_configured_clis_in_cooldown(monkeypatch):
+    """Configured CLIs all in cooldown is a transient outage."""
+    import time
+
+    from auto_slopp.utils.cli_executor import (
+        are_all_clis_in_cooldown,
+        has_cli_configurations,
+    )
+
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [CLIConfiguration(cli_command="codex", cli_args=["exec"])],
+    )
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor._cli_states",
+        {0: {"active": False, "cooldown_until": time.time() + 3600}},
+    )
+
+    assert has_cli_configurations() is True
+    assert are_all_clis_in_cooldown() is True
+
+
+def test_are_all_clis_in_cooldown_false_when_a_cli_is_available(monkeypatch):
+    """At least one active (or cooldown-expired) CLI means not all are in cooldown."""
+    from auto_slopp.utils.cli_executor import are_all_clis_in_cooldown
+
+    monkeypatch.setattr(
+        "auto_slopp.utils.cli_executor.settings.cli_configurations",
+        [CLIConfiguration(cli_command="codex", cli_args=["exec"])],
+    )
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {0: {"active": True, "cooldown_until": 0.0}})
+    assert are_all_clis_in_cooldown() is False
+    # Cooldown already expired: the CLI is available again
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {0: {"active": False, "cooldown_until": 0.0}})
+    assert are_all_clis_in_cooldown() is False
+
+
+def test_error_indicates_llm_unavailability_explicit_cli_available_keeps_matching_pure(monkeypatch):
+    """An explicit cli_available value must be used without reading global state."""
+    from auto_slopp.constants import error_indicates_llm_unavailability
+
+    # Weak pattern ("exhausted") corroborated by explicit unavailable state
+    assert error_indicates_llm_unavailability("all clients exhausted", cli_available=False) is True
+    # ...but not when a CLI is available
+    assert error_indicates_llm_unavailability("all clients exhausted", cli_available=True) is False
+    # Strong patterns and status codes are matched regardless of CLI state
+    assert error_indicates_llm_unavailability("LLM timed out", cli_available=True) is True
+    assert error_indicates_llm_unavailability("HTTP 503", cli_available=True) is True
+    # No match at all
+    assert error_indicates_llm_unavailability("git push failed", cli_available=False) is False
+
+
+def test_error_indicates_llm_unavailability_weak_pattern_not_corroborated_without_configured_clis(monkeypatch):
+    """A weak-pattern error must NOT classify as LLM-unavailable when no CLIs are configured."""
+    from auto_slopp.constants import error_indicates_llm_unavailability
+
+    monkeypatch.setattr("auto_slopp.utils.cli_executor.settings.cli_configurations", [])
+    monkeypatch.setattr("auto_slopp.utils.cli_executor._cli_states", {})
+
+    assert error_indicates_llm_unavailability("all clients exhausted") is False

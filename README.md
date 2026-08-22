@@ -832,7 +832,7 @@ When the Ralph loop hits the maximum iteration limit, the worker now distinguish
 
 - **Genuine iteration exhaustion**: The task genuinely requires more iterations than allowed. The task is marked as failed permanently via `on_max_iterations_reached`, and the issue/task is closed with a failure comment.
 
-- **LLM unavailability during execution**: The LLM/CLI tool became unavailable mid-loop (timeouts, connection errors, rate limits, service unavailable). The task is **skipped** via `on_skip` instead of failed, preserving it for automatic retry when the LLM becomes available again. A skip comment is posted to the issue (GitHub keeps the required label so it stays eligible for retry) or the task status is set to "skipped" (Vikunja) so it can be picked up on the next cycle.
+- **LLM unavailability during execution**: The LLM/CLI tool became unavailable mid-loop (timeouts, connection errors, rate limits, service unavailable). The task is **skipped** via `on_skip` instead of failed, preserving it for automatic retry when the LLM becomes available again. A skip comment is posted to the issue (GitHub keeps the required label so it stays eligible for retry) or committed to the task (Vikunja, which leaves the task status unchanged) so it can be picked up on the next cycle.
 
 This behavior is detected in the worker's `max_loops_reached` handling: `IssueWorker._is_llm_unavailable()` checks the mid-loop failure reason preserved by the Ralph executor (`last_error`, falling back to `error`) for patterns like "timed out", "rate limit", "connection refused", "service unavailable", "503", etc. A mid-loop LLM outage is therefore skipped for retry rather than dropped as exhausted iterations.
 

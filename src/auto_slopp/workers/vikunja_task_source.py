@@ -15,6 +15,7 @@ from auto_slopp.utils.vikunja_operations import (
     comment_on_task,
     find_or_create_project,
     get_open_tasks_by_project,
+    get_task_details,
     update_task_status,
     verify_blocking_closed,
 )
@@ -26,6 +27,11 @@ logger = logging.getLogger(__name__)
 
 class VikunjaTaskSource(TaskSource):
     """Task source that loads tasks from Vikunja."""
+
+    # Marker shared by all skip comments; used to detect an already-posted
+    # skip comment so repeated retries during a prolonged outage do not add
+    # duplicate comments (and commits) on every retry cycle.
+    SKIP_COMMENT_MARKER = "⏭️ **Task Skipped**"
 
     def _update_task_with_comment_and_status(
         self,
@@ -330,8 +336,12 @@ class VikunjaTaskSource(TaskSource):
             logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
             return
 
+        if self._latest_comment_is_skip_comment(task.id):
+            logger.info(f"Task #{task.id} already ends with a skip comment; not posting another: {reason}")
+            return
+
         skip_comment = (
-            f"⏭️ **Task Skipped**\n\n"
+            f"{self.SKIP_COMMENT_MARKER}\n\n"
             f"Reason: {reason}\n\n"
             f"This task will be retried when the LLM becomes available."
         )
@@ -341,6 +351,32 @@ class VikunjaTaskSource(TaskSource):
         else:
             logger.warning(f"Failed to add skip comment to task {task.id}")
         logger.info(f"Added skip comment to task {task.id} (status left unchanged): {reason}")
+
+    def _latest_comment_is_skip_comment(self, task_id: int) -> bool:
+        """Return True if the most recent comment on the task is a skip comment.
+
+        Used by :meth:`on_skip` to avoid posting a duplicate skip comment (and
+        commit) on every retry cycle of a prolonged outage.
+
+        Args:
+            task_id: Vikunja task ID to check.
+
+        Returns:
+            True if the latest comment is a skip comment, False otherwise
+            (including when the task details or comments cannot be fetched).
+        """
+        try:
+            task_details = get_task_details(task_id)
+        except Exception as e:
+            logger.warning(f"Failed to check existing comments for task {task_id}: {e}")
+            return False
+        if not task_details:
+            return False
+        comments = task_details.get("comments") or []
+        if not comments:
+            return False
+        latest = max(comments, key=lambda c: c.get("created_time") or "")
+        return self.SKIP_COMMENT_MARKER in (latest.get("content") or "")
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.
