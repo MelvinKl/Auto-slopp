@@ -840,11 +840,11 @@ Plan:
         )
 
 # Findings that block the PR and trigger a fix round. 'nit:' and 'chore:'
-    # are intentionally non-blocking: nitpicks do not converge (each fresh
-    # review surfaces new nits), so treating them as actionable would spin the
-    # fix/re-review loop until max iterations without ever going clean.
-    ACTIONABLE_FINDING_PREFIXES = ("issue:", "suggestion:")
-    INFORMATIONAL_FINDING_PREFIXES = ("nit:", "chore:")
+# are intentionally non-blocking: nitpicks do not converge (each fresh
+# review surfaces new nits), so treating them as actionable would spin the
+# fix/re-review loop until max iterations without ever going clean.
+ACTIONABLE_FINDING_PREFIXES = ("issue:", "suggestion:")
+INFORMATIONAL_FINDING_PREFIXES = ("nit:", "chore:")
 
     @staticmethod
     def _normalize_finding(line: str) -> str:
