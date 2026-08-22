@@ -1260,6 +1260,35 @@ class TestRalphExecutor:
             assert result["max_loops_reached"] is True
             assert "loops_executed" in result
 
+    def test_run_refined_task_loop_max_iterations_preserves_llm_unavailable_last_error(self, ralph_executor):
+        """Test that the mid-loop LLM-unavailability reason is preserved as 'last_error' at max iterations."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. Step that will never complete\n")
+
+            ralph_executor.max_iterations = 3
+            # Force every batch iteration to fail with an LLM-unavailability error
+            ralph_executor.execute_fn = lambda *args, **kwargs: {
+                "success": False,
+                "error": "claude timed out after 7200 seconds",
+            }
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+                issue_number=1,
+            )
+
+            assert result["success"] is False
+            assert result["max_loops_reached"] is True
+            assert result["loops_executed"] == 3
+            assert "timed out" in result["last_error"], "last_error must keep the mid-loop LLM timeout reason"
+
     def test_run_refined_task_loop_final_check_failure_sets_error(self, ralph_executor):
         """Test that a final acceptance check failure is reported via 'error', not just 'last_error'."""
         with tempfile.TemporaryDirectory() as tmpdir:

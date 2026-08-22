@@ -337,6 +337,20 @@ class IssueWorker(Worker):
                     result["error"] = ralph_error
 
                     if ralph_result.get("max_loops_reached", False):
+                        # LLM outages inside the step loop also surface as max_loops_reached
+                        # after all iterations are exhausted. Check the executor's preserved
+                        # mid-loop failure reason so the issue is skipped for retry instead of
+                        # being permanently dropped as "exhausted iterations".
+                        last_error = ralph_result.get("last_error") or ralph_result.get("error", "")
+                        if self._is_llm_unavailable(last_error):
+                            self.logger.warning(
+                                f"LLM unavailable during Ralph loop, skipping task #{task_id}: {last_error}"
+                            )
+                            self.task_source.on_skip(task, last_error)
+                            result["success"] = True
+                            result["skipped"] = True
+                            result["skip_reason"] = last_error
+                            return result
                         self.logger.warning(f"Ralph loop reached max iterations for task #{task_id}")
                         self.task_source.on_max_iterations_reached(
                             task,

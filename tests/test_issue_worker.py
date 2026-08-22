@@ -397,6 +397,74 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
+    def test_ralph_max_loops_reached_with_llm_unavailable_calls_on_skip(
+        self, mock_settings, mock_create_branch, mock_checkout
+    ):
+        """Test that an LLM outage inside the Ralph loop triggers on_skip, not on_max_iterations_reached."""
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        # Simulate an LLM outage mid-loop that exhausted all iterations
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": False,
+            "max_loops_reached": True,
+            "loops_executed": 10,
+            "steps_completed": 8,
+            "total_steps": 15,
+            "error": "Maximum iterations (10) reached before all steps completed",
+            "last_error": "LLM timed out waiting for response",
+        }
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert len(result["task_results"]) == 1
+        task_result = result["task_results"][0]
+        assert task_source.on_skip_called is True
+        assert task_source.on_max_iterations_called is False
+        assert task_source.on_task_failure_called is False
+        assert "timed out" in task_source.skip_reason
+        assert task_result.get("skipped") is True
+        assert task_result.get("skip_reason")
+        assert "timed out" in task_result["skip_reason"]
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_ralph_max_loops_reached_without_llm_unavailable_calls_on_max_iterations(
+        self, mock_settings, mock_create_branch, mock_checkout
+    ):
+        """Test that genuine iteration exhaustion still calls on_max_iterations_reached, not on_skip."""
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        # Non-unavailability mid-loop failure reason
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": False,
+            "max_loops_reached": True,
+            "loops_executed": 10,
+            "steps_completed": 8,
+            "total_steps": 15,
+            "error": "Maximum iterations (10) reached before all steps completed",
+            "last_error": "Step implementation failed: syntax error in code",
+        }
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert len(result["task_results"]) == 1
+        task_result = result["task_results"][0]
+        assert task_source.on_max_iterations_called is True
+        assert task_source.on_skip_called is False
+        assert task_source.on_task_failure_called is False
+        assert task_result.get("skipped") is None
+        assert task_result.get("skip_reason") is None
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
     def test_ralph_executor_llm_unavailable_calls_on_skip(self, mock_settings, mock_create_branch, mock_checkout):
         """Test that on_skip is called when Ralph executor fails due to LLM unavailability."""
         mock_settings.ralph_enabled = True
