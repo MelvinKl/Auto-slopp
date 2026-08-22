@@ -27,11 +27,16 @@ _active_cli_configuration_index = 0
 # Out-of-range timeout values already logged at warning level; subsequent
 # resolutions of the same value log at debug only.
 # Uses OrderedDict for LRU eviction when max size is reached.
+# NOTE: these dicts are mutated without a lock; this assumes single-threaded
+# access to this module state (concurrent use from multiple threads/processes
+# sharing this module would risk redundant warnings or RuntimeError on
+# concurrent move_to_end/popitem).
 _warned_out_of_range_timeouts: "OrderedDict[int, None]" = OrderedDict()
 
 # Out-of-range fallback values already logged at warning level; subsequent
 # resolutions of the same value log at debug only.
 # Uses OrderedDict for LRU eviction when max size is reached.
+# (Same single-threaded access assumption as _warned_out_of_range_timeouts.)
 _warned_out_of_range_fallbacks: "OrderedDict[int, None]" = OrderedDict()
 
 # Maximum number of distinct out-of-range timeout/fallback values to track.
@@ -48,9 +53,13 @@ _TIMEOUT_WARN_LOG_LEVEL = logging.WARNING
 # Initialize log level from environment variable
 _warn_level_env = os.getenv("AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL")
 if _warn_level_env:
-    try:
+    # Validate against an explicit set of allowed level names rather than
+    # getattr(logging, ...), which would also accept non-level attributes
+    # such as NOTSET, FATAL, or module internals.
+    _valid_warn_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+    if _warn_level_env.upper() in _valid_warn_levels:
         _TIMEOUT_WARN_LOG_LEVEL = getattr(logging, _warn_level_env.upper())
-    except AttributeError:
+    else:
         logger.warning(
             "Invalid AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL value: %r. "
             "Valid values: DEBUG, INFO, WARNING, ERROR, CRITICAL. Using WARNING.",
