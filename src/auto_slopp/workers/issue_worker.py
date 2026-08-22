@@ -838,3 +838,183 @@ Plan:
             "- Do not commit or push; the orchestrator will commit and push the changes for you.\n"
             "- After fixing, run 'make lint' and 'make test' and make sure both pass."
         )
+
+    # Findings that block the PR and trigger a fix round. 'nit:' and 'chore:'
+    # are intentionally non-blocking: nitpicks do not converge (each fresh
+    # review surfaces new nits), so treating them as actionable would spin the
+    # fix/re-review loop until max iterations without ever going clean.
+    ACTIONABLE_FINDING_PREFIXES = ("issue:", "suggestion:")
+    INFORMATIONAL_FINDING_PREFIXES = ("nit:", "chore:")
+
+    @staticmethod
+    def _normalize_finding(line: str) -> str:
+        """Normalize a review finding line for duplicate/stall detection."""
+        return re.sub(r"\s+", " ", line).strip().lower()
+
+    def _mark_pr_review_incomplete(self, result: Dict[str, Any], iterations: int) -> None:
+        """Mark result as successful but not completed so the issue stays open
+        for the next task iteration."""
+        result["task_completed"] = False
+        result["tasks_completed"] = 0
+        result["success"] = True
+        result["pr_review_done"] = True
+        result["pr_review_iterations"] = iterations
+
+    def _review_pull_request(
+        self, repo_dir: Path, pr_url: str, title: str, body: str
+    ) -> tuple[bool, str, List[str], Optional[str]]:
+        """Review a pull request and check for actionable findings.
+
+        Args:
+            repo_dir: Path to the repository directory
+            pr_url: URL of the pull request to review
+            title: Title of the pull request
+            body: Body/description of the pull request
+
+        Returns:
+            Tuple of (has_findings, comment_string, finding_lines, error) where:
+            - has_findings: bool, True if actionable findings (issue:, suggestion:) were found
+            - comment_string: string to post as a review comment on the PR
+            - finding_lines: deduplicated list of actionable finding lines
+            - error: error message if the review itself failed, else None
+              (informational nit:/chore: lines are included in comment_string
+              but never in finding_lines, so they do not trigger fix rounds)
+        """
+        try:
+            # Extract PR number from URL
+            # PR URL format: https://github.com/owner/repo/pull/123
+            pr_number = int(pr_url.split("/")[-1])
+        except (ValueError, IndexError):  # fmt: skip
+            error_msg = f"Could not extract PR number from URL: {pr_url}"
+            self.logger.error(error_msg)
+            return False, "", [], error_msg
+
+        # Get the PR diff/files
+        try:
+            diff = get_pr_files(repo_dir, pr_number)
+        except Exception as e:
+            self.logger.error(f"Failed to get files for PR #{pr_number}: {str(e)}")
+            return False, "", [], f"Failed to get PR diff: {str(e)}"
+
+        # Check if diff is empty
+        if not diff.strip():
+            self.logger.warning(f"No changes found in PR #{pr_number} to review")
+            return False, "No changes found in the pull request to review.", [], None
+
+        # Prepare instructions for the CLI tool to review the PR
+        instructions = self._build_review_instructions(title, body, diff)
+
+        # Run the CLI tool to generate review comments
+        review_result = run_cli_executor(
+            additional_instructions=instructions,
+            working_directory=repo_dir,
+            timeout=self.timeout,
+            capture_output=True,
+            task_name="pr_review",
+        )
+
+        if not review_result.get("success", False):
+            error_msg = f"CLI tool failed to review PR #{pr_number}: " f"{review_result.get('error', 'Unknown error')}"
+            self.logger.error(error_msg)
+            return False, "", [], error_msg
+
+        # Extract the review comments from the stdout
+        review_output = (review_result.get("stdout") or "").strip()
+        if not review_output:
+            self.logger.warning(f"No review output generated for PR #{pr_number}")
+            return False, "", [], "No review feedback was generated."
+
+        # Split the review output into actionable findings (issue:, suggestion:)
+        # and informational notes (nit:, chore:). 'question:' and 'praise:' are
+        # ignored. Actionable findings are deduplicated so the reviewer
+        # repeating itself does not inflate the fix list.
+        lines = [line.strip() for line in review_output.split("\n") if line.strip()]
+        finding_lines: List[str] = []
+        informational_lines: List[str] = []
+        seen = set()
+        for line in lines:
+            line_lower = line.lower()
+            if any(line_lower.startswith(p) for p in self.ACTIONABLE_FINDING_PREFIXES):
+                key = self._normalize_finding(line)
+                if key not in seen:
+                    seen.add(key)
+                    finding_lines.append(line)
+            elif any(line_lower.startswith(p) for p in self.INFORMATIONAL_FINDING_PREFIXES):
+                informational_lines.append(line)
+
+        if finding_lines:
+            comment_string = f"PR review found the following issues that need attention:\n\n{'\n'.join(finding_lines)}"
+        else:
+            # No actionable findings (only praise/questions/nits or no valid comments)
+            comment_string = (
+                "PR review completed - no actionable issues found (only praise/questions or minor comments)."
+            )
+
+        if informational_lines:
+            comment_string += f"\n\nNon-blocking notes:\n\n{'\n'.join(informational_lines)}"
+
+        has_findings = len(finding_lines) > 0
+        return has_findings, comment_string, finding_lines, None
+
+    def _build_pr_description_instructions(
+        self,
+        task: Task,
+        task_content: str,
+    ) -> str:
+        """Build instructions for generating a PR description from task steps."""
+        return (
+            "Generate a pull request description in markdown.\n"
+            f"Task ID: {task.id}\n"
+            f"Task title: {task.title}\n"
+            f"Task description:\n{task.body}\n\n"
+            "Use the completed steps from this task markdown as the source of truth:\n"
+            "----- BEGIN TASK -----\n"
+            f"{task_content}\n"
+            "----- END TASK -----\n\n"
+            "Requirements:\n"
+            "- Include a concise summary of what changed.\n"
+            "- Include completed steps that were implemented.\n"
+            "- Include test verification details.\n"
+            f"- Include `Closes #{task.id}` in the final PR description.\n"
+            "- Return markdown only. Do not modify files.\n"
+        )
+
+    def _create_error_result(self, start_time: float, repo_path: Path, error_msg: str) -> Dict[str, Any]:
+        """Create an error result dictionary."""
+        return {
+            "worker_name": "IssueWorker",
+            "execution_time": self._get_elapsed_time(start_time),
+            "timestamp": start_time,
+            "repo_path": str(repo_path),
+            "dry_run": self.dry_run,
+            "success": False,
+            "error": error_msg,
+            "repositories_processed": 0,
+            "repositories_with_errors": 1,
+            "tasks_processed": 0,
+            "openagent_executions": 0,
+            "prs_created": 0,
+            "tasks_completed": 0,
+            "task_results": [],
+        }
+
+    def _get_current_time(self) -> float:
+        """Get current time as float for consistent timing."""
+        return time.time()
+
+    def _get_elapsed_time(self, start_time: float) -> float:
+        """Get elapsed time from start time."""
+        return time.time() - start_time
+
+    def _log_completion_summary(self, results: Dict[str, Any]) -> None:
+        """Log completion summary."""
+        cli_tool = get_active_cli_command()
+        self.logger.info(
+            f"IssueWorker completed. Processed: "
+            f"{results['tasks_processed']}, "
+            f"Skipped: {results['tasks_skipped']}, "
+            f"{cli_tool} executions: {results['openagent_executions']}, "
+            f"PRs created: {results['prs_created']}, "
+            f"Tasks completed: {results['tasks_completed']}, "
+            f"Errors: {results['repositories_with_errors']}"
+        )

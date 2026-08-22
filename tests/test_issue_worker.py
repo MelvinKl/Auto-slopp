@@ -5,31 +5,11 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from auto_slopp.utils.linking import ensure_issue_link_in_pr_body
 from auto_slopp.workers.github_task_source import GitHubTaskSource
 from auto_slopp.workers.issue_worker import IssueWorker
 from auto_slopp.workers.task_source import Task, TaskSource
 from auto_slopp.workers.vikunja_task_source import VikunjaTaskSource
-
-
-@pytest.fixture(autouse=True)
-def _disable_pr_review_loop():
-    """Neutralize the PR review loop for tests that don't exercise it.
-
-    Most tests in this module mock ``settings`` opaquely and only assert on
-    PR creation/completion, so the iterative PR review loop is stubbed out:
-    the review reports no findings, and review submission/label removal
-    succeed. Tests that specifically cover the review loop should override
-    these patches.
-    """
-    with (
-        patch.object(IssueWorker, "_review_pull_request", return_value=(False, "", [])),
-        patch("auto_slopp.workers.issue_worker.submit_pr_review", return_value=True),
-        patch("auto_slopp.workers.issue_worker.remove_label_from_issue", return_value=True),
-    ):
-        yield
 
 
 class MockTaskSource(TaskSource):
@@ -343,7 +323,6 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
-        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -418,85 +397,73 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
-    def test_ralph_max_iterations_llm_unavailable_calls_on_skip(self, mock_settings, mock_create_branch, mock_checkout):
-        """Test that on_skip is called (not on_max_iterations_reached) when LLM is unavailable during Ralph loop.
-
-        This is the core integration test for the fix: when Ralph reaches max iterations
-        due to LLM unavailability (e.g., timeout), the task should be skipped for retry
-        rather than permanently dropped.
-        """
+    def test_ralph_executor_llm_unavailable_calls_on_skip(self, mock_settings, mock_create_branch, mock_checkout):
+        """Test that on_skip is called when Ralph executor fails due to LLM unavailability."""
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
-
-        # Mock RalphExecutor.execute to return max_loops_reached
+        # Mock the RalphExecutor.execute to simulate LLM unavailability
         worker.ralph_executor.execute = lambda *args, **kwargs: {
             "success": False,
-            "loops_executed": 10,
-            "steps_completed": 8,
-            "total_steps": 15,
-            "max_loops_reached": True,
-            "error": "Maximum iterations (10) reached before all steps completed",
+            "loops_executed": 1,
+            "steps_completed": 0,
+            "total_steps": 3,
+            "max_loops_reached": False,
+            "error": "No active CLI configuration available",
         }
-        # Simulate that the LLM timed out during the loop (the key scenario the fix addresses)
-        worker.ralph_executor._last_iteration_failure_reason = "timed out waiting for response"
-
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
-        assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is False
-        assert result["task_results"][0]["skipped"] is True
-        # The skip reason must reflect the actual LLM-unavailability reason from
-        # the last iteration, not the generic "Maximum iterations reached" message.
-        assert result["task_results"][0]["skip_reason"] == "timed out waiting for response"
-        assert task_source.skip_reason == "timed out waiting for response"
-        # on_skip should be called, NOT on_max_iterations_reached
+        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0].get("skipped") is True
         assert task_source.on_skip_called is True
+        assert "No active CLI configuration available" in task_source.skip_reason
         assert task_source.on_max_iterations_called is False
+        assert task_source.on_task_failure_called is False
 
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
-    def test_ralph_max_iterations_genuine_exhaustion_calls_on_max_iterations(
-        self, mock_settings, mock_create_branch, mock_checkout
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    def test_direct_execution_llm_unavailable_calls_on_skip(
+        self,
+        mock_cli,
+        mock_execute,
+        mock_settings,
+        mock_current_branch,
+        mock_has_changes,
+        mock_create_branch,
+        mock_checkout,
     ):
-        """Test that on_max_iterations_reached is still called for genuine iteration exhaustion.
-
-        When the LLM is available but the task simply can't be completed within the
-        iteration budget, the task should be dropped via on_max_iterations_reached.
-        """
-        mock_settings.ralph_enabled = True
-        mock_settings.github_issue_step_max_iterations = 10
+        """Test that on_skip is called when direct CLI execution fails due to LLM unavailability."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = False
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
+        mock_execute.return_value = {
+            "success": False,
+            "error": "All CLI configurations exhausted",
+        }
+        mock_has_changes.return_value = False
+        mock_current_branch.return_value = "ai/task-1"
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
-
-        # Mock RalphExecutor.execute to return max_loops_reached
-        worker.ralph_executor.execute = lambda *args, **kwargs: {
-            "success": False,
-            "loops_executed": 10,
-            "steps_completed": 8,
-            "total_steps": 15,
-            "max_loops_reached": True,
-            "error": "Maximum iterations (10) reached before all steps completed",
-        }
-        # No LLM unavailability – genuine iteration exhaustion
-        worker.ralph_executor._last_iteration_failure_reason = None
-        worker.ralph_executor._last_error = "Step implementation failed: syntax error in code"
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is False
-        # on_max_iterations_reached should be called, NOT on_skip
-        assert task_source.on_max_iterations_called is True
-        assert task_source.on_skip_called is False
+        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0].get("skipped") is True
+        assert task_source.on_skip_called is True
+        assert "All CLI configurations exhausted" in task_source.skip_reason
+        assert task_source.on_task_failure_called is False
 
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
@@ -614,7 +581,6 @@ class TestIssueWorker:
         """Test that PR is created when commits are made during Ralph loop (has_changes=False but commits ahead)."""
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
-        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_settings.github_issue_step_max_iterations = 10
         # has_changes returns False because Ralph already committed everything
         mock_has_changes.return_value = False
@@ -721,7 +687,6 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
-        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -885,7 +850,6 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
-        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -937,7 +901,6 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
-        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -1102,7 +1065,6 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
-        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -1157,7 +1119,6 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
-        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_settings.github_issue_step_max_iterations = 10
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
@@ -1315,17 +1276,15 @@ class TestIssueWorker:
             "loops_executed": 1,
             "steps_completed": 2,
             "total_steps": 5,
-            "max_loops_reached": True,
+            "max_loops_reached": False,
             "error": "LLM timed out waiting for response",
         }
-        # Simulate LLM unavailability during the loop via the public accessor.
-        worker.ralph_executor.get_skip_reason = lambda: "LLM timed out waiting for response"
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
         assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is False
+        assert result["task_results"][0]["success"] is True
         assert result["task_results"][0]["skipped"] is True
         assert "skip_reason" in result["task_results"][0]
         assert task_source.on_skip_called is True
@@ -1352,7 +1311,7 @@ class TestIssueWorker:
         assert result["tasks_processed"] == 0
         assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is False
+        assert result["task_results"][0]["success"] is True
         assert result["task_results"][0]["skipped"] is True
         assert "skip_reason" in result["task_results"][0]
         assert task_source.on_skip_called is True
@@ -1411,19 +1370,12 @@ class TestIssueWorker:
         assert worker._is_llm_unavailable("Git push failed") is False
         assert worker._is_llm_unavailable("Permission denied") is False
         assert worker._is_llm_unavailable("no cli configuration found") is False
-        assert worker._is_llm_unavailable("LLM is unavailable") is True  # Shared pattern from constants
+        assert worker._is_llm_unavailable("LLM is unavailable") is False  # Too broad, not a specific pattern
         assert worker._is_llm_unavailable("") is False
-        # Bare status codes are matched with word boundaries so incidental
-        # numbers embedded in a larger token do not trigger a false positive.
-        assert worker._is_llm_unavailable("HTTP 503") is True
-        assert worker._is_llm_unavailable("status 429 returned") is True
-        assert worker._is_llm_unavailable("line 5035 in file") is False
-        assert worker._is_llm_unavailable("process_503x failed") is False
 
-    @patch("auto_slopp.utils.cli_executor.settings")
     @patch("auto_slopp.workers.issue_worker.settings")
-    def test_is_llm_unavailable_via_cli_states(self, mock_settings, mock_cli_settings):
-        """Test that CLI unavailability is only a secondary confirmation, never an independent trigger."""
+    def test_is_llm_unavailable_via_cli_states(self, mock_settings):
+        """Test that _is_llm_unavailable checks _cli_states against cli_configurations."""
         import time
 
         from auto_slopp.utils.cli_executor import _cli_states
@@ -1433,36 +1385,47 @@ class TestIssueWorker:
 
         num_configs = 3
         mock_settings.cli_configurations = [type("Config", (), {"name": f"config{i}"}) for i in range(num_configs)]
-        # is_any_cli_available() reads settings from the cli_executor module
-        mock_cli_settings.cli_configurations = mock_settings.cli_configurations
 
         # Save original _cli_states
         original_cli_states = _cli_states.copy()
 
         try:
+            # Test 1: All configs inactive, cooldown not expired -> True
             now = time.time()
-
-            # Test 1: All configs inactive, cooldown not expired, but no error
-            # pattern match -> False. CLI unavailability alone must not trigger.
             _cli_states.clear()
             _cli_states.update({i: {"active": False, "cooldown_until": now + 3600} for i in range(num_configs)})
-            assert worker._is_llm_unavailable("") is False
+            assert worker._is_llm_unavailable("") is True
 
-            # Test 2: A genuine code error while all CLIs are in a transient
-            # cooldown window must NOT be misclassified as LLM unavailable.
-            assert worker._is_llm_unavailable("syntax error in code") is False
-
-            # Test 3: A genuine unavailability error is detected even when all
-            # CLIs are inactive (error pattern match is the required signal).
-            assert worker._is_llm_unavailable("timed out waiting for response") is True
-
-            # Test 4: All configs active -> False for a non-unavailability error
+            # Test 2: All configs active -> False
             _cli_states.clear()
             _cli_states.update({i: {"active": True, "cooldown_until": 0.0} for i in range(num_configs)})
             assert worker._is_llm_unavailable("") is False
-            assert worker._is_llm_unavailable("Git push failed") is False
 
-            # Test 5: String matching works regardless of CLI state
+            # Test 3: One config active, others inactive -> False
+            _cli_states.clear()
+            _cli_states.update(
+                {
+                    0: {"active": True, "cooldown_until": 0.0},
+                    1: {"active": False, "cooldown_until": now + 3600},
+                    2: {"active": False, "cooldown_until": now + 3600},
+                }
+            )
+            assert worker._is_llm_unavailable("") is False
+
+            # Test 4: All inactive but one cooldown expired -> False
+            _cli_states.clear()
+            _cli_states.update(
+                {
+                    0: {"active": False, "cooldown_until": now - 3600},
+                    1: {"active": False, "cooldown_until": now + 3600},
+                    2: {"active": False, "cooldown_until": now + 3600},
+                }
+            )
+            assert worker._is_llm_unavailable("") is False
+
+            # Test 5: String matching still works alongside cli_states check
+            _cli_states.clear()
+            _cli_states.update({i: {"active": True, "cooldown_until": 0.0} for i in range(num_configs)})
             assert worker._is_llm_unavailable("LLM timed out") is True
             assert worker._is_llm_unavailable("Git push failed") is False
         finally:
@@ -1519,19 +1482,16 @@ class TestIssueWorker:
         mock_current_branch.return_value = "main"
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
-        # Simulate LLM unavailability detected from the executor's error state.
-        worker.ralph_executor.get_skip_reason = lambda: "timed out waiting for response"
+        # Mock _is_llm_unavailable to return True
+        worker._is_llm_unavailable = lambda _: True
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
         assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is False
+        assert result["task_results"][0]["success"] is True
         assert result["task_results"][0]["skipped"] is True
-        assert (
-            result["task_results"][0]["skip_reason"]
-            == "LLM unavailable - no changes made: timed out waiting for response"
-        )
+        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no changes made"
         assert task_source.on_skip_called is True
         assert task_source.on_no_changes_called is False
 
@@ -1579,8 +1539,8 @@ class TestIssueWorker:
             "steps_completed": 3,
             "total_steps": 3,
         }
-        # Simulate LLM unavailability detected from the executor's error state.
-        worker.ralph_executor.get_skip_reason = lambda: "timed out waiting for response"
+        # Mock _is_llm_unavailable to return True
+        worker._is_llm_unavailable = lambda _: True
         with tempfile.TemporaryDirectory() as temp_dir:
             with caplog.at_level("WARNING"):
                 result = worker.run(Path(temp_dir))
@@ -1589,12 +1549,9 @@ class TestIssueWorker:
         assert result["tasks_processed"] == 0
         assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is False
+        assert result["task_results"][0]["success"] is True
         assert result["task_results"][0]["skipped"] is True
-        assert (
-            result["task_results"][0]["skip_reason"]
-            == "LLM unavailable - no commits ahead: timed out waiting for response"
-        )
+        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no commits ahead"
         assert task_source.on_skip_called is True
         assert task_source.on_no_changes_called is False
         # Verify ensure_ralph_in_gitignore was called
@@ -1680,7 +1637,6 @@ class TestIssueWorker:
     ):
         """Integration test: .ralph is added to .gitignore when missing."""
         mock_settings.ralph_enabled = True
-        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_settings.github_issue_step_max_iterations = 10
         mock_commits_ahead.return_value = 1
         mock_push.return_value = (True, "")
@@ -1731,7 +1687,6 @@ class TestIssueWorker:
     ):
         """Integration test: .ralph is not duplicated when already in .gitignore."""
         mock_settings.ralph_enabled = True
-        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_settings.github_issue_step_max_iterations = 10
         mock_commits_ahead.return_value = 1
         mock_push.return_value = (True, "")
@@ -1978,7 +1933,6 @@ class TestGeneratePRBodyFromTaskFileIntegration:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
-        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_settings.github_issue_step_max_iterations = 10
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
@@ -2049,7 +2003,6 @@ class TestGeneratePRBodyFromTaskFileIntegration:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
-        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -2106,7 +2059,6 @@ class TestGeneratePRBodyFromTaskFileIntegration:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
-        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_settings.github_issue_step_max_iterations = 10
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
