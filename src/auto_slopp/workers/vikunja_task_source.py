@@ -307,8 +307,12 @@ class VikunjaTaskSource(TaskSource):
     def on_skip(self, task: Task, reason: str) -> None:
         """Called when a task is skipped (e.g., due to LLM unavailability).
 
-        Adds a skip comment to the task and updates the task status to "skipped",
-        so the task remains eligible for future processing.
+        Adds a skip comment to the task but does NOT change the task status:
+        Vikunja statuses are per-project and user-defined, so a project may
+        not have a status named "skipped" (which would make the status update
+        fail on every skip), and ``get_tasks`` only picks up tasks that are
+        not ``done``, so leaving the status unchanged keeps the task eligible
+        for retry once the LLM is available again.
 
         Args:
             task: The task being skipped
@@ -324,14 +328,12 @@ class VikunjaTaskSource(TaskSource):
             f"Reason: {reason}\n\n"
             f"This task will be retried when the LLM becomes available."
         )
-        self._update_task_with_comment_and_status(
-            task_id=task.id,
-            comment=skip_comment,
-            repo_path=repo_path,
-            status="skipped",
-            commit_message=f"Updated task {task.id} status to 'skipped'",
-        )
-        logger.info(f"Added skip comment and set status to 'skipped' for task {task.id}: {reason}")
+        comment_success = comment_on_task(task.id, skip_comment)
+        if comment_success:
+            commit(repo_path, f"Added comment to task {task.id}")
+        else:
+            logger.warning(f"Failed to add skip comment to task {task.id}")
+        logger.info(f"Added skip comment to task {task.id} (status left unchanged): {reason}")
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.

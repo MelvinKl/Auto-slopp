@@ -536,6 +536,7 @@ class TestIssueWorker:
         assert task_source.on_max_iterations_called is False
         assert task_source.on_task_failure_called is False
 
+    @patch("auto_slopp.constants.is_any_cli_available")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
@@ -552,10 +553,14 @@ class TestIssueWorker:
         mock_has_changes,
         mock_create_branch,
         mock_checkout,
+        mock_is_any_cli,
     ):
         """Test that on_skip is called when direct CLI execution fails due to LLM unavailability."""
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        # "exhausted"/"all cli" are weak patterns: corroboration by all CLIs
+        # being inactive is required for the error to classify as unavailable.
+        mock_is_any_cli.return_value = False
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute.return_value = {
