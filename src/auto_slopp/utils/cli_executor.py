@@ -34,14 +34,16 @@ _warned_out_of_range_fallbacks: set = set()
 # Log level for out-of-range timeout warnings. Can be overridden via
 # AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL environment variable.
 # Defaults to WARNING; set to DEBUG to reduce log volume in production.
-# Resolved lazily (on first use) so the env var can be changed at runtime
-# without reloading this module.
+# Resolved on first use (and cached thereafter), so the env var may be set
+# after import but before the first call to _get_timeout_warn_level.
 _TIMEOUT_WARN_LOG_LEVEL: Optional[int] = None
 
 
 def _get_timeout_warn_level() -> int:
     """Resolve the out-of-range timeout warning log level (cached after first use)."""
     global _TIMEOUT_WARN_LOG_LEVEL
+    # No lock around the lazy init: concurrent first-use callers may both
+    # compute the level, but the write is idempotent so the race is benign.
     if _TIMEOUT_WARN_LOG_LEVEL is None:
         warn_level_env = os.getenv("AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL")
         level = logging.WARNING
