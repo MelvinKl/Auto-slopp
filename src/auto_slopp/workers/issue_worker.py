@@ -6,18 +6,15 @@ for step-based execution.
 """
 
 import logging
+import re
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from auto_slopp.constants import (
-    UNAVAILABILITY_PATTERNS,
-    error_indicates_llm_unavailability,
-)
 from auto_slopp.utils.cli_executor import (
+    _cli_states,
     execute_with_instructions,
     get_active_cli_command,
-    is_any_cli_available,
     run_cli_executor,
 )
 from auto_slopp.utils.git_operations import (
@@ -52,9 +49,6 @@ class IssueWorker(Worker):
     using the Ralph loop for step-based execution. It handles task lifecycle
     events (start, complete, failure, no changes) via the TaskSource interface.
     """
-
-    # Shared source of truth for LLM unavailability detection.
-    UNAVAILABILITY_PATTERNS: tuple[str, ...] = UNAVAILABILITY_PATTERNS
 
     def __init__(
         self,
@@ -200,20 +194,42 @@ class IssueWorker(Worker):
         Returns:
             True if the error indicates LLM is unavailable, False otherwise
         """
-        error_indicates_unavailable = error_indicates_llm_unavailability(error_msg)
-        if error_indicates_unavailable:
-            return True
+        error_lower = error_msg.lower()
+        error_indicates_unavailable = (
+            "timed out" in error_lower
+            or "connection refused" in error_lower
+            or "connection reset" in error_lower
+            or "rate limit" in error_lower
+            or "too many requests" in error_lower
+            or "service unavailable" in error_lower
+            or "gateway timeout" in error_lower
+            or re.search(r"\bllm unavailable\b", error_lower) is not None
+            or "no active cli" in error_lower
+            or "all cli" in error_lower
+            or "exhausted" in error_lower
+            or "cooldown" in error_lower
+            or "no configuration meets" in error_lower
+            or "503" in error_lower
+            or "502" in error_lower
+            or "504" in error_lower
+            or "internal server error" in error_lower
+        )
+        # Also check if all CLI configurations are inactive (in cooldown) and cooldown hasn't expired
+        all_clis_inactive = False
+        cli_configs = settings.cli_configurations
+        if cli_configs and _cli_states:
+            now = time.time()
+            num_configs = len(cli_configs)
+            if num_configs > 0:
+                all_clis_inactive = True
+                for i in range(num_configs):
+                    state = _cli_states.get(i, {"active": True, "cooldown_until": 0.0})
+                    # CLI is available if active, or if inactive but cooldown has expired
+                    if state.get("active", True) or now >= state.get("cooldown_until", 0.0):
+                        all_clis_inactive = False
+                        break
 
-        # CLI unavailability is treated only as a secondary confirmation, never
-        # an independent trigger. A genuine code error (e.g. "syntax error in
-        # code") must not be misclassified as "LLM unavailable" just because all
-        # CLIs happen to be in a transient cooldown window.
-        if not is_any_cli_available():
-            self.logger.debug(
-                f"Error did not match unavailability patterns and all CLIs are "
-                f"inactive; not treating as LLM unavailable: {error_msg!r}"
-            )
-        return False
+        return error_indicates_unavailable or all_clis_inactive
 
     def _is_permanent_error(self, error_msg: str) -> bool:
         """Check if the error indicates a permanent configuration/setup issue.
@@ -321,58 +337,25 @@ class IssueWorker(Worker):
                     result["error"] = ralph_error
 
                     if ralph_result.get("max_loops_reached", False):
-                        # Distinguish between genuine iteration exhaustion and
-                        # LLM unavailability during the loop. The latter should
-                        # trigger a skip (retry later), not a permanent failure.
-                        skip_reason = self.ralph_executor.get_skip_reason()
-                        if skip_reason is not None:
-                            self.logger.warning(
-                                f"Ralph loop hit max iterations but LLM was unavailable "
-                                f"during execution – skipping task #{task_id} for retry"
-                            )
-                            # Use the actual iteration failure reason (e.g. "timed
-                            # out waiting for response") rather than the generic
-                            # "Maximum iterations reached" message, which would
-                            # mislead the skip comment posted to the issue.
-                            self.task_source.on_skip(task, skip_reason)
-                            result["success"] = False
-                            result["skipped"] = True
-                            result["skip_reason"] = skip_reason
-                        else:
-                            self.logger.warning(f"Ralph loop reached max iterations for task #{task_id}")
-                            self.task_source.on_max_iterations_reached(
-                                task,
-                                ralph_result.get("steps_completed", 0),
-                                ralph_result.get("total_steps", 0),
-                                ralph_result.get("error", "Unknown error"),
-                            )
+                        self.logger.warning(f"Ralph loop reached max iterations for task #{task_id}")
+                        self.task_source.on_max_iterations_reached(
+                            task,
+                            ralph_result.get("steps_completed", 0),
+                            ralph_result.get("total_steps", 0),
+                            ralph_result.get("error", "Unknown error"),
+                        )
                     elif self._is_llm_unavailable(ralph_error):
                         self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
                         self.task_source.on_skip(task, ralph_error)
-                        result["success"] = False
+                        result["success"] = True
                         result["skipped"] = True
                         result["skip_reason"] = ralph_error
                         return result
+                    elif self._is_permanent_error(ralph_error):
+                        self.logger.error(f"Permanent error detected for task #{task_id}: {ralph_error}")
+                        self.task_source.on_task_failure(task, ralph_error)
                     else:
-                        # Non-max-loops-reached Ralph failure (e.g. refinement/parse
-                        # phase) – check the executor's own error state for LLM
-                        # unavailability before falling back to a failure.
-                        skip_reason = self.ralph_executor.get_skip_reason()
-                        if skip_reason is not None:
-                            self.logger.warning(
-                                f"Ralph loop failed but LLM appears unavailable "
-                                f"(refinement/parse phase) – skipping task #{task_id} for retry"
-                            )
-                            self.task_source.on_skip(task, skip_reason)
-                            result["success"] = False
-                            result["skipped"] = True
-                            result["skip_reason"] = skip_reason
-                        else:
-                            if self._is_permanent_error(ralph_error):
-                                self.logger.error(f"Permanent error detected for task #{task_id}: {ralph_error}")
-                            else:
-                                self.logger.error(f"Ralph loop failed for task #{task_id}: {ralph_error}")
-                            self.task_source.on_task_failure(task, ralph_error)
+                        self.task_source.on_task_failure(task, ralph_error)
 
                     return result
 
@@ -405,7 +388,7 @@ class IssueWorker(Worker):
                     if self._is_llm_unavailable(error_msg):
                         self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
                         self.task_source.on_skip(task, error_msg)
-                        result["success"] = False
+                        result["success"] = True
                         result["skipped"] = True
                         result["skip_reason"] = error_msg
                         return result
@@ -418,16 +401,12 @@ class IssueWorker(Worker):
 
             current_branch = get_current_branch(repo_dir)
             if current_branch in ("main", "master"):
-                skip_reason = self.ralph_executor.get_skip_reason()
-                if skip_reason is not None:
-                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}: {skip_reason}")
-                    # Include the underlying failure reason so the issue
-                    # comment reflects the real cause (e.g. a timeout).
-                    skip_message = f"LLM unavailable - no changes made: {skip_reason}"
-                    self.task_source.on_skip(task, skip_message)
-                    result["success"] = False
+                if self._is_llm_unavailable(""):
+                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
+                    self.task_source.on_skip(task, "LLM unavailable - no changes made")
+                    result["success"] = True
                     result["skipped"] = True
-                    result["skip_reason"] = skip_message
+                    result["skip_reason"] = "LLM unavailable - no changes made"
                     return result
 
                 self.logger.info(f"No changes made for task #{task_id}, closing task")
@@ -446,16 +425,12 @@ class IssueWorker(Worker):
             # to ensure everything is committed before proceeding.
             ahead_count = get_commits_ahead_of_branch(repo_dir, base_branch="main")
             if ahead_count == 0:
-                skip_reason = self.ralph_executor.get_skip_reason()
-                if skip_reason is not None:
-                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}: {skip_reason}")
-                    # Include the underlying failure reason so the issue
-                    # comment reflects the real cause (e.g. a timeout).
-                    skip_message = f"LLM unavailable - no commits ahead: {skip_reason}"
-                    self.task_source.on_skip(task, skip_message)
-                    result["success"] = False
+                if self._is_llm_unavailable(""):
+                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
+                    self.task_source.on_skip(task, "LLM unavailable - no commits ahead")
+                    result["success"] = True
                     result["skipped"] = True
-                    result["skip_reason"] = skip_message
+                    result["skip_reason"] = "LLM unavailable - no commits ahead"
                     return result
 
                 self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue")
@@ -548,9 +523,16 @@ class IssueWorker(Worker):
 
             # PR Review Loop: Review PR, fix issues, and re-review until clean
             # This loop counts towards the overall iterations for the issue
-            max_pr_review_iterations = settings.github_issue_pr_review_max_iterations or 5
+            max_pr_review_iterations = settings.github_issue_pr_review_max_iterations
+            if not isinstance(max_pr_review_iterations, int) or max_pr_review_iterations < 1:
+                max_pr_review_iterations = 5
             pr_review_iteration = 0
             pr_number = int(pr_url.split("/")[-1])
+            # Normalized findings from the previous round. Used for stall
+            # detection: if a round re-flags exactly the same findings as the
+            # previous round, the fixer is not making progress and further
+            # rounds are wasted.
+            previous_round_findings: set[str] = set()
 
             while pr_review_iteration < max_pr_review_iterations:
                 pr_review_iteration += 1
@@ -559,19 +541,39 @@ class IssueWorker(Worker):
                 )
 
                 # Perform PR review to check for findings
-                has_findings, review_comments, finding_lines = self._review_pull_request(
+                has_findings, review_comments, finding_lines, review_error = self._review_pull_request(
                     repo_dir, pr_url, task.title, task.body
                 )
 
-                # Submit the review to the PR itself (NOT to the GitHub issue)
-                try:
-                    pr_review_success = submit_pr_review(repo_dir, pr_number, review_comments, event="COMMENT")
-                    if pr_review_success:
-                        self.logger.info(f"Submitted PR review to PR #{pr_number}")
-                    else:
-                        self.logger.warning(f"Failed to submit PR review to PR #{pr_number}")
-                except Exception as e:
-                    self.logger.warning(f"Failed to submit PR review: {e}")
+                if review_error is not None:
+                    self.logger.error(f"PR review failed for PR #{pr_number}: {review_error}")
+                    if self._is_llm_unavailable(review_error):
+                        self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
+                        self.task_source.on_skip(task, review_error)
+                        result["success"] = True
+                        result["skipped"] = True
+                        result["skip_reason"] = review_error
+                        result["pr_review_iterations"] = pr_review_iteration
+                        return result
+                    # Review tooling failed: don't post the error as a PR review
+                    # comment and don't burn further iterations. The work is done
+                    # and the PR exists, so review is best-effort: complete the
+                    # task without findings.
+                    self.logger.warning(f"PR review unavailable for PR #{pr_number}; completing task without review")
+                    result["pr_review_error"] = review_error
+                    has_findings = False
+                    review_comments = ""
+
+                if review_comments and not review_error:
+                    # Submit the review to the PR itself (NOT to the GitHub issue)
+                    try:
+                        pr_review_success = submit_pr_review(repo_dir, pr_number, review_comments, event="COMMENT")
+                        if pr_review_success:
+                            self.logger.info(f"Submitted PR review to PR #{pr_number}")
+                        else:
+                            self.logger.warning(f"Failed to submit PR review to PR #{pr_number}")
+                    except Exception as e:
+                        self.logger.warning(f"Failed to submit PR review: {e}")
 
                 if not has_findings:
                     # No findings (only praise/questions) - proceed with normal completion
@@ -599,6 +601,20 @@ class IssueWorker(Worker):
                 # Findings found - fix them by calling CLI tool with the PR review results
                 self.logger.info(f"PR review found {len(finding_lines)} issue(s) requiring fixes for task #{task_id}")
 
+                # Stall detection: if this round re-flags exactly the same findings
+                # as the previous round, the fixer is not making progress. Stop
+                # instead of repeating the same fix/review cycle until max iterations.
+                round_findings = {self._normalize_finding(line) for line in finding_lines}
+                if round_findings and round_findings == previous_round_findings:
+                    self.logger.warning(
+                        f"No progress in PR review loop for PR #{pr_number}: all "
+                        f"{len(round_findings)} finding(s) were already flagged in the previous round. "
+                        f"Stopping after {pr_review_iteration} iteration(s)."
+                    )
+                    self._mark_pr_review_incomplete(result, pr_review_iteration)
+                    return result
+                previous_round_findings = round_findings
+
                 # Build instructions for the CLI tool to fix the PR review issues
                 fix_instructions = self._build_pr_fix_instructions(
                     pr_number=pr_number,
@@ -621,39 +637,34 @@ class IssueWorker(Worker):
                         f"{fix_result.get('error', 'Unknown error')}"
                     )
                     # Mark as successful but not completed - issue stays open for next task iteration
-                    result["task_completed"] = False
-                    result["tasks_completed"] = 0
-                    result["success"] = True
-                    result["pr_review_done"] = True
-                    result["pr_review_iterations"] = pr_review_iteration
+                    self._mark_pr_review_incomplete(result, pr_review_iteration)
                     return result
 
-                # Commit and push the fixes
-                if has_changes(repo_dir):
-                    commit_success, _ = commit_and_push_changes(
-                        repo_dir,
-                        f"Task #{task_id}: fix PR review issues (iteration {pr_review_iteration})",
-                        push_if_remote=False,
-                    )
-                    if not commit_success:
-                        self.logger.error(f"Failed to commit PR review fixes for task #{task_id}")
-                        result["task_completed"] = False
-                        result["tasks_completed"] = 0
-                        result["success"] = True
-                        result["pr_review_done"] = True
-                        result["pr_review_iterations"] = pr_review_iteration
-                        return result
+                if not has_changes(repo_dir):
+                    # The fixer changed nothing: re-reviewing would produce the same
+                    # findings, so stop early instead of burning another review.
+                    self.logger.warning(f"PR review fix made no changes for task #{task_id}; skipping re-review")
+                    self._mark_pr_review_incomplete(result, pr_review_iteration)
+                    return result
 
-                    # Push the fixes to the PR branch
-                    push_success, push_message = push_to_remote(repo_dir, remote="origin", branch=current_branch)
-                    if not push_success:
-                        self.logger.error(f"Failed to push PR review fixes for task #{task_id}: {push_message}")
-                        result["task_completed"] = False
-                        result["tasks_completed"] = 0
-                        result["success"] = True
-                        result["pr_review_done"] = True
-                        result["pr_review_iterations"] = pr_review_iteration
-                        return result
+                # Commit and push the fixes (the worker owns commit/push so the
+                # branch state stays deterministic)
+                commit_success, _ = commit_and_push_changes(
+                    repo_dir,
+                    f"Task #{task_id}: fix PR review issues (iteration {pr_review_iteration})",
+                    push_if_remote=False,
+                )
+                if not commit_success:
+                    self.logger.error(f"Failed to commit PR review fixes for task #{task_id}")
+                    self._mark_pr_review_incomplete(result, pr_review_iteration)
+                    return result
+
+                # Push the fixes to the PR branch
+                push_success, push_message = push_to_remote(repo_dir, remote="origin", branch=current_branch)
+                if not push_success:
+                    self.logger.error(f"Failed to push PR review fixes for task #{task_id}: {push_message}")
+                    self._mark_pr_review_incomplete(result, pr_review_iteration)
+                    return result
 
                 # Continue loop to re-review the PR
                 self.logger.info(f"PR review fixes applied, re-reviewing PR #{pr_number}")
@@ -661,11 +672,7 @@ class IssueWorker(Worker):
             # Max PR review iterations reached
             self.logger.warning(f"PR review reached max iterations ({max_pr_review_iterations}) for task #{task_id}")
             # Mark as successful but not completed - issue stays open for next task iteration
-            result["task_completed"] = False
-            result["tasks_completed"] = 0
-            result["success"] = True
-            result["pr_review_done"] = True
-            result["pr_review_iterations"] = pr_review_iteration
+            self._mark_pr_review_incomplete(result, pr_review_iteration)
 
         except Exception as e:
             self.logger.error(f"Error processing task #{task_id}: {str(e)}")
@@ -825,148 +832,9 @@ Plan:
             f"Fix the issues found during the PR review for PR #{pr_number} ({pr_url}).\n\n"
             f"The PR review found the following issues that need to be fixed:\n\n"
             f"{findings_text}\n\n"
-            f"Please fix ALL of these issues in the code. Make the necessary changes to the codebase, "
-            f"commit them with a clear commit message, and push to the current branch.\n\n"
-            f"After fixing, ensure that 'make lint' and 'make test' both pass successfully."
-        )
-
-    def _review_pull_request(self, repo_dir: Path, pr_url: str, title: str, body: str) -> tuple[bool, str, List[str]]:
-        """Review a pull request and check for actionable findings.
-
-        Args:
-            repo_dir: Path to the repository directory
-            pr_url: URL of the pull request to review
-            title: Title of the pull request
-            body: Body/description of the pull request
-
-        Returns:
-            Tuple of (has_findings, comment_string, finding_lines) where:
-            - has_findings: bool, True if actionable findings were found
-            - comment_string: string to post as a review comment on the PR
-            - finding_lines: list of strings, each line that is a finding (issue:, suggestion:, nit:, chore:)
-        """
-        try:
-            # Extract PR number from URL
-            # PR URL format: https://github.com/owner/repo/pull/123
-            pr_number = int(pr_url.split("/")[-1])
-        except (ValueError, IndexError):  # fmt: skip
-            self.logger.error(f"Could not extract PR number from URL: {pr_url}")
-            return False, "Failed to extract PR number from URL.", []
-
-        # Get the PR diff/files
-        try:
-            diff = get_pr_files(repo_dir, pr_number)
-        except Exception as e:
-            self.logger.error(f"Failed to get files for PR #{pr_number}: {str(e)}")
-            return False, f"Failed to get PR diff: {str(e)}", []
-
-        # Check if diff is empty
-        if not diff.strip():
-            self.logger.warning(f"No changes found in PR #{pr_number} to review")
-            return False, "No changes found in the pull request to review.", []
-
-        # Prepare instructions for the CLI tool to review the PR
-        instructions = self._build_review_instructions(title, body, diff)
-
-        # Run the CLI tool to generate review comments
-        review_result = run_cli_executor(
-            additional_instructions=instructions,
-            working_directory=repo_dir,
-            timeout=self.timeout,
-            capture_output=True,
-            task_name="pr_review",
-        )
-
-        if not review_result.get("success", False):
-            error_msg = f"CLI tool failed to review PR #{pr_number}: " f"{review_result.get('error', 'Unknown error')}"
-            self.logger.error(error_msg)
-            return [], error_msg
-
-        # Extract the review comments from the stdout
-        review_output = (review_result.get("stdout") or "").strip()
-        if not review_output:
-            self.logger.warning(f"No review output generated for PR #{pr_number}")
-            return [], "No review feedback was generated."
-
-        # Parse the review output to check for actionable findings
-        # Findings are comments that start with 'issue:', 'suggestion:', 'nit:', or 'chore:'
-        # (excluding 'question:' and 'praise:' as per requirements)
-        finding_prefixes = ("issue:", "suggestion:", "nit:", "chore:")
-        lines = [line.strip() for line in review_output.split("\n") if line.strip()]
-        finding_lines = [line for line in lines if any(line.lower().startswith(p) for p in finding_prefixes)]
-
-        if finding_lines:
-            # Format the findings for the PR review comment
-            findings_text = "\n".join(finding_lines)
-            comment_string = f"PR review found the following issues that need attention:\n\n{findings_text}"
-        else:
-            # No actionable findings (only praise/questions or no valid comments)
-            comment_string = (
-                "PR review completed - no actionable issues found (only praise/questions or minor comments)."
-            )
-
-        has_findings = len(finding_lines) > 0
-        return has_findings, comment_string, finding_lines
-
-    def _build_pr_description_instructions(
-        self,
-        task: Task,
-        task_content: str,
-    ) -> str:
-        """Build instructions for generating a PR description from task steps."""
-        return (
-            "Generate a pull request description in markdown.\n"
-            f"Task ID: {task.id}\n"
-            f"Task title: {task.title}\n"
-            f"Task description:\n{task.body}\n\n"
-            "Use the completed steps from this task markdown as the source of truth:\n"
-            "----- BEGIN TASK -----\n"
-            f"{task_content}\n"
-            "----- END TASK -----\n\n"
-            "Requirements:\n"
-            "- Include a concise summary of what changed.\n"
-            "- Include completed steps that were implemented.\n"
-            "- Include test verification details.\n"
-            f"- Include `Closes #{task.id}` in the final PR description.\n"
-            "- Return markdown only. Do not modify files.\n"
-        )
-
-    def _create_error_result(self, start_time: float, repo_path: Path, error_msg: str) -> Dict[str, Any]:
-        """Create an error result dictionary."""
-        return {
-            "worker_name": "IssueWorker",
-            "execution_time": self._get_elapsed_time(start_time),
-            "timestamp": start_time,
-            "repo_path": str(repo_path),
-            "dry_run": self.dry_run,
-            "success": False,
-            "error": error_msg,
-            "repositories_processed": 0,
-            "repositories_with_errors": 1,
-            "tasks_processed": 0,
-            "openagent_executions": 0,
-            "prs_created": 0,
-            "tasks_completed": 0,
-            "task_results": [],
-        }
-
-    def _get_current_time(self) -> float:
-        """Get current time as float for consistent timing."""
-        return time.time()
-
-    def _get_elapsed_time(self, start_time: float) -> float:
-        """Get elapsed time from start time."""
-        return time.time() - start_time
-
-    def _log_completion_summary(self, results: Dict[str, Any]) -> None:
-        """Log completion summary."""
-        cli_tool = get_active_cli_command()
-        self.logger.info(
-            f"IssueWorker completed. Processed: "
-            f"{results['tasks_processed']}, "
-            f"Skipped: {results['tasks_skipped']}, "
-            f"{cli_tool} executions: {results['openagent_executions']}, "
-            f"PRs created: {results['prs_created']}, "
-            f"Tasks completed: {results['tasks_completed']}, "
-            f"Errors: {results['repositories_with_errors']}"
+            "Rules:\n"
+            "- Fix ONLY the issues listed above. Do not make unrelated changes, refactors, or formatting changes.\n"
+            "- Keep changes minimal and focused on the listed issues.\n"
+            "- Do not commit or push; the orchestrator will commit and push the changes for you.\n"
+            "- After fixing, run 'make lint' and 'make test' and make sure both pass."
         )
