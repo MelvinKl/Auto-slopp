@@ -23,9 +23,15 @@ def _reset_warned_timeouts():
 
     cli_executor._warned_out_of_range_timeouts.clear()
     cli_executor._warned_out_of_range_fallbacks.clear()
+    # Pin the warn level to the default so WARNING-level assertions stay
+    # deterministic even if AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL is set
+    # in the environment (e.g., CI) or a prior test resolved/cached a level.
+    saved_warn_level = cli_executor._TIMEOUT_WARN_LOG_LEVEL
+    cli_executor._TIMEOUT_WARN_LOG_LEVEL = logging.WARNING
     yield
     cli_executor._warned_out_of_range_timeouts.clear()
     cli_executor._warned_out_of_range_fallbacks.clear()
+    cli_executor._TIMEOUT_WARN_LOG_LEVEL = saved_warn_level
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
