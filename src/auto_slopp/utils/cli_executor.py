@@ -8,7 +8,6 @@ import logging
 import os
 import subprocess
 import time
-from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -26,45 +25,41 @@ _active_cli_configuration_index = 0
 
 # Out-of-range timeout values already logged at warning level; subsequent
 # resolutions of the same value log at debug only.
-# Uses OrderedDict for LRU eviction when max size is reached.
-# NOTE: these dicts are mutated without a lock; this assumes single-threaded
-# access to this module state (concurrent use from multiple threads/processes
-# sharing this module would risk redundant warnings or RuntimeError on
-# concurrent move_to_end/popitem).
-_warned_out_of_range_timeouts: "OrderedDict[int, None]" = OrderedDict()
+_warned_out_of_range_timeouts: set = set()
 
 # Out-of-range fallback values already logged at warning level; subsequent
 # resolutions of the same value log at debug only.
-# Uses OrderedDict for LRU eviction when max size is reached.
-# (Same single-threaded access assumption as _warned_out_of_range_timeouts.)
-_warned_out_of_range_fallbacks: "OrderedDict[int, None]" = OrderedDict()
-
-# Maximum number of distinct out-of-range timeout/fallback values to track.
-# When this limit is reached, the least recently used entry is evicted to
-# make room for new values, ensuring bounded memory usage in long-running
-# processes that encounter many distinct misconfigured timeout values.
-_MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS = 1000
+_warned_out_of_range_fallbacks: set = set()
 
 # Log level for out-of-range timeout warnings. Can be overridden via
 # AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL environment variable.
 # Defaults to WARNING; set to DEBUG to reduce log volume in production.
-_TIMEOUT_WARN_LOG_LEVEL = logging.WARNING
+# Resolved lazily (on first use) so the env var can be changed at runtime
+# without reloading this module.
+_TIMEOUT_WARN_LOG_LEVEL: Optional[int] = None
 
-# Initialize log level from environment variable
-_warn_level_env = os.getenv("AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL")
-if _warn_level_env:
-    # Validate against an explicit set of allowed level names rather than
-    # getattr(logging, ...), which would also accept non-level attributes
-    # such as NOTSET, FATAL, or module internals.
-    _valid_warn_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-    if _warn_level_env.upper() in _valid_warn_levels:
-        _TIMEOUT_WARN_LOG_LEVEL = getattr(logging, _warn_level_env.upper())
-    else:
-        logger.warning(
-            "Invalid AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL value: %r. "
-            "Valid values: DEBUG, INFO, WARNING, ERROR, CRITICAL. Using WARNING.",
-            _warn_level_env,
-        )
+
+def _get_timeout_warn_level() -> int:
+    """Resolve the out-of-range timeout warning log level (cached after first use)."""
+    global _TIMEOUT_WARN_LOG_LEVEL
+    if _TIMEOUT_WARN_LOG_LEVEL is None:
+        warn_level_env = os.getenv("AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL")
+        level = logging.WARNING
+        if warn_level_env:
+            # Validate against an explicit set of allowed level names rather
+            # than getattr(logging, ...), which would also accept non-level
+            # attributes such as NOTSET, FATAL, or module internals.
+            _valid_warn_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+            if warn_level_env.upper() in _valid_warn_levels:
+                level = getattr(logging, warn_level_env.upper())
+            else:
+                logger.warning(
+                    "Invalid AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL value: %r. "
+                    "Valid values: DEBUG, INFO, WARNING, ERROR, CRITICAL. Using WARNING.",
+                    warn_level_env,
+                )
+        _TIMEOUT_WARN_LOG_LEVEL = level
+    return _TIMEOUT_WARN_LOG_LEVEL
 
 
 _PROBE_INSTRUCTIONS = "are you working?"
@@ -284,7 +279,7 @@ def _execute_command(
 
 
 def _warn_once_tracked(
-    tracked: "OrderedDict[int, None]",
+    tracked: set,
     value: Any,
     level: int,
     fmt: str,
@@ -292,17 +287,13 @@ def _warn_once_tracked(
 ) -> None:
     """Log ``fmt % args`` at ``level`` once per distinct ``value``.
 
-    Values already present in ``tracked`` are logged at debug level with a
-    "(already warned)" suffix; new values are added to ``tracked`` (with LRU
-    eviction once ``_MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS`` is reached).
+    Values already present in ``tracked`` are logged at debug level with an
+    "(already warned)" suffix; new values are added to ``tracked``.
     """
     if value in tracked:
-        tracked.move_to_end(value)
         logger.log(logging.DEBUG, fmt + " (already warned)", *args)
     else:
-        if len(tracked) >= _MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS:
-            tracked.popitem(last=False)
-        tracked[value] = None
+        tracked.add(value)
         logger.log(level, fmt, *args)
 
 
@@ -344,7 +335,7 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
         _warn_once_tracked(
             _warned_out_of_range_fallbacks,
             fallback,
-            _TIMEOUT_WARN_LOG_LEVEL,
+            _get_timeout_warn_level(),
             "Discarding out-of-range fallback timeout %r (valid range: 0 < timeout <= %d " "seconds); using %r instead",
             fallback,
             MAX_TIMEOUT_SECONDS,
@@ -365,7 +356,7 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
         _warn_once_tracked(
             _warned_out_of_range_timeouts,
             raw_timeout,
-            _TIMEOUT_WARN_LOG_LEVEL,
+            _get_timeout_warn_level(),
             "Discarding out-of-range timeout %r (%s; valid range: 0 < timeout <= %d seconds); "
             "using fallback %r instead",
             raw_timeout,

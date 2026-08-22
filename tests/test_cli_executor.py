@@ -852,31 +852,17 @@ def test_resolve_timeout_out_of_range_fallback_uses_probe_timeout():
     assert len(warning_calls) == 3
 
 
-def test_resolve_timeout_tracking_set_is_bounded():
-    """Distinct out-of-range values are still warned about once the cap is exceeded, but LRU eviction applies."""
+def test_resolve_timeout_warned_values_tracked_in_set():
+    """Distinct out-of-range values are each warned about once and tracked in a plain set."""
     from auto_slopp.utils import cli_executor
 
-    with patch.object(cli_executor, "_MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS", 1):
-        original_timeouts = cli_executor._warned_out_of_range_timeouts
-        original_fallbacks = cli_executor._warned_out_of_range_fallbacks
-        cli_executor._warned_out_of_range_timeouts = cli_executor.__dict__.get(
-            "_warned_out_of_range_timeouts", cli_executor.__dict__["_warned_out_of_range_timeouts"]
-        ).__class__()
-        cli_executor._warned_out_of_range_fallbacks = cli_executor.__dict__.get(
-            "_warned_out_of_range_fallbacks", cli_executor.__dict__["_warned_out_of_range_fallbacks"]
-        ).__class__()
-        try:
-            with patch.object(cli_executor.logger, "log") as mock_log:
-                _resolve_timeout(40000000, fallback=100)
-                _resolve_timeout(50000000, fallback=100)
-            # Both values were warned about.
-            warning_calls = [c for c in mock_log.call_args_list if c[0][0] == logging.WARNING]
-            assert len(warning_calls) == 2
-            # ...but only the most recent value is tracked due to LRU eviction (cap=1).
-            assert set(cli_executor._warned_out_of_range_timeouts.keys()) == {50000000}
-        finally:
-            cli_executor._warned_out_of_range_timeouts = original_timeouts
-            cli_executor._warned_out_of_range_fallbacks = original_fallbacks
+    with patch.object(cli_executor.logger, "log") as mock_log:
+        _resolve_timeout(40000000, fallback=100)
+        _resolve_timeout(50000000, fallback=100)
+    # Both distinct values were warned about and are tracked.
+    warning_calls = [c for c in mock_log.call_args_list if c[0][0] == logging.WARNING]
+    assert len(warning_calls) == 2
+    assert cli_executor._warned_out_of_range_timeouts == {40000000, 50000000}
 
 
 def test_resolve_timeout_warns_once_per_distinct_value():
@@ -902,3 +888,16 @@ def test_resolve_timeout_warns_once_per_distinct_value():
     non_positive_problem = warning_calls[1][0][3]
     assert "value above the maximum" in above_max_problem
     assert "non-positive value (0)" in non_positive_problem
+
+
+def test_resolve_timeout_warn_level_read_lazily(monkeypatch):
+    """The warn-level env var is resolved lazily, so it can be set after import."""
+    from auto_slopp.utils import cli_executor
+
+    monkeypatch.setattr(cli_executor, "_TIMEOUT_WARN_LOG_LEVEL", None)
+    monkeypatch.setenv("AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL", "DEBUG")
+    with patch.object(cli_executor.logger, "log") as mock_log:
+        _resolve_timeout(0, fallback=100)
+    assert mock_log.call_args_list[0][0][0] == logging.DEBUG
+    # The resolved level is cached for subsequent calls.
+    assert cli_executor._TIMEOUT_WARN_LOG_LEVEL == logging.DEBUG
