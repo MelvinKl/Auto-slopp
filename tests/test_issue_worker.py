@@ -15,7 +15,6 @@ skipped, ``test_run_with_successful_execution`` patches
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Any, NamedTuple
 from unittest.mock import patch
 
 import pytest
@@ -2471,4 +2470,3 @@ class TestIssueWorkerPrReviewLoop:
         # No second review happened even though max iterations allow it
         assert mock_review.call_count == 1
         assert task_source.on_task_failure_called is False
-
