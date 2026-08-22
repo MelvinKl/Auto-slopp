@@ -22,8 +22,10 @@ def _reset_warned_timeouts():
     from auto_slopp.utils import cli_executor
 
     cli_executor._warned_out_of_range_timeouts.clear()
+    cli_executor._warned_out_of_range_fallbacks.clear()
     yield
     cli_executor._warned_out_of_range_timeouts.clear()
+    cli_executor._warned_out_of_range_fallbacks.clear()
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")

@@ -327,7 +327,7 @@ class TestSettings:
         """Test that CLIConfiguration accepts MAX_TIMEOUT_SECONDS and rejects values above it."""
         config = CLIConfiguration(cli_command="tool", timeout=MAX_TIMEOUT_SECONDS)
         assert config.timeout == MAX_TIMEOUT_SECONDS
-        with pytest.raises(ValidationError, match="timeout must be -1"):
+        with pytest.raises(ValidationError, match=f"timeout must be {NO_TIMEOUT}"):
             CLIConfiguration(cli_command="tool", timeout=MAX_TIMEOUT_SECONDS + 1)
 
     def test_pr_review_worker_settings_defaults(self):
