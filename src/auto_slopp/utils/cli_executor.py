@@ -283,6 +283,29 @@ def _execute_command(
         }
 
 
+def _warn_once_tracked(
+    tracked: "OrderedDict[int, None]",
+    value: Any,
+    level: int,
+    fmt: str,
+    *args: Any,
+) -> None:
+    """Log ``fmt % args`` at ``level`` once per distinct ``value``.
+
+    Values already present in ``tracked`` are logged at debug level with a
+    "(already warned)" suffix; new values are added to ``tracked`` (with LRU
+    eviction once ``_MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS`` is reached).
+    """
+    if value in tracked:
+        tracked.move_to_end(value)
+        logger.log(logging.DEBUG, fmt + " (already warned)", *args)
+    else:
+        if len(tracked) >= _MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS:
+            tracked.popitem(last=False)
+        tracked[value] = None
+        logger.log(level, fmt, *args)
+
+
 def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None) -> Optional[int]:
     """Resolve a raw timeout value to an effective timeout.
 
@@ -318,28 +341,15 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
         # verbatim with no diagnostic. Warn (once per distinct value) and
         # use the built-in probe timeout instead so the final effective
         # timeout is always in range and diagnosable.
-        if fallback in _warned_out_of_range_fallbacks:
-            _warned_out_of_range_fallbacks.move_to_end(fallback)
-            logger.log(
-                logging.DEBUG,
-                "Discarding out-of-range fallback timeout %r (valid range: 0 < timeout <= %d "
-                "seconds); using %r instead (already warned)",
-                fallback,
-                MAX_TIMEOUT_SECONDS,
-                _PROBE_TIMEOUT_SECONDS,
-            )
-        else:
-            if len(_warned_out_of_range_fallbacks) >= _MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS:
-                _warned_out_of_range_fallbacks.popitem(last=False)
-            _warned_out_of_range_fallbacks[fallback] = None
-            logger.log(
-                _TIMEOUT_WARN_LOG_LEVEL,
-                "Discarding out-of-range fallback timeout %r (valid range: 0 < timeout <= %d "
-                "seconds); using %r instead",
-                fallback,
-                MAX_TIMEOUT_SECONDS,
-                _PROBE_TIMEOUT_SECONDS,
-            )
+        _warn_once_tracked(
+            _warned_out_of_range_fallbacks,
+            fallback,
+            _TIMEOUT_WARN_LOG_LEVEL,
+            "Discarding out-of-range fallback timeout %r (valid range: 0 < timeout <= %d " "seconds); using %r instead",
+            fallback,
+            MAX_TIMEOUT_SECONDS,
+            _PROBE_TIMEOUT_SECONDS,
+        )
         effective = _PROBE_TIMEOUT_SECONDS
     if raw_timeout is not None:
         # raw_timeout was present but out of range (0 < t <= MAX_TIMEOUT_SECONDS);
@@ -352,30 +362,17 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
             problem = f"value above the maximum ({MAX_TIMEOUT_SECONDS} seconds)"
         # Warn once per distinct value; repeated resolutions of the same
         # misconfigured value (e.g., probe/failover loops) log at debug only.
-        if raw_timeout in _warned_out_of_range_timeouts:
-            _warned_out_of_range_timeouts.move_to_end(raw_timeout)
-            logger.log(
-                logging.DEBUG,
-                "Discarding out-of-range timeout %r (%s; valid range: 0 < timeout <= %d seconds); "
-                "using fallback %r instead (already warned)",
-                raw_timeout,
-                problem,
-                MAX_TIMEOUT_SECONDS,
-                effective,
-            )
-        else:
-            if len(_warned_out_of_range_timeouts) >= _MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS:
-                _warned_out_of_range_timeouts.popitem(last=False)
-            _warned_out_of_range_timeouts[raw_timeout] = None
-            logger.log(
-                _TIMEOUT_WARN_LOG_LEVEL,
-                "Discarding out-of-range timeout %r (%s; valid range: 0 < timeout <= %d seconds); "
-                "using fallback %r instead",
-                raw_timeout,
-                problem,
-                MAX_TIMEOUT_SECONDS,
-                effective,
-            )
+        _warn_once_tracked(
+            _warned_out_of_range_timeouts,
+            raw_timeout,
+            _TIMEOUT_WARN_LOG_LEVEL,
+            "Discarding out-of-range timeout %r (%s; valid range: 0 < timeout <= %d seconds); "
+            "using fallback %r instead",
+            raw_timeout,
+            problem,
+            MAX_TIMEOUT_SECONDS,
+            effective,
+        )
     return effective
 
 
