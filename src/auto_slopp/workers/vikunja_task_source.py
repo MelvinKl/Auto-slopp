@@ -4,6 +4,7 @@ This module provides a TaskSource implementation that loads tasks from
 Vikunja, following the same patterns used by VikunjaWorker.
 """
 
+import hashlib
 import logging
 from pathlib import Path
 from typing import Optional
@@ -39,8 +40,6 @@ class VikunjaTaskSource(TaskSource):
         """
         # Create a unique project identifier based on the full path to avoid conflicts
         # between repositories with the same name in different locations
-        import hashlib
-
         project_name = repo_path.name
         path_hash = hashlib.md5(str(repo_path.absolute()).encode(), usedforsecurity=False).hexdigest()[:6]
         identifier = f"{project_name[:3]}-{path_hash}".lower()

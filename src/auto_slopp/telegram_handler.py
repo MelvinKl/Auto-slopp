@@ -93,7 +93,7 @@ class TelegramHandler(logging.Handler):
         with suppress(Exception):
             task.result()
 
-    # noqa: C901 -- TelegramHandler._send_message_async: long orchestrator; splitting deferred (issue #419)
+    # TelegramHandler._send_message_async: long orchestrator; splitting deferred (issue #419)
     async def _send_message_async(self, record: logging.LogRecord) -> None:  # noqa: C901
         """Send a log message to Telegram asynchronously.
 

@@ -109,7 +109,7 @@ class PRWorker(Worker):
 
         return results
 
-    # noqa: C901 -- PRWorker._process_repository: long orchestrator; splitting deferred (issue #419)
+    # PRWorker._process_repository: long orchestrator; splitting deferred (issue #419)
     def _process_repository(self, repo_dir: Path) -> dict[str, Any]:  # noqa: C901
         """Process a single repository directory.
 
@@ -248,7 +248,7 @@ class PRWorker(Worker):
 
         return filtered_branches
 
-    # noqa: C901 -- PRWorker._get_and_log_workflow_runs: long orchestrator; splitting deferred (issue #419)
+    # PRWorker._get_and_log_workflow_runs: long orchestrator; splitting deferred (issue #419)
     def _get_and_log_workflow_runs(self, repo_dir: Path, branch: str) -> list[dict[str, Any]]:  # noqa: C901
         """Get workflow runs for a branch and log their conclusions.
         Returns a list of workflow runs that have failed (conclusion != 'success' and status = 'completed')

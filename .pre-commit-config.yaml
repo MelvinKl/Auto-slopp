@@ -34,9 +34,8 @@ repos:
 
   - repo: local
     hooks:
-      - id: flake8-check-ignore-codes
-        name: flake8-check-ignore-codes
-        entry: uv run flake8 --select=E203,W503 --max-line-length=120
+      - id: check-flake8-ignore-sync
+        name: check-flake8-ignore-sync
+        entry: uv run python scripts/check_flake8_ignore_sync.py
         language: system
-        types: [python]
-        pass_filenames: true
+        pass_filenames: false

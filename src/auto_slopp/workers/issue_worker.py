@@ -259,7 +259,7 @@ class IssueWorker(Worker):
         )
         return permanent_indicators
 
-    # noqa: C901 -- IssueWorker._process_single_task: long orchestrator; splitting deferred (issue #419)
+    # IssueWorker._process_single_task: long orchestrator; splitting deferred (issue #419)
     def _process_single_task(self, repo_dir: Path, task: Task) -> dict[str, Any]:  # noqa: C901
         """Process a single task using Ralph loop.
 
@@ -861,7 +861,7 @@ Plan:
         result["pr_review_done"] = True
         result["pr_review_iterations"] = iterations
 
-    # noqa: C901 -- IssueWorker._review_pull_request: long orchestrator; splitting deferred (issue #419)
+    # IssueWorker._review_pull_request: long orchestrator; splitting deferred (issue #419)
     def _review_pull_request(  # noqa: C901 -- long orchestrator; splitting deferred (issue #419)
         self, repo_dir: Path, pr_url: str, title: str, body: str
     ) -> tuple[bool, str, list[str], Optional[str]]:

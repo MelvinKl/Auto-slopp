@@ -77,7 +77,7 @@ class PrReviewWorker(Worker):
         self.logger.info(f"PrReviewWorker starting for {repo_path}")
         return self._process_repository(repo_path)
 
-    # noqa: C901 -- PrReviewWorker._process_repository: long orchestrator; splitting deferred (issue #419)
+    # PrReviewWorker._process_repository: long orchestrator; splitting deferred (issue #419)
     def _process_repository(self, repo_dir: Path) -> dict[str, Any]:  # noqa: C901
         """Process a single repository for PR reviews.
 

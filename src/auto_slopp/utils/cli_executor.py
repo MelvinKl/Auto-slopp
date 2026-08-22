@@ -293,7 +293,7 @@ def _probe_configuration(config: dict[str, Any], working_dir: Path, timeout: Opt
     return result["success"]
 
 
-# noqa: C901 -- run_cli_executor: long orchestrator; splitting deferred (issue #419)
+# run_cli_executor: long orchestrator; splitting deferred (issue #419)
 def run_cli_executor(  # noqa: C901 -- long orchestrator; splitting deferred (issue #419)
     additional_instructions: Optional[str] = None,
     working_directory: Optional[Path] = None,

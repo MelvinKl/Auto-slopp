@@ -328,7 +328,7 @@ def restore_stashed_changes(repo_dir: Path) -> bool:
     return True
 
 
-# noqa: C901 -- checkout_branch_resilient: long orchestrator; splitting deferred (issue #419)
+# checkout_branch_resilient: long orchestrator; splitting deferred (issue #419)
 def checkout_branch_resilient(  # noqa: C901
     repo_dir: Path, branch: str, fetch_first: bool = True, timeout: int = 60
 ) -> bool:
@@ -515,7 +515,7 @@ def push_branch(repo_dir: Path, branch: str, force: bool = True, timeout: int = 
     return True
 
 
-# noqa: C901 -- merge_main_into_branch: long orchestrator; splitting deferred (issue #419)
+# merge_main_into_branch: long orchestrator; splitting deferred (issue #419)
 def merge_main_into_branch(  # noqa: C901 -- long orchestrator; splitting deferred (issue #419)
     repo_dir: Path, branch: str, remote_name: str = "origin", timeout: int = 60
 ) -> tuple[bool, str]:

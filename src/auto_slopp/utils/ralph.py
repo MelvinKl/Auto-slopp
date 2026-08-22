@@ -157,7 +157,7 @@ class PlanParser:
         return PlanParser.parse_content(content)
 
     @staticmethod
-    # noqa: C901 -- PlanParser.parse_content: long orchestrator; splitting deferred (issue #419)
+    # PlanParser.parse_content: long orchestrator; splitting deferred (issue #419)
     def parse_content(content: str) -> Plan:  # noqa: C901 -- long orchestrator; splitting deferred (issue #419)
         """Parse a plan from markdown content.
 
@@ -936,7 +936,7 @@ class RalphExecutor:
         execution_result["task_path"] = str(task_path)
         return execution_result
 
-    # noqa: C901 -- RalphExecutor._run_refined_task_loop: long orchestrator; splitting deferred (issue #419)
+    # RalphExecutor._run_refined_task_loop: long orchestrator; splitting deferred (issue #419)
     def _run_refined_task_loop(  # noqa: C901 -- long orchestrator; splitting deferred (issue #419)
         self,
         repo_dir: Path,

@@ -215,7 +215,7 @@ def create_task(
         return None
 
 
-# noqa: C901 -- get_tasks: long orchestrator; splitting deferred (issue #419)
+# get_tasks: long orchestrator; splitting deferred (issue #419)
 def get_tasks(  # noqa: C901 -- long orchestrator; splitting deferred (issue #419)
     task_filter: Optional[Union[str, list[str]]] = None,
     sort_by: Optional[str] = None,
@@ -471,7 +471,7 @@ def check_task_dependencies(task_id: int) -> list[dict[str, Any]]:
         return []
 
 
-# noqa: C901 -- verify_blocking_closed: long orchestrator; splitting deferred (issue #419)
+# verify_blocking_closed: long orchestrator; splitting deferred (issue #419)
 def verify_blocking_closed(task_id: int) -> bool:  # noqa: C901 -- long orchestrator; splitting deferred (issue #419)
     """Verify if all blocking dependencies for a task are closed.
 
