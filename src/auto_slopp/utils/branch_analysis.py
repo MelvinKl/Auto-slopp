@@ -68,7 +68,7 @@ def identify_stale_branches(
 
 def delete_stale_branches(
     stale_branches: list[dict[str, Any]], repo_dir: Path, dry_run: bool = False
-) -> tuple[list, list]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Delete stale branches.
 
     Args:
