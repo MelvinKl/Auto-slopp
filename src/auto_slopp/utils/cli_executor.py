@@ -23,10 +23,19 @@ logger = logging.getLogger(__name__)
 _active_cli_configuration_index = 0
 
 # Out-of-range timeout values already logged at warning level; subsequent
-# resolutions of the same value log at debug only. Valid configurations can
-# only produce NO_TIMEOUT or a value in (0, MAX_TIMEOUT_SECONDS], so this set
-# stays small in practice.
+# resolutions of the same value log at debug only.
 _warned_out_of_range_timeouts: Set[int] = set()
+
+# Out-of-range fallback values already logged at warning level; subsequent
+# resolutions of the same value log at debug only.
+_warned_out_of_range_fallbacks: Set[int] = set()
+
+# Timeout values can originate from external or dynamic sources (env-driven
+# CLI configurations, per-invocation overrides), so the "warn once" tracking
+# sets are bounded to guarantee no unbounded process-lifetime growth. Once a
+# set exceeds this size, new values are still warned about but no longer
+# tracked.
+_MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS = 1000
 
 
 _PROBE_INSTRUCTIONS = "are you working?"
@@ -261,17 +270,44 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
         raw_timeout: The timeout value (None for unspecified, -1 for NO_TIMEOUT, or a positive integer).
         fallback: Default timeout in seconds to use when raw_timeout is None, non-positive,
                   or exceeds the maximum. Defaults to None; when None, falls back to
-                  _PROBE_TIMEOUT_SECONDS (600s).
+                  _PROBE_TIMEOUT_SECONDS (600s). The fallback is validated against the
+                  same range (0 < timeout <= MAX_TIMEOUT_SECONDS); an out-of-range
+                  fallback is warned about and replaced by _PROBE_TIMEOUT_SECONDS.
 
     Returns:
         None if raw_timeout is NO_TIMEOUT (-1), the raw_timeout value if positive and within range,
-        or the fallback value (or _PROBE_TIMEOUT_SECONDS if fallback is None) otherwise.
+        or the fallback value if it is in range (or _PROBE_TIMEOUT_SECONDS if fallback is None
+        or out of range) otherwise.
     """
     if raw_timeout == NO_TIMEOUT:
         return None
     if raw_timeout is not None and 0 < raw_timeout <= MAX_TIMEOUT_SECONDS:
         return raw_timeout
     effective = fallback if fallback is not None else _PROBE_TIMEOUT_SECONDS
+    if fallback is not None and not (0 < fallback <= MAX_TIMEOUT_SECONDS):
+        # The fallback itself is out of range; it would otherwise be used
+        # verbatim with no diagnostic. Warn (once per distinct value) and
+        # use the built-in probe timeout instead so the final effective
+        # timeout is always in range and diagnosable.
+        if fallback in _warned_out_of_range_fallbacks:
+            logger.debug(
+                "Discarding out-of-range fallback timeout %r (valid range: 0 < timeout <= %d "
+                "seconds); using %r instead (already warned)",
+                fallback,
+                MAX_TIMEOUT_SECONDS,
+                _PROBE_TIMEOUT_SECONDS,
+            )
+        else:
+            if len(_warned_out_of_range_fallbacks) < _MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS:
+                _warned_out_of_range_fallbacks.add(fallback)
+            logger.warning(
+                "Discarding out-of-range fallback timeout %r (valid range: 0 < timeout <= %d "
+                "seconds); using %r instead",
+                fallback,
+                MAX_TIMEOUT_SECONDS,
+                _PROBE_TIMEOUT_SECONDS,
+            )
+        effective = _PROBE_TIMEOUT_SECONDS
     if raw_timeout is not None:
         # raw_timeout was present but out of range (0 < t <= MAX_TIMEOUT_SECONDS);
         # log the discarded value so configuration mistakes are diagnosable.
@@ -293,7 +329,8 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
                 effective,
             )
         else:
-            _warned_out_of_range_timeouts.add(raw_timeout)
+            if len(_warned_out_of_range_timeouts) < _MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS:
+                _warned_out_of_range_timeouts.add(raw_timeout)
             logger.warning(
                 "Discarding out-of-range timeout %r (%s; valid range: 0 < timeout <= %d seconds); "
                 "using fallback %r instead",

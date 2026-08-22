@@ -833,6 +833,50 @@ def test_resolve_timeout_max_boundary():
     assert _resolve_timeout(MAX_TIMEOUT_SECONDS, fallback=100) == MAX_TIMEOUT_SECONDS
 
 
+def test_resolve_timeout_out_of_range_fallback_uses_probe_timeout():
+    """An out-of-range fallback should be discarded (with a warning) and replaced by _PROBE_TIMEOUT_SECONDS."""
+    from auto_slopp.utils import cli_executor
+
+    with (
+        patch.object(cli_executor.logger, "warning") as mock_warning,
+        patch.object(cli_executor.logger, "debug") as mock_debug,
+    ):
+        assert cli_executor._resolve_timeout(None, fallback=-5) == cli_executor._PROBE_TIMEOUT_SECONDS
+        assert cli_executor._resolve_timeout(None, fallback=0) == cli_executor._PROBE_TIMEOUT_SECONDS
+        assert (
+            cli_executor._resolve_timeout(None, fallback=cli_executor.MAX_TIMEOUT_SECONDS + 1)
+            == cli_executor._PROBE_TIMEOUT_SECONDS
+        )
+    assert mock_warning.call_count == 3
+    assert mock_debug.call_count == 0
+
+
+def test_resolve_timeout_tracking_set_is_bounded():
+    """Distinct out-of-range values are still warned about once the cap is exceeded, but no longer tracked."""
+    from auto_slopp.utils import cli_executor
+
+    with patch.object(cli_executor, "_MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS", 1):
+        original_set = cli_executor._warned_out_of_range_timeouts
+        original_fallbacks = cli_executor._warned_out_of_range_fallbacks
+        cli_executor._warned_out_of_range_timeouts = set()
+        cli_executor._warned_out_of_range_fallbacks = set()
+        try:
+            with (
+                patch.object(cli_executor.logger, "warning") as mock_warning,
+                patch.object(cli_executor.logger, "debug") as mock_debug,
+            ):
+                _resolve_timeout(40000000, fallback=100)
+                _resolve_timeout(50000000, fallback=100)
+            # Both values were warned about.
+            assert mock_warning.call_count == 2
+            assert mock_debug.call_count == 0
+            # ...but only the first value was tracked once the cap (1) was exceeded.
+            assert cli_executor._warned_out_of_range_timeouts == {40000000}
+        finally:
+            cli_executor._warned_out_of_range_timeouts = original_set
+            cli_executor._warned_out_of_range_fallbacks = original_fallbacks
+
+
 def test_resolve_timeout_warns_once_per_distinct_value():
     """Out-of-range timeouts warn once per distinct value, then log at debug.
 
