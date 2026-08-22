@@ -559,7 +559,9 @@ class IssueWorker(Worker):
                     # comment and don't burn further iterations. The work is done
                     # and the PR exists, so review is best-effort: complete the
                     # task without findings.
-                    self.logger.warning(f"PR review unavailable for PR #{pr_number}; completing task without review")
+                    self.logger.warning(
+                        f"PR review unavailable for PR #{pr_number}; completing task without review",
+                    )
                     result["pr_review_error"] = review_error
                     has_findings = False
                     review_comments = ""
