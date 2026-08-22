@@ -7,7 +7,7 @@ import logging
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Set
+from typing import Any
 
 from auto_slopp.utils.git_operations import (
     delete_branch,
@@ -40,8 +40,8 @@ def create_branch_cleanup_result(repo_dir: Path) -> dict:
 
 
 def identify_stale_branches(
-    local_branches: List[Dict[str, Any]], remote_branches: Set[str], days_threshold: int
-) -> List[Dict[str, Any]]:
+    local_branches: list[dict[str, Any]], remote_branches: set[str], days_threshold: int
+) -> list[dict[str, Any]]:
     """Identify branches that are stale and should be deleted.
 
     Args:
@@ -67,7 +67,7 @@ def identify_stale_branches(
 
 
 def delete_stale_branches(
-    stale_branches: List[Dict[str, Any]], repo_dir: Path, dry_run: bool = False
+    stale_branches: list[dict[str, Any]], repo_dir: Path, dry_run: bool = False
 ) -> tuple[list, list]:
     """Delete stale branches.
 

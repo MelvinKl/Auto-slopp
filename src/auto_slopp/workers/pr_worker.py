@@ -7,7 +7,7 @@ runs tests, and uses the configured CLI tool to fix any failing tests.
 import logging
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from auto_slopp.utils.cli_executor import get_active_cli_command, run_cli_executor
 from auto_slopp.utils.git_operations import (
@@ -38,7 +38,7 @@ class PRWorker(Worker):
         self.timeout = timeout if timeout is not None else settings.slop_timeout
         self.logger = logging.getLogger("auto_slopp.workers.PRWorker")
 
-    def run(self, repo_path: Path) -> Dict[str, Any]:
+    def run(self, repo_path: Path) -> dict[str, Any]:
         """Execute PR branch testing workflow for a single repository.
 
         Args:
@@ -109,7 +109,8 @@ class PRWorker(Worker):
 
         return results
 
-    def _process_repository(self, repo_dir: Path) -> Dict[str, Any]:
+    # noqa: C901 -- PRWorker._process_repository: long orchestrator; splitting deferred (issue #419)
+    def _process_repository(self, repo_dir: Path) -> dict[str, Any]:  # noqa: C901
         """Process a single repository directory.
 
         Args:
@@ -149,7 +150,8 @@ class PRWorker(Worker):
                 failed_workflows = self._get_and_log_workflow_runs(repo_dir, branch)
                 if failed_workflows:
                     self.logger.info(
-                        f"Skipping fixes for branch {branch} due to {len(failed_workflows)} non-successful GitHub Actions workflow runs"
+                        f"Skipping fixes for branch {branch} due to {len(failed_workflows)} "
+                        "non-successful GitHub Actions workflow runs"
                     )
                     continue
 
@@ -220,7 +222,7 @@ class PRWorker(Worker):
 
         return result
 
-    def _get_open_pr_branches(self, repo_dir: Path) -> List[str]:
+    def _get_open_pr_branches(self, repo_dir: Path) -> list[str]:
         """Get list of branches from open PRs in the repository, filtered by allowed creator.
 
         Args:
@@ -246,7 +248,8 @@ class PRWorker(Worker):
 
         return filtered_branches
 
-    def _get_and_log_workflow_runs(self, repo_dir: Path, branch: str) -> List[Dict[str, Any]]:
+    # noqa: C901 -- PRWorker._get_and_log_workflow_runs: long orchestrator; splitting deferred (issue #419)
+    def _get_and_log_workflow_runs(self, repo_dir: Path, branch: str) -> list[dict[str, Any]]:  # noqa: C901
         """Get workflow runs for a branch and log their conclusions.
         Returns a list of workflow runs that have failed (conclusion != 'success' and status = 'completed')
         and are triggered by pull_request."""
@@ -278,13 +281,15 @@ class PRWorker(Worker):
                         self.logger.warning(f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' failed.")
                     else:
                         self.logger.info(
-                            f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' concluded with '{conclusion}' (not success)."
+                            f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' "
+                            f"concluded with '{conclusion}' (not success)."
                         )
                 # If conclusion is None for a completed workflow, treat as not success
                 elif conclusion is None:
                     failed_runs.append(run)
                     self.logger.warning(
-                        f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' completed but has no conclusion."
+                        f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' completed "
+                        "but has no conclusion."
                     )
                 # If conclusion is 'success', it's not a failure
                 else:
@@ -321,11 +326,13 @@ class PRWorker(Worker):
                         self.logger.warning(f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' failed.")
                     else:
                         self.logger.info(
-                            f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' concluded with '{conclusion}' (not success)."
+                            f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' "
+                            f"concluded with '{conclusion}' (not success)."
                         )
             else:
                 self.logger.info(
-                    f"Workflow run for branch {branch}: workflow '{workflow_name}' has no conclusion yet (maybe in progress or queued)"
+                    f"Workflow run for branch {branch}: workflow '{workflow_name}' has no conclusion yet "
+                    "(maybe in progress or queued)"
                 )
                 all_success = False
 
@@ -392,7 +399,7 @@ class PRWorker(Worker):
         self.logger.info(f"Successfully pushed branch {branch}")
         return True
 
-    def _run_tests(self, repo_dir: Path) -> Dict[str, Any]:
+    def _run_tests(self, repo_dir: Path) -> dict[str, Any]:
         """Run make test in the repository.
 
         Args:
@@ -429,7 +436,7 @@ class PRWorker(Worker):
                 "error": f"Error running tests: {str(e)}",
             }
 
-    def _fix_tests_with_cli(self, repo_dir: Path) -> Dict[str, Any]:
+    def _fix_tests_with_cli(self, repo_dir: Path) -> dict[str, Any]:
         """Use the configured CLI tool to fix failing tests.
 
         Args:
@@ -456,7 +463,7 @@ class PRWorker(Worker):
             "return_code": result["return_code"],
         }
 
-    def _fix_merge_with_cli(self, repo_dir: Path) -> Dict[str, Any]:
+    def _fix_merge_with_cli(self, repo_dir: Path) -> dict[str, Any]:
         """Use the configured CLI tool to fix merge conflicts.
 
         Args:

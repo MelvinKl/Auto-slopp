@@ -6,7 +6,7 @@ feedback using conventional comments format.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from auto_slopp.utils.cli_executor import run_cli_executor
 from auto_slopp.utils.github_operations import (
@@ -65,7 +65,7 @@ class PrReviewWorker(Worker):
         self.timeout = timeout if timeout is not None else settings.slop_timeout
         self.logger = logging.getLogger("auto_slopp.workers.PrReviewWorker")
 
-    def run(self, repo_path: Path) -> Dict[str, Any]:
+    def run(self, repo_path: Path) -> dict[str, Any]:
         """Execute PR review workflow for a single repository.
 
         Args:
@@ -77,7 +77,8 @@ class PrReviewWorker(Worker):
         self.logger.info(f"PrReviewWorker starting for {repo_path}")
         return self._process_repository(repo_path)
 
-    def _process_repository(self, repo_dir: Path) -> Dict[str, Any]:
+    # noqa: C901 -- PrReviewWorker._process_repository: long orchestrator; splitting deferred (issue #419)
+    def _process_repository(self, repo_dir: Path) -> dict[str, Any]:  # noqa: C901
         """Process a single repository for PR reviews.
 
         Args:

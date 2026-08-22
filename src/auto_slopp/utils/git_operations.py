@@ -4,13 +4,14 @@ This module provides pure functions for common git operations
 used across different workers.
 """
 
+import contextlib
 import logging
 import os
 import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from auto_slopp.utils.cli_executor import get_active_cli_command, run_cli_executor
 
@@ -123,13 +124,14 @@ def _handle_git_operation_failure(
             logger.info(f"{cli_tool} successfully resolved the git operation '{operation}' failure")
         else:
             logger.error(
-                f"{cli_tool} failed to resolve git operation '{operation}' failure: {result.get('error', 'Unknown error')}"
+                f"{cli_tool} failed to resolve git operation '{operation}' failure: "
+                f"{result.get('error', 'Unknown error')}"
             )
     except Exception as e:
         logger.error(f"Failed to call {cli_tool} for git operation '{operation}' failure: {str(e)}")
 
 
-def get_local_branches(repo_dir: Path) -> List[Dict[str, Any]]:
+def get_local_branches(repo_dir: Path) -> list[dict[str, Any]]:
     """Get all local branches with their last commit dates.
 
     Args:
@@ -326,7 +328,10 @@ def restore_stashed_changes(repo_dir: Path) -> bool:
     return True
 
 
-def checkout_branch_resilient(repo_dir: Path, branch: str, fetch_first: bool = True, timeout: int = 60) -> bool:
+# noqa: C901 -- checkout_branch_resilient: long orchestrator; splitting deferred (issue #419)
+def checkout_branch_resilient(  # noqa: C901
+    repo_dir: Path, branch: str, fetch_first: bool = True, timeout: int = 60
+) -> bool:
     """Checkout a git branch with enhanced resilience.
 
     If checkout fails, stashes uncommitted changes and retries.
@@ -510,9 +515,10 @@ def push_branch(repo_dir: Path, branch: str, force: bool = True, timeout: int = 
     return True
 
 
-def merge_main_into_branch(
+# noqa: C901 -- merge_main_into_branch: long orchestrator; splitting deferred (issue #419)
+def merge_main_into_branch(  # noqa: C901 -- long orchestrator; splitting deferred (issue #419)
     repo_dir: Path, branch: str, remote_name: str = "origin", timeout: int = 60
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """Merge origin/main into the current branch.
 
     Args:
@@ -606,7 +612,7 @@ def is_bare_repository(repo_dir: Path) -> bool:
     return result.stdout.strip() == "true"
 
 
-def get_remotes(repo_dir: Path) -> List[Dict[str, str]]:
+def get_remotes(repo_dir: Path) -> list[dict[str, str]]:
     """Get all remotes with their URLs.
 
     Args:
@@ -668,7 +674,7 @@ def branch_exists(repo_dir: Path, branch: str) -> bool:
     return result.returncode == 0
 
 
-def get_ahead_behind(repo_dir: Path, remote: str = "origin", branch: Optional[str] = None) -> Tuple[int, int]:
+def get_ahead_behind(repo_dir: Path, remote: str = "origin", branch: Optional[str] = None) -> tuple[int, int]:
     """Get ahead/behind count between local and remote branch.
 
     Args:
@@ -682,7 +688,7 @@ def get_ahead_behind(repo_dir: Path, remote: str = "origin", branch: Optional[st
     if branch is None:
         branch = get_current_branch(repo_dir)
 
-    try:
+    with contextlib.suppress(Exception):
         result = _run_git_command(
             repo_dir,
             "rev-list",
@@ -696,9 +702,6 @@ def get_ahead_behind(repo_dir: Path, remote: str = "origin", branch: Optional[st
             counts = result.stdout.strip().split("\t")
             if len(counts) == 2:
                 return int(counts[0]), int(counts[1])
-
-    except Exception:
-        pass
 
     return 0, 0
 
@@ -714,7 +717,7 @@ def get_commits_ahead_of_branch(repo_dir: Path, base_branch: str = "main") -> in
         Number of commits the current branch is ahead of base_branch.
         Returns 0 if the comparison fails or if not ahead.
     """
-    try:
+    with contextlib.suppress(Exception):
         result = _run_git_command(
             repo_dir,
             "rev-list",
@@ -724,12 +727,10 @@ def get_commits_ahead_of_branch(repo_dir: Path, base_branch: str = "main") -> in
         )
         if result.returncode == 0:
             return int(result.stdout.strip())
-    except Exception:
-        pass
     return 0
 
 
-def push_to_remote(repo_dir: Path, remote: str = "origin", branch: Optional[str] = None) -> Tuple[bool, str]:
+def push_to_remote(repo_dir: Path, remote: str = "origin", branch: Optional[str] = None) -> tuple[bool, str]:
     """Push changes to a remote branch.
 
     Args:
@@ -815,7 +816,7 @@ def is_git_repo(directory: Path) -> bool:
 
 def commit_and_push_changes(
     repo_dir: Path, commit_message: str, push_if_remote: bool = True
-) -> Tuple[bool, Optional[bool]]:
+) -> tuple[bool, Optional[bool]]:
     """Commit and push changes in a git repository.
 
     Args:
@@ -872,7 +873,7 @@ def commit_and_push_changes(
         os.chdir(original_cwd)
 
 
-def commit(repo_path: Path, message: str, push_if_remote: bool = False) -> Tuple[bool, Optional[bool]]:
+def commit(repo_path: Path, message: str, push_if_remote: bool = False) -> tuple[bool, Optional[bool]]:
     """Commit changes in the repository.
 
     Args:
@@ -887,7 +888,7 @@ def commit(repo_path: Path, message: str, push_if_remote: bool = False) -> Tuple
     return commit_and_push_changes(repo_path, message, push_if_remote)
 
 
-def commit_and_push(repo_path: Path, message: str) -> Tuple[bool, bool]:
+def commit_and_push(repo_path: Path, message: str) -> tuple[bool, bool]:
     """Commit and push changes in the repository.
 
     Args:

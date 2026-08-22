@@ -67,9 +67,7 @@ class TestPRReviewWorker:
                                         "auto_slopp.workers.pr_review_worker.remove_label_from_issue"
                                     ) as mock_remove:
                                         mock_remove.return_value = True
-                                        with patch(
-                                            "auto_slopp.workers.pr_review_worker.PrReviewWorker._format_conventional_comments"
-                                        ) as mock_format:
+                                        with patch.object(worker, "_format_conventional_comments") as mock_format:
                                             mock_format.return_value = mock_formatted_comments
                                             result = worker._process_repository(repo_dir)
 

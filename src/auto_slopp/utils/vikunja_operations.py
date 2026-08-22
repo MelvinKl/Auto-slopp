@@ -7,7 +7,7 @@ used across different workers.
 import json
 import logging
 import subprocess
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ def _run_vikunja_command(
         raise VikunjaOperationError(f"Vikunja command timed out: {e}")
 
 
-def find_project(project_name: str) -> Optional[Dict[str, Any]]:
+def find_project(project_name: str) -> Optional[dict[str, Any]]:
     """Find a project by name or identifier.
 
     Args:
@@ -98,7 +98,7 @@ def find_project(project_name: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def create_project(project_name: str, project_identifier: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def create_project(project_name: str, project_identifier: Optional[str] = None) -> Optional[dict[str, Any]]:
     """Create a new project.
 
     Args:
@@ -146,7 +146,7 @@ def create_project(project_name: str, project_identifier: Optional[str] = None) 
         return None
 
 
-def find_or_create_project(project_name: str, project_identifier: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def find_or_create_project(project_name: str, project_identifier: Optional[str] = None) -> Optional[dict[str, Any]]:
     """Find an existing project or create a new one if not found.
 
     Args:
@@ -173,7 +173,7 @@ def create_task(
     project_id: int,
     title: str,
     description: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
+) -> Optional[dict[str, Any]]:
     """Create a new task in a project.
 
     Args:
@@ -215,11 +215,12 @@ def create_task(
         return None
 
 
-def get_tasks(
-    task_filter: Optional[Union[str, List[str]]] = None,
+# noqa: C901 -- get_tasks: long orchestrator; splitting deferred (issue #419)
+def get_tasks(  # noqa: C901 -- long orchestrator; splitting deferred (issue #419)
+    task_filter: Optional[Union[str, list[str]]] = None,
     sort_by: Optional[str] = None,
     order_by: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Get list of tasks from Vikunja.
 
     Args:
@@ -272,7 +273,7 @@ def get_tasks(
         return []
 
 
-def get_task_details(task_id: int) -> Optional[Dict[str, Any]]:
+def get_task_details(task_id: int) -> Optional[dict[str, Any]]:
     """Get detailed information about a specific task.
 
     Args:
@@ -353,7 +354,7 @@ def comment_on_task(task_id: int, comment: str) -> bool:
         return False
 
 
-def create_subtask(parent_task_id: int, title: str, description: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def create_subtask(parent_task_id: int, title: str, description: Optional[str] = None) -> Optional[dict[str, Any]]:
     """Create a subtask for a parent task.
 
     Args:
@@ -390,7 +391,7 @@ def create_subtask(parent_task_id: int, title: str, description: Optional[str] =
         return None
 
 
-def analyze_task(task_id: int) -> Optional[List[Dict[str, Any]]]:
+def analyze_task(task_id: int) -> Optional[list[dict[str, Any]]]:
     """Analyze a task and generate subtasks using AI.
 
     Args:
@@ -430,7 +431,7 @@ def analyze_task(task_id: int) -> Optional[List[Dict[str, Any]]]:
         return None
 
 
-def check_task_dependencies(task_id: int) -> List[Dict[str, Any]]:
+def check_task_dependencies(task_id: int) -> list[dict[str, Any]]:
     """Check dependencies for a task.
 
     Args:
@@ -470,7 +471,8 @@ def check_task_dependencies(task_id: int) -> List[Dict[str, Any]]:
         return []
 
 
-def verify_blocking_closed(task_id: int) -> bool:
+# noqa: C901 -- verify_blocking_closed: long orchestrator; splitting deferred (issue #419)
+def verify_blocking_closed(task_id: int) -> bool:  # noqa: C901 -- long orchestrator; splitting deferred (issue #419)
     """Verify if all blocking dependencies for a task are closed.
 
     Args:
@@ -528,7 +530,7 @@ def verify_blocking_closed(task_id: int) -> bool:
         return False
 
 
-def get_open_tasks_by_project(project_id: int) -> List[Dict[str, Any]]:
+def get_open_tasks_by_project(project_id: int) -> list[dict[str, Any]]:
     """Get open tasks for a specific project.
 
     Args:
@@ -540,7 +542,7 @@ def get_open_tasks_by_project(project_id: int) -> List[Dict[str, Any]]:
     return get_tasks(task_filter=[f"project_id={project_id}", "done=false"])
 
 
-def get_task_by_identifier(identifier: str) -> Optional[Dict[str, Any]]:
+def get_task_by_identifier(identifier: str) -> Optional[dict[str, Any]]:
     """Get a task by its identifier.
 
     Args:
