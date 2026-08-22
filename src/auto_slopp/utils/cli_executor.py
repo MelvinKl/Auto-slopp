@@ -275,22 +275,30 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
     if raw_timeout is not None:
         # raw_timeout was present but out of range (0 < t <= MAX_TIMEOUT_SECONDS);
         # log the discarded value so configuration mistakes are diagnosable.
+        # Distinguish non-positive values from values above the maximum to make
+        # misconfiguration diagnosis faster (mirrors the Pydantic validator).
+        if raw_timeout <= 0:
+            problem = f"non-positive value ({raw_timeout})"
+        else:
+            problem = f"value above the maximum ({MAX_TIMEOUT_SECONDS} seconds)"
         # Warn once per distinct value; repeated resolutions of the same
         # misconfigured value (e.g., probe/failover loops) log at debug only.
         if raw_timeout in _warned_out_of_range_timeouts:
             logger.debug(
-                "Discarding out-of-range timeout %r (valid range: 0 < timeout <= %d seconds); "
+                "Discarding out-of-range timeout %r (%s; valid range: 0 < timeout <= %d seconds); "
                 "using fallback %r instead (already warned)",
                 raw_timeout,
+                problem,
                 MAX_TIMEOUT_SECONDS,
                 effective,
             )
         else:
             _warned_out_of_range_timeouts.add(raw_timeout)
             logger.warning(
-                "Discarding out-of-range timeout %r (valid range: 0 < timeout <= %d seconds); "
+                "Discarding out-of-range timeout %r (%s; valid range: 0 < timeout <= %d seconds); "
                 "using fallback %r instead",
                 raw_timeout,
+                problem,
                 MAX_TIMEOUT_SECONDS,
                 effective,
             )

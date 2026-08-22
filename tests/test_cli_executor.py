@@ -850,3 +850,9 @@ def test_resolve_timeout_warns_once_per_distinct_value():
         _resolve_timeout(0, fallback=100)  # distinct value: warns again
     assert mock_warning.call_count == 2
     assert mock_debug.call_count == 1
+    # Above-maximum and non-positive values are diagnosed differently.
+    # Argument order: (format, raw_timeout, problem, max, fallback).
+    above_max_problem = mock_warning.call_args_list[0][0][2]
+    non_positive_problem = mock_warning.call_args_list[1][0][2]
+    assert "value above the maximum" in above_max_problem
+    assert "non-positive value (0)" in non_positive_problem
