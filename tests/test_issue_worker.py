@@ -99,7 +99,7 @@ def _mock_pr_review_no_findings():
     implementation (which shells out to ``gh``). Tests that do not request it
     exercise the real code path.
     """
-    with patch.object(IssueWorker, "_review_pull_request", return_value=(False, "", [])):
+    with patch.object(IssueWorker, "_review_pull_request", return_value=(False, "", [], None)):
         yield
 
 
@@ -942,7 +942,7 @@ class TestIssueWorker:
         test also verifies that the PR review loop is actually reached during a
         successful run.
         """
-        mock_review.return_value = (False, "", [])
+        mock_review.return_value = (False, "", [], None)
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
@@ -2395,6 +2395,7 @@ class TestIssueWorkerPrReviewLoop:
         result, task_source, _mock_review, mock_fix_cli, mock_submit_review = self._run_with_review_sequence(
             review_sequence
         )
+        task_result = result["task_results"][0]
         assert task_result.get("pr_review_error") is not None
         assert mock_submit_review.call_count == 0
         assert mock_fix_cli.call_count == 0
