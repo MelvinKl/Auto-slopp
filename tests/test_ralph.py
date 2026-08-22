@@ -1432,6 +1432,52 @@ class TestRalphExecutor:
             assert not task_path.exists(), "Task file should be deleted on failed evaluation at max iterations"
             assert validation_calls[0] == 1
 
+    def test_run_refined_task_loop_max_iterations_final_check_failure_recorded_in_error_state(self, ralph_executor):
+        """Test that a final acceptance check failure at max iterations is recorded in the error state.
+
+        If the last step iteration succeeded (clearing ``_last_error`` and
+        ``_last_iteration_failure_reason``) and the final acceptance check
+        then fails, ``get_skip_reason()`` must still be able to surface the
+        failure so an LLM timeout during the final check skips the issue for
+        retry instead of dropping it via ``on_max_iterations_reached``.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Second step\n")
+
+            ralph_executor.max_iterations = 2
+            ralph_executor.has_changes_fn = lambda path: False
+
+            def tracking_execute_fn(*args, **kwargs):
+                task_name = kwargs.get("task_name", "unknown")
+                if task_name == "task_implementation_validation":
+                    return {"success": False, "error": "LLM timed out waiting for response"}
+                # Implementation call: close only step 1, leaving step 2 open
+                task_path.write_text("# Test\n\n## Steps\n\n- [x] 1. First step\n- [ ] 2. Second step\n")
+                return {"success": True}
+
+            ralph_executor.execute_fn = tracking_execute_fn
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+                issue_number=1,
+            )
+
+            assert result["success"] is False
+            assert result["max_loops_reached"] is True
+            assert result["last_error"] == "LLM timed out waiting for response"
+            # The failure must also be recorded in the executor's error state
+            # (the successful step iterations cleared it).
+            assert ralph_executor._last_error == "LLM timed out waiting for response"
+            assert ralph_executor._last_iteration_failure_reason == "LLM timed out waiting for response"
+            assert ralph_executor.get_skip_reason() == "LLM timed out waiting for response"
+
     def test_run_refined_task_loop_no_intermediate_checks(self, ralph_executor):
         """Test that refined task loop executes steps in a single batch call with final validation."""
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -12,9 +12,10 @@ from auto_slopp.utils.cli_executor import is_any_cli_available
 #
 # Note: bare HTTP status codes are intentionally NOT listed here as plain
 # substrings. They live in :data:`UNAVAILABILITY_STATUS_CODES` below and are
-# matched with word boundaries so that incidental numbers in a message (a file
-# path like ``/tmp/503/``, a line number in a stack trace, or a variable name
-# containing ``429``) do not cause a false positive.
+# matched with word boundaries so that a code embedded in a longer token
+# (e.g. ``5034`` or ``x503y``) does not cause a false positive. A code
+# appearing as a standalone number (e.g. in a file path like ``/tmp/503/file``
+# or a line number) still matches.
 UNAVAILABILITY_PATTERNS: tuple[str, ...] = (
     "llm unavailable",
     "llm is unavailable",
@@ -58,8 +59,9 @@ WEAK_UNAVAILABILITY_PATTERNS: tuple[str, ...] = (
 
 # Bare HTTP status codes that indicate unavailability. These are matched with
 # word boundaries (e.g. ``re.search(r"\b503\b", ...)``) rather than as plain
-# substrings, so that unrelated numbers embedded in an error message do not
-# trigger a false positive.
+# substrings, so that a code embedded in a longer token (e.g. ``5034``,
+# ``x503y``) does not trigger a false positive. A standalone number (e.g. in a
+# file path or a line number) still matches.
 UNAVAILABILITY_STATUS_CODES: tuple[str, ...] = (
     "429",
     "502",
@@ -76,8 +78,9 @@ def error_indicates_llm_unavailability(error_msg: str) -> bool:
     Substring patterns in :data:`UNAVAILABILITY_PATTERNS` are matched
     case-insensitively. Bare HTTP status codes in
     :data:`UNAVAILABILITY_STATUS_CODES` are matched with word boundaries so that
-    incidental numbers in the message (file paths, line numbers, identifiers)
-    do not trigger a false positive.
+    a code embedded in a longer token (e.g. ``5034``) does not trigger a false
+    positive; a code appearing as a standalone number (file paths, line
+    numbers) still matches.
 
     Broad patterns in :data:`WEAK_UNAVAILABILITY_PATTERNS` can also appear in
     genuine step/CLI-output failures, so a match on them alone is not

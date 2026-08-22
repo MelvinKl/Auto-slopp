@@ -315,6 +315,23 @@ class TestVikunjaTaskSource:
     @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_on_task_failure_updates_status_even_when_comment_fails(self, mock_comment, mock_update, mock_commit):
+        """Test that the status is still updated to 'failed' when posting the comment fails."""
+        mock_comment.return_value = False
+        mock_update.return_value = True
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test/repo")})
+
+        task_source.on_task_failure(task, "Test error")
+
+        mock_comment.assert_called_once()
+        # The status transition must not be skipped just because the comment failed
+        mock_update.assert_called_once_with(42, "failed")
+        mock_commit.assert_called_once_with(Path("/test/repo"), "Updated task status to 'failed'")
+
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
     def test_on_no_changes_updates_status_and_comments(self, mock_comment, mock_update, mock_commit):
         """Test that on_no_changes updates status and adds comment."""
         task_source = VikunjaTaskSource()

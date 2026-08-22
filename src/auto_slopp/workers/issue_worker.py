@@ -404,14 +404,17 @@ class IssueWorker(Worker):
 
             current_branch = get_current_branch(repo_dir)
             if current_branch in ("main", "master"):
-                skip_reason = self.ralph_executor.get_skip_reason()
-                if skip_reason:
-                    skip_message = f"LLM unavailable - no changes made: {skip_reason}"
-                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}: {skip_reason}")
-                    self.task_source.on_skip(task, skip_message)
+                # A run that reaches this point has succeeded, which clears the
+                # executor's error state (get_skip_reason() can only return None
+                # here), so the skip trigger is the CLI state itself: if all
+                # CLIs are inactive the task is skipped for retry instead of
+                # being closed as "no changes".
+                if not is_any_cli_available():
+                    self.logger.warning(f"All CLIs inactive, skipping task #{task_id}: no changes made")
+                    self.task_source.on_skip(task, "LLM unavailable - no changes made")
                     result["success"] = True
                     result["skipped"] = True
-                    result["skip_reason"] = skip_message
+                    result["skip_reason"] = "LLM unavailable - no changes made"
                     return result
 
                 self.logger.info(f"No changes made for task #{task_id}, closing task")
@@ -430,14 +433,16 @@ class IssueWorker(Worker):
             # to ensure everything is committed before proceeding.
             ahead_count = get_commits_ahead_of_branch(repo_dir, base_branch="main")
             if ahead_count == 0:
-                skip_reason = self.ralph_executor.get_skip_reason()
-                if skip_reason:
-                    skip_message = f"LLM unavailable - no commits ahead: {skip_reason}"
-                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}: {skip_reason}")
-                    self.task_source.on_skip(task, skip_message)
+                # See the "no changes made" branch above: a run that reaches
+                # this point has succeeded, so the skip trigger is the CLI
+                # state itself (all CLIs inactive), not the executor's
+                # (cleared) failure reason.
+                if not is_any_cli_available():
+                    self.logger.warning(f"All CLIs inactive, skipping task #{task_id}: no commits ahead")
+                    self.task_source.on_skip(task, "LLM unavailable - no commits ahead")
                     result["success"] = True
                     result["skipped"] = True
-                    result["skip_reason"] = skip_message
+                    result["skip_reason"] = "LLM unavailable - no commits ahead"
                     return result
 
                 self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue")

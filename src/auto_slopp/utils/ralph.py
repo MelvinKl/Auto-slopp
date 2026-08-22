@@ -1234,6 +1234,14 @@ class RalphExecutor:
                     result.pop("error", None)
             else:
                 result["last_error"] = final_check_result.get("error", "Final acceptance check failed")
+                # The last step iteration succeeded and cleared both error
+                # fields, so record the final-check failure in the executor's
+                # error state as well: otherwise get_skip_reason() returns
+                # None and an LLM outage during the final check drops the
+                # issue via on_max_iterations_reached instead of skipping it
+                # for retry.
+                self._last_error = result["last_error"]
+                self._last_iteration_failure_reason = self._last_error
                 # Final acceptance check failed at max iterations. Delete the
                 # task file so it is recreated from scratch on the next Ralph
                 # invocation.

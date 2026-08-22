@@ -39,9 +39,9 @@ class VikunjaTaskSource(TaskSource):
 
         This is a convenience helper that combines :func:`comment_on_task`,
         :func:`update_task_status`, and :func:`commit` into a single call.
-        It is used by lifecycle hooks (``on_skip``, ``on_task_failure``, etc.)
-        to keep the common "comment + status transition + commit" pattern
-        DRY.
+        It is used by lifecycle hooks (e.g. ``on_task_complete``,
+        ``on_no_changes``, ``on_max_iterations_reached``) to keep the common
+        "comment + status transition + commit" pattern DRY.
 
         Args:
             task_id: Vikunja task ID.
@@ -250,7 +250,10 @@ class VikunjaTaskSource(TaskSource):
     def on_task_failure(self, task: Task, error: str) -> None:
         """Called when a task fails.
 
-        Updates task status to "failed" and adds a failure comment.
+        Updates task status to "failed" and adds a failure comment. The
+        status transition is attempted even if posting the comment fails, so
+        a task whose comment posting failed still ends up "failed" instead of
+        silently staying in its previous status.
 
         Args:
             task: The failed task
@@ -268,13 +271,17 @@ class VikunjaTaskSource(TaskSource):
             f"**Task:** {task.title}\n\n"
             f"This task will not be processed again automatically."
         )
-        self._update_task_with_comment_and_status(
-            task_id=task.id,
-            comment=failure_comment,
-            repo_path=repo_path,
-            status="failed",
-            commit_message="Updated task status to 'failed'",
-        )
+        comment_success = comment_on_task(task.id, failure_comment)
+        if comment_success:
+            commit(repo_path, f"Added comment to task {task.id}")
+        else:
+            logger.warning(f"Failed to add failure comment to task {task.id}")
+
+        status_success = update_task_status(task.id, "failed")
+        if status_success:
+            commit(repo_path, "Updated task status to 'failed'")
+        else:
+            logger.warning(f"Failed to update status to 'failed' for task {task.id}")
 
     def on_no_changes(self, task: Task) -> None:
         """Called when no changes were needed for a task.

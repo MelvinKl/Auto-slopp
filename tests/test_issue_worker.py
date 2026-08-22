@@ -1559,19 +1559,16 @@ class TestIssueWorker:
         mock_current_branch.return_value = "main"
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
-        # Mock the executor's skip reason so the no-changes skip path fires
-        worker.ralph_executor.get_skip_reason = lambda: "LLM timed out waiting for response"
-        result = worker.run(Path("/tmp"))
+        # All CLIs inactive so the no-changes skip path fires
+        with patch("auto_slopp.workers.issue_worker.is_any_cli_available", return_value=False):
+            result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
         assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
         assert result["task_results"][0]["success"] is True
         assert result["task_results"][0]["skipped"] is True
-        assert (
-            result["task_results"][0]["skip_reason"]
-            == "LLM unavailable - no changes made: LLM timed out waiting for response"
-        )
+        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no changes made"
         assert task_source.on_skip_called is True
         assert task_source.on_no_changes_called is False
 
@@ -1619,11 +1616,11 @@ class TestIssueWorker:
             "steps_completed": 3,
             "total_steps": 3,
         }
-        # Mock the executor's skip reason so the no-commits-ahead skip path fires
-        worker.ralph_executor.get_skip_reason = lambda: "LLM timed out waiting for response"
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with caplog.at_level("WARNING"):
-                result = worker.run(Path(temp_dir))
+        # All CLIs inactive so the no-commits-ahead skip path fires
+        with patch("auto_slopp.workers.issue_worker.is_any_cli_available", return_value=False):
+            with tempfile.TemporaryDirectory() as temp_dir:
+                with caplog.at_level("WARNING"):
+                    result = worker.run(Path(temp_dir))
 
         assert result["success"] is True
         assert result["tasks_processed"] == 0
@@ -1631,10 +1628,7 @@ class TestIssueWorker:
         assert len(result["task_results"]) == 1
         assert result["task_results"][0]["success"] is True
         assert result["task_results"][0]["skipped"] is True
-        assert (
-            result["task_results"][0]["skip_reason"]
-            == "LLM unavailable - no commits ahead: LLM timed out waiting for response"
-        )
+        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no commits ahead"
         assert task_source.on_skip_called is True
         assert task_source.on_no_changes_called is False
         # Verify ensure_ralph_in_gitignore was called
