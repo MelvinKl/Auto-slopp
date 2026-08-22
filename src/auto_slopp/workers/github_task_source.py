@@ -602,6 +602,9 @@ class GitHubTaskSource(TaskSource):
 
             # Check if there are any workflow runs for recent commits
             with contextlib.suppress(Exception):
+                # Suppress all exceptions: git log may fail if not in a repo,
+                # permissions issues, or timeout. We only care about positive
+                # signals; any error means "unknown, assume no activity"
                 # Get the most recent commits to this repo
                 result = subprocess.run(
                     ["git", "log", "--oneline", "-10"],

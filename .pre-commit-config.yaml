@@ -31,3 +31,12 @@ repos:
           - flake8-docstrings
           - flake8-import-order
           - flake8-bugbear
+
+  - repo: local
+    hooks:
+      - id: flake8-check-ignore-codes
+        name: flake8-check-ignore-codes
+        entry: uv run flake8 --select=E203,W503 --max-line-length=120
+        language: system
+        types: [python]
+        pass_filenames: true

@@ -1022,6 +1022,9 @@ class RalphExecutor:
 
             # After batch execution, check if all steps are now closed
             with contextlib.suppress(Exception):
+                # Suppress all exceptions: PlanParser.parse_file may fail if
+                # file is missing, malformed, or permissions issues.
+                # steps_completed stays at default (0) which is safe for progress tracking
                 updated_plan = PlanParser.parse_file(task_path)
                 result["steps_completed"] = len([step for step in updated_plan.steps if step.is_closed])
 

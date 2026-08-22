@@ -689,6 +689,9 @@ def get_ahead_behind(repo_dir: Path, remote: str = "origin", branch: Optional[st
         branch = get_current_branch(repo_dir)
 
     with contextlib.suppress(Exception):
+        # Suppress all exceptions: rev-list may fail if remote/branch
+        # doesn't exist, permissions issues, or not in a git repo.
+        # Returning (0, 0) is safe as it means "unknown, assume up to date"
         result = _run_git_command(
             repo_dir,
             "rev-list",
@@ -718,6 +721,9 @@ def get_commits_ahead_of_branch(repo_dir: Path, base_branch: str = "main") -> in
         Returns 0 if the comparison fails or if not ahead.
     """
     with contextlib.suppress(Exception):
+        # Suppress all exceptions: rev-list may fail if base branch
+        # doesn't exist, permissions issues, or not in a git repo.
+        # Returning 0 is safe as it means "unknown, assume not ahead"
         result = _run_git_command(
             repo_dir,
             "rev-list",
