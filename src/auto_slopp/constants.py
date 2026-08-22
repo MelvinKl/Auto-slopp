@@ -34,6 +34,14 @@ UNAVAILABILITY_PATTERNS: tuple[str, ...] = (
     "unreachable",
     "gateway timeout",
     "internal server error",
+    # CLI-configuration-level outages reported by the CLI executor (e.g.
+    # "No active CLI configuration", "All CLI configurations are in cooldown",
+    # "No configuration meets the requirements").
+    "no active cli",
+    "all cli",
+    "exhausted",
+    "cooldown",
+    "no configuration meets",
 )
 
 # Bare HTTP status codes that indicate unavailability. These are matched with

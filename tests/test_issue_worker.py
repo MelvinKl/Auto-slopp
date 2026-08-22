@@ -1438,7 +1438,9 @@ class TestIssueWorker:
         assert worker._is_llm_unavailable("Git push failed") is False
         assert worker._is_llm_unavailable("Permission denied") is False
         assert worker._is_llm_unavailable("no cli configuration found") is False
-        assert worker._is_llm_unavailable("LLM is unavailable") is False  # Too broad, not a specific pattern
+        assert (
+            worker._is_llm_unavailable("LLM is unavailable") is True
+        )  # Matched via the shared UNAVAILABILITY_PATTERNS
         assert worker._is_llm_unavailable("") is False
 
     @patch("auto_slopp.workers.issue_worker.settings")
@@ -1550,8 +1552,8 @@ class TestIssueWorker:
         mock_current_branch.return_value = "main"
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
-        # Mock _is_llm_unavailable to return True
-        worker._is_llm_unavailable = lambda _: True
+        # Mock the executor's skip reason so the no-changes skip path fires
+        worker.ralph_executor.get_skip_reason = lambda: "LLM timed out waiting for response"
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
@@ -1559,7 +1561,10 @@ class TestIssueWorker:
         assert len(result["task_results"]) == 1
         assert result["task_results"][0]["success"] is True
         assert result["task_results"][0]["skipped"] is True
-        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no changes made"
+        assert (
+            result["task_results"][0]["skip_reason"]
+            == "LLM unavailable - no changes made: LLM timed out waiting for response"
+        )
         assert task_source.on_skip_called is True
         assert task_source.on_no_changes_called is False
 
@@ -1607,8 +1612,8 @@ class TestIssueWorker:
             "steps_completed": 3,
             "total_steps": 3,
         }
-        # Mock _is_llm_unavailable to return True
-        worker._is_llm_unavailable = lambda _: True
+        # Mock the executor's skip reason so the no-commits-ahead skip path fires
+        worker.ralph_executor.get_skip_reason = lambda: "LLM timed out waiting for response"
         with tempfile.TemporaryDirectory() as temp_dir:
             with caplog.at_level("WARNING"):
                 result = worker.run(Path(temp_dir))
@@ -1619,7 +1624,10 @@ class TestIssueWorker:
         assert len(result["task_results"]) == 1
         assert result["task_results"][0]["success"] is True
         assert result["task_results"][0]["skipped"] is True
-        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no commits ahead"
+        assert (
+            result["task_results"][0]["skip_reason"]
+            == "LLM unavailable - no commits ahead: LLM timed out waiting for response"
+        )
         assert task_source.on_skip_called is True
         assert task_source.on_no_changes_called is False
         # Verify ensure_ralph_in_gitignore was called

@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from auto_slopp.constants import error_indicates_llm_unavailability
 from auto_slopp.utils.cli_executor import (
     _cli_states,
     execute_with_instructions,
@@ -186,7 +187,10 @@ class IssueWorker(Worker):
     def _is_llm_unavailable(self, error_msg: str) -> bool:
         """Check if the error indicates LLM unavailability.
 
-        Uses specific patterns to avoid false positives from unrelated errors.
+        Uses the shared unavailability patterns from :mod:`auto_slopp.constants`
+        (the same source of truth as :class:`RalphExecutor`) to avoid false
+        positives from unrelated errors. HTTP status codes are matched with
+        word boundaries via the shared constant.
 
         Args:
             error_msg: The error message to check
@@ -194,26 +198,7 @@ class IssueWorker(Worker):
         Returns:
             True if the error indicates LLM is unavailable, False otherwise
         """
-        error_lower = error_msg.lower()
-        error_indicates_unavailable = (
-            "timed out" in error_lower
-            or "connection refused" in error_lower
-            or "connection reset" in error_lower
-            or "rate limit" in error_lower
-            or "too many requests" in error_lower
-            or "service unavailable" in error_lower
-            or "gateway timeout" in error_lower
-            or re.search(r"\bllm unavailable\b", error_lower) is not None
-            or "no active cli" in error_lower
-            or "all cli" in error_lower
-            or "exhausted" in error_lower
-            or "cooldown" in error_lower
-            or "no configuration meets" in error_lower
-            or "503" in error_lower
-            or "502" in error_lower
-            or "504" in error_lower
-            or "internal server error" in error_lower
-        )
+        error_indicates_unavailable = bool(error_msg) and error_indicates_llm_unavailability(error_msg)
         # Also check if all CLI configurations are inactive (in cooldown) and cooldown hasn't expired
         all_clis_inactive = False
         cli_configs = settings.cli_configurations
@@ -415,12 +400,14 @@ class IssueWorker(Worker):
 
             current_branch = get_current_branch(repo_dir)
             if current_branch in ("main", "master"):
-                if self._is_llm_unavailable(""):
-                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                    self.task_source.on_skip(task, "LLM unavailable - no changes made")
+                skip_reason = self.ralph_executor.get_skip_reason()
+                if skip_reason:
+                    skip_message = f"LLM unavailable - no changes made: {skip_reason}"
+                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}: {skip_reason}")
+                    self.task_source.on_skip(task, skip_message)
                     result["success"] = True
                     result["skipped"] = True
-                    result["skip_reason"] = "LLM unavailable - no changes made"
+                    result["skip_reason"] = skip_message
                     return result
 
                 self.logger.info(f"No changes made for task #{task_id}, closing task")
@@ -439,12 +426,14 @@ class IssueWorker(Worker):
             # to ensure everything is committed before proceeding.
             ahead_count = get_commits_ahead_of_branch(repo_dir, base_branch="main")
             if ahead_count == 0:
-                if self._is_llm_unavailable(""):
-                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                    self.task_source.on_skip(task, "LLM unavailable - no commits ahead")
+                skip_reason = self.ralph_executor.get_skip_reason()
+                if skip_reason:
+                    skip_message = f"LLM unavailable - no commits ahead: {skip_reason}"
+                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}: {skip_reason}")
+                    self.task_source.on_skip(task, skip_message)
                     result["success"] = True
                     result["skipped"] = True
-                    result["skip_reason"] = "LLM unavailable - no commits ahead"
+                    result["skip_reason"] = skip_message
                     return result
 
                 self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue")

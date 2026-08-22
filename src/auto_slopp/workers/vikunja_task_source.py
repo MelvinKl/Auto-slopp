@@ -52,6 +52,12 @@ class VikunjaTaskSource(TaskSource):
                 ``f"Updated task {task_id}: {status}"`` when ``status`` is
                 provided, or ``f"Added comment to task {task_id}"`` otherwise.
 
+        Note:
+            If the comment succeeds but the status update fails, a
+            comment-only commit is still made (intentional: the posted
+            comment is tracked as a commit rather than skipped, so a
+            failed status transition does not lose the comment record).
+
         Returns:
             ``True`` if the comment was posted successfully.  Failures to
             post the comment are logged and return ``False``; status
@@ -346,10 +352,15 @@ class VikunjaTaskSource(TaskSource):
             f"- Last error: {error}\n\n"
             f"This task will not be processed again automatically."
         )
+        repo_path = task.raw.get("_repo_path")
+        if repo_path is None:
+            logger.warning(f"No repo_path found in task #{task.id}, skipping max-iterations handling")
+            return
+
         self._update_task_with_comment_and_status(
             task_id=task.id,
             comment=failure_comment,
-            repo_path=task.raw.get("_repo_path"),
+            repo_path=repo_path,
             status="failed",
             commit_message="Updated task status to 'failed'",
         )

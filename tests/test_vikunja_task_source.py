@@ -521,3 +521,82 @@ class TestVikunjaTaskSource:
         mock_comment.assert_called_once()
         mock_update.assert_called_once_with(42, "skipped")
         mock_commit.assert_called_once()
+
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_update_task_with_comment_and_status_commits_when_both_succeed(
+        self, mock_comment, mock_update, mock_commit
+    ):
+        """Test that commit is called when both comment_on_task and update_task_status succeed."""
+        mock_comment.return_value = True
+        mock_update.return_value = True
+        task_source = VikunjaTaskSource()
+        repo_path = Path("/test/repo")
+
+        result = task_source._update_task_with_comment_and_status(42, "Comment text", repo_path, "done")
+
+        assert result is True
+        mock_comment.assert_called_once_with(42, "Comment text")
+        mock_update.assert_called_once_with(42, "done")
+        mock_commit.assert_called_once_with(repo_path, "Updated task 42: done")
+
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_update_task_with_comment_and_status_skips_commit_when_comment_fails(
+        self, mock_comment, mock_update, mock_commit, caplog
+    ):
+        """Test that commit is NOT called and the helper returns False when comment_on_task fails."""
+        mock_comment.return_value = False
+        mock_update.return_value = True
+        task_source = VikunjaTaskSource()
+        repo_path = Path("/test/repo")
+
+        result = task_source._update_task_with_comment_and_status(42, "Comment text", repo_path, "done")
+
+        assert result is False
+        mock_comment.assert_called_once()
+        mock_update.assert_not_called()
+        mock_commit.assert_not_called()
+        assert "Failed to add comment to task 42" in caplog.text
+
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_update_task_with_comment_and_status_comment_only_commit_when_status_fails(
+        self, mock_comment, mock_update, mock_commit, caplog
+    ):
+        """Test that a comment-only commit is still made when update_task_status fails (intentional fallthrough)."""
+        mock_comment.return_value = True
+        mock_update.return_value = False
+        task_source = VikunjaTaskSource()
+        repo_path = Path("/test/repo")
+
+        result = task_source._update_task_with_comment_and_status(42, "Comment text", repo_path, "done")
+
+        assert result is True
+        mock_comment.assert_called_once()
+        mock_update.assert_called_once()
+        mock_commit.assert_called_once_with(repo_path, "Added comment to task 42")
+        assert "Failed to update status to 'done' for task 42" in caplog.text
+
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_update_task_with_comment_and_status_no_commit_when_both_fail(
+        self, mock_comment, mock_update, mock_commit, caplog
+    ):
+        """Test that commit is NOT called and the helper returns False when both operations fail."""
+        mock_comment.return_value = False
+        mock_update.return_value = False
+        task_source = VikunjaTaskSource()
+        repo_path = Path("/test/repo")
+
+        result = task_source._update_task_with_comment_and_status(42, "Comment text", repo_path, "done")
+
+        assert result is False
+        mock_comment.assert_called_once()
+        mock_update.assert_not_called()
+        mock_commit.assert_not_called()
+        assert "Failed to add comment to task 42" in caplog.text
