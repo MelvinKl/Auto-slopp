@@ -54,12 +54,12 @@ class MockTaskSource(TaskSource):
     def on_no_changes(self, task: Task) -> None:
         self.on_no_changes_called = True
 
-    def on_skip(self, task: Task, reason: str = "") -> None:
-        self.on_skip_called = True
-        self.skip_reason = reason
-
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         self.on_max_iterations_called = True
+
+    def on_skip(self, task: Task, reason: str) -> None:
+        self.on_skip_called = True
+        self.skip_reason = reason
 
 
 class CapturingTaskSourceWithFindings(MockTaskSource):
@@ -364,7 +364,6 @@ class TestIssueWorker:
         assert result["tasks_processed"] == 0
         assert len(result["task_results"]) == 1
         assert result["task_results"][0]["success"] is False
-        assert result["task_results"][0]["status"] == "failure"
         assert task_source.on_task_failure_called is True
 
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
@@ -419,7 +418,7 @@ class TestIssueWorker:
         assert result["success"] is True
         assert result["tasks_processed"] == 0
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is None
+        assert result["task_results"][0]["success"] is True
         assert result["task_results"][0].get("skipped") is True
         assert task_source.on_skip_called is True
         assert "No active CLI configuration available" in task_source.skip_reason
@@ -460,7 +459,7 @@ class TestIssueWorker:
         assert result["success"] is True
         assert result["tasks_processed"] == 0
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is None
+        assert result["task_results"][0]["success"] is True
         assert result["task_results"][0].get("skipped") is True
         assert task_source.on_skip_called is True
         assert "All CLI configurations exhausted" in task_source.skip_reason
@@ -470,7 +469,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
     def test_branch_creation_failure(self, mock_settings, mock_create_branch, mock_checkout):
-        """Test that run handles branch creation failure as a failure and calls on_task_failure."""
+        """Test that run handles branch creation failure and calls on_task_failure."""
         mock_settings.ralph_enabled = False
         mock_checkout.return_value = True
         mock_create_branch.return_value = False
@@ -480,12 +479,9 @@ class TestIssueWorker:
         assert result["success"] is True
         assert result["tasks_processed"] == 0
         assert len(result["task_results"]) == 1
-        assert result["tasks_skipped"] == 0
-        assert result["task_results"][0]["status"] == "failure"
-        assert result["task_results"][0]["success"] is False
-        assert "Could not create branch" in result["task_results"][0]["error"]
+        assert "Failed to create branch" in result["task_results"][0]["error"]
+        assert "task #1" in result["task_results"][0]["error"]
         assert task_source.on_task_failure_called is True
-        assert task_source.on_skip_called is False
 
     @patch("auto_slopp.workers.issue_worker.settings")
     def test_create_results_dict(self, mock_settings):
@@ -1288,8 +1284,8 @@ class TestIssueWorker:
         assert result["tasks_processed"] == 0
         assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is None
-        assert result["task_results"][0]["status"] == "skipped"
+        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["skipped"] is True
         assert "skip_reason" in result["task_results"][0]
         assert task_source.on_skip_called is True
         assert task_source.on_task_failure_called is False
@@ -1315,8 +1311,8 @@ class TestIssueWorker:
         assert result["tasks_processed"] == 0
         assert result["tasks_skipped"] == 1
         assert len(result["task_results"]) == 1
-        assert result["task_results"][0]["success"] is None
-        assert result["task_results"][0]["status"] == "skipped"
+        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["skipped"] is True
         assert "skip_reason" in result["task_results"][0]
         assert task_source.on_skip_called is True
         assert task_source.on_task_failure_called is False
@@ -1458,6 +1454,111 @@ class TestIssueWorker:
         assert worker._is_permanent_error("Connection refused") is False
         assert worker._is_permanent_error("Rate limit exceeded") is False
         assert worker._is_permanent_error("") is False
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
+    def test_no_changes_llm_unavailable_calls_on_skip(
+        self,
+        mock_execute,
+        mock_cli,
+        mock_settings,
+        mock_current_branch,
+        mock_has_changes,
+        mock_create_branch,
+        mock_checkout,
+    ):
+        """Test that on_skip is called when LLM unavailable and no changes made (has_changes=False)."""
+        mock_cli.return_value = "opencode"
+        mock_settings.ralph_enabled = False
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        mock_execute.return_value = {"success": True}
+        mock_has_changes.return_value = False
+        mock_current_branch.return_value = "main"
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        # Mock _is_llm_unavailable to return True
+        worker._is_llm_unavailable = lambda _: True
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert result["tasks_processed"] == 0
+        assert result["tasks_skipped"] == 1
+        assert len(result["task_results"]) == 1
+        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["skipped"] is True
+        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no changes made"
+        assert task_source.on_skip_called is True
+        assert task_source.on_no_changes_called is False
+
+    @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.has_changes")
+    @patch("auto_slopp.workers.issue_worker.get_current_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    @patch("auto_slopp.workers.issue_worker.push_to_remote")
+    @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.ensure_ralph_in_gitignore")
+    def test_no_commits_ahead_llm_unavailable_calls_on_skip(
+        self,
+        mock_cli,
+        mock_commits_ahead,
+        mock_push,
+        mock_settings,
+        mock_current_branch,
+        mock_has_changes,
+        mock_create_branch,
+        mock_checkout,
+        mock_commit_push,
+        mock_ensure_gitignore,
+        caplog,
+    ):
+        """Test that on_skip is called when LLM unavailable and no commits ahead of main."""
+        mock_cli.return_value = True  # ensure_ralph_in_gitignore
+        mock_commits_ahead.return_value = "opencode"  # get_active_cli_command
+        mock_checkout.return_value = True  # create_and_checkout_branch
+        mock_create_branch.return_value = True  # has_changes
+        mock_has_changes.return_value = "ai/task-1"  # get_current_branch
+        mock_current_branch.ralph_enabled = True  # settings
+        mock_current_branch.github_issue_step_max_iterations = 10  # settings
+        mock_settings.return_value = (True, "")  # push_to_remote
+        mock_push.return_value = 0  # get_commits_ahead_of_branch
+        mock_commit_push.return_value = (True, "")  # checkout_branch_resilient
+        mock_ensure_gitignore.return_value = (True, "")  # commit_and_push_changes
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": True,
+            "loops_executed": 1,
+            "steps_completed": 3,
+            "total_steps": 3,
+        }
+        # Mock _is_llm_unavailable to return True
+        worker._is_llm_unavailable = lambda _: True
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with caplog.at_level("WARNING"):
+                result = worker.run(Path(temp_dir))
+
+        assert result["success"] is True
+        assert result["tasks_processed"] == 0
+        assert result["tasks_skipped"] == 1
+        assert len(result["task_results"]) == 1
+        assert result["task_results"][0]["success"] is True
+        assert result["task_results"][0]["skipped"] is True
+        assert result["task_results"][0]["skip_reason"] == "LLM unavailable - no commits ahead"
+        assert task_source.on_skip_called is True
+        assert task_source.on_no_changes_called is False
+        # Verify ensure_ralph_in_gitignore was called
+        mock_cli.assert_called_once()
+        # Verify no warning was logged
+        gitignore_warnings = [r for r in caplog.records if "Failed to ensure .ralph in .gitignore" in r.message]
+        assert len(gitignore_warnings) == 0
 
     @patch("auto_slopp.workers.issue_worker.ensure_ralph_in_gitignore")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
@@ -1626,500 +1727,6 @@ class TestIssueWorker:
             assert content.count(".ralph/") == 1
             assert "*.pyc" in content
             assert "__pycache__/" in content
-
-    def test_skip_task_returns_proper_structure(self):
-        """Test that _skip_task produces a properly structured skipped result."""
-        task_source = MockTaskSource()
-        worker = IssueWorker(task_source=task_source)
-        task = Task(id=42, title="Skipped Task", body="Test body")
-        result = worker._skip_task(worker._init_result(Path("/tmp"), task), task, skip_reason="LLM unavailable")
-
-        assert result["repository"] == "tmp"
-        assert result["skip_reason"] == "LLM unavailable"
-        assert result["task_id"] == 42
-        assert result["task_title"] == "Skipped Task"
-        assert result["success"] is None
-        assert result["status"] == "skipped"
-        assert result["openagent_executed"] is False
-        assert result["openagent_executions"] == 0
-        assert result["task_completed"] is False
-        assert result["tasks_completed"] == 0
-        assert result["pr_created"] is False
-        assert result["prs_created"] == 0
-        assert result["error"] is None
-        assert result["ralph_loops_executed"] == 0
-        assert result["ralph_steps_completed"] == 0
-
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    def test_skipped_task_not_counted_as_processed(self, mock_settings, mock_create_branch, mock_checkout):
-        """Test that skipped tasks are counted in tasks_skipped, not tasks_processed."""
-        mock_settings.ralph_enabled = True
-        mock_settings.github_issue_step_max_iterations = 10
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-        worker.ralph_executor.execute = lambda *args, **kwargs: {
-            "success": False,
-            "loops_executed": 1,
-            "steps_completed": 0,
-            "total_steps": 3,
-            "max_loops_reached": False,
-            "error": "No active CLI configuration available",
-        }
-        result = worker.run(Path("/tmp"))
-        assert result["tasks_skipped"] == 1
-        assert result["tasks_processed"] == 0
-        assert result["tasks_completed"] == 0
-
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    def test_skipped_task_does_not_call_on_task_failure(self, mock_settings, mock_create_branch, mock_checkout):
-        """Test that skipped tasks do not trigger on_task_failure callback."""
-        mock_settings.ralph_enabled = True
-        mock_settings.github_issue_step_max_iterations = 10
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-        worker.ralph_executor.execute = lambda *args, **kwargs: {
-            "success": False,
-            "loops_executed": 1,
-            "steps_completed": 0,
-            "total_steps": 3,
-            "max_loops_reached": False,
-            "error": "No active CLI configuration available",
-        }
-        result = worker.run(Path("/tmp"))
-        assert task_source.on_task_failure_called is False
-        assert task_source.on_task_complete_called is False
-        assert task_source.on_no_changes_called is False
-
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    def test_skipped_task_does_not_log_failure_warning(self, mock_settings, mock_create_branch, mock_checkout, caplog):
-        """Test that skipped tasks do not trigger 'Failed to process task' warning log."""
-        mock_settings.ralph_enabled = True
-        mock_settings.github_issue_step_max_iterations = 10
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-        worker.ralph_executor.execute = lambda *args, **kwargs: {
-            "success": False,
-            "loops_executed": 1,
-            "steps_completed": 0,
-            "total_steps": 3,
-            "max_loops_reached": False,
-            "error": "No active CLI configuration available",
-        }
-        with caplog.at_level("WARNING", logger="auto_slopp.workers.IssueWorker"):
-            result = worker.run(Path("/tmp"))
-        failure_messages = [r.message for r in caplog.records if "Failed to process task" in r.message]
-        assert len(failure_messages) == 0, f"Unexpected failure warnings: {failure_messages}"
-
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    def test_skipped_task_calls_on_task_start_before_skip(self, mock_settings, mock_create_branch, mock_checkout):
-        """Test that on_task_start is called before the skip decision.
-
-        _process_single_task calls on_task_start before executing the agent,
-        so skipped tasks still trigger the start callback.
-        """
-        mock_settings.ralph_enabled = True
-        mock_settings.github_issue_step_max_iterations = 10
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-        worker.ralph_executor.execute = lambda *args, **kwargs: {
-            "success": False,
-            "loops_executed": 1,
-            "steps_completed": 0,
-            "total_steps": 3,
-            "max_loops_reached": False,
-            "error": "No active CLI configuration available",
-        }
-        result = worker.run(Path("/tmp"))
-        assert task_source.on_task_start_called is True
-        assert task_source.on_task_complete_called is False
-        assert task_source.on_task_failure_called is False
-
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    def test_mixed_outcomes_skipped_and_failed(self, mock_settings, mock_create_branch, mock_checkout):
-        """Test that skipped and failed tasks are counted separately."""
-        mock_settings.ralph_enabled = True
-        mock_settings.github_issue_step_max_iterations = 10
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        # First task: LLM unavailable (skip), second task: non-LLM execution failure
-
-        def fake_execute(*args, **kwargs):
-            if kwargs.get("issue_number") == 1:
-                return {
-                    "success": False,
-                    "loops_executed": 1,
-                    "steps_completed": 0,
-                    "total_steps": 3,
-                    "max_loops_reached": False,
-                    "error": "No active CLI configuration available",
-                }
-            return {
-                "success": False,
-                "loops_executed": 1,
-                "steps_completed": 0,
-                "total_steps": 3,
-                "max_loops_reached": False,
-                "error": "Git push failed: permission denied",
-            }
-
-        task_source = MockTaskSource(
-            tasks=[
-                Task(id=1, title="Skip Me", body=""),
-                Task(id=2, title="Fail Me", body=""),
-            ]
-        )
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-        worker.ralph_executor.execute = fake_execute
-        result = worker.run(Path("/tmp"))
-        assert result["tasks_skipped"] == 1
-        assert result["tasks_processed"] == 0
-        assert result["tasks_completed"] == 0
-        assert len(result["task_results"]) == 2
-        assert result["task_results"][0]["status"] == "skipped"
-        assert result["task_results"][0]["success"] is None
-        assert result["task_results"][1]["status"] == "failure"
-        assert result["task_results"][1]["success"] is False
-
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    def test_skipped_task_summary_includes_count(self, mock_settings, mock_create_branch, mock_checkout, caplog):
-        """Test that the completion summary log includes the tasks_skipped count."""
-        mock_settings.ralph_enabled = True
-        mock_settings.github_issue_step_max_iterations = 10
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-        worker.ralph_executor.execute = lambda *args, **kwargs: {
-            "success": False,
-            "loops_executed": 1,
-            "steps_completed": 0,
-            "total_steps": 3,
-            "max_loops_reached": False,
-            "error": "No active CLI configuration available",
-        }
-        with caplog.at_level("INFO", logger="auto_slopp.workers.IssueWorker"):
-            result = worker.run(Path("/tmp"))
-        summary_messages = [r.message for r in caplog.records if "Skipped:" in r.message]
-        assert len(summary_messages) == 1
-        assert "Skipped: 1" in summary_messages[0]
-
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    def test_all_tasks_skipped_no_failure_warning(self, mock_settings, mock_create_branch, mock_checkout, caplog):
-        """Test that when all tasks are skipped, no 'Failed to process task' warnings are logged."""
-        mock_settings.ralph_enabled = True
-        mock_settings.github_issue_step_max_iterations = 10
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        task_source = MockTaskSource(
-            tasks=[
-                Task(id=1, title="Test 1", body=""),
-                Task(id=2, title="Test 2", body=""),
-                Task(id=3, title="Test 3", body=""),
-            ]
-        )
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-        worker.ralph_executor.execute = lambda *args, **kwargs: {
-            "success": False,
-            "loops_executed": 1,
-            "steps_completed": 0,
-            "total_steps": 3,
-            "max_loops_reached": False,
-            "error": "No active CLI configuration available",
-        }
-        with caplog.at_level("WARNING", logger="auto_slopp.workers.IssueWorker"):
-            result = worker.run(Path("/tmp"))
-        failure_messages = [r.message for r in caplog.records if "Failed to process task" in r.message]
-        assert len(failure_messages) == 0
-        assert result["tasks_skipped"] == 3
-
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    def test_skip_guard_uses_canonical_success_none_signal(self, mock_settings, mock_create_branch, mock_checkout):
-        """Test that the run() guard uses only `success is None` to detect skips.
-
-        The canonical skip signal is `success=None`. The guard in run() must not
-        also check `status == "skipped"` — that would duplicate the signal and
-        make the canonical indicator less obvious.
-        """
-        mock_settings.ralph_enabled = True
-        mock_settings.github_issue_step_max_iterations = 10
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-        worker.ralph_executor.execute = lambda *args, **kwargs: {
-            "success": False,
-            "loops_executed": 1,
-            "steps_completed": 0,
-            "total_steps": 3,
-            "max_loops_reached": False,
-            "error": "No active CLI configuration available",
-        }
-        result = worker.run(Path("/tmp"))
-
-        # The skip signal must be `success=None` (the canonical indicator)
-        task_result = result["task_results"][0]
-        assert task_result["success"] is None, "Skip signal must be success=None"
-        assert task_result["status"] == "skipped"
-
-        # The task must be counted as skipped (not processed or failed)
-        assert result["tasks_skipped"] == 1
-        assert result["tasks_processed"] == 0
-        assert result["tasks_completed"] == 0
-
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    def test_run_guard_distinguishes_skip_from_failure(self, mock_settings, mock_create_branch, mock_checkout):
-        """Test that the run() guard correctly distinguishes skip (None) from failure (False)."""
-        mock_settings.ralph_enabled = True
-        mock_settings.github_issue_step_max_iterations = 10
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        # First task: LLM unavailable → skip (success=None)
-        # Second task: non-LLM Ralph failure → failure (success=False)
-
-        def fake_execute(*args, **kwargs):
-            if kwargs.get("issue_number") == 1:
-                return {
-                    "success": False,
-                    "loops_executed": 1,
-                    "steps_completed": 0,
-                    "total_steps": 3,
-                    "max_loops_reached": False,
-                    "error": "No active CLI configuration available",
-                }
-            return {
-                "success": False,
-                "loops_executed": 1,
-                "steps_completed": 0,
-                "total_steps": 3,
-                "max_loops_reached": False,
-                "error": "Git push failed: permission denied",
-            }
-
-        task_source = MockTaskSource(
-            tasks=[
-                Task(id=1, title="Skip Me", body=""),
-                Task(id=2, title="Fail Me", body=""),
-            ]
-        )
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-        worker.ralph_executor.execute = fake_execute
-        result = worker.run(Path("/tmp"))
-
-        # Skip: success is None, counted in tasks_skipped
-        assert result["task_results"][0]["success"] is None
-        assert result["task_results"][0]["status"] == "skipped"
-        # Failure: success is False, NOT counted in tasks_skipped
-        assert result["task_results"][1]["success"] is False
-        assert result["task_results"][1]["status"] == "failure"
-        # Counts are separate
-        assert result["tasks_skipped"] == 1
-        assert result["tasks_processed"] == 0
-        assert result["tasks_completed"] == 0
-
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    def test_unified_skip_signal_all_paths(self, mock_settings, mock_create_branch, mock_checkout, caplog):
-        """Regression test: skip paths produce the same canonical skip signal.
-
-        The canonical skip signal is `success=None` with `status='skipped'`.
-        The LLM-unavailable skip paths in _process_single_task must produce
-        this signal:
-        1. LLM unavailable during Ralph loop
-        2. LLM unavailable during CLI execution
-
-        This test verifies that:
-        - Skip paths produce `success=None` and `status='skipped'`
-        - Skipped tasks are counted in `tasks_skipped`, not `tasks_processed`
-        - No 'Failed to process task' warning is logged for skips
-        - `on_skip` is called for LLM-unavailable skips
-        - `on_task_failure` is NOT called for skips
-        """
-        mock_settings.ralph_enabled = True
-        mock_settings.github_issue_step_max_iterations = 10
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-        worker.ralph_executor.execute = lambda *args, **kwargs: {
-            "success": False,
-            "loops_executed": 1,
-            "steps_completed": 0,
-            "total_steps": 3,
-            "max_loops_reached": False,
-            "error": "No active CLI configuration available",
-        }
-
-        with caplog.at_level("WARNING", logger="auto_slopp.workers.IssueWorker"):
-            result = worker.run(Path("/tmp"))
-
-        # Canonical skip signal
-        task_result = result["task_results"][0]
-        assert task_result["success"] is None, "Skip signal must be success=None"
-        assert task_result["status"] == "skipped"
-        assert "skip_reason" in task_result
-
-        # Counted in tasks_skipped, NOT in tasks_processed or tasks_completed
-        assert result["tasks_skipped"] == 1
-        assert result["tasks_processed"] == 0
-        assert result["tasks_completed"] == 0
-
-        # No failure warning logged
-        failure_messages = [r.message for r in caplog.records if "Failed to process task" in r.message]
-        assert len(failure_messages) == 0, f"Unexpected failure warnings: {failure_messages}"
-
-        # on_skip is NOT called for branch creation failure (that's a different skip path)
-        # but the canonical signal is still correct
-
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    def test_unified_skip_signal_ralph_llm_unavailable(self, mock_settings, mock_create_branch, mock_checkout, caplog):
-        """Regression: LLM unavailable during Ralph loop produces canonical skip signal."""
-        mock_settings.ralph_enabled = True
-        mock_settings.github_issue_step_max_iterations = 10
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-        worker.ralph_executor.execute = lambda *args, **kwargs: {
-            "success": False,
-            "loops_executed": 1,
-            "steps_completed": 2,
-            "total_steps": 5,
-            "max_loops_reached": False,
-            "error": "LLM timed out waiting for response",
-        }
-
-        with caplog.at_level("WARNING", logger="auto_slopp.workers.IssueWorker"):
-            result = worker.run(Path("/tmp"))
-
-        # Canonical skip signal
-        task_result = result["task_results"][0]
-        assert task_result["success"] is None, "Skip signal must be success=None"
-        assert task_result["status"] == "skipped"
-        assert "skip_reason" in task_result
-
-        # Counted in tasks_skipped
-        assert result["tasks_skipped"] == 1
-        assert result["tasks_processed"] == 0
-
-        # No failure warning
-        failure_messages = [r.message for r in caplog.records if "Failed to process task" in r.message]
-        assert len(failure_messages) == 0
-
-        # on_skip called, on_task_failure NOT called
-        assert task_source.on_skip_called is True
-        assert task_source.on_task_failure_called is False
-
-    @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
-    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
-    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
-    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
-    @patch("auto_slopp.workers.issue_worker.settings")
-    def test_unified_skip_signal_cli_llm_unavailable(
-        self, mock_settings, mock_create_branch, mock_checkout, mock_cli, mock_execute, caplog
-    ):
-        """Regression: LLM unavailable during CLI execution produces canonical skip signal."""
-        mock_settings.ralph_enabled = False
-        mock_checkout.return_value = True
-        mock_create_branch.return_value = True
-        mock_cli.return_value = "opencode"
-        mock_execute.return_value = {"success": False, "error": "LLM unavailable: connection refused"}
-        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
-        worker = IssueWorker(task_source=task_source, dry_run=False)
-
-        with caplog.at_level("WARNING", logger="auto_slopp.workers.IssueWorker"):
-            result = worker.run(Path("/tmp"))
-
-        # Canonical skip signal
-        task_result = result["task_results"][0]
-        assert task_result["success"] is None, "Skip signal must be success=None"
-        assert task_result["status"] == "skipped"
-        assert "skip_reason" in task_result
-
-        # Counted in tasks_skipped
-        assert result["tasks_skipped"] == 1
-        assert result["tasks_processed"] == 0
-
-        # No failure warning
-        failure_messages = [r.message for r in caplog.records if "Failed to process task" in r.message]
-        assert len(failure_messages) == 0
-
-        # on_skip called, on_task_failure NOT called
-        assert task_source.on_skip_called is True
-        assert task_source.on_task_failure_called is False
-
-    def test_is_task_skipped_helper(self):
-        """Test the is_task_skipped static helper method."""
-        # Skipped task: success=None
-        assert IssueWorker.is_task_skipped({"success": None}) is True
-        assert IssueWorker.is_task_skipped({"success": None, "status": "skipped"}) is True
-
-        # Not skipped: success=True
-        assert IssueWorker.is_task_skipped({"success": True}) is False
-
-        # Not skipped: success=False
-        assert IssueWorker.is_task_skipped({"success": False}) is False
-
-        # Not skipped: missing key
-        assert IssueWorker.is_task_skipped({}) is False
-
-    def test_is_task_failed_helper(self):
-        """Test the is_task_failed static helper method."""
-        # Failed task: success=False
-        assert IssueWorker.is_task_failed({"success": False}) is True
-        assert IssueWorker.is_task_failed({"success": False, "status": "failure"}) is True
-
-        # Not failed: success=True
-        assert IssueWorker.is_task_failed({"success": True}) is False
-
-        # Not failed: success=None (skipped is NOT a failure)
-        assert IssueWorker.is_task_failed({"success": None}) is False
-
-        # Not failed: missing key
-        assert IssueWorker.is_task_failed({}) is False
-
-    def test_is_task_successful_helper(self):
-        """Test the is_task_successful static helper method."""
-        # Successful task: success=True
-        assert IssueWorker.is_task_successful({"success": True}) is True
-        assert IssueWorker.is_task_successful({"success": True, "status": "success"}) is True
-
-        # Not successful: success=False
-        assert IssueWorker.is_task_successful({"success": False}) is False
-
-        # Not successful: success=None (skipped is NOT successful)
-        assert IssueWorker.is_task_successful({"success": None}) is False
-
-        # Not successful: missing key
-        assert IssueWorker.is_task_successful({}) is False
 
 
 class TestEnsureIssueLinkInPRBody:
