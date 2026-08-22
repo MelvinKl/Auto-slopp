@@ -1,5 +1,6 @@
 """Tests for CLI execution behavior."""
 
+import logging
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
@@ -837,43 +838,42 @@ def test_resolve_timeout_out_of_range_fallback_uses_probe_timeout():
     """An out-of-range fallback should be discarded (with a warning) and replaced by _PROBE_TIMEOUT_SECONDS."""
     from auto_slopp.utils import cli_executor
 
-    with (
-        patch.object(cli_executor.logger, "warning") as mock_warning,
-        patch.object(cli_executor.logger, "debug") as mock_debug,
-    ):
+    with (patch.object(cli_executor.logger, "log") as mock_log,):
         assert cli_executor._resolve_timeout(None, fallback=-5) == cli_executor._PROBE_TIMEOUT_SECONDS
         assert cli_executor._resolve_timeout(None, fallback=0) == cli_executor._PROBE_TIMEOUT_SECONDS
         assert (
             cli_executor._resolve_timeout(None, fallback=cli_executor.MAX_TIMEOUT_SECONDS + 1)
             == cli_executor._PROBE_TIMEOUT_SECONDS
         )
-    assert mock_warning.call_count == 3
-    assert mock_debug.call_count == 0
+    # Filter for WARNING level logs (default)
+    warning_calls = [c for c in mock_log.call_args_list if c[0][0] == logging.WARNING]
+    assert len(warning_calls) == 3
 
 
 def test_resolve_timeout_tracking_set_is_bounded():
-    """Distinct out-of-range values are still warned about once the cap is exceeded, but no longer tracked."""
+    """Distinct out-of-range values are still warned about once the cap is exceeded, but LRU eviction applies."""
     from auto_slopp.utils import cli_executor
 
     with patch.object(cli_executor, "_MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS", 1):
-        original_set = cli_executor._warned_out_of_range_timeouts
+        original_timeouts = cli_executor._warned_out_of_range_timeouts
         original_fallbacks = cli_executor._warned_out_of_range_fallbacks
-        cli_executor._warned_out_of_range_timeouts = set()
-        cli_executor._warned_out_of_range_fallbacks = set()
+        cli_executor._warned_out_of_range_timeouts = cli_executor.__dict__.get(
+            "_warned_out_of_range_timeouts", cli_executor.__dict__["_warned_out_of_range_timeouts"]
+        ).__class__()
+        cli_executor._warned_out_of_range_fallbacks = cli_executor.__dict__.get(
+            "_warned_out_of_range_fallbacks", cli_executor.__dict__["_warned_out_of_range_fallbacks"]
+        ).__class__()
         try:
-            with (
-                patch.object(cli_executor.logger, "warning") as mock_warning,
-                patch.object(cli_executor.logger, "debug") as mock_debug,
-            ):
+            with patch.object(cli_executor.logger, "log") as mock_log:
                 _resolve_timeout(40000000, fallback=100)
                 _resolve_timeout(50000000, fallback=100)
             # Both values were warned about.
-            assert mock_warning.call_count == 2
-            assert mock_debug.call_count == 0
-            # ...but only the first value was tracked once the cap (1) was exceeded.
-            assert cli_executor._warned_out_of_range_timeouts == {40000000}
+            warning_calls = [c for c in mock_log.call_args_list if c[0][0] == logging.WARNING]
+            assert len(warning_calls) == 2
+            # ...but only the most recent value is tracked due to LRU eviction (cap=1).
+            assert set(cli_executor._warned_out_of_range_timeouts.keys()) == {50000000}
         finally:
-            cli_executor._warned_out_of_range_timeouts = original_set
+            cli_executor._warned_out_of_range_timeouts = original_timeouts
             cli_executor._warned_out_of_range_fallbacks = original_fallbacks
 
 
@@ -885,18 +885,18 @@ def test_resolve_timeout_warns_once_per_distinct_value():
     """
     from auto_slopp.utils import cli_executor
 
-    with (
-        patch.object(cli_executor.logger, "warning") as mock_warning,
-        patch.object(cli_executor.logger, "debug") as mock_debug,
-    ):
+    with patch.object(cli_executor.logger, "log") as mock_log:
         _resolve_timeout(99999999, fallback=100)
         _resolve_timeout(99999999, fallback=100)  # same value: debug, not warning
         _resolve_timeout(0, fallback=100)  # distinct value: warns again
-    assert mock_warning.call_count == 2
-    assert mock_debug.call_count == 1
+
+    warning_calls = [c for c in mock_log.call_args_list if c[0][0] == logging.WARNING]
+    debug_calls = [c for c in mock_log.call_args_list if c[0][0] == logging.DEBUG]
+    assert len(warning_calls) == 2
+    assert len(debug_calls) == 1
     # Above-maximum and non-positive values are diagnosed differently.
-    # Argument order: (format, raw_timeout, problem, max, fallback).
-    above_max_problem = mock_warning.call_args_list[0][0][2]
-    non_positive_problem = mock_warning.call_args_list[1][0][2]
+    # Argument order: (level, format, raw_timeout, problem, max, fallback).
+    above_max_problem = warning_calls[0][0][3]
+    non_positive_problem = warning_calls[1][0][3]
     assert "value above the maximum" in above_max_problem
     assert "non-positive value (0)" in non_positive_problem

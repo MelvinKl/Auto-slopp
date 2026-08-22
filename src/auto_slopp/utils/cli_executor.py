@@ -5,11 +5,13 @@ This module provides a centralized utility for executing configured CLI commands
 """
 
 import logging
+import os
 import subprocess
 import time
+from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 from settings.main import (
     MAX_TIMEOUT_SECONDS,
@@ -24,18 +26,36 @@ _active_cli_configuration_index = 0
 
 # Out-of-range timeout values already logged at warning level; subsequent
 # resolutions of the same value log at debug only.
-_warned_out_of_range_timeouts: Set[int] = set()
+# Uses OrderedDict for LRU eviction when max size is reached.
+_warned_out_of_range_timeouts: "OrderedDict[int, None]" = OrderedDict()
 
 # Out-of-range fallback values already logged at warning level; subsequent
 # resolutions of the same value log at debug only.
-_warned_out_of_range_fallbacks: Set[int] = set()
+# Uses OrderedDict for LRU eviction when max size is reached.
+_warned_out_of_range_fallbacks: "OrderedDict[int, None]" = OrderedDict()
 
-# Timeout values can originate from external or dynamic sources (env-driven
-# CLI configurations, per-invocation overrides), so the "warn once" tracking
-# sets are bounded to guarantee no unbounded process-lifetime growth. Once a
-# set exceeds this size, new values are still warned about but no longer
-# tracked.
+# Maximum number of distinct out-of-range timeout/fallback values to track.
+# When this limit is reached, the least recently used entry is evicted to
+# make room for new values, ensuring bounded memory usage in long-running
+# processes that encounter many distinct misconfigured timeout values.
 _MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS = 1000
+
+# Log level for out-of-range timeout warnings. Can be overridden via
+# AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL environment variable.
+# Defaults to WARNING; set to DEBUG to reduce log volume in production.
+_TIMEOUT_WARN_LOG_LEVEL = logging.WARNING
+
+# Initialize log level from environment variable
+_warn_level_env = os.getenv("AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL")
+if _warn_level_env:
+    try:
+        _TIMEOUT_WARN_LOG_LEVEL = getattr(logging, _warn_level_env.upper())
+    except AttributeError:
+        logger.warning(
+            "Invalid AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL value: %r. "
+            "Valid values: DEBUG, INFO, WARNING, ERROR, CRITICAL. Using WARNING.",
+            _warn_level_env,
+        )
 
 
 _PROBE_INSTRUCTIONS = "are you working?"
@@ -290,7 +310,9 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
         # use the built-in probe timeout instead so the final effective
         # timeout is always in range and diagnosable.
         if fallback in _warned_out_of_range_fallbacks:
-            logger.debug(
+            _warned_out_of_range_fallbacks.move_to_end(fallback)
+            logger.log(
+                logging.DEBUG,
                 "Discarding out-of-range fallback timeout %r (valid range: 0 < timeout <= %d "
                 "seconds); using %r instead (already warned)",
                 fallback,
@@ -298,9 +320,11 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
                 _PROBE_TIMEOUT_SECONDS,
             )
         else:
-            if len(_warned_out_of_range_fallbacks) < _MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS:
-                _warned_out_of_range_fallbacks.add(fallback)
-            logger.warning(
+            if len(_warned_out_of_range_fallbacks) >= _MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS:
+                _warned_out_of_range_fallbacks.popitem(last=False)
+            _warned_out_of_range_fallbacks[fallback] = None
+            logger.log(
+                _TIMEOUT_WARN_LOG_LEVEL,
                 "Discarding out-of-range fallback timeout %r (valid range: 0 < timeout <= %d "
                 "seconds); using %r instead",
                 fallback,
@@ -320,7 +344,9 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
         # Warn once per distinct value; repeated resolutions of the same
         # misconfigured value (e.g., probe/failover loops) log at debug only.
         if raw_timeout in _warned_out_of_range_timeouts:
-            logger.debug(
+            _warned_out_of_range_timeouts.move_to_end(raw_timeout)
+            logger.log(
+                logging.DEBUG,
                 "Discarding out-of-range timeout %r (%s; valid range: 0 < timeout <= %d seconds); "
                 "using fallback %r instead (already warned)",
                 raw_timeout,
@@ -329,9 +355,11 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
                 effective,
             )
         else:
-            if len(_warned_out_of_range_timeouts) < _MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS:
-                _warned_out_of_range_timeouts.add(raw_timeout)
-            logger.warning(
+            if len(_warned_out_of_range_timeouts) >= _MAX_TRACKED_OUT_OF_RANGE_TIMEOUTS:
+                _warned_out_of_range_timeouts.popitem(last=False)
+            _warned_out_of_range_timeouts[raw_timeout] = None
+            logger.log(
+                _TIMEOUT_WARN_LOG_LEVEL,
                 "Discarding out-of-range timeout %r (%s; valid range: 0 < timeout <= %d seconds); "
                 "using fallback %r instead",
                 raw_timeout,
