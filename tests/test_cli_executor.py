@@ -4,14 +4,25 @@ import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
+import pytest
+
 from auto_slopp.utils.cli_executor import (
     _check_startup_health,
     _config_to_dict,
     _resolve_timeout,
-    clear_timeout_warnings,
     run_cli_executor,
 )
 from settings.main import MAX_TIMEOUT_SECONDS, NO_TIMEOUT, CLIConfiguration, TaskRating
+
+
+@pytest.fixture(autouse=True)
+def _reset_warned_timeouts():
+    """Reset the module-level warned-timeout tracker so warning tests are order-independent."""
+    from auto_slopp.utils import cli_executor
+
+    cli_executor._warned_out_of_range_timeouts.clear()
+    yield
+    cli_executor._warned_out_of_range_timeouts.clear()
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
@@ -830,9 +841,6 @@ def test_resolve_timeout_warns_once_per_distinct_value():
     """
     from auto_slopp.utils import cli_executor
 
-    # The warned-values tracker is module-level and persists across tests; start
-    # from a clean slate so this test is order-independent.
-    clear_timeout_warnings()
     with (
         patch.object(cli_executor.logger, "warning") as mock_warning,
         patch.object(cli_executor.logger, "debug") as mock_debug,

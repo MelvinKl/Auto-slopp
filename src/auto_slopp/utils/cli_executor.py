@@ -22,62 +22,11 @@ from settings.main import (
 logger = logging.getLogger(__name__)
 _active_cli_configuration_index = 0
 
-# Maximum number of distinct out-of-range timeout values to track.
-# Prevents unbounded memory growth if many misconfigured timeouts are encountered.
-_MAX_WARNED_TIMEOUTS = 1000
-
-
-class _WarnedTimeoutTracker:
-    """Track warned out-of-range timeout values with bounded size.
-
-    Uses a simple LRU eviction policy when the maximum size is reached.
-    This prevents unbounded memory growth in long-running processes that
-    encounter many distinct misconfigured timeout values.
-    """
-
-    def __init__(self, max_size: int = _MAX_WARNED_TIMEOUTS) -> None:
-        self._max_size = max_size
-        self._values: Set[int] = set()
-        self._order: List[int] = []
-
-    def __contains__(self, value: int) -> bool:
-        return value in self._values
-
-    def add(self, value: int) -> None:
-        if value in self._values:
-            # Move to end (most recently used)
-            self._order.remove(value)
-            self._order.append(value)
-            return
-        if len(self._values) >= self._max_size:
-            # Evict least recently used
-            oldest = self._order.pop(0)
-            self._values.discard(oldest)
-        self._values.add(value)
-        self._order.append(value)
-
-    def clear(self) -> None:
-        """Clear all tracked timeout values.
-
-        Useful for test isolation to avoid coupling tests to implementation details.
-        """
-        self._values.clear()
-        self._order.clear()
-
-
-_warned_out_of_range_timeouts = _WarnedTimeoutTracker()
-
-
-def clear_timeout_warnings() -> None:
-    """Clear the set of warned out-of-range timeout values.
-
-    This function allows test isolation without coupling tests to
-    implementation details of the warning tracker.
-
-    Example:
-        >>> clear_timeout_warnings()
-    """
-    _warned_out_of_range_timeouts.clear()
+# Out-of-range timeout values already logged at warning level; subsequent
+# resolutions of the same value log at debug only. Valid configurations can
+# only produce NO_TIMEOUT or a value in (0, MAX_TIMEOUT_SECONDS], so this set
+# stays small in practice.
+_warned_out_of_range_timeouts: Set[int] = set()
 
 
 _PROBE_INSTRUCTIONS = "are you working?"
