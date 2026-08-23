@@ -294,6 +294,10 @@ def _warn_once_tracked(
     Values already present in ``tracked`` are logged at debug level with an
     "(already warned)" suffix; new values are added to ``tracked``.
     """
+    # No lock around the check-then-add: under concurrent first-use of the
+    # same value, two callers may both miss it in ``tracked`` and both log
+    # the warning (a harmless duplicate, unlike the idempotent lazy init in
+    # _get_timeout_warn_level).
     if value in tracked:
         logger.log(logging.DEBUG, fmt + " (already warned)", *args)
     else:
