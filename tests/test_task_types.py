@@ -19,7 +19,7 @@ class TestValidateTaskResult:
             "task_id": 1,
             "task_title": "Test Task",
             "success": None,
-            "status": TaskStatus.SKIPPED,
+            "status": TaskStatus.SKIPPED.value,
             "openagent_executed": False,
             "openagent_executions": 0,
             "task_completed": False,
@@ -41,7 +41,7 @@ class TestValidateTaskResult:
             "task_id": 1,
             "task_title": "Test Task",
             "success": True,
-            "status": TaskStatus.SUCCESS,
+            "status": TaskStatus.SUCCESS.value,
             "openagent_executed": True,
             "openagent_executions": 1,
             "task_completed": True,
@@ -61,7 +61,7 @@ class TestValidateTaskResult:
             "task_id": 1,
             "task_title": "Test Task",
             "success": False,
-            "status": TaskStatus.FAILURE,
+            "status": TaskStatus.FAILURE.value,
             "openagent_executed": True,
             "openagent_executions": 1,
             "task_completed": False,
@@ -81,7 +81,7 @@ class TestValidateTaskResult:
             "task_id": 1,
             "task_title": "Test Task",
             "success": None,
-            "status": TaskStatus.SKIPPED,
+            "status": TaskStatus.SKIPPED.value,
             "openagent_executed": False,
             "openagent_executions": 0,
             "task_completed": False,
@@ -103,7 +103,7 @@ class TestValidateTaskResult:
             "task_id": 1,
             "task_title": "Test Task",
             "success": True,
-            "status": TaskStatus.SUCCESS,
+            "status": TaskStatus.SUCCESS.value,
             "openagent_executed": True,
             "openagent_executions": 1,
             "task_completed": True,
@@ -125,7 +125,7 @@ class TestValidateTaskResult:
             "task_id": 1,
             "task_title": "Test Task",
             "success": None,
-            "status": TaskStatus.SUCCESS,
+            "status": TaskStatus.SUCCESS.value,
             "openagent_executed": True,
             "openagent_executions": 1,
             "task_completed": True,
@@ -146,7 +146,7 @@ class TestValidateTaskResult:
             "task_id": 1,
             "task_title": "Test Task",
             "success": True,
-            "status": TaskStatus.SKIPPED,
+            "status": TaskStatus.SKIPPED.value,
             "openagent_executed": False,
             "openagent_executions": 0,
             "task_completed": False,
@@ -173,7 +173,7 @@ class TestValidateTaskResult:
             "task_id": 1,
             "task_title": "Test Task",
             "success": None,
-            "status": TaskStatus.SKIPPED,
+            "status": TaskStatus.SKIPPED.value,
             "openagent_executed": False,
             "openagent_executions": 0,
             "task_completed": False,
@@ -194,7 +194,7 @@ class TestValidateTaskResult:
             validate_task_result(result)
 
         # Manually break the sync: keep status=SUCCESS but set skipped=True
-        result["status"] = TaskStatus.SUCCESS
+        result["status"] = TaskStatus.SUCCESS.value
         result["success"] = True
         result["skipped"] = True
         with pytest.raises(ValueError, match="skipped can only be True when status is SKIPPED"):
@@ -207,7 +207,7 @@ class TestValidateTaskResult:
             "task_id": 1,
             "task_title": "Test Task",
             "success": True,
-            "status": TaskStatus.PENDING,
+            "status": TaskStatus.PENDING.value,
             "openagent_executed": False,
             "openagent_executions": 0,
             "task_completed": False,
@@ -227,7 +227,7 @@ class TestValidateTaskResult:
             "task_id": 1,
             "task_title": "Test Task",
             "success": None,
-            "status": TaskStatus.SKIPPED,
+            "status": TaskStatus.SKIPPED.value,
             "openagent_executed": False,
             "openagent_executions": 0,
             "task_completed": False,

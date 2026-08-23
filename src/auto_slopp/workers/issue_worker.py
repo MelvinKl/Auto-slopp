@@ -39,7 +39,7 @@ from auto_slopp.utils.linking import ensure_issue_link_in_pr_body
 from auto_slopp.utils.ralph import RalphExecutor
 from auto_slopp.worker import Worker
 from auto_slopp.workers.task_source import Task, TaskSource
-from auto_slopp.workers.task_types import TaskStatus
+from auto_slopp.workers.task_types import TaskStatus, validate_task_result
 from settings.main import settings
 
 
@@ -126,6 +126,7 @@ class IssueWorker(Worker):
 
         for task in tasks:
             task_result = self._process_single_task(repo_path, task)
+            validate_task_result(task_result)
             results["task_results"].append(task_result)
 
             # A skip is a distinct, non-error outcome: it is counted and

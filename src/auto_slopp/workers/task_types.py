@@ -65,8 +65,8 @@ class TaskResult(TypedDict):
         error: Error message (if any).
         ralph_loops_executed: Number of Ralph loops executed.
         ralph_steps_completed: Number of Ralph steps completed.
-        status: Outcome label (``TaskStatus.PENDING``, ``TaskStatus.SUCCESS``,
-                ``TaskStatus.SKIPPED``, or ``TaskStatus.FAILURE``).
+        status: Outcome label (``"pending"``, ``"success"``, ``"skipped"``,
+                or ``"failure"``).
 
     Conditionally set:
         skipped: Legacy convenience flag, ``True`` when
@@ -95,7 +95,7 @@ class TaskResult(TypedDict):
     error: Required[Optional[str]]
     ralph_loops_executed: Required[int]
     ralph_steps_completed: Required[int]
-    status: Required[TaskStatus]  # 'pending', 'success', 'failure', or 'skipped'
+    status: Required[str]  # 'pending', 'success', 'failure', or 'skipped'
 
     # Conditionally set fields
     skipped: NotRequired[bool]  # Legacy flag; True when status == TaskStatus.SKIPPED (canonical signal: success=None)
