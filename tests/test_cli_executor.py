@@ -826,6 +826,9 @@ def test_resolve_timeout_non_integer_treated_as_invalid():
 
     assert _resolve_timeout("600") == _PROBE_TIMEOUT_SECONDS
     assert _resolve_timeout(-1.0) == _PROBE_TIMEOUT_SECONDS
+    # bool is a subclass of int but is not a valid timeout
+    assert _resolve_timeout(True) == _PROBE_TIMEOUT_SECONDS
+    assert _resolve_timeout(False) == _PROBE_TIMEOUT_SECONDS
 
 
 def test_resolve_timeout_max_boundary():

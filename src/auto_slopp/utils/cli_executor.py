@@ -320,16 +320,19 @@ def _resolve_timeout(raw_timeout: Optional[int]) -> Optional[int]:
         None if raw_timeout is NO_TIMEOUT (-1), the raw_timeout value if positive and within range,
         or _PROBE_TIMEOUT_SECONDS otherwise.
     """
-    if raw_timeout == NO_TIMEOUT and isinstance(raw_timeout, int):
+    # bool is a subclass of int, but True/False are not valid timeouts; treat
+    # them as non-integer (without this, True would silently pass as 1 second).
+    is_int = isinstance(raw_timeout, int) and not isinstance(raw_timeout, bool)
+    if raw_timeout == NO_TIMEOUT and is_int:
         return None
-    if isinstance(raw_timeout, int) and 0 < raw_timeout <= MAX_TIMEOUT_SECONDS:
+    if is_int and 0 < raw_timeout <= MAX_TIMEOUT_SECONDS:
         return raw_timeout
     if raw_timeout is not None:
         # raw_timeout was present but invalid (non-integer or out of range);
         # log the discarded value so configuration mistakes are diagnosable.
         # Distinguish non-integer, non-positive, and above-maximum values to make
         # misconfiguration diagnosis faster (mirrors the Pydantic validator).
-        if not isinstance(raw_timeout, int):
+        if not is_int:
             problem = f"non-integer value ({raw_timeout!r})"
         elif raw_timeout <= 0:
             problem = f"non-positive value ({raw_timeout})"
