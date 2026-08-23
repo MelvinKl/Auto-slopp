@@ -22,7 +22,6 @@ def _reset_warned_timeouts():
     from auto_slopp.utils import cli_executor
 
     cli_executor._warned_out_of_range_timeouts.clear()
-    cli_executor._warned_out_of_range_fallbacks.clear()
     # Pin the warn level to the default so WARNING-level assertions stay
     # deterministic even if AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL is set
     # in the environment (e.g., CI) or a prior test resolved/cached a level.
@@ -30,7 +29,6 @@ def _reset_warned_timeouts():
     cli_executor._TIMEOUT_WARN_LOG_LEVEL = logging.WARNING
     yield
     cli_executor._warned_out_of_range_timeouts.clear()
-    cli_executor._warned_out_of_range_fallbacks.clear()
     cli_executor._TIMEOUT_WARN_LOG_LEVEL = saved_warn_level
 
 
@@ -788,7 +786,6 @@ def test_resolve_timeout_no_timeout_returns_none():
     from auto_slopp.utils.cli_executor import _resolve_timeout
 
     assert _resolve_timeout(NO_TIMEOUT) is None
-    assert _resolve_timeout(NO_TIMEOUT, fallback=30) is None
 
 
 def test_resolve_timeout_positive_returns_value():
@@ -797,65 +794,43 @@ def test_resolve_timeout_positive_returns_value():
 
     assert _resolve_timeout(30) == 30
     assert _resolve_timeout(3600) == 3600
-    assert _resolve_timeout(3600, fallback=60) == 3600
 
 
-def test_resolve_timeout_none_with_fallback():
-    """When raw_timeout is None and fallback is provided, use fallback."""
-    from auto_slopp.utils.cli_executor import _resolve_timeout
-
-    assert _resolve_timeout(None, fallback=120) == 120
-
-
-def test_resolve_timeout_none_without_fallback():
-    """When raw_timeout is None and no fallback, use _PROBE_TIMEOUT_SECONDS."""
+def test_resolve_timeout_none_uses_probe_timeout():
+    """When raw_timeout is None, use _PROBE_TIMEOUT_SECONDS."""
     from auto_slopp.utils.cli_executor import _PROBE_TIMEOUT_SECONDS, _resolve_timeout
 
     assert _resolve_timeout(None) == _PROBE_TIMEOUT_SECONDS
 
 
-def test_resolve_timeout_none_explicit_fallback_none():
-    """When raw_timeout is None and fallback is explicitly None, still use _PROBE_TIMEOUT_SECONDS."""
+def test_resolve_timeout_zero_uses_probe_timeout():
+    """A zero or negative (non-NO_TIMEOUT) timeout should use _PROBE_TIMEOUT_SECONDS."""
     from auto_slopp.utils.cli_executor import _PROBE_TIMEOUT_SECONDS, _resolve_timeout
 
-    assert _resolve_timeout(None, fallback=None) == _PROBE_TIMEOUT_SECONDS
-
-
-def test_resolve_timeout_zero_uses_fallback():
-    """A zero or negative (non-NO_TIMEOUT) timeout should use fallback."""
-    from auto_slopp.utils.cli_executor import _PROBE_TIMEOUT_SECONDS, _resolve_timeout
-
-    assert _resolve_timeout(0, fallback=45) == 45
-    assert _resolve_timeout(-5, fallback=45) == 45
     assert _resolve_timeout(0) == _PROBE_TIMEOUT_SECONDS
+    assert _resolve_timeout(-5) == _PROBE_TIMEOUT_SECONDS
 
 
-def test_resolve_timeout_with_invalid_positive_uses_fallback():
-    """A timeout exceeding the maximum should use fallback."""
-    assert _resolve_timeout(MAX_TIMEOUT_SECONDS + 1, fallback=100) == 100
-    assert _resolve_timeout(99999999, fallback=100) == 100
+def test_resolve_timeout_with_invalid_positive_uses_probe_timeout():
+    """A timeout exceeding the maximum should use _PROBE_TIMEOUT_SECONDS."""
+    from auto_slopp.utils.cli_executor import _PROBE_TIMEOUT_SECONDS, _resolve_timeout
+
+    assert _resolve_timeout(MAX_TIMEOUT_SECONDS + 1) == _PROBE_TIMEOUT_SECONDS
+    assert _resolve_timeout(99999999) == _PROBE_TIMEOUT_SECONDS
+
+
+def test_resolve_timeout_non_integer_treated_as_invalid():
+    """A non-integer raw timeout (e.g., str from a hand-edited config) should be
+    treated as invalid without raising, and resolved to _PROBE_TIMEOUT_SECONDS."""
+    from auto_slopp.utils.cli_executor import _PROBE_TIMEOUT_SECONDS, _resolve_timeout
+
+    assert _resolve_timeout("600") == _PROBE_TIMEOUT_SECONDS
+    assert _resolve_timeout(-1.0) == _PROBE_TIMEOUT_SECONDS
 
 
 def test_resolve_timeout_max_boundary():
     """The maximum timeout boundary value should be accepted as-is."""
     assert _resolve_timeout(MAX_TIMEOUT_SECONDS) == MAX_TIMEOUT_SECONDS
-    assert _resolve_timeout(MAX_TIMEOUT_SECONDS, fallback=100) == MAX_TIMEOUT_SECONDS
-
-
-def test_resolve_timeout_out_of_range_fallback_uses_probe_timeout():
-    """An out-of-range fallback should be discarded (with a warning) and replaced by _PROBE_TIMEOUT_SECONDS."""
-    from auto_slopp.utils import cli_executor
-
-    with (patch.object(cli_executor.logger, "log") as mock_log,):
-        assert cli_executor._resolve_timeout(None, fallback=-5) == cli_executor._PROBE_TIMEOUT_SECONDS
-        assert cli_executor._resolve_timeout(None, fallback=0) == cli_executor._PROBE_TIMEOUT_SECONDS
-        assert (
-            cli_executor._resolve_timeout(None, fallback=cli_executor.MAX_TIMEOUT_SECONDS + 1)
-            == cli_executor._PROBE_TIMEOUT_SECONDS
-        )
-    # Filter for WARNING level logs (default)
-    warning_calls = [c for c in mock_log.call_args_list if c[0][0] == logging.WARNING]
-    assert len(warning_calls) == 3
 
 
 def test_resolve_timeout_warned_values_tracked_in_set():
@@ -863,8 +838,8 @@ def test_resolve_timeout_warned_values_tracked_in_set():
     from auto_slopp.utils import cli_executor
 
     with patch.object(cli_executor.logger, "log") as mock_log:
-        _resolve_timeout(40000000, fallback=100)
-        _resolve_timeout(50000000, fallback=100)
+        _resolve_timeout(40000000)
+        _resolve_timeout(50000000)
     # Both distinct values were warned about and are tracked.
     warning_calls = [c for c in mock_log.call_args_list if c[0][0] == logging.WARNING]
     assert len(warning_calls) == 2
@@ -880,16 +855,16 @@ def test_resolve_timeout_warns_once_per_distinct_value():
     from auto_slopp.utils import cli_executor
 
     with patch.object(cli_executor.logger, "log") as mock_log:
-        _resolve_timeout(99999999, fallback=100)
-        _resolve_timeout(99999999, fallback=100)  # same value: debug, not warning
-        _resolve_timeout(0, fallback=100)  # distinct value: warns again
+        _resolve_timeout(99999999)
+        _resolve_timeout(99999999)  # same value: debug, not warning
+        _resolve_timeout(0)  # distinct value: warns again
 
     warning_calls = [c for c in mock_log.call_args_list if c[0][0] == logging.WARNING]
     debug_calls = [c for c in mock_log.call_args_list if c[0][0] == logging.DEBUG]
     assert len(warning_calls) == 2
     assert len(debug_calls) == 1
     # Above-maximum and non-positive values are diagnosed differently.
-    # Argument order: (level, format, raw_timeout, problem, max, fallback).
+    # Argument order: (level, format, raw_timeout, problem, max, effective).
     above_max_problem = warning_calls[0][0][3]
     non_positive_problem = warning_calls[1][0][3]
     assert "value above the maximum" in above_max_problem
@@ -903,7 +878,7 @@ def test_resolve_timeout_warn_level_read_lazily(monkeypatch):
     monkeypatch.setattr(cli_executor, "_TIMEOUT_WARN_LOG_LEVEL", None)
     monkeypatch.setenv("AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL", "DEBUG")
     with patch.object(cli_executor.logger, "log") as mock_log:
-        _resolve_timeout(0, fallback=100)
+        _resolve_timeout(0)
     assert mock_log.call_args_list[0][0][0] == logging.DEBUG
     # The resolved level is cached for subsequent calls.
     assert cli_executor._TIMEOUT_WARN_LOG_LEVEL == logging.DEBUG

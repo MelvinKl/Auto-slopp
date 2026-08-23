@@ -27,10 +27,6 @@ _active_cli_configuration_index = 0
 # resolutions of the same value log at debug only.
 _warned_out_of_range_timeouts: set = set()
 
-# Out-of-range fallback values already logged at warning level; subsequent
-# resolutions of the same value log at debug only.
-_warned_out_of_range_fallbacks: set = set()
-
 # Log level for out-of-range timeout warnings. Can be overridden via
 # AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL environment variable.
 # Defaults to WARNING; set to DEBUG to reduce log volume in production.
@@ -299,57 +295,32 @@ def _warn_once_tracked(
         logger.log(level, fmt, *args)
 
 
-def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None) -> Optional[int]:
+def _resolve_timeout(raw_timeout: Optional[int]) -> Optional[int]:
     """Resolve a raw timeout value to an effective timeout.
 
-    Handles the NO_TIMEOUT sentinel (-1), treats out-of-range values as
-    invalid (valid range: 0 < timeout ≤ MAX_TIMEOUT_SECONDS, ~1 year), and
-    resolves None (unspecified) or invalid values to the provided fallback
-    (or _PROBE_TIMEOUT_SECONDS when no fallback is given).
-
-    Note: the NO_TIMEOUT sentinel takes precedence over the provided
-    fallback: when raw_timeout is NO_TIMEOUT, None is returned even if a
-    fallback is given.
+    Handles the NO_TIMEOUT sentinel (-1), treats non-integer or out-of-range
+    values as invalid (valid range: 0 < timeout ≤ MAX_TIMEOUT_SECONDS, ~1 year),
+    and resolves None (unspecified) or invalid values to _PROBE_TIMEOUT_SECONDS.
 
     Args:
         raw_timeout: The timeout value (None for unspecified, -1 for NO_TIMEOUT, or a positive integer).
-        fallback: Default timeout in seconds to use when raw_timeout is None, non-positive,
-                  or exceeds the maximum. Defaults to None; when None, falls back to
-                  _PROBE_TIMEOUT_SECONDS (600s). The fallback is validated against the
-                  same range (0 < timeout <= MAX_TIMEOUT_SECONDS); an out-of-range
-                  fallback is warned about and replaced by _PROBE_TIMEOUT_SECONDS.
 
     Returns:
         None if raw_timeout is NO_TIMEOUT (-1), the raw_timeout value if positive and within range,
-        or the fallback value if it is in range (or _PROBE_TIMEOUT_SECONDS if fallback is None
-        or out of range) otherwise.
+        or _PROBE_TIMEOUT_SECONDS otherwise.
     """
-    if raw_timeout == NO_TIMEOUT:
+    if raw_timeout == NO_TIMEOUT and isinstance(raw_timeout, int):
         return None
-    if raw_timeout is not None and 0 < raw_timeout <= MAX_TIMEOUT_SECONDS:
+    if isinstance(raw_timeout, int) and 0 < raw_timeout <= MAX_TIMEOUT_SECONDS:
         return raw_timeout
-    effective = fallback if fallback is not None else _PROBE_TIMEOUT_SECONDS
-    if fallback is not None and not (0 < fallback <= MAX_TIMEOUT_SECONDS):
-        # The fallback itself is out of range; it would otherwise be used
-        # verbatim with no diagnostic. Warn (once per distinct value) and
-        # use the built-in probe timeout instead so the final effective
-        # timeout is always in range and diagnosable.
-        _warn_once_tracked(
-            _warned_out_of_range_fallbacks,
-            fallback,
-            _get_timeout_warn_level(),
-            "Discarding out-of-range fallback timeout %r (valid range: 0 < timeout <= %d " "seconds); using %r instead",
-            fallback,
-            MAX_TIMEOUT_SECONDS,
-            _PROBE_TIMEOUT_SECONDS,
-        )
-        effective = _PROBE_TIMEOUT_SECONDS
     if raw_timeout is not None:
-        # raw_timeout was present but out of range (0 < t <= MAX_TIMEOUT_SECONDS);
+        # raw_timeout was present but invalid (non-integer or out of range);
         # log the discarded value so configuration mistakes are diagnosable.
-        # Distinguish non-positive values from values above the maximum to make
+        # Distinguish non-integer, non-positive, and above-maximum values to make
         # misconfiguration diagnosis faster (mirrors the Pydantic validator).
-        if raw_timeout <= 0:
+        if not isinstance(raw_timeout, int):
+            problem = f"non-integer value ({raw_timeout!r})"
+        elif raw_timeout <= 0:
             problem = f"non-positive value ({raw_timeout})"
         else:
             problem = f"value above the maximum ({MAX_TIMEOUT_SECONDS} seconds)"
@@ -359,14 +330,13 @@ def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None)
             _warned_out_of_range_timeouts,
             raw_timeout,
             _get_timeout_warn_level(),
-            "Discarding out-of-range timeout %r (%s; valid range: 0 < timeout <= %d seconds); "
-            "using fallback %r instead",
+            "Discarding out-of-range timeout %r (%s; valid range: 0 < timeout <= %d seconds); " "using %r instead",
             raw_timeout,
             problem,
             MAX_TIMEOUT_SECONDS,
-            effective,
+            _PROBE_TIMEOUT_SECONDS,
         )
-    return effective
+    return _PROBE_TIMEOUT_SECONDS
 
 
 def _probe_configuration(config: Dict[str, Any], working_dir: Path, timeout: Optional[int] = None) -> bool:
