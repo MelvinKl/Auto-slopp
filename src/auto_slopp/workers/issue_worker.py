@@ -143,8 +143,10 @@ class IssueWorker(Worker):
             # logged separately from real failures (success=False).
             if task_result.get("status") == TaskStatus.SKIPPED.value:
                 results["tasks_skipped"] += 1
-                # A task can be skipped after a PR was created (e.g. the
-                # PR-review LLM-unavailable path); still count the PR.
+                # A task can be skipped after the agent already ran and a PR
+                # was created (e.g. the PR-review LLM-unavailable path); still
+                # count the executions and the PR.
+                results["openagent_executions"] += task_result.get("openagent_executions", 0)
                 results["prs_created"] += task_result.get("prs_created", 0)
                 self.logger.info(f"Task #{task.id} skipped: {task_result.get('skip_reason', 'Unknown')}")
             elif task_result["success"]:
@@ -153,6 +155,7 @@ class IssueWorker(Worker):
                 results["prs_created"] += task_result.get("prs_created", 0)
                 results["tasks_completed"] += task_result.get("tasks_completed", 0)
             else:
+                results["tasks_failed"] += 1
                 self.logger.warning(f"Failed to process task #{task.id}: {task_result.get('error', 'Unknown error')}")
 
         results["execution_time"] = self._get_elapsed_time(start_time)
@@ -172,6 +175,7 @@ class IssueWorker(Worker):
             "repositories_with_errors": 0,
             "tasks_processed": 0,
             "tasks_skipped": 0,
+            "tasks_failed": 0,
             "openagent_executions": 0,
             "prs_created": 0,
             "tasks_completed": 0,
@@ -668,7 +672,12 @@ class IssueWorker(Worker):
         result["skipped"] = True
         result["skip_reason"] = reason
         self.logger.info(f"Task #{task.id} skipped: {reason}")
-        self.task_source.on_skip(task, reason)
+        try:
+            self.task_source.on_skip(task, reason)
+        except Exception as e:
+            # A buggy task source must not turn an intentional skip into a
+            # failure (the outer except in _process_single_task would).
+            self.logger.warning(f"on_skip failed for task #{task.id}: {e}")
         return result
 
     def _set_failure(self, result: Dict[str, Any], task: Task, error: str) -> Dict[str, Any]:
@@ -1019,6 +1028,7 @@ Plan:
             f"IssueWorker completed. Processed: "
             f"{results['tasks_processed']}, "
             f"Skipped: {results['tasks_skipped']}, "
+            f"Failed: {results['tasks_failed']}, "
             f"{cli_tool} executions: {results['openagent_executions']}, "
             f"PRs created: {results['prs_created']}, "
             f"Tasks completed: {results['tasks_completed']}, "
