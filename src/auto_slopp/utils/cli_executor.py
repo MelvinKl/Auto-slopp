@@ -8,6 +8,7 @@ import logging
 import os
 import subprocess
 import time
+from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -24,8 +25,10 @@ logger = logging.getLogger(__name__)
 _active_cli_configuration_index = 0
 
 # Out-of-range timeout values already logged at warning level; subsequent
-# resolutions of the same value log at debug only.
-_warned_out_of_range_timeouts: set = set()
+# resolutions of the same value log at debug only. OrderedDict is used so
+# _warn_once_tracked can maintain deterministic LRU eviction order (a plain
+# set's pop() would evict an arbitrary, unspecified element).
+_warned_out_of_range_timeouts: "OrderedDict[Any, bool]" = OrderedDict()
 
 # Log level for out-of-range timeout warnings. Can be overridden via
 # AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL environment variable.
@@ -279,17 +282,25 @@ def _execute_command(
 
 
 # Upper bound on distinct values remembered by _warn_once_tracked.
+# When the bound is hit, the least-recently-seen value is evicted and, if it
+# reappears, it warns once more (see README note on out-of-range warnings).
 _MAX_TRACKED_WARN_VALUES = 1024
 
 
 def _warn_once_tracked(
-    tracked: set,
+    tracked: "OrderedDict[Any, bool]",
     value: Any,
     level: int,
     fmt: str,
     *args: Any,
 ) -> None:
     """Log ``fmt % args`` at ``level`` once per distinct ``value``.
+
+    ``tracked`` must be an :class:`collections.OrderedDict` used as an LRU
+    cache: seeing a value moves it to the end, and when the bound
+    :data:`_MAX_TRACKED_WARN_VALUES` is exceeded the least-recently-seen
+    value is evicted first, so "warn once" semantics are deterministic even
+    with a churning stream of misconfigured values.
 
     Values already present in ``tracked`` are logged at debug level with an
     "(already warned)" suffix; new values are added to ``tracked``.
@@ -299,14 +310,18 @@ def _warn_once_tracked(
     # the warning (a harmless duplicate, unlike the idempotent lazy init in
     # _get_timeout_warn_level).
     if value in tracked:
+        # LRU bookkeeping: refresh recency so this value survives eviction.
+        tracked.move_to_end(value)
         logger.log(logging.DEBUG, fmt + " (already warned)", *args)
     else:
-        tracked.add(value)
-        # Keep the tracked set bounded so frequently-varying misconfigured
+        tracked[value] = True
+        # Keep the tracked cache bounded so frequently-varying misconfigured
         # values cannot grow it without limit for the process lifetime.
         # Evicted values simply warn again if they reappear.
         while len(tracked) > _MAX_TRACKED_WARN_VALUES:
-            tracked.pop()
+            # Evict the least-recently-seen value (deterministic, unlike
+            # set.pop() which removes an arbitrary element).
+            tracked.popitem(last=False)
         logger.log(level, fmt, *args)
 
 

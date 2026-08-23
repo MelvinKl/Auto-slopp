@@ -836,8 +836,8 @@ def test_resolve_timeout_max_boundary():
     assert _resolve_timeout(MAX_TIMEOUT_SECONDS) == MAX_TIMEOUT_SECONDS
 
 
-def test_resolve_timeout_warned_values_tracked_in_set():
-    """Distinct out-of-range values are each warned about once and tracked in a plain set."""
+def test_resolve_timeout_warned_values_tracked_in_ordereddict():
+    """Distinct out-of-range values are each warned about once and tracked in the OrderedDict."""
     from auto_slopp.utils import cli_executor
 
     with patch.object(cli_executor.logger, "log") as mock_log:
@@ -846,7 +846,7 @@ def test_resolve_timeout_warned_values_tracked_in_set():
     # Both distinct values were warned about and are tracked.
     warning_calls = [c for c in mock_log.call_args_list if c[0][0] == logging.WARNING]
     assert len(warning_calls) == 2
-    assert cli_executor._warned_out_of_range_timeouts == {40000000, 50000000}
+    assert set(cli_executor._warned_out_of_range_timeouts) == {40000000, 50000000}
 
 
 def test_resolve_timeout_warns_once_per_distinct_value():
