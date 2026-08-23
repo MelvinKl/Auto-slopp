@@ -943,7 +943,7 @@ The `TaskSource` interface defines lifecycle hooks for task processing:
 - `on_task_complete(task, branch_name, pr_url, findings)`: Called on successful completion
 - `on_task_failure(task, error)`: Called when a task fails
 - `on_no_changes(task)`: Called when no changes were needed
-- `on_skip(task, reason="")`: Called when a task is skipped (e.g., LLM unavailable). For GitHub tasks, skips are logged only (no comment posted). For Vikunja tasks, a skip comment is added to the task. The `reason` parameter provides context for the skip.
+- `on_skip(task, reason="")`: Called when a task is skipped (e.g., LLM unavailable). For GitHub tasks, skips are logged only (no comment posted). For Vikunja tasks, a skip comment is added to the task. The `reason` parameter provides context for the skip. **Breaking change for custom `TaskSource` subclasses:** the signature changed from `on_skip(task)` to `on_skip(task, reason="")`; overrides using the old signature must be updated to accept the `reason` parameter (with a default of `""`), or a `TypeError` will be raised at runtime.
 - `on_max_iterations_reached(task, steps_completed, total_steps, error)`: Called when max iterations are reached
 
 ## API Reference

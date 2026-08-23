@@ -133,10 +133,7 @@ class IssueWorker(Worker):
                 # result as a failure instead of aborting the whole run and
                 # discarding accumulated task results.
                 self.logger.error(f"Inconsistent task result for task #{task.id}: {e}")
-                task_result["success"] = False
-                task_result["status"] = TaskStatus.FAILURE.value
-                task_result["task_completed"] = False
-                task_result["error"] = f"Inconsistent task result: {e}"
+                self._mark_inconsistent(task_result, f"Inconsistent task result: {e}")
             results["task_results"].append(task_result)
 
             # A skip is a distinct, non-error outcome: it is counted and
@@ -678,6 +675,19 @@ class IssueWorker(Worker):
             # A buggy task source must not turn an intentional skip into a
             # failure (the outer except in _process_single_task would).
             self.logger.warning(f"on_skip failed for task #{task.id}: {e}")
+        return result
+
+    def _mark_inconsistent(self, result: Dict[str, Any], error: str) -> Dict[str, Any]:
+        """Mark a task result as failed after a result-validation invariant violation.
+
+        Mirrors the dict mutation of ``_set_failure`` but does not notify the
+        task source: the task already reached its terminal state before
+        validation ran, so no ``on_task_failure`` callback should fire.
+        """
+        result["success"] = False
+        result["status"] = TaskStatus.FAILURE.value
+        result["task_completed"] = False
+        result["error"] = error
         return result
 
     def _set_failure(self, result: Dict[str, Any], task: Task, error: str) -> Dict[str, Any]:

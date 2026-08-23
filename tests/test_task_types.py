@@ -201,7 +201,7 @@ class TestValidateTaskResult:
             validate_task_result(result)
 
     def test_pending_result_without_skipped(self):
-        """Test that a pending result without skipped field passes validation."""
+        """Test that a pending (non-terminal) result fails validation."""
         result: TaskResult = {
             "repository": "test-repo",
             "task_id": 1,
@@ -218,7 +218,8 @@ class TestValidateTaskResult:
             "ralph_loops_executed": 0,
             "ralph_steps_completed": 0,
         }
-        validate_task_result(result)
+        with pytest.raises(ValueError, match="terminal status"):
+            validate_task_result(result)
 
     def test_skipped_result_with_empty_skip_reason(self):
         """Test that a skipped result with empty skip_reason passes validation."""
