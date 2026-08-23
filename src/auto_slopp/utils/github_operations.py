@@ -126,12 +126,16 @@ def get_open_issues(repo_dir: Path) -> List[Dict[str, Any]]:
         return []
 
 
-def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]]:
+def get_issue_comments(repo_dir: Path, issue_number: int, latest: bool = False) -> List[Dict[str, Any]]:
     """Get list of comments on an issue in the repository.
 
     Args:
         repo_dir: Path to the git repository
         issue_number: Issue number to get comments for
+        latest: When True, fetch the most recent up to 100 comments
+            (GraphQL ``last: 100``) instead of the oldest up to 100
+            (``first: 100``). Nodes are still returned in ascending
+            (oldest-first) order within the fetched page.
 
     Returns:
         List of dictionaries containing comment information (id, body, author, createdAt).
@@ -144,10 +148,11 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
         # gh issue view --json comments doesn't expose databaseId
         owner = settings.github_issue_worker_allowed_creator
         repo = repo_dir.name
+        page_field = "last" if latest else "first"
         query = (
             '{ repository(owner: "' + owner + '", name: "' + repo + '") '
             '{ issue(number: ' + str(issue_number) + ') '
-            '{ comments(first: 100) '
+            '{ comments(' + page_field + ': 100) '
             '{ nodes { id databaseId body author { login } createdAt } } } } }'
         )
         result = _run_gh_command(

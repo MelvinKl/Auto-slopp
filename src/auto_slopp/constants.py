@@ -3,8 +3,6 @@
 import re
 from typing import Optional
 
-from auto_slopp.utils.cli_executor import are_all_clis_in_cooldown
-
 # Lowercase substrings that indicate the LLM/CLI tool is unavailable.
 # Patterns are matched case-insensitively via .lower() on the error message.
 # Used by :class:`IssueWorker` and :class:`RalphExecutor` to distinguish
@@ -108,6 +106,11 @@ def error_indicates_llm_unavailability(error_msg: str, cli_available: Optional[b
         return True
     if any(pattern in error_lower for pattern in WEAK_UNAVAILABILITY_PATTERNS):
         if cli_available is None:
+            # Lazy import: keeps this module free of the CLI-execution/settings
+            # machinery by default (and avoids a circular import if
+            # cli_executor ever needs a constant).
+            from auto_slopp.utils.cli_executor import are_all_clis_in_cooldown
+
             return are_all_clis_in_cooldown()
         return not cli_available
     return False

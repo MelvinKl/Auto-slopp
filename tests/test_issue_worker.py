@@ -536,7 +536,7 @@ class TestIssueWorker:
         assert task_source.on_max_iterations_called is False
         assert task_source.on_task_failure_called is False
 
-    @patch("auto_slopp.constants.are_all_clis_in_cooldown")
+    @patch("auto_slopp.utils.cli_executor.are_all_clis_in_cooldown")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")

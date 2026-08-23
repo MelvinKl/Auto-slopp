@@ -371,6 +371,10 @@ class GitHubTaskSource(TaskSource):
     def _latest_comment_is_skip_comment(self, repo_path: Path, issue_number: int) -> bool:
         """Return True if the most recent comment on the issue is a skip comment.
 
+        Only the most recent up to 100 comments are checked (fetched via
+        GraphQL ``last: 100``), which is sufficient because a duplicate skip
+        comment would always be among the newest comments.
+
         Used by :meth:`on_skip` to avoid posting a duplicate skip comment on
         every retry cycle of a prolonged outage.
 
@@ -383,7 +387,7 @@ class GitHubTaskSource(TaskSource):
             (including when the comments cannot be fetched).
         """
         try:
-            comments = get_issue_comments(repo_path, issue_number)
+            comments = get_issue_comments(repo_path, issue_number, latest=True)
         except Exception as e:
             logger.warning(f"Failed to check existing comments for issue #{issue_number}: {e}")
             return False
