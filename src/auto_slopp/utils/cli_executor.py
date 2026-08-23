@@ -46,14 +46,16 @@ def _get_timeout_warn_level() -> int:
         if warn_level_env:
             # Validate against an explicit set of allowed level names rather
             # than getattr(logging, ...), which would also accept non-level
-            # attributes such as NOTSET, FATAL, or module internals.
-            _valid_warn_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+            # attributes such as NOTSET or module internals. FATAL is the
+            # standard logging alias for CRITICAL and is accepted as such.
+            _valid_warn_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL"}
             if warn_level_env.upper() in _valid_warn_levels:
                 level = getattr(logging, warn_level_env.upper())
             else:
                 logger.warning(
                     "Invalid AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL value: %r. "
-                    "Valid values: DEBUG, INFO, WARNING, ERROR, CRITICAL. Using WARNING.",
+                    "Valid values: DEBUG, INFO, WARNING, ERROR, CRITICAL (FATAL accepted as an alias for CRITICAL). "
+                    "Using WARNING.",
                     warn_level_env,
                 )
         _TIMEOUT_WARN_LOG_LEVEL = level
@@ -276,6 +278,10 @@ def _execute_command(
         }
 
 
+# Upper bound on distinct values remembered by _warn_once_tracked.
+_MAX_TRACKED_WARN_VALUES = 1024
+
+
 def _warn_once_tracked(
     tracked: set,
     value: Any,
@@ -292,6 +298,11 @@ def _warn_once_tracked(
         logger.log(logging.DEBUG, fmt + " (already warned)", *args)
     else:
         tracked.add(value)
+        # Keep the tracked set bounded so frequently-varying misconfigured
+        # values cannot grow it without limit for the process lifetime.
+        # Evicted values simply warn again if they reappear.
+        while len(tracked) > _MAX_TRACKED_WARN_VALUES:
+            tracked.pop()
         logger.log(level, fmt, *args)
 
 

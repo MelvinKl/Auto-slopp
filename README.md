@@ -103,7 +103,7 @@ AUTO_SLOPP_CLI_CONFIGURATIONS='[
 
 When a CLI command times out, the task enters a cooldown period and the next available CLI configuration is tried. Set `timeout: -1` to disable this behavior and let commands run indefinitely.
 
-Out-of-range timeout values (e.g., non-positive values or values above 31,536,000 seconds) are discarded and a diagnostic warning is logged (once per distinct value). The log level of these warnings can be adjusted with the `AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL` environment variable. Valid values: `DEBUG`, `INFO`, `WARNING` (default), `ERROR`, and `CRITICAL`. The value is resolved once and cached on first use, so changing the variable at runtime has no effect until the next process start. For example, set it to `DEBUG` to reduce log volume in production:
+Out-of-range timeout values (e.g., non-positive values or values above 31,536,000 seconds) are discarded and a diagnostic warning is logged (once per distinct value). The log level of these warnings can be adjusted with the `AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL` environment variable. Valid values: `DEBUG`, `INFO`, `WARNING` (default), `ERROR`, and `CRITICAL` (`FATAL` is accepted as an alias for `CRITICAL`). The value is resolved once and cached on first use, so changing the variable at runtime has no effect until the next process start. For example, set it to `DEBUG` to reduce log volume in production:
 
 ```bash
 AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL=DEBUG
