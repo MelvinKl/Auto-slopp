@@ -127,6 +127,27 @@ class TestIssueWorker:
             assert result["success"] is True
             assert result["tasks_processed"] == 0
 
+    @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.validate_task_result")
+    def test_run_records_failure_on_inconsistent_task_result(self, mock_validate, mock_checkout, mock_cli):
+        """An inconsistent task result is recorded as a failure instead of
+        aborting the whole run and discarding accumulated results."""
+        mock_validate.side_effect = ValueError("When success is None, status must be SKIPPED")
+        mock_checkout.return_value = True
+        mock_cli.return_value = "opencode"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+            worker = IssueWorker(task_source=task_source, dry_run=True)
+            result = worker.run(Path(temp_dir))
+            task_result = result["task_results"][0]
+            assert task_result["success"] is False
+            assert task_result["status"] == "failure"
+            assert "Inconsistent task result" in task_result["error"]
+            # Run still completes and returns the summary instead of raising
+            assert len(result["task_results"]) == 1
+            assert task_source.on_task_failure_called is False
+
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
@@ -2319,6 +2340,9 @@ class TestIssueWorkerPrReviewLoop:
         assert task_source.on_skip_called is True
         assert mock_fix_cli.call_count == 0
         assert mock_submit_review.call_count == 0
+        # The PR was created before the task was skipped, so it must still be counted
+        assert task_result["prs_created"] == 1
+        assert result["prs_created"] == 1
 
     def test_fix_round_making_no_changes_stops_loop(self):
         """If the fixer changes nothing, the loop stops instead of re-reviewing the unchanged PR."""

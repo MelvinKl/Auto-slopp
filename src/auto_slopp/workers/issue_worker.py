@@ -126,13 +126,26 @@ class IssueWorker(Worker):
 
         for task in tasks:
             task_result = self._process_single_task(repo_path, task)
-            validate_task_result(task_result)
+            try:
+                validate_task_result(task_result)
+            except ValueError as e:
+                # Data-consistency invariant on internal state: record the
+                # result as a failure instead of aborting the whole run and
+                # discarding accumulated task results.
+                self.logger.error(f"Inconsistent task result for task #{task.id}: {e}")
+                task_result["success"] = False
+                task_result["status"] = TaskStatus.FAILURE.value
+                task_result["task_completed"] = False
+                task_result["error"] = f"Inconsistent task result: {e}"
             results["task_results"].append(task_result)
 
             # A skip is a distinct, non-error outcome: it is counted and
             # logged separately from real failures (success=False).
             if task_result.get("status") == TaskStatus.SKIPPED.value:
                 results["tasks_skipped"] += 1
+                # A task can be skipped after a PR was created (e.g. the
+                # PR-review LLM-unavailable path); still count the PR.
+                results["prs_created"] += task_result.get("prs_created", 0)
                 self.logger.info(f"Task #{task.id} skipped: {task_result.get('skip_reason', 'Unknown')}")
             elif task_result["success"]:
                 results["tasks_processed"] += 1
