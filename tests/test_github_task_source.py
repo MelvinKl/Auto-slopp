@@ -629,7 +629,10 @@ class TestGitHubTaskSource:
             {
                 "id": 2,
                 "databaseId": 2,
-                "body": "⏭️ **Task Skipped**\n\nReason: LLM unavailable\n\nThis issue will be retried when the LLM becomes available.",
+                "body": (
+                    "⏭️ **Task Skipped**\n\nReason: LLM unavailable\n\n"
+                    "This issue will be retried when the LLM becomes available."
+                ),
                 "author": "user",
                 "createdAt": "2024-01-02T00:00:00Z",
             },

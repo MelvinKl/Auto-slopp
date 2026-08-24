@@ -403,7 +403,10 @@ class TestVikunjaTaskSource:
             "comments": [
                 {"content": "some earlier comment", "created_time": "2024-01-01T00:00:00Z"},
                 {
-                    "content": "⏭️ **Task Skipped**\n\nReason: LLM unavailable\n\nThis task will be retried when the LLM becomes available.",
+                    "content": (
+                        "⏭️ **Task Skipped**\n\nReason: LLM unavailable\n\n"
+                        "This task will be retried when the LLM becomes available."
+                    ),
                     "created_time": "2024-01-02T00:00:00Z",
                 },
             ],

@@ -111,7 +111,7 @@ class TaskSource(ABC):
             error: Error description
         """
 
-    def on_no_changes(self, task: Task) -> None:
+    def on_no_changes(self, task: Task) -> None:  # noqa: B027 -- intentional non-abstract no-op hook
         """Called when no changes were needed for a task.
 
         This is a non-abstract hook so that subclasses which do not need to
@@ -124,7 +124,7 @@ class TaskSource(ABC):
         """
         pass
 
-    def on_skip(self, task: Task, reason: str) -> None:
+    def on_skip(self, task: Task, reason: str) -> None:  # noqa: B027 -- intentional non-abstract no-op hook
         """Called when a task should be skipped (e.g., when LLM is unavailable).
 
         This is a non-abstract hook with a default no-op implementation, so that

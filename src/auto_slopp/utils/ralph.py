@@ -1162,8 +1162,8 @@ class RalphExecutor:
             try:
                 updated_plan = PlanParser.parse_file(task_path)
                 result["steps_completed"] = len([step for step in updated_plan.steps if step.is_closed])
-            except Exception:
-                pass
+            except Exception as e:  # noqa: S110
+                self.logger.debug(f"Could not re-parse plan after batch execution: {e}")
 
             # Successful iteration – clear the last-iteration error and any
             # stale run-level error so a transient failure in an earlier
