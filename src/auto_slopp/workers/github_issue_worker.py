@@ -4,7 +4,7 @@ This worker is a thin wrapper around IssueWorker that uses GitHubTaskSource.
 """
 
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from auto_slopp.worker import Worker
 from auto_slopp.workers.github_task_source import GitHubTaskSource
@@ -39,7 +39,7 @@ class GitHubIssueWorker(Worker):
             dry_run=dry_run,
         )
 
-    def run(self, repo_path: Path) -> Dict[str, Any]:
+    def run(self, repo_path: Path) -> dict[str, Any]:
         """Execute the GitHub issue processing workflow for a single repository.
 
         Args:
