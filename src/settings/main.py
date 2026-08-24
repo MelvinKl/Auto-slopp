@@ -234,7 +234,7 @@ class Settings(BaseSettings):
         description="Minimum number of review comments per PR (kept for compatibility; the review prompt is conservative and may output fewer)",
     )
     pr_review_worker_max_comments: int = Field(
-        default=3,
+        default=5,
         ge=1,
         le=20,
         description="Maximum number of review comments per PR",
