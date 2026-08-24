@@ -1,7 +1,6 @@
 """Tests for TaskSource ABC and Task dataclass."""
 
 from pathlib import Path
-from typing import List
 from unittest.mock import patch
 
 from auto_slopp.workers.github_task_source import GitHubTaskSource
@@ -12,7 +11,7 @@ from auto_slopp.workers.vikunja_task_source import VikunjaTaskSource
 class ConcreteTaskSource(TaskSource):
     """Concrete implementation for testing the ABC."""
 
-    def get_tasks(self, repo_path: Path) -> List[Task]:
+    def get_tasks(self, repo_path: Path) -> list[Task]:
         return [Task(id=1, title="Test", body="body")]
 
     def get_branch_name(self, task: Task) -> str:
@@ -122,7 +121,7 @@ class TestTaskSource:
         import pytest
 
         class IncompleteSource(TaskSource):
-            def get_tasks(self, repo_path: Path) -> List[Task]:
+            def get_tasks(self, repo_path: Path) -> list[Task]:
                 return []
 
         with pytest.raises(TypeError):

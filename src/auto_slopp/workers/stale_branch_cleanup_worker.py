@@ -7,7 +7,7 @@ and deletes them if their last commit is older than the configured threshold.
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from auto_slopp.utils.branch_analysis import analyze_repository_branches
 from auto_slopp.utils.git_operations import (
@@ -36,7 +36,7 @@ class StaleBranchCleanupWorker(Worker):
         self.dry_run = dry_run
         self.logger = logging.getLogger("auto_slopp.workers.StaleBranchCleanupWorker")
 
-    def run(self, repo_path: Path) -> Dict[str, Any]:
+    def run(self, repo_path: Path) -> dict[str, Any]:
         """Execute stale branch cleanup for a single repository.
 
         Args:
@@ -65,7 +65,7 @@ class StaleBranchCleanupWorker(Worker):
 
         return results
 
-    def _validate_input_path(self, repo_path: Path, start_time: datetime) -> Optional[Dict[str, Any]]:
+    def _validate_input_path(self, repo_path: Path, start_time: datetime) -> Optional[dict[str, Any]]:
         """Validate the input repository path.
 
         Args:
@@ -93,7 +93,7 @@ class StaleBranchCleanupWorker(Worker):
             }
         return None
 
-    def _create_results_dict(self, start_time: datetime, repo_path: Path) -> Dict[str, Any]:
+    def _create_results_dict(self, start_time: datetime, repo_path: Path) -> dict[str, Any]:
         """Create the initial results dictionary.
 
         Args:
@@ -118,7 +118,7 @@ class StaleBranchCleanupWorker(Worker):
             "success": True,
         }
 
-    def _process_single_repository(self, repo_dir: Path) -> Dict[str, Any]:
+    def _process_single_repository(self, repo_dir: Path) -> dict[str, Any]:
         """Process a single repository directory for stale branch cleanup.
 
         Args:
@@ -146,7 +146,7 @@ class StaleBranchCleanupWorker(Worker):
         # Analyze and cleanup branches using utility function
         return analyze_repository_branches(repo_dir=repo_dir, days_threshold=self.days_threshold, dry_run=self.dry_run)
 
-    def _process_repository(self, repo_info: Dict[str, Any]) -> Dict[str, Any]:
+    def _process_repository(self, repo_info: dict[str, Any]) -> dict[str, Any]:
         """Process a single repository directory for stale branch cleanup.
 
         Args:
@@ -169,7 +169,7 @@ class StaleBranchCleanupWorker(Worker):
         # Analyze and cleanup branches using utility function
         return analyze_repository_branches(repo_dir=repo_dir, days_threshold=self.days_threshold, dry_run=self.dry_run)
 
-    def _create_invalid_repo_result_from_path(self, repo_dir: Path, errors: List[str]) -> Dict[str, Any]:
+    def _create_invalid_repo_result_from_path(self, repo_dir: Path, errors: list[str]) -> dict[str, Any]:
         """Create result for an invalid repository from path.
 
         Args:
@@ -190,7 +190,7 @@ class StaleBranchCleanupWorker(Worker):
             "error": "; ".join(errors),
         }
 
-    def _create_invalid_repo_result(self, repo_info: Dict[str, Any]) -> Dict[str, Any]:
+    def _create_invalid_repo_result(self, repo_info: dict[str, Any]) -> dict[str, Any]:
         """Create result for an invalid repository.
 
         Args:
@@ -210,7 +210,7 @@ class StaleBranchCleanupWorker(Worker):
             "error": "; ".join(repo_info.get("errors", ["Repository is invalid"])),
         }
 
-    def _update_results_statistics(self, results: Dict[str, Any], repo_result: Dict[str, Any]) -> None:
+    def _update_results_statistics(self, results: dict[str, Any], repo_result: dict[str, Any]) -> None:
         """Update results statistics with repository processing result.
 
         Args:
@@ -226,7 +226,7 @@ class StaleBranchCleanupWorker(Worker):
             results["repositories_with_errors"] += 1
             results["success"] = False
 
-    def _log_completion_summary(self, results: Dict[str, Any]) -> None:
+    def _log_completion_summary(self, results: dict[str, Any]) -> None:
         """Log completion summary.
 
         Args:
@@ -239,7 +239,7 @@ class StaleBranchCleanupWorker(Worker):
             f"Total failed: {results['total_branches_failed']}"
         )
 
-    def _get_local_branches(self) -> List[Dict[str, Any]]:
+    def _get_local_branches(self) -> list[dict[str, Any]]:
         """Get local branches for testing purposes.
 
         Returns:
@@ -247,7 +247,7 @@ class StaleBranchCleanupWorker(Worker):
         """
         return get_local_branches(Path.cwd())
 
-    def _get_remote_branches(self) -> Set[str]:
+    def _get_remote_branches(self) -> set[str]:
         """Get remote branches for testing purposes.
 
         Returns:
@@ -256,8 +256,8 @@ class StaleBranchCleanupWorker(Worker):
         return get_remote_branches(Path.cwd())
 
     def _identify_stale_branches(
-        self, local_branches: List[Dict[str, Any]], remote_branches: Set[str]
-    ) -> List[Dict[str, Any]]:
+        self, local_branches: list[dict[str, Any]], remote_branches: set[str]
+    ) -> list[dict[str, Any]]:
         """Identify stale branches for testing purposes.
 
         Args:
