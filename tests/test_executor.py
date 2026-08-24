@@ -194,7 +194,6 @@ class TestExecutorThreading:
         sub = temp_dir / "repo1"
         sub.mkdir()
 
-        concurrent_count = [0]
         max_concurrent = [0]
         current_concurrent = [0]
         lock = threading.Lock()
