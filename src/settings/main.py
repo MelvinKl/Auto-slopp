@@ -28,8 +28,7 @@ class TaskRating(BaseModel):
 NO_TIMEOUT = -1
 """Sentinel value for timeout: -1 means never timeout (subprocess runs indefinitely).
 
-This constant is exported in ``__all__`` and is the public API for disabling
-timeouts in CLI configurations and executor calls.
+This is the public API for disabling timeouts in CLI configurations and executor calls.
 """
 
 MAX_TIMEOUT_SECONDS = 31_536_000  # ~1 year in seconds

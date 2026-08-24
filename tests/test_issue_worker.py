@@ -2395,6 +2395,9 @@ class TestIssueWorkerPrReviewLoop:
             review_sequence
         )
         task_result = result["task_results"][0]
+        assert result["success"] is True
+        assert task_result["success"] is True
+        assert task_result["task_completed"] is True
         assert task_result.get("pr_review_error") is not None
         assert mock_submit_review.call_count == 0
         assert mock_fix_cli.call_count == 0

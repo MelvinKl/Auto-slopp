@@ -336,15 +336,23 @@ def _warn_once_tracked(
         logger.log(level, fmt, *args)
 
 
-def _resolve_timeout(raw_timeout: Optional[int]) -> Optional[int]:
+def _resolve_timeout(raw_timeout: Optional[Any]) -> Optional[int]:
     """Resolve a raw timeout value to an effective timeout.
 
     Handles the NO_TIMEOUT sentinel (-1), treats non-integer or out-of-range
     values as invalid (valid range: 0 < timeout ≤ MAX_TIMEOUT_SECONDS, ~1 year),
     and resolves None (unspecified) or invalid values to _PROBE_TIMEOUT_SECONDS.
 
+    Note:
+        The parameter is intentionally typed ``Optional[Any]`` rather than
+        ``Optional[int]``: callers (or a hand-edited JSON config) may pass
+        non-integer values such as ``str``, ``float``, ``bool``, ``list``, or
+        ``dict``; those are deliberately accepted here, diagnosed with a
+        warning, and resolved to :data:`_PROBE_TIMEOUT_SECONDS`.
+
     Args:
-        raw_timeout: The timeout value (None for unspecified, -1 for NO_TIMEOUT, or a positive integer).
+        raw_timeout: The timeout value (None for unspecified, -1 for NO_TIMEOUT, a positive integer,
+        or any other value that will be diagnosed and discarded).
 
     Returns:
         None if raw_timeout is NO_TIMEOUT (-1), the raw_timeout value if positive and within range,
