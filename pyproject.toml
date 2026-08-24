@@ -67,11 +67,7 @@ exclude = '''
     | dist
     | openapi_client
   )/
-)
-|
-(src/auto_slopp/utils/github_operations\.py$
-|src/auto_slopp/workers/github_task_source\.py$)
-'''
+)'''
 
 [tool.flake8]
 exclude= ["src/assistant/models", ".eggs", ".git", ".hg", ".mypy_cache", ".tox", ".venv", ".devcontainer", "venv", "_build", "buck-out", "build", "dist", "**/__init__.py"]
@@ -81,44 +77,28 @@ max-complexity = 8
 max-annotations-complexity = 3
 docstring-convention = 'numpy'
 max-line-length = 120
+# flake8-quotes must match black's double-quote style, otherwise it conflicts
+# with black formatting (Q000/BLK100).
+inline-quotes = '"'
+docstring-quotes = '"'
+multiline-quotes = '"'
+# Only codes that conflict with black remain globally ignored:
+# - E203: whitespace before ':' (black splits slices differently)
+# - W503: line break before binary operator (black formats after it)
 extend-ignore = [
     "E203",
     "W503",
-    "Q000",
-    "WOT001",
-    "SIM117",
-    "S101",
-    "S105",
-    "S106",
-    "S108",
-    "S110",
-    "S403",
-    "S404",
-    "S405",
-    "S603",
-    "S605",
-    "S607",
-    "S608",
-    "S609",
-    "C901",
-    "E501",
-    "F811",
-    "F841",
-    "B007",
-    "B014",
-    "BLK100",
-    "D104",
-    "D406",
-    "D407",
-    "D202",
-    "D401",
-    "I100",
-    "I201",
-    "B027",
 ]
 ban-relative-imports = true
 per-file-ignores = """
-  ./tests/*: S101,I252
+  ./tests/*: S101,I252,S105,S106,S108,S404,S603,S605,S607
+  src/auto_slopp/executor.py: S404,S603,S607
+  src/auto_slopp/utils/cli_executor.py: S404,S603,S607
+  src/auto_slopp/utils/git_operations.py: S404,S603,S607
+  src/auto_slopp/utils/github_operations.py: S404,S603,S607
+  src/auto_slopp/utils/vikunja_operations.py: S404,S603
+  src/auto_slopp/workers/github_task_source.py: S404,S603,S607
+  src/auto_slopp/workers/pr_worker.py: S404,S603,S607
 """
 
 [tool.isort]

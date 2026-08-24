@@ -172,10 +172,12 @@ class TestPRWorker:
             },
         ]
 
-        with patch("auto_slopp.workers.pr_worker.get_open_prs", return_value=mock_prs):
-            with patch("auto_slopp.workers.pr_worker.settings") as mock_settings:
-                mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
-                branches = worker._get_open_pr_branches(repo_dir)
+        with (
+            patch("auto_slopp.workers.pr_worker.get_open_prs", return_value=mock_prs),
+            patch("auto_slopp.workers.pr_worker.settings") as mock_settings,
+        ):
+            mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
+            branches = worker._get_open_pr_branches(repo_dir)
 
         assert len(branches) == 2
         assert "feature-1" in branches
@@ -202,10 +204,12 @@ class TestPRWorker:
             },
         ]
 
-        with patch("auto_slopp.workers.pr_worker.get_open_prs", return_value=mock_prs):
-            with patch("auto_slopp.workers.pr_worker.settings") as mock_settings:
-                mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
-                branches = worker._get_open_pr_branches(repo_dir)
+        with (
+            patch("auto_slopp.workers.pr_worker.get_open_prs", return_value=mock_prs),
+            patch("auto_slopp.workers.pr_worker.settings") as mock_settings,
+        ):
+            mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
+            branches = worker._get_open_pr_branches(repo_dir)
 
         assert len(branches) == 0
 
@@ -229,10 +233,12 @@ class TestPRWorker:
             },
         ]
 
-        with patch("auto_slopp.workers.pr_worker.get_open_prs", return_value=mock_prs):
-            with patch("auto_slopp.workers.pr_worker.settings") as mock_settings:
-                mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
-                branches = worker._get_open_pr_branches(repo_dir)
+        with (
+            patch("auto_slopp.workers.pr_worker.get_open_prs", return_value=mock_prs),
+            patch("auto_slopp.workers.pr_worker.settings") as mock_settings,
+        ):
+            mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
+            branches = worker._get_open_pr_branches(repo_dir)
 
         assert len(branches) == 2
         assert "feature-1" in branches
@@ -264,10 +270,12 @@ class TestPRWorker:
             },
         ]
 
-        with patch("auto_slopp.workers.pr_worker.get_open_prs", return_value=mock_prs):
-            with patch("auto_slopp.workers.pr_worker.settings") as mock_settings:
-                mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
-                branches = worker._get_open_pr_branches(repo_dir)
+        with (
+            patch("auto_slopp.workers.pr_worker.get_open_prs", return_value=mock_prs),
+            patch("auto_slopp.workers.pr_worker.settings") as mock_settings,
+        ):
+            mock_settings.github_issue_worker_allowed_creator = "MelvinKl"
+            branches = worker._get_open_pr_branches(repo_dir)
 
         assert len(branches) == 1
         assert "feature-3" in branches

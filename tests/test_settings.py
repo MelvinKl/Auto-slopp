@@ -16,9 +16,8 @@ class TestSettings:
     def test_default_settings_values(self):
         """Test that default settings values are correctly set when no env vars are set."""
         env_vars_to_keep = {k: v for k, v in os.environ.items() if not k.startswith("AUTO_SLOPP_")}
-        with patch.dict(os.environ, env_vars_to_keep, clear=True):
-            with patch("dotenv.load_dotenv", return_value=None):
-                test_settings = Settings()
+        with patch.dict(os.environ, env_vars_to_keep, clear=True), patch("dotenv.load_dotenv", return_value=None):
+            test_settings = Settings()
 
         assert test_settings.base_repo_path == Path.cwd()
         assert test_settings.executor_sleep_interval == 600.0
@@ -37,9 +36,8 @@ class TestSettings:
     def test_telegram_api_url_template(self):
         """Test that telegram_api_url contains token placeholder."""
         env_vars_to_clear = {k: v for k, v in os.environ.items() if k.startswith("AUTO_SLOPP_")}
-        with patch.dict(os.environ, env_vars_to_clear, clear=True):
-            with patch("dotenv.load_dotenv", return_value=None):
-                test_settings = Settings()
+        with patch.dict(os.environ, env_vars_to_clear, clear=True), patch("dotenv.load_dotenv", return_value=None):
+            test_settings = Settings()
 
         assert "{token}" in test_settings.telegram_api_url
         assert test_settings.telegram_api_url.startswith("https://api.telegram.org/bot")
@@ -66,9 +64,8 @@ class TestSettings:
     def test_optional_telegram_fields(self):
         """Test optional telegram fields use configured values."""
         env_vars_to_keep = {k: v for k, v in os.environ.items() if not k.startswith("AUTO_SLOPP_")}
-        with patch.dict(os.environ, env_vars_to_keep, clear=True):
-            with patch("dotenv.load_dotenv", return_value=None):
-                test_settings = Settings()
+        with patch.dict(os.environ, env_vars_to_keep, clear=True), patch("dotenv.load_dotenv", return_value=None):
+            test_settings = Settings()
 
         assert test_settings.telegram_enabled is False
         assert test_settings.telegram_bot_token is None
@@ -88,9 +85,8 @@ class TestSettings:
 
     def test_settings_validation_error(self):
         """Test that Pydantic validation works correctly."""
-        with patch.dict(os.environ, {"AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL": "invalid"}):
-            with pytest.raises(ValidationError):
-                Settings()
+        with patch.dict(os.environ, {"AUTO_SLOPP_EXECUTOR_SLEEP_INTERVAL": "invalid"}), pytest.raises(ValidationError):
+            Settings()
 
     def test_path_expansion(self):
         """Test that tilde paths are expanded correctly."""
@@ -193,9 +189,8 @@ class TestSettings:
             "AUTO_SLOPP_AUTO_UPDATE_REBOOT_DELAY": "-1",
         }
 
-        with patch.dict(os.environ, env_vars, clear=True):
-            with pytest.raises(ValidationError):
-                Settings()
+        with patch.dict(os.environ, env_vars, clear=True), pytest.raises(ValidationError):
+            Settings()
 
     def test_github_issue_step_max_iterations_default(self):
         """Test default github_issue_step_max_iterations value."""
@@ -208,9 +203,8 @@ class TestSettings:
             "AUTO_SLOPP_GITHUB_ISSUE_STEP_MAX_ITERATIONS": "0",
         }
 
-        with patch.dict(os.environ, env_vars, clear=True):
-            with pytest.raises(ValidationError):
-                Settings()
+        with patch.dict(os.environ, env_vars, clear=True), pytest.raises(ValidationError):
+            Settings()
 
     def test_stale_branch_days_threshold_default(self):
         """Test default stale_branch_days_threshold value."""
@@ -234,9 +228,8 @@ class TestSettings:
             "AUTO_SLOPP_STALE_BRANCH_DAYS_THRESHOLD": "-1",
         }
 
-        with patch.dict(os.environ, env_vars, clear=True):
-            with pytest.raises(ValidationError):
-                Settings()
+        with patch.dict(os.environ, env_vars, clear=True), pytest.raises(ValidationError):
+            Settings()
 
     def test_stale_branch_days_threshold_zero(self):
         """Test that stale_branch_days_threshold can be set to zero."""
@@ -427,9 +420,8 @@ cli_configurations:
     def test_pr_review_worker_settings_defaults(self):
         """Test that PR review worker settings have correct defaults."""
         env_vars_to_keep = {k: v for k, v in os.environ.items() if not k.startswith("AUTO_SLOPP_")}
-        with patch.dict(os.environ, env_vars_to_keep, clear=True):
-            with patch("dotenv.load_dotenv", return_value=None):
-                test_settings = Settings()
+        with patch.dict(os.environ, env_vars_to_keep, clear=True), patch("dotenv.load_dotenv", return_value=None):
+            test_settings = Settings()
 
         assert test_settings.pr_review_worker_required_label == "AI"
         assert test_settings.pr_review_worker_min_comments == 0
