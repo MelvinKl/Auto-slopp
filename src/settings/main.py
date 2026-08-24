@@ -209,6 +209,15 @@ class Settings(BaseSettings):
         ),
     )
 
+    cli_executor_timeout_warn_level: str = Field(
+        default="WARNING",
+        description=(
+            "Log level for out-of-range timeout warnings in the CLI executor. "
+            "Valid values: DEBUG, INFO, WARNING, ERROR, CRITICAL (FATAL accepted as an alias for CRITICAL). "
+            "Defaults to WARNING; set to DEBUG to reduce log volume in production."
+        ),
+    )
+
     slop_timeout: int = Field(
         default=10000,
         ge=1,

@@ -875,11 +875,11 @@ def test_resolve_timeout_warns_once_per_distinct_value():
 
 
 def test_resolve_timeout_warn_level_read_lazily(monkeypatch):
-    """The warn-level env var is resolved lazily, so it can be set after import."""
+    """The warn-level setting is resolved lazily, so it can be changed after import."""
     from auto_slopp.utils import cli_executor
 
     monkeypatch.setattr(cli_executor, "_TIMEOUT_WARN_LOG_LEVEL", None)
-    monkeypatch.setenv("AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL", "DEBUG")
+    monkeypatch.setattr(cli_executor.settings, "cli_executor_timeout_warn_level", "DEBUG")
     with patch.object(cli_executor.logger, "log") as mock_log:
         _resolve_timeout(0)
     assert mock_log.call_args_list[0][0][0] == logging.DEBUG

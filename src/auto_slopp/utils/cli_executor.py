@@ -5,7 +5,6 @@ This module provides a centralized utility for executing configured CLI commands
 """
 
 import logging
-import os
 import subprocess
 import time
 from collections import OrderedDict
@@ -30,11 +29,12 @@ _active_cli_configuration_index = 0
 # set's pop() would evict an arbitrary, unspecified element).
 _warned_out_of_range_timeouts: "OrderedDict[Any, bool]" = OrderedDict()
 
-# Log level for out-of-range timeout warnings. Can be overridden via
-# AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL environment variable.
+# Log level for out-of-range timeout warnings. Configured via the
+# Settings.cli_executor_timeout_warn_level field (environment variable
+# AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL).
 # Defaults to WARNING; set to DEBUG to reduce log volume in production.
-# Resolved on first use (and cached thereafter), so the env var may be set
-# after import but before the first call to _get_timeout_warn_level.
+# Resolved on first use (and cached thereafter), so the setting may be
+# changed after import but before the first call to _get_timeout_warn_level.
 _TIMEOUT_WARN_LOG_LEVEL: Optional[int] = None
 
 
@@ -44,22 +44,21 @@ def _get_timeout_warn_level() -> int:
     # No lock around the lazy init: concurrent first-use callers may both
     # compute the level, but the write is idempotent so the race is benign.
     if _TIMEOUT_WARN_LOG_LEVEL is None:
-        warn_level_env = os.getenv("AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL")
+        warn_level = settings.cli_executor_timeout_warn_level
         level = logging.WARNING
-        if warn_level_env:
+        if warn_level:
             # Validate against an explicit set of allowed level names rather
             # than getattr(logging, ...), which would also accept non-level
             # attributes such as NOTSET or module internals. FATAL is the
             # standard logging alias for CRITICAL and is accepted as such.
-            _valid_warn_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL"}
-            if warn_level_env.upper() in _valid_warn_levels:
-                level = getattr(logging, warn_level_env.upper())
+            if warn_level.upper() in _VALID_WARN_LEVELS:
+                level = getattr(logging, warn_level.upper())
             else:
                 logger.warning(
-                    "Invalid AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL value: %r. "
+                    "Invalid cli_executor_timeout_warn_level value: %r. "
                     "Valid values: DEBUG, INFO, WARNING, ERROR, CRITICAL (FATAL accepted as an alias for CRITICAL). "
                     "Using WARNING.",
-                    warn_level_env,
+                    warn_level,
                 )
         _TIMEOUT_WARN_LOG_LEVEL = level
     return _TIMEOUT_WARN_LOG_LEVEL
@@ -280,6 +279,11 @@ def _execute_command(
             "error": error_msg,
         }
 
+
+# Allowed level names for the out-of-range timeout warning level
+# (Settings.cli_executor_timeout_warn_level). FATAL is the standard
+# logging alias for CRITICAL and is accepted as such.
+_VALID_WARN_LEVELS: frozenset = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL"})
 
 # Upper bound on distinct values remembered by _warn_once_tracked.
 # When the bound is hit, the least-recently-seen value is evicted and, if it
