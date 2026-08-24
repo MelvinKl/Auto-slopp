@@ -7,6 +7,7 @@ for step-based execution.
 
 import logging
 import re
+import subprocess
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -535,6 +536,35 @@ class IssueWorker(Worker):
             # rounds are wasted.
             previous_round_findings: set[str] = set()
 
+            # Cap the TOTAL number of PR review fix rounds across outer task
+            # runs. Each fix round commits "Task #<id>: fix PR review issues",
+            # so those commits persist in the branch history. Counting them
+            # against the budget stops the indefinite outer loop for PRs whose
+            # reviewer persistently re-flags the same finding.
+            prior_fix_rounds = self._count_prior_pr_review_fix_rounds(repo_dir, task_id)
+            if prior_fix_rounds >= max_pr_review_iterations:
+                self.logger.warning(
+                    f"PR review fix budget exhausted for task #{task_id}: "
+                    f"{prior_fix_rounds} prior fix round(s) already reach the maximum of "
+                    f"{max_pr_review_iterations}. Stopping automatic PR review for this PR."
+                )
+                label_removed = remove_label_from_issue(repo_dir, task.id, settings.github_issue_worker_required_label)
+                if label_removed:
+                    self.logger.info(f"Removed automatic work label from issue #{task.id} after PR review cap")
+                else:
+                    self.logger.warning(
+                        f"Failed to remove automatic work label from issue #{task.id} after PR review cap"
+                    )
+                result["task_completed"] = True
+                result["tasks_completed"] = 1
+                result["success"] = True
+                result["label_removed"] = label_removed
+                result["pr_review_done"] = True
+                result["pr_review_iterations"] = 0
+                result["pr_review_capped"] = True
+                return result
+            max_pr_review_iterations -= prior_fix_rounds
+
             while pr_review_iteration < max_pr_review_iterations:
                 pr_review_iteration += 1
                 self.logger.info(
@@ -836,6 +866,39 @@ Plan:
     # and each review pass generates new ones.
     ACTIONABLE_FINDING_PREFIXES = ("issue:",)
     INFORMATIONAL_FINDING_PREFIXES = ("suggestion:", "nit:", "chore:")
+
+    @staticmethod
+    def _count_prior_pr_review_fix_rounds(repo_dir: Path, task_id: int) -> int:
+        """Count PR review fix commits on the current branch made by earlier task runs.
+
+        Each fix round commits with the message
+        "Task #{task_id}: fix PR review issues (iteration N)". Counting those
+        commits against the PR review budget caps the total fix rounds across
+        outer task runs, so a PR whose reviewer persistently re-flags the same
+        finding cannot loop indefinitely.
+
+        Args:
+            repo_dir: Path to the repository directory
+            task_id: Task/issue id whose fix commits are counted
+
+        Returns:
+            Number of prior PR review fix rounds, or 0 if it cannot be
+            determined (e.g., not a git repository or git failed).
+        """
+        try:
+            completed = subprocess.run(
+                ["git", "log", "main..HEAD", "--pretty=%s"],
+                cwd=repo_dir,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if completed.returncode != 0:
+                return 0
+            marker = f"Task #{task_id}: fix PR review issues"
+            return sum(1 for line in completed.stdout.splitlines() if marker in line)
+        except Exception:
+            return 0
 
     @staticmethod
     def _normalize_finding(line: str) -> str:

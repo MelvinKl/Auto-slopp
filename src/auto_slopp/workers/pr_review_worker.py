@@ -238,4 +238,14 @@ class PrReviewWorker(Worker):
             if has_valid_prefix:
                 formatted_lines.append(line)
 
+        dropped_lines = len(lines) - len(formatted_lines)
+        if dropped_lines:
+            # Log dropped lines so a model ignoring the prefix format is
+            # diagnosable instead of silently posting an empty review.
+            self.logger.warning(
+                f"Dropped {dropped_lines} line(s) without a valid conventional comment prefix "
+                f"(expected one of: {', '.join(valid_prefixes)}). "
+                f"If the entire review was dropped, the model ignored the prefix format."
+            )
+
         return "\n".join(formatted_lines)
