@@ -22,7 +22,6 @@
 | **TaskSource** | Abstraction for loading tasks from different sources (GitHub, Vikunja) |
 | **Vikunja** | Open-source task management application |
 | **VikunjaTaskSource** | TaskSource implementation that loads tasks from Vikunja |
-| **VikunjaWorker** | Worker that processes Vikunja tasks using the IssueWorker + VikunjaTaskSource |
 | **Worker** | Pluggable automation unit that inherits from `Worker` base class and implements `run()` |
 | **Worker Discovery** | Runtime scanning of `workers/` package for `Worker` subclasses |
 | **`gh` CLI** | GitHub's official command-line tool for interacting with the GitHub API |
