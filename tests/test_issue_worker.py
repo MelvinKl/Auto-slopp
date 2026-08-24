@@ -516,15 +516,22 @@ class TestIssueWorker:
         mock_create_branch.return_value = True
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
-        # Mock the RalphExecutor.execute to simulate LLM unavailability
-        worker.ralph_executor.execute = lambda *args, **kwargs: {
-            "success": False,
-            "loops_executed": 1,
-            "steps_completed": 0,
-            "total_steps": 3,
-            "max_loops_reached": False,
-            "error": "No active CLI configuration available",
-        }
+
+        # Mock the RalphExecutor.execute to simulate LLM unavailability. Like
+        # the real execute(), record the failure in the executor's error
+        # state: get_skip_reason() is the source of truth for skip decisions.
+        def mock_execute(*args, **kwargs):
+            worker.ralph_executor._last_error = "No active CLI configuration available"
+            return {
+                "success": False,
+                "loops_executed": 1,
+                "steps_completed": 0,
+                "total_steps": 3,
+                "max_loops_reached": False,
+                "error": "No active CLI configuration available",
+            }
+
+        worker.ralph_executor.execute = mock_execute
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
@@ -536,7 +543,7 @@ class TestIssueWorker:
         assert task_source.on_max_iterations_called is False
         assert task_source.on_task_failure_called is False
 
-    @patch("auto_slopp.utils.cli_executor.are_all_clis_in_cooldown")
+    @patch("auto_slopp.workers.issue_worker.are_all_clis_in_cooldown")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
@@ -1388,14 +1395,21 @@ class TestIssueWorker:
         mock_create_branch.return_value = True
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
-        worker.ralph_executor.execute = lambda *args, **kwargs: {
-            "success": False,
-            "loops_executed": 1,
-            "steps_completed": 2,
-            "total_steps": 5,
-            "max_loops_reached": False,
-            "error": "LLM timed out waiting for response",
-        }
+
+        # Like the real execute(), record the failure in the executor's error
+        # state: get_skip_reason() is the source of truth for skip decisions.
+        def mock_execute(*args, **kwargs):
+            worker.ralph_executor._last_error = "LLM timed out waiting for response"
+            return {
+                "success": False,
+                "loops_executed": 1,
+                "steps_completed": 2,
+                "total_steps": 5,
+                "max_loops_reached": False,
+                "error": "LLM timed out waiting for response",
+            }
+
+        worker.ralph_executor.execute = mock_execute
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0

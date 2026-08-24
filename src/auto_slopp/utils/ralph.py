@@ -1234,14 +1234,20 @@ class RalphExecutor:
                     result.pop("error", None)
             else:
                 result["last_error"] = final_check_result.get("error", "Final acceptance check failed")
-                # The last step iteration succeeded and cleared both error
-                # fields, so record the final-check failure in the executor's
-                # error state as well: otherwise get_skip_reason() returns
-                # None and an LLM outage during the final check drops the
-                # issue via on_max_iterations_reached instead of skipping it
-                # for retry.
-                self._last_error = result["last_error"]
-                self._last_iteration_failure_reason = self._last_error
+                # Only record the final-check failure in the executor's error
+                # state when it itself indicates LLM unavailability. A
+                # genuine final-check failure (e.g. a `make test` failure
+                # after the outage recovered) must not overwrite a
+                # mid-loop outage reason (e.g. a timeout): otherwise
+                # get_skip_reason() returns None and the issue is dropped
+                # via on_max_iterations_reached even though the loop was
+                # exhausted by the outage. When the final check itself fails
+                # due to an outage, recording it here also covers the case
+                # where a prior successful iteration cleared both error
+                # fields.
+                if error_indicates_llm_unavailability(result["last_error"]):
+                    self._last_error = result["last_error"]
+                    self._last_iteration_failure_reason = self._last_error
                 # Final acceptance check failed at max iterations. Delete the
                 # task file so it is recreated from scratch on the next Ralph
                 # invocation.

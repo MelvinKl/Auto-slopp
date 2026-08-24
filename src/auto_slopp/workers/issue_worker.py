@@ -205,7 +205,11 @@ class IssueWorker(Worker):
         """
         if not error_msg:
             return False
-        if error_indicates_llm_unavailability(error_msg):
+        # Pass the explicit CLI state derived from this module's own import
+        # (rather than letting the helper lazily import it from cli_executor)
+        # so weak-pattern corroboration follows the same, patchable code path
+        # as the cooldown check below.
+        if error_indicates_llm_unavailability(error_msg, cli_available=not are_all_clis_in_cooldown()):
             return True
         # CLI unavailability is treated only as a secondary confirmation, never
         # an independent trigger. A genuine code error (e.g. "syntax error in
@@ -347,12 +351,16 @@ class IssueWorker(Worker):
                             ralph_result.get("total_steps", 0),
                             ralph_result.get("error", "Unknown error"),
                         )
-                    elif self._is_llm_unavailable(ralph_error):
-                        self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                        self.task_source.on_skip(task, ralph_error)
+                    elif skip_reason := self.ralph_executor.get_skip_reason():
+                        # RalphExecutor.execute() records early failures
+                        # (update/refinement) into its error state, so both
+                        # skip decisions above reference the same source of
+                        # truth as the max_loops_reached branch.
+                        self.logger.warning(f"LLM unavailable, skipping task #{task_id}: {skip_reason}")
+                        self.task_source.on_skip(task, skip_reason)
                         result["success"] = True
                         result["skipped"] = True
-                        result["skip_reason"] = ralph_error
+                        result["skip_reason"] = skip_reason
                         return result
                     elif self._is_permanent_error(ralph_error):
                         self.logger.error(f"Permanent error detected for task #{task_id}: {ralph_error}")
