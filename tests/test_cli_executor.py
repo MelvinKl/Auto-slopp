@@ -755,7 +755,7 @@ def test_probe_falls_back_to_default_timeout(mock_run, monkeypatch):
 
 
 @patch("auto_slopp.utils.cli_executor.subprocess.run")
-def test_startup_health_uses_config_timeout(mock_run, monkeypatch):
+def test_startup_health_passes_config_timeout_to_probe(mock_run, monkeypatch):
     """Startup health check should pass config timeout to probe."""
     mock_run.return_value.returncode = 0
     mock_run.return_value.stdout = "ok"

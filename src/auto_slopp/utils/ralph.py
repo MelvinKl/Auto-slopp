@@ -6,12 +6,13 @@ This module provides a mechanism for:
 3. Executing steps in a loop until completion or max iterations
 """
 
+import contextlib
 import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -77,12 +78,12 @@ class Plan:
 
     title: str
     description: str
-    steps: List[Step] = field(default_factory=list)
+    steps: list[Step] = field(default_factory=list)
     header_content: str = ""
     footer_content: str = ""
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
-    def get_open_steps(self) -> List[Step]:
+    def get_open_steps(self) -> list[Step]:
         """Get all open (not closed) steps."""
         return [s for s in self.steps if not s.is_closed]
 
@@ -156,7 +157,8 @@ class PlanParser:
         return PlanParser.parse_content(content)
 
     @staticmethod
-    def parse_content(content: str) -> Plan:
+    # PlanParser.parse_content: long orchestrator; splitting deferred (issue #419)
+    def parse_content(content: str) -> Plan:  # noqa: C901 -- long orchestrator; splitting deferred (issue #419)
         """Parse a plan from markdown content.
 
         Args:
@@ -168,13 +170,13 @@ class PlanParser:
         lines = content.split("\n")
         title = "Plan"
         description = ""
-        steps: List[Step] = []
-        header_lines: List[str] = []
-        footer_lines: List[str] = []
+        steps: list[Step] = []
+        header_lines: list[str] = []
+        footer_lines: list[str] = []
         in_header = True
         in_steps = False
         found_title = False
-        description_lines: List[str] = []
+        description_lines: list[str] = []
 
         for line in lines:
             if line.strip().startswith("# ") and not found_title:
@@ -229,11 +231,11 @@ class RalphExecutor:
     def __init__(
         self,
         logger: logging.Logger,
-        agent_args: List[str],
+        agent_args: list[str],
         timeout: int,
-        execute_fn: Callable[..., Dict[str, Any]],
+        execute_fn: Callable[..., dict[str, Any]],
         has_changes_fn: Callable[[Path], bool],
-        commit_fn: Callable[[Path, str, bool], Tuple[bool, Optional[bool]]],
+        commit_fn: Callable[[Path, str, bool], tuple[bool, Optional[bool]]],
         max_iterations: int,
         file_prefix: str = "github",
         task_planning_name: str = "task_planning",
@@ -290,7 +292,7 @@ class RalphExecutor:
         issue_number: int,
         issue_title: str,
         issue_body: str,
-        comment_texts: List[str],
+        comment_texts: list[str],
         branch_name: str,
     ) -> None:
         """Create the initial GitHub issue task file in .ralph."""
@@ -315,7 +317,8 @@ class RalphExecutor:
             "- [ ] 3. Update or add tests for the implementation.\n"
             "  - Acceptance Criteria:\n"
             "    - Tests cover the implemented behavior.\n"
-            "- [ ] 4. If the change affects user-facing behavior or documentation, update README.md and any documentation affected by the changes.\n"
+            "- [ ] 4. If the change affects user-facing behavior or documentation, update README.md and any "
+            "documentation affected by the changes.\n"
             "  - Acceptance Criteria:\n"
             "    - Documentation reflects the changes made (if applicable).\n"
             "- [ ] 5. Run `make test` and confirm it succeeds.\n"
@@ -334,9 +337,9 @@ class RalphExecutor:
         issue_number: int,
         issue_title: str,
         issue_body: str,
-        comment_texts: List[str],
+        comment_texts: list[str],
         branch_name: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Update an existing task file via the CLI instead of overwriting it."""
         comments_text = ""
         if comment_texts:
@@ -357,8 +360,8 @@ class RalphExecutor:
             "- Keep the '## Steps' section and the existing file format.\n"
             "- Keep step numbering sequential and stable.\n"
             "- The last step must always verify that `make test` succeeds.\n"
-            "- If the change affects user-facing behavior or documentation, include a step to update "
-            "README.md and any documentation affected by the changes. This step must come before the final `make test` step.\n"
+            "- If the change affects user-facing behavior or documentation, include a step to update README.md "
+            "and any documentation affected by the changes. This step must come before the final `make test` step.\n"
         )
 
         result = self.execute_fn(
@@ -397,9 +400,9 @@ class RalphExecutor:
         task_path: Path,
         issue_title: str,
         issue_body: str,
-        comment_texts: List[str],
+        comment_texts: list[str],
         branch_name: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Ask slopmachine to refine the task into concrete steps with acceptance criteria."""
         instructions = self._build_refinement_instructions(
             task_path=task_path,
@@ -443,7 +446,7 @@ class RalphExecutor:
         task_path: Path,
         issue_title: str,
         issue_body: str,
-        comment_texts: List[str],
+        comment_texts: list[str],
         branch_name: str,
     ) -> str:
         """Build instructions for refining the issue task file."""
@@ -464,60 +467,10 @@ class RalphExecutor:
             "- Every step must include acceptance criteria directly below it as bullets.\n"
             "- Keep step numbering sequential and stable.\n"
             "- The last step must always verify that `make test` succeeds.\n"
-            "- If the change affects user-facing behavior or documentation, include a step to update "
-            "README.md and any documentation affected by the changes. This step must come before the final `make test` step.\n"
+            "- If the change affects user-facing behavior or documentation, include a step to update README.md "
+            "and any documentation affected by the changes. This step must come before the final `make test` step.\n"
             "- Do not commit, do not push, and do not create a PR.\n"
         )
-
-    def _execute_step(
-        self,
-        step: Step,
-        plan: Plan,
-        repo_dir: Path,
-        issue_title: str,
-        issue_body: str,
-        comment_texts: List[str],
-        branch_name: str,
-    ) -> Dict[str, Any]:
-        """Execute a single step from the plan.
-
-        Args:
-            step: Step to execute
-            plan: The full plan containing all steps
-            repo_dir: Repository directory
-            issue_title: GitHub issue title
-            issue_body: GitHub issue body
-            comment_texts: List of comment texts from the issue
-            branch_name: Git branch name
-
-        Returns:
-            Execution result dictionary
-        """
-        step_instructions = self._build_step_instructions(
-            step=step,
-            plan=plan,
-            issue_title=issue_title,
-            issue_body=issue_body,
-            comment_texts=comment_texts,
-            branch_name=branch_name,
-        )
-
-        self.logger.info(f"Executing step {step.number}: {step.description}")
-
-        result = self.execute_fn(
-            step_instructions,
-            repo_dir,
-            self.agent_args,
-            self.timeout,
-            task_name=self.implementation_name,
-        )
-
-        if result.get("success", False):
-            self.logger.info(f"Step {step.number} completed successfully")
-        else:
-            self.logger.warning(f"Step {step.number} failed: {result.get('error', 'Unknown error')}")
-
-        return result
 
     def _build_step_instructions(
         self,
@@ -525,7 +478,7 @@ class RalphExecutor:
         plan: Plan,
         issue_title: str,
         issue_body: str,
-        comment_texts: List[str],
+        comment_texts: list[str],
         branch_name: str,
     ) -> str:
         """Build instructions for a single step.
@@ -584,7 +537,7 @@ class RalphExecutor:
         plan: Plan,
         issue_title: str,
         issue_body: str,
-        comment_texts: List[str],
+        comment_texts: list[str],
         branch_name: str,
     ) -> str:
         """Build instructions for implementing ALL remaining open steps at once.
@@ -638,9 +591,9 @@ class RalphExecutor:
         repo_dir: Path,
         issue_title: str,
         issue_body: str,
-        comment_texts: List[str],
+        comment_texts: list[str],
         branch_name: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute ALL remaining open steps in a single CLI call.
 
         Args:
@@ -693,9 +646,9 @@ class RalphExecutor:
         repo_dir: Path,
         issue_title: str,
         issue_body: str,
-        comment_texts: List[str],
+        comment_texts: list[str],
         branch_name: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute a single step from the plan.
 
         Args:
@@ -742,9 +695,9 @@ class RalphExecutor:
         repo_dir: Path,
         issue_title: str,
         issue_body: str,
-        comment_texts: List[str],
+        comment_texts: list[str],
         branch_name: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute ALL remaining open steps in a single CLI call (batch mode).
 
         This replaces the per-step loop with a single CLI invocation that handles
@@ -800,7 +753,7 @@ class RalphExecutor:
         issue_title: str,
         issue_body: str,
         branch_name: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run final acceptance criteria validation for all steps at once.
 
         Args:
@@ -897,9 +850,9 @@ class RalphExecutor:
         issue_number: int,
         issue_title: str,
         issue_body: str,
-        comment_texts: List[str],
+        comment_texts: list[str],
         branch_name: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute issue processing using refined task execution in .ralph/github-<issue>.md."""
         task_path = self._get_issue_task_path(repo_dir, issue_number)
 
@@ -983,16 +936,17 @@ class RalphExecutor:
         execution_result["task_path"] = str(task_path)
         return execution_result
 
-    def _run_refined_task_loop(
+    # RalphExecutor._run_refined_task_loop: long orchestrator; splitting deferred (issue #419)
+    def _run_refined_task_loop(  # noqa: C901 -- long orchestrator; splitting deferred (issue #419)
         self,
         repo_dir: Path,
         task_path: Path,
         issue_title: str,
         issue_body: str,
-        comment_texts: List[str],
+        comment_texts: list[str],
         branch_name: str,
         issue_number: int = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute all remaining steps in a single batched CLI call, with retry on failure.
 
         Instead of calling the CLI once per step, this method calls the CLI once with
@@ -1001,7 +955,7 @@ class RalphExecutor:
         a final acceptance check validates all steps.
         """
         max_iterations = self.max_iterations
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "success": False,
             "loops_executed": 0,
             "steps_completed": 0,
@@ -1067,11 +1021,12 @@ class RalphExecutor:
                 continue
 
             # After batch execution, check if all steps are now closed
-            try:
+            with contextlib.suppress(Exception):
+                # Suppress all exceptions: PlanParser.parse_file may fail if
+                # file is missing, malformed, or permissions issues.
+                # steps_completed stays at default (0) which is safe for progress tracking
                 updated_plan = PlanParser.parse_file(task_path)
                 result["steps_completed"] = len([step for step in updated_plan.steps if step.is_closed])
-            except Exception:
-                pass
 
             # Commit any changes made during batch execution
             repo_has_changes = False

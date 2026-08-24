@@ -16,13 +16,15 @@ class TestTelegramHandler:
     def test_init_missing_credentials(self):
         """Test initialization fails without bot token and chat ID."""
         # Arrange - Mock settings with missing credentials
-        with patch.dict(
-            "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_bot_token": None, "telegram_chat_id": None},
+        with (
+            patch.dict(
+                "auto_slopp.telegram_handler.settings.__dict__",
+                {"telegram_bot_token": None, "telegram_chat_id": None},
+            ),
+            pytest.raises(ValueError, match="Both bot_token and chat_id must be provided"),
         ):
             # Act & Assert - Should raise ValueError
-            with pytest.raises(ValueError, match="Both bot_token and chat_id must be provided"):
-                TelegramHandler()
+            TelegramHandler()
 
     def test_init_with_direct_credentials(self):
         """Test initialization with direct credentials (ignoring settings)."""
@@ -868,12 +870,14 @@ class TestTelegramErrorScenarios:
                 assert f"bot{token}" in handler.api_url
 
         # Test empty token should fail
-        with patch.dict(
-            "auto_slopp.telegram_handler.settings.__dict__",
-            {"telegram_bot_token": "", "telegram_chat_id": "test_chat"},
+        with (
+            patch.dict(
+                "auto_slopp.telegram_handler.settings.__dict__",
+                {"telegram_bot_token": "", "telegram_chat_id": "test_chat"},
+            ),
+            pytest.raises(ValueError, match="Both bot_token and chat_id must be provided"),
         ):
-            with pytest.raises(ValueError, match="Both bot_token and chat_id must be provided"):
-                TelegramHandler()
+            TelegramHandler()
 
     def test_invalid_chat_id_formats(self):
         """Test initialization with various chat ID formats."""

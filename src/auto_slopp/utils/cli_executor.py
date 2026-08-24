@@ -10,7 +10,7 @@ import time
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from settings.main import (
     MAX_TIMEOUT_SECONDS,
@@ -63,23 +63,22 @@ def _get_timeout_warn_level() -> int:
         _TIMEOUT_WARN_LOG_LEVEL = level
     return _TIMEOUT_WARN_LOG_LEVEL
 
-
 _PROBE_INSTRUCTIONS = "are you working?"
 # 600 seconds (10 minutes) balances catching hung tools without waiting too long.
 # CLI tools like Claude Code or Codex can take minutes to cold-start, so we
 # allow generous time while still detecting genuinely broken configurations.
 _PROBE_TIMEOUT_SECONDS = 600
 
-_cli_states: Dict[int, Dict[str, Any]] = {}
+_cli_states: dict[int, dict[str, Any]] = {}
 
 
-def _get_cli_state(index: int) -> Dict[str, Any]:
+def _get_cli_state(index: int) -> dict[str, Any]:
     if index not in _cli_states:
         _cli_states[index] = {"active": True, "cooldown_until": 0.0}
     return _cli_states[index]
 
 
-def _config_to_dict(config: CLIConfiguration) -> Dict[str, Any]:
+def _config_to_dict(config: CLIConfiguration) -> dict[str, Any]:
     """Convert a CLIConfiguration to a plain dict for probe/execution."""
     return {
         "cli_command": config.cli_command,
@@ -104,8 +103,6 @@ def _check_startup_health(working_dir: Path) -> None:
                 state["cooldown_until"] = time.time() + config.cooldown_seconds
         except (
             subprocess.TimeoutExpired,
-            FileNotFoundError,
-            PermissionError,
             OSError,
         ) as e:
             logger.warning(f"CLI tool {config.name} probe raised {type(e).__name__}: {e}. Placing in cooldown.")
@@ -129,8 +126,6 @@ def _check_cooldowns(working_dir: Path) -> None:
                     state["cooldown_until"] = now + config.cooldown_seconds
             except (
                 subprocess.TimeoutExpired,
-                FileNotFoundError,
-                PermissionError,
                 OSError,
             ) as e:
                 logger.warning(f"CLI tool {config.name} probe raised {type(e).__name__}: {e}. Resetting cooldown.")
@@ -167,7 +162,7 @@ def _choose_best_config_index(task_rating: TaskRating, working_dir: Path, task_n
     return best_index
 
 
-def _get_cli_configurations() -> List[Dict[str, Any]]:
+def _get_cli_configurations() -> list[dict[str, Any]]:
     """Return configured CLI configurations ordered by preference."""
     return [_config_to_dict(config) for config in settings.cli_configurations]
 
@@ -187,10 +182,10 @@ def get_active_cli_command() -> str:
 
 def _build_command(
     cli_command: str,
-    cli_base_args: List[str],
-    agent_args: List[str],
+    cli_base_args: list[str],
+    agent_args: list[str],
     additional_instructions: Optional[str],
-) -> List[str]:
+) -> list[str]:
     """Build command list from CLI configuration and invocation inputs."""
     cmd_args = list(cli_base_args) + list(agent_args)
 
@@ -204,12 +199,12 @@ def _build_command(
 
 def _execute_command(
     cli_command: str,
-    args: List[str],
+    args: list[str],
     working_dir: Path,
     timeout: Optional[int],
     capture_output: bool,
     start_time: Optional[float] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Execute a fully built command and return standardized result data.
 
     Args:
@@ -395,7 +390,7 @@ def _resolve_timeout(raw_timeout: Optional[Any]) -> Optional[int]:
     return _PROBE_TIMEOUT_SECONDS
 
 
-def _probe_configuration(config: Dict[str, Any], working_dir: Path, timeout: Optional[int] = None) -> bool:
+def _probe_configuration(config: dict[str, Any], working_dir: Path, timeout: Optional[int] = None) -> bool:
     """Run quick health probe for one configuration.
 
     Uses the provided timeout:
@@ -431,14 +426,15 @@ def _probe_configuration(config: Dict[str, Any], working_dir: Path, timeout: Opt
     return result["success"]
 
 
-def run_cli_executor(
+# run_cli_executor: long orchestrator; splitting deferred (issue #419)
+def run_cli_executor(  # noqa: C901 -- long orchestrator; splitting deferred (issue #419)
     additional_instructions: Optional[str] = None,
     working_directory: Optional[Path] = None,
     timeout: Optional[int] = None,
-    agent_args: Optional[List[str]] = None,
+    agent_args: Optional[list[str]] = None,
     capture_output: bool = True,
     task_name: str = "default",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Execute the configured CLI command with the specified parameters.
 
     This centralized utility handles CLI execution with consistent
@@ -464,8 +460,8 @@ def run_cli_executor(
         - timeout: bool - Whether execution timed out
         - stdout: str (optional) - Captured stdout if capture_output=True
         - stderr: str (optional) - Captured stderr if capture_output=True
-        - stdout_lines: List[str] (optional) - Stdout as lines if capture_output=True
-        - stderr_lines: List[str] (optional) - Stderr as lines if capture_output=True
+        - stdout_lines: list[str] (optional) - Stdout as lines if capture_output=True
+        - stderr_lines: list[str] (optional) - Stderr as lines if capture_output=True
         - error: str (optional) - Error message if execution failed
 
     Examples:
@@ -519,7 +515,7 @@ def run_cli_executor(
 
     task_rating = settings.task_difficulties.get(task_name, settings.task_difficulties["default"])
 
-    final_result: Optional[Dict[str, Any]] = None
+    final_result: Optional[dict[str, Any]] = None
     tried_indices = set()
 
     while True:
@@ -607,10 +603,10 @@ def run_cli_executor(
 def execute_with_instructions(
     instructions: str,
     work_dir: Path,
-    agent_args: Optional[List[str]] = None,
+    agent_args: Optional[list[str]] = None,
     timeout: Optional[int] = None,
     task_name: str = "default",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Execute CLI with specific instructions.
 
     Args:
