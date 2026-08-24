@@ -304,17 +304,28 @@ def _warn_once_tracked(
 
     Values already present in ``tracked`` are logged at debug level with an
     "(already warned)" suffix; new values are added to ``tracked``.
+
+    Unhashable values (e.g., a list or dict ``timeout`` from a hand-edited
+    JSON config) are tracked by ``repr(value)`` so they are still warned
+    about and discarded gracefully instead of raising ``TypeError``.
     """
+    try:
+        key: Any = value
+        hash(key)
+    except TypeError:
+        # Unhashable values cannot serve as dict keys; fall back to their
+        # repr (stable for equal values) so "warn once" still applies.
+        key = repr(value)
     # No lock around the check-then-add: under concurrent first-use of the
     # same value, two callers may both miss it in ``tracked`` and both log
     # the warning (a harmless duplicate, unlike the idempotent lazy init in
     # _get_timeout_warn_level).
-    if value in tracked:
+    if key in tracked:
         # LRU bookkeeping: refresh recency so this value survives eviction.
-        tracked.move_to_end(value)
+        tracked.move_to_end(key)
         logger.log(logging.DEBUG, fmt + " (already warned)", *args)
     else:
-        tracked[value] = True
+        tracked[key] = True
         # Keep the tracked cache bounded so frequently-varying misconfigured
         # values cannot grow it without limit for the process lifetime.
         # Evicted values simply warn again if they reappear.
