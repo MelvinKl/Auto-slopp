@@ -688,6 +688,11 @@ class IssueWorker(Worker):
         result["status"] = TaskStatus.FAILURE.value
         result["task_completed"] = False
         result["error"] = error
+        # A validation violation means the result is NOT a valid skip: clear
+        # any stale skip fields so the recorded result satisfies the
+        # skip invariants enforced by validate_task_result.
+        result["skipped"] = False
+        result.pop("skip_reason", None)
         return result
 
     def _set_failure(self, result: Dict[str, Any], task: Task, error: str) -> Dict[str, Any]:
