@@ -1,119 +1,116 @@
-# Flake8 Lint Violations Report
+# Flake8 Lint Configuration Report
 
 ## Summary
 
-Total violations found: 3,742 (currently ignored via extend-ignore in pyproject.toml)
+The `[tool.flake8] extend-ignore` list in `pyproject.toml` has been reduced to only the
+codes that strictly conflict with black:
 
-## Breakdown by Error Code
+```toml
+extend-ignore = [
+    "E203",  # whitespace before ':' - black splits slices differently
+    "W503",  # line break before binary operator - black formats after it
+]
+```
 
-### Code Quality Issues
+All previously ignored codes (Q000, WOT001, SIM117, S101, S105, S106, S108, S110, S403,
+S404, S405, S603, S605, S607, S608, S609, C901, E501, F811, F841, B007, B014, BLK100,
+D104, D406, D407, D202, D401, I100, I201, B027) are now enforced. Most violations were
+fixed in code; the rest are handled with targeted `per-file-ignores` entries or inline
+`# noqa` comments with justification.
 
-**F401 (28 violations)** - Imported but unused
-- Unused imports throughout the codebase
+`make test` (black + isort + flake8 + safety + bandit + pytest) passes with this
+configuration.
 
-**F811 (3 violations)** - Redefinition of unused name
-- Redefinition of unused variables
+## Quote style (flake8-quotes)
 
-**F841 (7 violations)** - Local variable assigned but never used
-- Unused local variables
+flake8-quotes defaults to preferring *single* quotes, which conflicts with black's
+double-quote style. The plugin is now configured to match black:
 
-**C901 (9 violations)** - Functions too complex
-- Functions exceeding complexity threshold
+```toml
+inline-quotes = '"'
+docstring-quotes = '"'
+multiline-quotes = '"'
+```
 
-**E501 (5 violations)** - Lines too long
-- Lines exceeding 120 characters
+The only remaining single-quoted strings are GraphQL query fragments in
+`src/auto_slopp/utils/github_operations.py` that contain double quotes; flake8-quotes
+permits the non-preferred quote there to avoid escaping (black does the same).
 
-### Style Issues
+## Fixes applied in code
 
-**Q000 (3,498 violations)** - Double quotes found but single quotes preferred
-- Most common violation - codebase uses double quotes extensively
+| Code | What was fixed |
+| ---- | -------------- |
+| Q000  | Strings converted to the black-compatible double-quote style (black re-run afterwards) |
+| WOT001 | `typing.Dict/List/Set/Tuple` imports and usages replaced with builtin generics (`dict`/`list`/`set`/`tuple`) |
+| SIM117 | Adjacent `with` statements merged into single context managers |
+| S110  | `try/except/pass` blocks replaced with `contextlib.suppress(Exception)` |
+| E501  | Long lines wrapped to ≤ 120 characters |
+| F811  | Removed duplicate definitions (`NO_TIMEOUT`, `validate_timeout`, `_execute_step`) and renamed 3 duplicate test functions so both tests run |
+| B014  | Redundant exception types (`FileNotFoundError`, `PermissionError`) removed from `except` tuples that already catch `OSError` |
+| C901  | Reduced complexity of `_condense_comments`, `_has_author_comments`, and `VikunjaTaskSource.get_tasks` by extracting helpers; remaining long orchestrators carry justified inline suppressions (below) |
+| I100/I201 | Import order normalised with isort (black profile) |
+| BLK100 | Removed the stale per-file black `exclude` entries for `github_operations.py` / `github_task_source.py` so black and flake8-black agree |
 
-**SIM105 (5 violations)** - Use 'contextlib.suppress(Exception)'
-- Can simplify exception handling
+The remaining globally-unenforced codes (S403, S405, S608, S609, F841, B007, B027,
+D104, D406, D407, D202, D401) had **zero violations** and simply no longer needed
+exclusion.
 
-**SIM117 (22 violations)** - Use context manager instead of multiple with statements
-- Code can be simplified using context managers
+## Targeted per-file-ignores
 
-**WOT001 (4 violations)** - Don't import type Dict
-- Unnecessary type imports
+```toml
+per-file-ignores = """
+  ./tests/*: S101,I252,S105,S106,S108,S404,S603,S605,S607
+  src/auto_slopp/executor.py: S404,S603,S607
+  src/auto_slopp/utils/cli_executor.py: S404,S603,S607
+  src/auto_slopp/utils/git_operations.py: S404,S603,S607
+  src/auto_slopp/utils/github_operations.py: S404,S603,S607
+  src/auto_slopp/utils/vikunja_operations.py: S404,S603
+  src/auto_slopp/workers/github_task_source.py: S404,S603,S607
+  src/auto_slopp/workers/pr_worker.py: S404,S603,S607
+"""
+```
 
-### Security Issues
+Justification and covered violation counts (measured with all ignores and noqas
+disabled):
 
-**S105 (40 violations)** - Possible hardcoded password
-- Test tokens in test files
+| Scope | Codes | Violations | Why a global fix is not appropriate |
+| ----- | ----- | ---------- | ----------------------------------- |
+| `./tests/*` | S101 | 1519 | `assert` statements are the point of tests |
+| `./tests/*` | S105/S106 | 43 | Fake test tokens/passwords, no real credentials |
+| `./tests/*` | S108 | 115 | `tempfile` usage for isolated test sandboxes |
+| `./tests/*` | S404/S603/S605/S607 | 89 | Tests exercise the CLI/executor via subprocess with fixed arguments |
+| subprocess utility/worker modules (listed above) | S404/S603/S607 | 141 | These modules intentionally shell out to `git`/`gh`/docker; commands are built from fixed arguments, not untrusted input |
+| `./tests/*` | I252 | — | Dunder method names in mocks (`__dict__`, `__exit__`, ...) |
 
-**S106 (1 violation)** - Possible hardcoded password
-- 'direct_token' found
+## Inline suppressions with justification
 
-**S108 (22 violations)** - Probable insecure usage of temp file/directory
-- Temporary file usage concerns
+13 long orchestration functions keep a local `# noqa: C901` (plus a comment line
+explaining the rationale) because their branch logic is inherent to the workflow
+orchestration they implement and splitting is deferred:
 
-**S110 (4 violations)** - Try, Except, Pass detected
-- Silent exception handling
+| Location | Complexity |
+| -------- | ---------- |
+| `src/auto_slopp/telegram_handler.py` `TelegramHandler._send_message_async` | 11 |
+| `src/auto_slopp/utils/cli_executor.py` `run_cli_executor` | 9 |
+| `src/auto_slopp/utils/git_operations.py` `checkout_branch_resilient` | 13 |
+| `src/auto_slopp/utils/git_operations.py` `merge_main_into_branch` | 9 |
+| `src/auto_slopp/utils/ralph.py` `PlanParser.parse_content` | 10 |
+| `src/auto_slopp/utils/ralph.py` `RalphExecutor._run_refined_task_loop` | 14 |
+| `src/auto_slopp/utils/vikunja_operations.py` `get_tasks` | 10 |
+| `src/auto_slopp/utils/vikunja_operations.py` `verify_blocking_closed` | 14 |
+| `src/auto_slopp/workers/issue_worker.py` `IssueWorker._process_single_task` | 45 |
+| `src/auto_slopp/workers/issue_worker.py` `IssueWorker._review_pull_request` | 14 |
+| `src/auto_slopp/workers/pr_review_worker.py` `PrReviewWorker._process_repository` | 15 |
+| `src/auto_slopp/workers/pr_worker.py` `PRWorker._process_repository` | 15 |
+| `src/auto_slopp/workers/pr_worker.py` `PRWorker._get_and_log_workflow_runs` | 13 |
 
-**S404 (9 violations)** - Consider possible security implications with subprocess module
+Additionally, `Task.id` in `src/auto_slopp/workers/task_source.py` carries
+`# noqa: A003` (field name matches the task-source API).
 
-**S603 (17 violations)** - Subprocess call - check for execution of untrusted input
+## Verification
 
-**S605 (7 violations)** - Starting a process with a shell
+```bash
+make test        # black --check + isort --check + flake8 + safety + bandit + pytest
+```
 
-**S607 (23 violations)** - Starting a process with a partial executable path
-
-## Priority Recommendations
-
-1. **High Priority (Unused code):** Remove F401 (unused imports), F811 (redefinitions), F841 (unused variables)
-2. **Medium Priority (Code quality):** Address C901 (complexity), E501 (line length), SIM105/SIM117 (code simplification)
-3. **Low Priority (Style):** Q000 (quotes) - extensive refactoring needed, may consider removing from ignore list gradually
-4. **Security Review:** S105/S106/S108/S404/S603/S605/S607 - review if these are false positives or genuine concerns
-
-## Detailed Violation List by Category
-
-### F401 - Unused Imports (28 violations)
-
-**Source files:**
-- `src/auto_slopp/executor.py:7` - `typing.Any`
-- `src/auto_slopp/telegram_handler.py:5` - `time`
-- `src/auto_slopp/utils/branch_analysis.py:11` - `auto_slopp.utils.git_operations.get_current_branch`
-- `src/auto_slopp/utils/cli_executor.py:10` - `concurrent.futures.ThreadPoolExecutor`
-- `src/auto_slopp/utils/git_operations.py:16` - `settings.main.settings`
-- `src/auto_slopp/workers/pr_worker.py:19` - `auto_slopp.utils.repository_utils.discover_repositories`
-- `src/auto_slopp/workers/stale_branch_cleanup_worker.py:18` - `auto_slopp.utils.repository_utils.discover_repositories`
-- `src/settings/main.py:4` - `typing.Literal`
-- `src/settings/main.py:7` - `pydantic.model_validator`
-
-**Test files:**
-- `tests/test_auto_update.py` - `subprocess`, `time`, `pathlib.Path`, `unittest.mock.call`, `pytest`
-- `tests/test_cli_executor.py:5` - `unittest.mock.MagicMock`
-- `tests/test_file_operations.py:7` - `pytest`
-- `tests/test_git_operations.py` - `tempfile`, `pytest`, multiple git_operations imports
-- `tests/test_github_issue_worker.py:7` - `pytest`
-- `tests/test_main.py:8` - `pytest`
-- `tests/test_pr_worker.py:4` - `unittest.mock.MagicMock`
-- `tests/test_settings.py` - `settings.main.settings`, `tempfile`
-- `tests/test_telegram_handler.py:11` - `settings.main.settings`
-
-### F811 - Redefinition of Unused Name (3 violations)
-- `tests/test_auto_update.py:187:40` - redefinition of 'call' from line 6
-- `tests/test_auto_update.py:39:59` - redefinition of 'call' from line 6
-- `tests/test_settings.py:110:9` - redefinition of 'settings' from line 11
-
-### F841 - Unused Local Variables (7 violations)
-- `src/auto_slopp/telegram_handler.py:136:17` - variable 'e'
-- `src/auto_slopp/telegram_handler.py:87:9` - variable 'e'
-- `tests/test_auto_update.py:117:13` - variable 'executor'
-- `tests/test_github_issue_worker.py:437:21` - variable 'expected_branch'
-- `tests/test_main.py:191:63` - variable 'mock_exit'
-- `tests/test_stale_branch_cleanup_worker.py:117:13` - variable 'temp_repo_path'
-- `tests/test_telegram_handler.py:114:17` - variable 'loop'
-
-## Next Steps
-
-Step 1: ✅ Complete - Identified all violations
-Step 2: ✅ Complete - All unused variables identified and documented (see UNUSED_VARIABLES.md)
-Step 3: Identify unused functions
-Step 4: Remove unused variables
-Step 5: Remove unused functions
-Step 6: Review and resolve ignored warnings
-Step 7: Review and remove unused imports (F401 violations)
-Step 8: Verify improvements with flake8
-Step 9: Run make test to confirm success
+All checks pass.

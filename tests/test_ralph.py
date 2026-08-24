@@ -544,8 +544,8 @@ class TestRalphExecutor:
             assert "- [ ] 2. Implement the required code changes." in content
             assert "- [ ] 3. Update or add tests for the implementation." in content
             assert (
-                "- [ ] 4. If the change affects user-facing behavior or documentation, update README.md and any documentation affected by the changes."
-                in content
+                "- [ ] 4. If the change affects user-facing behavior or documentation, update README.md and any "
+                "documentation affected by the changes." in content
             )
             assert "- [ ] 5. Run `make test` and confirm it succeeds." in content
 
@@ -683,7 +683,8 @@ class TestRalphExecutor:
                 "- [ ] 1. Analyze the required implementation changes\n"
                 "- [ ] 2. Implement the required code changes\n"
                 "- [ ] 3. Update or add tests for the implementation\n"
-                "- [ ] 4. If the change affects user-facing behavior or documentation, update README.md and any documentation affected by the changes\n"
+                "- [ ] 4. If the change affects user-facing behavior or documentation, update README.md and any "
+                "documentation affected by the changes\n"
                 "- [ ] 5. Some other final step\n"
             )
             ralph_executor._ensure_last_step_is_make_test(task_path)
@@ -778,8 +779,9 @@ class TestRalphExecutor:
             )
 
             assert (
-                "If the change affects user-facing behavior or documentation, include a step to update README.md and any documentation affected by the changes. This step must come before the final `make test` step"
-                in instructions
+                "If the change affects user-facing behavior or documentation, include a step to update README.md "
+                "and any documentation affected by the changes. This step must come before the final "
+                "`make test` step" in instructions
             )
             assert "make test" in instructions
             assert "The last step must always verify" in instructions
@@ -813,8 +815,9 @@ class TestRalphExecutor:
             assert len(captured) == 1
             instructions = captured[0]
             assert (
-                "If the change affects user-facing behavior or documentation, include a step to update README.md and any documentation affected by the changes. This step must come before the final `make test` step"
-                in instructions
+                "If the change affects user-facing behavior or documentation, include a step to update README.md "
+                "and any documentation affected by the changes. This step must come before the final "
+                "`make test` step" in instructions
             )
             assert "make test" in instructions
             assert "The last step must always verify" in instructions

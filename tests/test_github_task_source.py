@@ -952,7 +952,7 @@ class TestGitHubTaskSource:
 
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
     @patch("auto_slopp.workers.github_task_source.settings")
-    def test_on_skip_handles_missing_repo_path(self, mock_settings, mock_comment):
+    def test_on_skip_handles_missing_repo_path_gracefully(self, mock_settings, mock_comment):
         """Test that on_skip handles missing repo_path in task gracefully."""
         mock_settings.github_issue_worker_required_label = "test-label"
         task_source = GitHubTaskSource()

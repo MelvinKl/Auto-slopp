@@ -8,7 +8,7 @@ process them identically regardless of origin.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -18,8 +18,8 @@ class Task:
     id: int  # noqa: A003
     title: str
     body: str
-    comments: List[str] = field(default_factory=list)
-    raw: Dict[str, Any] = field(default_factory=dict)
+    comments: list[str] = field(default_factory=list)
+    raw: dict[str, Any] = field(default_factory=dict)
 
 
 class TaskSource(ABC):
@@ -31,7 +31,7 @@ class TaskSource(ABC):
     """
 
     @abstractmethod
-    def get_tasks(self, repo_path: Path) -> List[Task]:
+    def get_tasks(self, repo_path: Path) -> list[Task]:
         """Fetch and filter tasks from the source.
 
         Args:
@@ -92,7 +92,7 @@ class TaskSource(ABC):
         """
 
     @abstractmethod
-    def on_task_complete(self, task: Task, branch_name: str, pr_url: str, findings: Optional[List[str]] = None) -> None:
+    def on_task_complete(self, task: Task, branch_name: str, pr_url: str, findings: Optional[list[str]] = None) -> None:
         """Called when a task completes successfully.
 
         Args:

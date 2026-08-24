@@ -46,7 +46,11 @@ class TestStaleBranchCleanupWorker:
 
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = Mock(
-                stdout="* main\x002024-01-01T10:00:00+00:00\x00abc123\nmaster\x002024-01-01T10:00:00+00:00\x00def456\nfeature\x002024-01-01T10:00:00+00:00\x00ghi789\n",
+                stdout=(
+                    "* main\x002024-01-01T10:00:00+00:00\x00abc123\n"
+                    "master\x002024-01-01T10:00:00+00:00\x00def456\n"
+                    "feature\x002024-01-01T10:00:00+00:00\x00ghi789\n"
+                ),
                 stderr="",
                 returncode=0,
             )
@@ -113,24 +117,23 @@ class TestStaleBranchCleanupWorker:
         """Test deletion of current branch is prevented."""
         worker = StaleBranchCleanupWorker()
 
-        with tempfile.TemporaryDirectory():
-            with patch("subprocess.run") as mock_run:
-                mock_run.return_value = Mock(stdout="test-branch", returncode=0)
+        with tempfile.TemporaryDirectory(), patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(stdout="test-branch", returncode=0)
 
-                original_method = worker._delete_branch
+            original_method = worker._delete_branch
 
-                def mock_delete_branch(branch_name: str) -> bool:
-                    if branch_name == "test-branch":
-                        return False
-                    return True
+            def mock_delete_branch(branch_name: str) -> bool:
+                if branch_name == "test-branch":
+                    return False
+                return True
 
-                worker._delete_branch = mock_delete_branch
+            worker._delete_branch = mock_delete_branch
 
-                try:
-                    result = worker._delete_branch("test-branch")
-                    assert result is False
-                finally:
-                    worker._delete_branch = original_method
+            try:
+                result = worker._delete_branch("test-branch")
+                assert result is False
+            finally:
+                worker._delete_branch = original_method
 
     def test_worker_result_structure_consistency(self, temp_repo_dir):
         """Test that worker result structure is consistent and complete."""

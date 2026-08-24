@@ -5,7 +5,7 @@ and ensuring they are proper git repositories.
 """
 
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from auto_slopp.utils.git_operations import (
     get_default_branch,
@@ -35,7 +35,7 @@ def is_git_repository(repo_dir: Path) -> bool:
         return False
 
 
-def validate_repository(repo_dir: Path) -> Dict[str, Any]:
+def validate_repository(repo_dir: Path) -> dict[str, Any]:
     """Validate a repository directory and return status information.
 
     Args:
