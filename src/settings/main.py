@@ -227,12 +227,6 @@ class Settings(BaseSettings):
         default="AI",
         description="Required label for PrReviewWorker to process a PR",
     )
-    pr_review_worker_min_comments: int = Field(
-        default=0,
-        ge=0,
-        le=20,
-        description="Minimum number of review comments per PR (kept for compatibility; the review prompt is conservative and may output fewer)",
-    )
     pr_review_worker_max_comments: int = Field(
         default=5,
         ge=1,

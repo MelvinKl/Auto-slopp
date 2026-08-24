@@ -845,6 +845,10 @@ Plan:
     # non-blocking: suggestions and nitpicks do not converge (each fresh review
     # surfaces new ones), so treating them as actionable would spin the
     # fix/re-review loop until max iterations without ever going clean.
+    #
+    # Previously ACTIONABLE_FINDING_PREFIXES included "suggestion:" but this
+    # caused infinite fix/re-review loops because suggestions are subjective
+    # and each review pass generates new ones.
     ACTIONABLE_FINDING_PREFIXES = ("issue:",)
     INFORMATIONAL_FINDING_PREFIXES = ("suggestion:", "nit:", "chore:")
 
