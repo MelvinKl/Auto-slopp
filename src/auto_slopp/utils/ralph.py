@@ -1159,6 +1159,16 @@ class RalphExecutor:
                 result["last_error"] = final_check_result.get("error", "Final acceptance check failed")
                 result["loops_executed"] = iteration - 1
                 result["error"] = final_check_result.get("error", "Final acceptance check failed")
+                # Also record the failure in the executor's error state (the
+                # same way the max-iterations final-check branch does): without
+                # this, a final-check failure caused by an LLM outage leaves
+                # max_loops_reached=False and get_skip_reason()=None, so the
+                # worker would drop the issue via on_task_failure instead of
+                # skipping it for retry. Non-outage final-check failures must
+                # not poison the executor's error state.
+                if error_indicates_llm_unavailability(result["last_error"]):
+                    self._last_error = result["last_error"]
+                    self._last_iteration_failure_reason = self._last_error
                 return result
 
             # Execute ALL remaining open steps in a single batched CLI call

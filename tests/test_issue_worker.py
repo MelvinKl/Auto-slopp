@@ -430,6 +430,15 @@ class TestIssueWorker:
         assert task_result.get("skipped") is True
         assert task_result.get("skip_reason")
         assert "timed out" in task_result["skip_reason"]
+        # The underlying mid-loop failure must be carried in result["error"]
+        # (and result["root_error"]) rather than the generic
+        # "Maximum iterations reached" message, so the fields don't contradict
+        # each other.
+        assert task_result.get("root_error")
+        assert "timed out" in task_result["root_error"]
+        assert task_result.get("error")
+        assert "timed out" in task_result["error"]
+        assert "Maximum iterations" not in task_result["error"]
 
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")

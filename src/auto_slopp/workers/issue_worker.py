@@ -343,6 +343,13 @@ class IssueWorker(Worker):
                             result["success"] = True
                             result["skipped"] = True
                             result["skip_reason"] = skip_reason
+                            # The generic "Maximum iterations reached" message
+                            # in result["error"] does not describe the actual
+                            # failure; carry the underlying mid-loop failure in
+                            # result["root_error"] as well so the two don't
+                            # contradict each other.
+                            result["root_error"] = skip_reason
+                            result["error"] = skip_reason
                             return result
                         self.logger.warning(f"Ralph loop reached max iterations for task #{task_id}")
                         self.task_source.on_max_iterations_reached(
