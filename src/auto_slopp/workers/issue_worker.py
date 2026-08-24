@@ -153,6 +153,11 @@ class IssueWorker(Worker):
                 results["tasks_completed"] += task_result.get("tasks_completed", 0)
             else:
                 results["tasks_failed"] += 1
+                # A task can fail after the agent already ran and a PR was
+                # created (e.g. an unexpected exception in the PR-review loop);
+                # still count the executions and the PR.
+                results["openagent_executions"] += task_result.get("openagent_executions", 0)
+                results["prs_created"] += task_result.get("prs_created", 0)
                 self.logger.warning(f"Failed to process task #{task.id}: {task_result.get('error', 'Unknown error')}")
 
         results["execution_time"] = self._get_elapsed_time(start_time)
