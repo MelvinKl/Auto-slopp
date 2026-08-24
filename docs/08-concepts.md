@@ -190,7 +190,6 @@ ALL_WORKERS: list[Type[Worker]] = [
     GitHubIssueWorker,
     PRWorker,
     StaleBranchCleanupWorker,
-    VikunjaWorker,
     PrReviewWorker,
 ]
 ```
@@ -199,7 +198,6 @@ ALL_WORKERS: list[Type[Worker]] = [
 - `GitHubIssueWorker`: Processes GitHub issues (wrapper around `IssueWorker` + `GitHubTaskSource`)
 - `PRWorker`: Tests open PR branches and fixes failing tests
 - `StaleBranchCleanupWorker`: Cleans up local branches without remote tracking
-- `VikunjaWorker`: Processes Vikunja tasks (wrapper around `IssueWorker` + `VikunjaTaskSource`)
 - `PrReviewWorker`: Reviews PRs with the "AI Review" label
 
 **Adding a new worker**:
