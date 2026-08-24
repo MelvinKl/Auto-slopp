@@ -78,6 +78,8 @@ class TaskResult(TypedDict):
         no_changes: True when task required no changes.
         pr_url: URL of the created PR.
         pr_review_done: True when PR review was performed.
+        pr_review_iterations: Number of PR review iterations performed.
+        pr_review_error: Error from the PR review (present when review tooling failed).
         label_removed: True when an automatic label was removed.
     """
 
@@ -103,6 +105,8 @@ class TaskResult(TypedDict):
     no_changes: NotRequired[bool]
     pr_url: NotRequired[str]
     pr_review_done: NotRequired[bool]
+    pr_review_iterations: NotRequired[int]
+    pr_review_error: NotRequired[str]
     label_removed: NotRequired[bool]
 
 

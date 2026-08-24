@@ -160,6 +160,10 @@ class IssueWorker(Worker):
                 results["prs_created"] += task_result.get("prs_created", 0)
                 self.logger.warning(f"Failed to process task #{task.id}: {task_result.get('error', 'Unknown error')}")
 
+        # Mirror per-task failures into the top-level run status.
+        if results["tasks_failed"] > 0:
+            results["success"] = False
+
         results["execution_time"] = self._get_elapsed_time(start_time)
         self._log_completion_summary(results)
 

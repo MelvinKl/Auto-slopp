@@ -381,7 +381,7 @@ class TestIssueWorker:
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
         result = worker.run(Path("/tmp"))
-        assert result["success"] is True
+        assert result["success"] is False
         assert result["tasks_processed"] == 0
         assert len(result["task_results"]) == 1
         assert result["task_results"][0]["success"] is False
@@ -408,7 +408,7 @@ class TestIssueWorker:
             "error": "Max iterations reached",
         }
         result = worker.run(Path("/tmp"))
-        assert result["success"] is True
+        assert result["success"] is False
         assert result["tasks_processed"] == 0
         assert len(result["task_results"]) == 1
         assert result["task_results"][0]["success"] is False
@@ -499,7 +499,7 @@ class TestIssueWorker:
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
         result = worker.run(Path("/tmp"))
-        assert result["success"] is True
+        assert result["success"] is False
         assert result["tasks_processed"] == 0
         assert len(result["task_results"]) == 1
         assert "Failed to create branch" in result["task_results"][0]["error"]
@@ -1439,7 +1439,7 @@ class TestIssueWorker:
             "error": "Git push failed: permission denied",
         }
         result = worker.run(Path("/tmp"))
-        assert result["success"] is True
+        assert result["success"] is False
         assert result["tasks_processed"] == 0
         assert result["tasks_skipped"] == 0
         assert len(result["task_results"]) == 1

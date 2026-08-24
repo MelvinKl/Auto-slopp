@@ -314,11 +314,6 @@ class GitHubTaskSource(TaskSource):
             task: The task that should be skipped
             reason: Optional reason for skipping (e.g., "LLM unavailable")
         """
-        repo_path = task.raw.get("_repo_path")
-        if repo_path is None:
-            logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
-            return
-
         # No GitHub comment is posted for skips — skip events are logged-only
         # to avoid cluttering issues with skip notifications. The label is preserved
         # so the task can be retried in a future run.

@@ -870,6 +870,7 @@ Each processed task produces a `TaskResult` dict. The `success` field uses `None
 | `no_changes` | `bool` | True when task required no changes (optional) |
 | `pr_url` | `str` | URL of the created PR (optional) |
 | `pr_review_done` | `bool` | True when PR review was performed (optional) |
+| `pr_review_iterations` | `int` | Number of PR review iterations performed (optional) |
 | `label_removed` | `bool` | True when an automatic label was removed (optional) |
 
 The completion summary logs task counts broken down by outcome:
