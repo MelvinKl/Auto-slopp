@@ -125,40 +125,7 @@ class IssueWorker(Worker):
             return results
 
         for task in tasks:
-            task_result = self._process_single_task(repo_path, task)
-            try:
-                validate_task_result(task_result)
-            except ValueError as e:
-                # Data-consistency invariant on internal state: record the
-                # result as a failure instead of aborting the whole run and
-                # discarding accumulated task results.
-                self.logger.error(f"Inconsistent task result for task #{task.id}: {e}")
-                self._mark_inconsistent(task_result, f"Inconsistent task result: {e}")
-            results["task_results"].append(task_result)
-
-            # A skip is a distinct, non-error outcome: it is counted and
-            # logged separately from real failures (success=False).
-            if task_result.get("status") == TaskStatus.SKIPPED.value:
-                results["tasks_skipped"] += 1
-                # A task can be skipped after the agent already ran and a PR
-                # was created (e.g. the PR-review LLM-unavailable path); still
-                # count the executions and the PR.
-                results["openagent_executions"] += task_result.get("openagent_executions", 0)
-                results["prs_created"] += task_result.get("prs_created", 0)
-                self.logger.info(f"Task #{task.id} skipped: {task_result.get('skip_reason', 'Unknown')}")
-            elif task_result["success"]:
-                results["tasks_processed"] += 1
-                results["openagent_executions"] += task_result.get("openagent_executions", 0)
-                results["prs_created"] += task_result.get("prs_created", 0)
-                results["tasks_completed"] += task_result.get("tasks_completed", 0)
-            else:
-                results["tasks_failed"] += 1
-                # A task can fail after the agent already ran and a PR was
-                # created (e.g. an unexpected exception in the PR-review loop);
-                # still count the executions and the PR.
-                results["openagent_executions"] += task_result.get("openagent_executions", 0)
-                results["prs_created"] += task_result.get("prs_created", 0)
-                self.logger.warning(f"Failed to process task #{task.id}: {task_result.get('error', 'Unknown error')}")
+            results = self._record_task_result(results, repo_path, task)
 
         # Mirror per-task failures into the top-level run status.
         if results["tasks_failed"] > 0:
@@ -166,6 +133,59 @@ class IssueWorker(Worker):
 
         results["execution_time"] = self._get_elapsed_time(start_time)
         self._log_completion_summary(results)
+
+        return results
+
+    def _record_task_result(
+        self,
+        results: dict[str, Any],
+        repo_path: Path,
+        task: Task,
+    ) -> dict[str, Any]:
+        """Process one task and fold its result into the run-level stats.
+
+        Args:
+            results: Run-level results dict to update in place
+            repo_path: Path to the repository directory
+            task: The task to process
+
+        Returns:
+            The updated results dict
+        """
+        task_result = self._process_single_task(repo_path, task)
+        try:
+            validate_task_result(task_result)
+        except ValueError as e:
+            # Data-consistency invariant on internal state: record the
+            # result as a failure instead of aborting the whole run and
+            # discarding accumulated task results.
+            self.logger.error(f"Inconsistent task result for task #{task.id}: {e}")
+            self._mark_inconsistent(task_result, f"Inconsistent task result: {e}")
+        results["task_results"].append(task_result)
+
+        # A skip is a distinct, non-error outcome: it is counted and
+        # logged separately from real failures (success=False).
+        if task_result.get("status") == TaskStatus.SKIPPED.value:
+            results["tasks_skipped"] += 1
+            # A task can be skipped after the agent already ran and a PR
+            # was created (e.g. the PR-review LLM-unavailable path); still
+            # count the executions and the PR.
+            results["openagent_executions"] += task_result.get("openagent_executions", 0)
+            results["prs_created"] += task_result.get("prs_created", 0)
+            self.logger.info(f"Task #{task.id} skipped: {task_result.get('skip_reason', 'Unknown')}")
+        elif task_result["success"]:
+            results["tasks_processed"] += 1
+            results["openagent_executions"] += task_result.get("openagent_executions", 0)
+            results["prs_created"] += task_result.get("prs_created", 0)
+            results["tasks_completed"] += task_result.get("tasks_completed", 0)
+        else:
+            results["tasks_failed"] += 1
+            # A task can fail after the agent already ran and a PR was
+            # created (e.g. an unexpected exception in the PR-review loop);
+            # still count the executions and the PR.
+            results["openagent_executions"] += task_result.get("openagent_executions", 0)
+            results["prs_created"] += task_result.get("prs_created", 0)
+            self.logger.warning(f"Failed to process task #{task.id}: {task_result.get('error', 'Unknown error')}")
 
         return results
 
@@ -648,7 +668,7 @@ class IssueWorker(Worker):
 
         return result
 
-    def _init_result(self, repo_dir: Path, task: Task) -> Dict[str, Any]:
+    def _init_result(self, repo_dir: Path, task: Task) -> dict[str, Any]:
         """Create the base result dict for a task (status pending, success True)."""
         return {
             "repository": repo_dir.name,
@@ -667,7 +687,7 @@ class IssueWorker(Worker):
             "ralph_steps_completed": 0,
         }
 
-    def _skip_task(self, result: Dict[str, Any], task: Task, reason: str) -> Dict[str, Any]:
+    def _skip_task(self, result: dict[str, Any], task: Task, reason: str) -> dict[str, Any]:
         """Mark a task result as skipped (a distinct, non-error outcome).
 
         Sets the canonical skip signal (``success=None`` +
@@ -687,7 +707,7 @@ class IssueWorker(Worker):
             self.logger.warning(f"on_skip failed for task #{task.id}: {e}")
         return result
 
-    def _mark_inconsistent(self, result: Dict[str, Any], error: str) -> Dict[str, Any]:
+    def _mark_inconsistent(self, result: dict[str, Any], error: str) -> dict[str, Any]:
         """Mark a task result as failed after a result-validation invariant violation.
 
         Mirrors the dict mutation of ``_set_failure`` but does not notify the
@@ -705,7 +725,7 @@ class IssueWorker(Worker):
         result.pop("skip_reason", None)
         return result
 
-    def _set_failure(self, result: Dict[str, Any], task: Task, error: str) -> Dict[str, Any]:
+    def _set_failure(self, result: dict[str, Any], task: Task, error: str) -> dict[str, Any]:
         """Mark a task result as a real failure and notify the task source."""
         result["success"] = False
         result["status"] = TaskStatus.FAILURE.value
@@ -720,7 +740,7 @@ class IssueWorker(Worker):
             self.logger.warning(f"on_task_failure failed for task #{task.id}: {e}")
         return result
 
-    def _set_success(self, result: Dict[str, Any]) -> Dict[str, Any]:
+    def _set_success(self, result: dict[str, Any]) -> dict[str, Any]:
         """Mark a task result as successful."""
         result["success"] = True
         result["status"] = TaskStatus.SUCCESS.value

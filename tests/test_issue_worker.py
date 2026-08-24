@@ -530,9 +530,11 @@ class TestIssueWorker:
             "max_loops_reached": False,
             "error": "LLM timed out waiting for response",
         }
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with caplog.at_level("INFO", logger="auto_slopp.workers.IssueWorker"):
-                result = worker.run(Path(temp_dir))
+        with (
+            tempfile.TemporaryDirectory() as temp_dir,
+            caplog.at_level("INFO", logger="auto_slopp.workers.IssueWorker"),
+        ):
+            result = worker.run(Path(temp_dir))
 
         assert result["tasks_skipped"] == 1
         assert result["tasks_processed"] == 0
@@ -564,9 +566,11 @@ class TestIssueWorker:
             if kwargs.get("issue_number") == 1
             else {"success": False, "error": "Git push failed: permission denied"}
         )
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with caplog.at_level("INFO", logger="auto_slopp.workers.IssueWorker"):
-                result = worker.run(Path(temp_dir))
+        with (
+            tempfile.TemporaryDirectory() as temp_dir,
+            caplog.at_level("INFO", logger="auto_slopp.workers.IssueWorker"),
+        ):
+            result = worker.run(Path(temp_dir))
 
         assert result["tasks_skipped"] == 1
         assert result["tasks_processed"] == 0
