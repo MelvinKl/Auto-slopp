@@ -4,10 +4,11 @@ This module provides a TaskSource implementation that loads tasks from
 GitHub Issues, following the same patterns used by GitHubIssueWorker.
 """
 
+import contextlib
 import logging
 import subprocess
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from auto_slopp.utils.cli_executor import execute_with_instructions
 from auto_slopp.utils.git_operations import sanitize_branch_name
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 class GitHubTaskSource(TaskSource):
     """Task source that loads tasks from GitHub Issues."""
 
-    def get_tasks(self, repo_path: Path) -> List[Task]:
+    def get_tasks(self, repo_path: Path) -> list[Task]:
         """Fetch and filter tasks from GitHub Issues.
 
         Args:
@@ -72,7 +73,7 @@ class GitHubTaskSource(TaskSource):
 
     def _condense_comments(
         self, repo_path: Path, issue_number: int, issue_author_login: str, allowed_creator: str
-    ) -> List[str]:
+    ) -> list[str]:
         """Condense comments from the issue author or allowed creator into a single comment.
 
         Fetches all comments via get_issue_comments(). Filters to only include comments
@@ -103,18 +104,11 @@ class GitHubTaskSource(TaskSource):
         logger.debug(f"[Condense] Found {len(all_comments)} total comments for issue #{issue_number}")
 
         # Filter comments to only include those from issue author or allowed creator
-        filtered_comments = []
-        for comment in all_comments:
-            author = comment.get("author")
-            if isinstance(author, dict):
-                author_login = author.get("login")
-            else:
-                author_login = author
-            if author_login in (issue_author_login, allowed_creator):
-                filtered_comments.append(comment)
+        filtered_comments = self._filter_relevant_comments(all_comments, issue_author_login, allowed_creator)
 
         logger.debug(
-            f"[Condense] Filtered to {len(filtered_comments)} comments (author: {issue_author_login}, allowed: {allowed_creator})"
+            f"[Condense] Filtered to {len(filtered_comments)} comments (author: {issue_author_login}, "
+            f"allowed: {allowed_creator})"
         )
 
         # No relevant comments
@@ -127,6 +121,55 @@ class GitHubTaskSource(TaskSource):
             return [filtered_comments[0].get("body", "") or ""]
         # Two or more relevant comments: condense them
         logger.debug(f"[Condense] Condensing {len(filtered_comments)} comments for issue #{issue_number}")
+        return self._condense_and_replace_comments(repo_path, issue_number, filtered_comments)
+
+    @staticmethod
+    def _comment_author_login(comment: dict) -> Optional[str]:
+        """Extract the author login from a comment dict.
+
+        Args:
+            comment: Comment dictionary with an 'author' entry (dict or login string)
+
+        Returns:
+            Author login name, or None if not present
+        """
+        author = comment.get("author")
+        if isinstance(author, dict):
+            return author.get("login")
+        return author
+
+    def _filter_relevant_comments(
+        self, all_comments: list[dict], issue_author_login: str, allowed_creator: str
+    ) -> list[dict]:
+        """Filter comments to those from the issue author or allowed creator.
+
+        Args:
+            all_comments: All comments on the issue
+            issue_author_login: Login of the issue author
+            allowed_creator: Whitelisted GitHub username
+
+        Returns:
+            List of comments from the issue author or allowed creator
+        """
+        filtered_comments = []
+        for comment in all_comments:
+            if self._comment_author_login(comment) in (issue_author_login, allowed_creator):
+                filtered_comments.append(comment)
+        return filtered_comments
+
+    def _condense_and_replace_comments(
+        self, repo_path: Path, issue_number: int, filtered_comments: list[dict]
+    ) -> list[str]:
+        """Condense comments into one summary, post it, and delete the originals.
+
+        Args:
+            repo_path: Path to the git repository
+            issue_number: Issue number to condense comments for
+            filtered_comments: Relevant comments to condense
+
+        Returns:
+            List containing the condensed summary as the sole comment
+        """
         comment_lines = []
         for i, comment in enumerate(filtered_comments, start=1):
             body = comment.get("body", "") or ""
@@ -214,7 +257,7 @@ class GitHubTaskSource(TaskSource):
         """
         pass
 
-    def on_task_complete(self, task: Task, branch_name: str, pr_url: str, findings: Optional[List[str]] = None) -> None:
+    def on_task_complete(self, task: Task, branch_name: str, pr_url: str, findings: Optional[list[str]] = None) -> None:
         """Called when a task completes successfully.
 
         If findings is provided and non-empty, adds a comment summarizing the findings
@@ -356,7 +399,7 @@ class GitHubTaskSource(TaskSource):
         else:
             logger.warning(f"Failed to remove required label from issue #{task.id}")
 
-    def _filter_renovate_issues(self, issues: List[dict]) -> List[dict]:
+    def _filter_renovate_issues(self, issues: list[dict]) -> list[dict]:
         """Filter out issues created by Renovate.
 
         Args:
@@ -417,7 +460,7 @@ class GitHubTaskSource(TaskSource):
 
         return has_required_label and is_allowed_creator
 
-    def _filter_by_label_and_creator(self, issues: List[dict]) -> List[dict]:
+    def _filter_by_label_and_creator(self, issues: list[dict]) -> list[dict]:
         """Filter issues based on required label and allowed creator.
 
         Args:
@@ -459,12 +502,7 @@ class GitHubTaskSource(TaskSource):
 
             author_comments = 0
             for comment in all_comments:
-                author = comment.get("author")
-                if isinstance(author, dict):
-                    author_login = author.get("login")
-                else:
-                    author_login = author
-                if author_login == issue_author_login:
+                if self._comment_author_login(comment) == issue_author_login:
                     author_comments += 1
                     # Check if comment is not the "No changes required" comment we just added
                     if "no changes required for this issue" in comment.get("body", "").lower():
@@ -508,7 +546,7 @@ class GitHubTaskSource(TaskSource):
             logger.warning(f"Failed to check PRs for issue #{issue_number}: {str(e)}")
             return False
 
-    def _pr_mentions_issue(self, prs: List[dict], issue_number: int) -> bool:
+    def _pr_mentions_issue(self, prs: list[dict], issue_number: int) -> bool:
         """Check if any PR in the list mentions the given issue number.
 
         Args:
@@ -560,7 +598,10 @@ class GitHubTaskSource(TaskSource):
                 return True
 
             # Check if there are any workflow runs for recent commits
-            try:
+            with contextlib.suppress(Exception):
+                # Suppress all exceptions: git log may fail if not in a repo,
+                # permissions issues, or timeout. We only care about positive
+                # signals; any error means "unknown, assume no activity"
                 # Get the most recent commits to this repo
                 result = subprocess.run(
                     ["git", "log", "--oneline", "-10"],
@@ -574,8 +615,6 @@ class GitHubTaskSource(TaskSource):
                     # Check if recent commits mention this issue
                     if str(issue_number) in recent_commits:
                         return True
-            except Exception:
-                pass
 
             return False
 

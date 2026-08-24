@@ -1,7 +1,7 @@
 """Main settings configuration using Pydantic BaseSettings."""
 
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, field_validator
@@ -28,13 +28,16 @@ class CLIConfiguration(BaseModel):
     cli_command: str = Field(
         description="CLI command to execute for automation tasks (e.g., opencode, claude, gemini)",
     )
-    cli_args: List[str] = Field(
+    cli_args: list[str] = Field(
         default_factory=list,
         description="Arguments to pass to the CLI command",
     )
     timeout: int = Field(
         default=-1,
-        description="Timeout in seconds for CLI execution. Set to -1 to disable timeout (never timeout). Must be -1 or a positive integer.",
+        description=(
+            "Timeout in seconds for CLI execution. Set to -1 to disable timeout (never timeout). "
+            "Must be -1 or a positive integer."
+        ),
     )
     capability: int = Field(
         default=5,
@@ -50,7 +53,7 @@ class CLIConfiguration(BaseModel):
         default="",
         description="Human-readable name for this CLI configuration",
     )
-    blacklist_tasks: List[str] = Field(
+    blacklist_tasks: list[str] = Field(
         default_factory=list,
         description="Task names for which this CLI configuration should not be used",
     )
@@ -76,14 +79,6 @@ class CLIConfiguration(BaseModel):
             f"(~1 year), got {v}. A value of -1 means never timeout; positive values specify seconds."
         )
 
-    @field_validator("timeout")
-    @classmethod
-    def validate_timeout(cls, v: int) -> int:
-        """Validate that timeout is either -1 (no timeout) or a positive integer."""
-        if v == -1 or v > 0:
-            return v
-        raise ValueError("timeout must be -1 (no timeout) or a positive integer")
-
 
 class Settings(BaseSettings):
     """Main application settings.
@@ -101,7 +96,7 @@ class Settings(BaseSettings):
         description="Directory for log files (WARNING+ severity). Set to None to disable file logging.",
     )
 
-    workers_disabled: List[str] = Field(
+    workers_disabled: list[str] = Field(
         default_factory=list,
         description="List of disabled worker names. Empty list means all workers are enabled.",
     )
@@ -158,7 +153,7 @@ class Settings(BaseSettings):
         default=False, description="Disable notification sound for Telegram messages"
     )
 
-    cli_configurations: List[CLIConfiguration] = Field(
+    cli_configurations: list[CLIConfiguration] = Field(
         default_factory=lambda: [
             CLIConfiguration(
                 cli_command="pi",
@@ -245,7 +240,7 @@ class Settings(BaseSettings):
         description="Path to an additional .env file to be appended to subprocess calls for github_operations",
     )
 
-    task_difficulties: Dict[str, TaskRating] = Field(
+    task_difficulties: dict[str, TaskRating] = Field(
         default={
             "task_planning": TaskRating(min_rating=0, max_rating=10, recommended_rating=10),
             "implementation": TaskRating(min_rating=5, max_rating=10, recommended_rating=10),

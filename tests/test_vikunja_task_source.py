@@ -504,7 +504,7 @@ class TestVikunjaTaskSource:
 
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
     @patch("auto_slopp.workers.vikunja_task_source.settings")
-    def test_on_skip_handles_missing_repo_path(self, mock_settings, mock_comment):
+    def test_on_skip_handles_missing_repo_path_with_label(self, mock_settings, mock_comment):
         """Test that on_skip handles missing repo_path gracefully."""
         mock_settings.github_issue_worker_required_label = "test-tag"
         mock_comment.return_value = True

@@ -777,7 +777,8 @@ class TestIssueWorker:
         mock_checkout,
         mock_commit_push,
     ):
-        """Test that _process_single_task() passes task.comments directly without re-condensing or replacing with placeholder.
+        """Test that _process_single_task() passes task.comments directly without re-condensing or replacing
+        with placeholder.
 
         When GitHubTaskSource._condense_comments() returns [condensed_summary], the worker
         should pass this directly to the agent without modification. The old fallback logic
@@ -1272,10 +1273,12 @@ class TestIssueWorker:
         ]
         with patch("auto_slopp.workers.github_task_source.execute_with_instructions") as mock_execute:
             mock_execute.return_value = {"success": True, "stdout": "Condensed summary"}
-            with patch("auto_slopp.workers.github_task_source.comment_on_issue"):
-                with patch("auto_slopp.workers.github_task_source.delete_issue_comment"):
-                    result = task_source._condense_comments(Path("/tmp"), 3, "author", "MelvinKl")
-                    assert result == ["Condensed summary"]
+            with (
+                patch("auto_slopp.workers.github_task_source.comment_on_issue"),
+                patch("auto_slopp.workers.github_task_source.delete_issue_comment"),
+            ):
+                result = task_source._condense_comments(Path("/tmp"), 3, "author", "MelvinKl")
+                assert result == ["Condensed summary"]
 
     def test_comments_pass_through_unchanged(self):
         """Test that task.comments are passed through without modification.
@@ -1352,9 +1355,11 @@ class TestIssueWorker:
             "steps_completed": 3,
             "total_steps": 3,
         }
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with caplog.at_level("WARNING", logger="auto_slopp.workers.issue_worker"):
-                worker.run(Path(temp_dir))
+        with (
+            tempfile.TemporaryDirectory() as temp_dir,
+            caplog.at_level("WARNING", logger="auto_slopp.workers.issue_worker"),
+        ):
+            worker.run(Path(temp_dir))
 
         # No warning should be logged when ensure_ralph_in_gitignore succeeds
         gitignore_warnings = [r for r in caplog.records if "Failed to ensure .ralph in .gitignore" in r.getMessage()]
@@ -1578,9 +1583,8 @@ class TestIssueWorker:
             "steps_completed": 3,
             "total_steps": 3,
         }
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with caplog.at_level("WARNING"):
-                worker.run(Path(temp_dir))
+        with tempfile.TemporaryDirectory() as temp_dir, caplog.at_level("WARNING"):
+            worker.run(Path(temp_dir))
 
         # Verify ensure_ralph_in_gitignore was called
         mock_ensure_gitignore.assert_called_once()

@@ -130,7 +130,10 @@ class TestGetWorkflowRunsForBranch:
         mock_subprocess_run.return_value = Mock(returncode=0, stdout="abc123")
         mock_run_gh.return_value = Mock(
             returncode=0,
-            stdout='[{"conclusion": "success", "name": "CI", "headSha": "abc123", "event": "pull_request", "status": "completed", "databaseId": 123}]',
+            stdout=(
+                '[{"conclusion": "success", "name": "CI", "headSha": "abc123", "event": "pull_request", '
+                '"status": "completed", "databaseId": 123}]'
+            ),
         )
         repo_dir = Path("/tmp/test_repo")
         result = get_workflow_runs_for_branch(repo_dir, "main")
@@ -149,7 +152,12 @@ class TestGetWorkflowRunsForBranch:
         mock_subprocess_run.return_value = Mock(returncode=0, stdout="abc123")
         mock_run_gh.return_value = Mock(
             returncode=0,
-            stdout='[{"conclusion": "success", "name": "CI", "headSha": "abc123", "event": "pull_request", "status": "completed", "databaseId": 123}, {"conclusion": "failure", "name": "Lint", "headSha": "def456", "event": "push", "status": "completed", "databaseId": 124}]',
+            stdout=(
+                '[{"conclusion": "success", "name": "CI", "headSha": "abc123", "event": "pull_request", '
+                '"status": "completed", "databaseId": 123}, '
+                '{"conclusion": "failure", "name": "Lint", "headSha": "def456", "event": "push", '
+                '"status": "completed", "databaseId": 124}]'
+            ),
         )
         repo_dir = Path("/tmp/test_repo")
         result = get_workflow_runs_for_branch(repo_dir, "main", event="pull_request")

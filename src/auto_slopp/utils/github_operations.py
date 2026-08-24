@@ -10,7 +10,7 @@ import os
 import subprocess
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from dotenv import dotenv_values
 
@@ -79,7 +79,7 @@ def _run_gh_command(
         raise GitHubOperationError(f"GitHub command timed out: {e}")
 
 
-def get_open_issues(repo_dir: Path) -> List[Dict[str, Any]]:
+def get_open_issues(repo_dir: Path) -> list[dict[str, Any]]:
     """Get list of open issues in the repository.
 
     Args:
@@ -126,7 +126,7 @@ def get_open_issues(repo_dir: Path) -> List[Dict[str, Any]]:
         return []
 
 
-def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]]:
+def get_issue_comments(repo_dir: Path, issue_number: int) -> list[dict[str, Any]]:
     """Get list of comments on an issue in the repository.
 
     Args:
@@ -146,9 +146,9 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
         repo = repo_dir.name
         query = (
             '{ repository(owner: "' + owner + '", name: "' + repo + '") '
-            '{ issue(number: ' + str(issue_number) + ') '
-            '{ comments(first: 100) '
-            '{ nodes { id databaseId body author { login } createdAt } } } } }'
+            "{ issue(number: " + str(issue_number) + ") "
+            "{ comments(first: 100) "
+            "{ nodes { id databaseId body author { login } createdAt } } } } }"
         )
         result = _run_gh_command(
             repo_dir,
@@ -166,13 +166,7 @@ def get_issue_comments(repo_dir: Path, issue_number: int) -> List[Dict[str, Any]
 
         data = json.loads(result.stdout)
         # Extract comments from GraphQL response
-        raw_comments = (
-            data.get("data", {})
-            .get("repository", {})
-            .get("issue", {})
-            .get("comments", {})
-            .get("nodes", [])
-        )
+        raw_comments = data.get("data", {}).get("repository", {}).get("issue", {}).get("comments", {}).get("nodes", [])
         logger.debug(
             f"[GetComments] Fetched {len(raw_comments)} raw comments for issue #{issue_number} in {repo_dir.name}"
         )
@@ -247,7 +241,8 @@ def delete_issue_comment(repo_dir: Path, issue_number: int, comment_id: int) -> 
             logger.debug(f"[DeleteComment] Successfully deleted comment {comment_id}")
         else:
             logger.warning(
-                f"[DeleteComment] Failed to delete comment {comment_id}, returncode: {result.returncode}, stderr: {result.stderr}"
+                f"[DeleteComment] Failed to delete comment {comment_id}, "
+                f"returncode: {result.returncode}, stderr: {result.stderr}"
             )
         return result.returncode == 0
 
@@ -326,7 +321,7 @@ def create_pull_request(
     body: str,
     head: str,
     base: str = "main",
-) -> Optional[Dict[str, Any]]:
+) -> Optional[dict[str, Any]]:
     """Create a pull request in the repository.
 
     Args:
@@ -378,7 +373,7 @@ def create_pull_request(
         return None
 
 
-def get_open_prs(repo_dir: Path) -> List[Dict[str, Any]]:
+def get_open_prs(repo_dir: Path) -> list[dict[str, Any]]:
     """Get list of open PRs in the repository with full information.
 
     Args:
@@ -425,7 +420,7 @@ def get_open_prs(repo_dir: Path) -> List[Dict[str, Any]]:
         return []
 
 
-def get_closed_prs(repo_dir: Path) -> List[Dict[str, Any]]:
+def get_closed_prs(repo_dir: Path) -> list[dict[str, Any]]:
     """Get list of closed/merged PRs in the repository with full information.
 
     Args:
@@ -474,7 +469,7 @@ def get_closed_prs(repo_dir: Path) -> List[Dict[str, Any]]:
         return []
 
 
-def get_pr_for_branch(repo_dir: Path, branch: str) -> Optional[Dict[str, Any]]:
+def get_pr_for_branch(repo_dir: Path, branch: str) -> Optional[dict[str, Any]]:
     """Get PR info for a specific branch if it exists.
 
     Args:
@@ -614,7 +609,7 @@ def get_pr_diff(repo_dir: Path, pr_number: int) -> Optional[str]:
         return None
 
 
-def get_open_prs_with_label(repo_dir: Path, label: str) -> List[Dict]:
+def get_open_prs_with_label(repo_dir: Path, label: str) -> list[dict]:
     """Get list of open PRs in the repository filtered by label.
 
     Args:
@@ -740,7 +735,7 @@ def submit_pr_review(repo_dir: Path, pr_number: int, body: str, event: str = "CO
         return False
 
 
-def get_workflow_runs_for_branch(repo_dir: Path, branch: str, event: Optional[str] = None) -> List[Dict[str, Any]]:
+def get_workflow_runs_for_branch(repo_dir: Path, branch: str, event: Optional[str] = None) -> list[dict[str, Any]]:
     """Get workflow runs for a specific branch, optionally filtered by event.
 
     Args:

@@ -9,7 +9,7 @@ import logging
 import re
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from auto_slopp.utils.cli_executor import (
     _cli_states,
@@ -55,7 +55,7 @@ class IssueWorker(Worker):
         self,
         task_source: TaskSource,
         timeout: int | None = None,
-        agent_args: Optional[List[str]] = None,
+        agent_args: Optional[list[str]] = None,
         dry_run: bool = False,
     ):
         """Initialize the IssueWorker.
@@ -88,7 +88,7 @@ class IssueWorker(Worker):
             validation_name="task_implementation_validation",
         )
 
-    def run(self, repo_path: Path) -> Dict[str, Any]:
+    def run(self, repo_path: Path) -> dict[str, Any]:
         """Execute the task processing workflow for a single repository.
 
         Args:
@@ -169,7 +169,7 @@ class IssueWorker(Worker):
 
         return results
 
-    def _create_results_dict(self, start_time: float, repo_path: Path) -> Dict[str, Any]:
+    def _create_results_dict(self, start_time: float, repo_path: Path) -> dict[str, Any]:
         """Create the initial results dictionary."""
         return {
             "worker_name": "IssueWorker",
@@ -286,7 +286,8 @@ class IssueWorker(Worker):
         )
         return permanent_indicators
 
-    def _process_single_task(self, repo_dir: Path, task: Task) -> Dict[str, Any]:
+    # IssueWorker._process_single_task: long orchestrator; splitting deferred (issue #419)
+    def _process_single_task(self, repo_dir: Path, task: Task) -> dict[str, Any]:  # noqa: C901
         """Process a single task using Ralph loop.
 
         Args:
@@ -729,7 +730,7 @@ class IssueWorker(Worker):
         self,
         task_title: str,
         task_body: str,
-        comments: List[str],
+        comments: list[str],
         branch_name: Optional[str] = None,
     ) -> str:
         """Build the instructions string from task title, body, and comments.
@@ -858,7 +859,7 @@ Plan:
         self,
         pr_number: int,
         pr_url: str,
-        finding_lines: List[str],
+        finding_lines: list[str],
     ) -> str:
         """Build instructions for the CLI tool to fix PR review issues.
 
@@ -895,7 +896,7 @@ Plan:
         """Normalize a review finding line for duplicate/stall detection."""
         return re.sub(r"\s+", " ", line).strip().lower()
 
-    def _mark_pr_review_incomplete(self, result: Dict[str, Any], iterations: int) -> None:
+    def _mark_pr_review_incomplete(self, result: dict[str, Any], iterations: int) -> None:
         """Mark result as successful but not completed so the issue stays open
         for the next task iteration."""
         result["task_completed"] = False
@@ -905,9 +906,10 @@ Plan:
         result["pr_review_done"] = True
         result["pr_review_iterations"] = iterations
 
-    def _review_pull_request(
+    # IssueWorker._review_pull_request: long orchestrator; splitting deferred (issue #419)
+    def _review_pull_request(  # noqa: C901 -- long orchestrator; splitting deferred (issue #419)
         self, repo_dir: Path, pr_url: str, title: str, body: str
-    ) -> tuple[bool, str, List[str], Optional[str]]:
+    ) -> tuple[bool, str, list[str], Optional[str]]:
         """Review a pull request and check for actionable findings.
 
         Args:
@@ -974,8 +976,8 @@ Plan:
         # ignored. Actionable findings are deduplicated so the reviewer
         # repeating itself does not inflate the fix list.
         lines = [line.strip() for line in review_output.split("\n") if line.strip()]
-        finding_lines: List[str] = []
-        informational_lines: List[str] = []
+        finding_lines: list[str] = []
+        informational_lines: list[str] = []
         seen = set()
         for line in lines:
             line_lower = line.lower()
@@ -1024,7 +1026,7 @@ Plan:
             "- Return markdown only. Do not modify files.\n"
         )
 
-    def _create_error_result(self, start_time: float, repo_path: Path, error_msg: str) -> Dict[str, Any]:
+    def _create_error_result(self, start_time: float, repo_path: Path, error_msg: str) -> dict[str, Any]:
         """Create an error result dictionary."""
         return {
             "worker_name": "IssueWorker",
@@ -1053,7 +1055,7 @@ Plan:
         """Get elapsed time from start time."""
         return time.time() - start_time
 
-    def _log_completion_summary(self, results: Dict[str, Any]) -> None:
+    def _log_completion_summary(self, results: dict[str, Any]) -> None:
         """Log completion summary."""
         cli_tool = get_active_cli_command()
         self.logger.info(
