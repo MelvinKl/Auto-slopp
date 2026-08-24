@@ -295,7 +295,7 @@ The `PrReviewWorker` provides automated code review for pull requests:
 
 **Configuration**:
 - `AUTO_SLOPP_PR_REVIEW_WORKER_REQUIRED_LABEL`: Label to trigger reviews (default: "AI")
-- `AUTO_SLOPP_PR_REVIEW_WORKER_MIN_COMMENTS`: Minimum comments per review (default: 0; the conservative prompt may output fewer)
+- `AUTO_SLOPP_PR_REVIEW_WORKER_MIN_COMMENTS`: Minimum comments per review (default: 0). **Deprecated**: kept at 0 for compatibility only. The conservative prompt no longer enforces a minimum comment count (it may output fewer, or just a single `praise:` line), so this setting is no longer used
 - `AUTO_SLOPP_PR_REVIEW_WORKER_MAX_COMMENTS`: Maximum comments per review (default: 5)
 - `AUTO_SLOPP_GITHUB_ISSUE_PR_REVIEW_MAX_ITERATIONS`: Maximum PR review/fix iterations before giving up (default: 3)
 
