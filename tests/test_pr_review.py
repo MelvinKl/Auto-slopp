@@ -34,9 +34,24 @@ class TestBuildConservativeReviewInstructions:
 
     def test_same_prompt_for_all_call_sites(self):
         """Both review call sites delegate to this shared builder."""
+        from unittest.mock import patch
+
         from auto_slopp.workers.issue_worker import IssueWorker
         from auto_slopp.workers.pr_review_worker import _build_review_instructions
 
-        shared = build_conservative_review_instructions("t", "b", "d")
-        assert _build_review_instructions("t", "b", "d") == shared
-        assert IssueWorker._build_review_instructions(None, "t", "b", "d") == shared
+        with (
+            patch(
+                "auto_slopp.workers.pr_review_worker.build_conservative_review_instructions",
+                wraps=build_conservative_review_instructions,
+            ) as pr_mock,
+            patch(
+                "auto_slopp.workers.issue_worker.build_conservative_review_instructions",
+                wraps=build_conservative_review_instructions,
+            ) as issue_mock,
+        ):
+            assert _build_review_instructions("t", "b", "d") == build_conservative_review_instructions("t", "b", "d")
+            assert IssueWorker._build_review_instructions(
+                None, "t", "b", "d"
+            ) == build_conservative_review_instructions("t", "b", "d")
+            pr_mock.assert_called_once_with("t", "b", "d")
+            issue_mock.assert_called_once_with("t", "b", "d")

@@ -40,7 +40,7 @@ from auto_slopp.utils.pr_review import build_conservative_review_instructions
 from auto_slopp.utils.ralph import RalphExecutor
 from auto_slopp.worker import Worker
 from auto_slopp.workers.task_source import Task, TaskSource
-from settings.main import settings
+from settings.main import DEFAULT_PR_REVIEW_MAX_ITERATIONS, settings
 
 
 class IssueWorker(Worker):
@@ -526,7 +526,7 @@ class IssueWorker(Worker):
             # This loop counts towards the overall iterations for the issue
             max_pr_review_iterations = settings.github_issue_pr_review_max_iterations
             if not isinstance(max_pr_review_iterations, int) or max_pr_review_iterations < 1:
-                max_pr_review_iterations = 3
+                max_pr_review_iterations = DEFAULT_PR_REVIEW_MAX_ITERATIONS
             pr_review_iteration = 0
             pr_number = int(pr_url.split("/")[-1])
             # Normalized findings from the previous round. Used for stall
