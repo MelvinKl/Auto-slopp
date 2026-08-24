@@ -113,13 +113,19 @@ def validate_task_result(result: TaskResult) -> None:
         result: The TaskResult to validate.
 
     Raises:
-        ValueError: If the result is not in a terminal state (status=PENDING),
+        ValueError: If status is not one of the TaskStatus values,
+            if the result is not in a terminal state (status=PENDING),
             if skipped field is inconsistent with status, or if
             success=None is inconsistent with status=SKIPPED.
     """
     skipped = result.get("skipped")
     status = result.get("status")
     success = result.get("success")
+
+    # A missing or typo'd status must not fall through to the success-based
+    # branch in run(); it must be caught by the same invariant.
+    if status not in {s.value for s in TaskStatus}:
+        raise ValueError(f"Invalid task status: {status!r}; must be one of " f"{sorted(s.value for s in TaskStatus)}")
 
     # All results reaching run() must have a terminal status; a leaked
     # PENDING result would otherwise be silently counted as a success.

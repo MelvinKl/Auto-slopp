@@ -706,7 +706,13 @@ class IssueWorker(Worker):
         result["status"] = TaskStatus.FAILURE.value
         result["task_completed"] = False
         result["error"] = error
-        self.task_source.on_task_failure(task, error)
+        try:
+            self.task_source.on_task_failure(task, error)
+        except Exception as e:
+            # A buggy task source must not abort the run (the outer except in
+            # _process_single_task would propagate it and discard all
+            # accumulated task results).
+            self.logger.warning(f"on_task_failure failed for task #{task.id}: {e}")
         return result
 
     def _set_success(self, result: Dict[str, Any]) -> Dict[str, Any]:
