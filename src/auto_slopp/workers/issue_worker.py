@@ -779,7 +779,8 @@ Plan:
 
         return ensure_issue_link_in_pr_body(generated_body, task.id)
 
-    def _build_review_instructions(self, title: str, body: str, diff: str) -> str:
+    @staticmethod
+    def _build_review_instructions(title: str, body: str, diff: str) -> str:
         """Build instructions for the CLI tool to review a PR.
 
         Delegates to the shared conservative prompt in

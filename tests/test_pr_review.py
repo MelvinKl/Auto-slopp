@@ -50,8 +50,8 @@ class TestBuildConservativeReviewInstructions:
             ) as issue_mock,
         ):
             assert _build_review_instructions("t", "b", "d") == build_conservative_review_instructions("t", "b", "d")
-            assert IssueWorker._build_review_instructions(
-                None, "t", "b", "d"
-            ) == build_conservative_review_instructions("t", "b", "d")
+            assert IssueWorker._build_review_instructions("t", "b", "d") == build_conservative_review_instructions(
+                "t", "b", "d"
+            )
             pr_mock.assert_called_once_with("t", "b", "d")
             issue_mock.assert_called_once_with("t", "b", "d")
