@@ -348,9 +348,9 @@ class VikunjaTaskSource(TaskSource):
         comment_success = comment_on_task(task.id, skip_comment)
         if comment_success:
             commit(repo_path, f"Added comment to task {task.id}")
+            logger.info(f"Added skip comment to task {task.id} (status left unchanged): {reason}")
         else:
             logger.warning(f"Failed to add skip comment to task {task.id}")
-        logger.info(f"Added skip comment to task {task.id} (status left unchanged): {reason}")
 
     def _latest_comment_is_skip_comment(self, task_id: int) -> bool:
         """Return True if the most recent comment on the task is a skip comment.

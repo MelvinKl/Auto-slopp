@@ -94,10 +94,17 @@ def error_indicates_llm_unavailability(error_msg: str, cli_available: Optional[b
     Args:
         error_msg: The error message to inspect.
         cli_available: Optional explicit CLI-availability state used to
-            corroborate weak patterns. When ``None`` (the default), the live
-            state is checked via :func:`are_all_clis_in_cooldown`. Passing an
-            explicit value keeps the matching pure (no global state is read),
-            which is also easier to unit test.
+            corroborate weak patterns. The value mirrors the negation of
+            :func:`are_all_clis_in_cooldown`: ``False`` means all *configured*
+            CLIs are currently in cooldown, not merely that no CLI is
+            available. A deployment with zero configured CLIs is a
+            misconfiguration, not an outage, so callers must not pass
+            ``False`` for one (in particular, do not derive the value from
+            :func:`is_any_cli_available`, which is also ``False`` there). When
+            ``None`` (the default), the live state is checked via
+            :func:`are_all_clis_in_cooldown`. Passing an explicit value keeps
+            the matching pure (no global state is read), which is also easier
+            to unit test.
     """
     error_lower = error_msg.lower()
     if any(pattern in error_lower for pattern in UNAVAILABILITY_PATTERNS):
