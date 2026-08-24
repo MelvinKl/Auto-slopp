@@ -790,7 +790,6 @@ Plan:
             Instructions string for the CLI tool.
         """
         body_section = f"\n{body}" if body else ""
-        max_comments = settings.pr_review_worker_max_comments
 
         return (
             f"You are a conservative code review assistant. Review the following pull request:\n"
@@ -801,14 +800,14 @@ Plan:
             f"or breaks the project's tests or lint. Do NOT report style preferences, "
             f"hypothetical improvements, or speculative issues. Prefer fewer, high-confidence "
             f"comments over many. If the code is fine, output a single 'praise:' line and stop. "
-            f"Generate at most {max_comments} comments. "
+            f"Do not invent problems to reach a comment count. "
             f"Each comment should be on a new line and start with one of the following:\n"
-            f"- 'issue:' for a concrete, verified problem that must be fixed\n"
-            f"- 'suggestion:' for an optional improvement (use sparingly, at most one)\n"
-            f"- 'nit:' for nitpicky comments\n"
-            f"- 'question:' for asking questions\n"
-            f"- 'praise:' for positive feedback\n"
-            f"- 'chore:' for chores or maintenance suggestions\n"
+            f"- 'issue:' for a concrete, verified problem that must be fixed (bug, correctness, security)\n"
+            f"- 'suggestion:' for a meaningful improvement that is not required\n"
+            f"- 'nit:' for minor style points\n"
+            f"- 'chore:' for maintenance suggestions\n"
+            f"- 'question:' for asking clarifying questions\n"
+            f"- 'praise:' for positive feedback when there is nothing wrong\n"
             f"Only output the comments, one per line, without any additional text or explanation."
         )
 
