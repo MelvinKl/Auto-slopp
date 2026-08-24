@@ -886,8 +886,22 @@ Plan:
             determined (e.g., not a git repository or git failed).
         """
         try:
+            # Detect the default branch dynamically (e.g. main, master) so the
+            # comparison works for repos whose default branch is not "main".
+            base_branch = "main"
+            symbolic_ref = subprocess.run(
+                ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+                cwd=repo_dir,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if symbolic_ref.returncode == 0:
+                ref = symbolic_ref.stdout.strip()
+                if "/" in ref:
+                    base_branch = ref.rsplit("/", 1)[-1]
             completed = subprocess.run(
-                ["git", "log", "main..HEAD", "--pretty=%s"],
+                ["git", "log", f"{base_branch}..HEAD", "--pretty=%s"],
                 cwd=repo_dir,
                 capture_output=True,
                 text=True,
@@ -896,8 +910,10 @@ Plan:
             if completed.returncode != 0:
                 return 0
             marker = f"Task #{task_id}: fix PR review issues"
-            return sum(1 for line in completed.stdout.splitlines() if marker in line)
-        except Exception:
+            marker_re = re.compile(rf"^{re.escape(marker)}(\s|\()")
+            return sum(1 for line in completed.stdout.splitlines() if marker_re.match(line))
+        except Exception as exc:
+            logging.getLogger(__name__).debug("Failed to count prior PR review fix rounds in %s: %s", repo_dir, exc)
             return 0
 
     @staticmethod
