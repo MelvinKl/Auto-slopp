@@ -560,7 +560,10 @@ class IssueWorker(Worker):
                 result["success"] = True
                 result["label_removed"] = label_removed
                 result["pr_review_done"] = True
-                result["pr_review_iterations"] = 0
+                # Report the prior fix rounds actually consumed (they are
+                # already committed to the branch) so downstream metrics
+                # reflect how many rounds were really used instead of 0.
+                result["pr_review_iterations"] = prior_fix_rounds
                 result["pr_review_capped"] = True
                 return result
             max_pr_review_iterations -= prior_fix_rounds

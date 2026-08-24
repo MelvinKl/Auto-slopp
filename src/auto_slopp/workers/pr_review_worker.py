@@ -166,6 +166,18 @@ class PrReviewWorker(Worker):
 
                 # Format the conventional comments
                 formatted_comments = self._format_conventional_comments(review_output)
+                if not formatted_comments:
+                    self.logger.warning(
+                        f"No review comments with valid prefixes for PR #{pr_number}; skipping review submission"
+                    )
+                    # Still remove the label to prevent infinite loop
+                    remove_success = remove_label_from_issue(repo_dir, pr_number, required_label)
+                    if not remove_success:
+                        self.logger.warning(
+                            f"Failed to remove '{required_label}' label from PR #{pr_number} after review"
+                        )
+                    results["pr_reviews_completed"] += 1
+                    continue
 
                 # Submit the review
                 review_success = submit_pr_review(repo_dir, pr_number, formatted_comments, event="COMMENT")
