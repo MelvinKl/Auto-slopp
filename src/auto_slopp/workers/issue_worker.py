@@ -863,7 +863,7 @@ Plan:
 
         Returns:
             Tuple of (has_findings, comment_string, finding_lines, error) where:
-            - has_findings: bool, True if actionable findings (issue:, suggestion:) were found
+            - has_findings: bool, True if actionable findings (issue: only) were found
             - comment_string: string to post as a review comment on the PR
             - finding_lines: deduplicated list of actionable finding lines
             - error: error message if the review itself failed, else None
