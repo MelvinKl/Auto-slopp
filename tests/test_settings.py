@@ -122,10 +122,15 @@ class TestSettings:
 
         Regression test: duplicate field/validator definitions in
         CLIConfiguration made Pydantic emit a UserWarning at class-definition
-        time (i.e. on import). Running the import in a subprocess with
-        UserWarnings raised from settings.main itself escalated to errors so
-        the bug cannot silently return (warnings from unrelated dependencies
-        in the import chain are intentionally ignored).
+        time (i.e. on import). The import is run in a subprocess and the
+        stderr output is checked for the specific Pydantic
+        duplicate-decorator message, which cannot silently return. Note we
+        deliberately do NOT escalate UserWarnings to errors here: the
+        `module=` filter of `warnings.filterwarnings` matches the module where
+        `warnings.warn()` is called (a Pydantic-internal module for this
+        warning, not `settings.main`), so such escalation would be dead code,
+        while dropping the filter entirely would make unrelated import-chain
+        UserWarnings fail the test.
         """
         env = os.environ.copy()
         # Layout assumption: this test lives in <repo>/tests/ and the package
@@ -136,11 +141,7 @@ class TestSettings:
         # (or drop it and rely on the installed package) accordingly.
         src_dir = Path(__file__).resolve().parent.parent / "src"
         env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(src_dir), env.get("PYTHONPATH")]))
-        code = (
-            "import warnings; "
-            "warnings.filterwarnings('error', category=UserWarning, module=r'^settings\\.main$'); "
-            "import settings.main  # noqa: F401"
-        )
+        code = "import settings.main  # noqa: F401"
         proc = subprocess.run(
             [sys.executable, "-c", code],
             env=env,
@@ -151,11 +152,11 @@ class TestSettings:
             timeout=30,
         )
         assert proc.returncode == 0, f"importing settings.main failed:\n{proc.stderr}"
-        # Belt and braces: a duplicate-field warning (as opposed to a duplicate
-        # validator) could be attributed to a different module and slip past the
-        # settings.main filter, so also check stderr for the specific Pydantic
-        # duplicate-decorator message. Unrelated dependencies may emit their own
-        # UserWarnings during import, so we deliberately do not assert on those.
+        # The stderr check is the only guard here: the Pydantic duplicate-decorator
+        # warning is emitted from a Pydantic-internal module, so a warnings filter
+        # scoped to settings.main could never catch it. Unrelated dependencies may
+        # emit their own UserWarnings during import, so we deliberately do not
+        # assert on those.
         assert (
             "overrides an existing Pydantic" not in proc.stderr
         ), f"duplicate Pydantic decorator warning during import:\n{proc.stderr}"
