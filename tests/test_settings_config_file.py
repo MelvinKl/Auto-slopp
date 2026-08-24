@@ -69,7 +69,9 @@ cli_configurations:
     def test_cli_configurations_env_override_takes_precedence(self):
         """Test that environment variable override takes precedence over file configuration."""
         env_vars = {
-            "AUTO_SLOPP_CLI_CONFIGURATIONS": '[{"cli_command": "env-override", "cli_args": ["--env-arg"], "capability": 3}]',
+            "AUTO_SLOPP_CLI_CONFIGURATIONS": (
+                '[{"cli_command": "env-override", "cli_args": ["--env-arg"], "capability": 3}]'
+            ),
         }
         with patch.dict(os.environ, env_vars, clear=False):
             test_settings = Settings()

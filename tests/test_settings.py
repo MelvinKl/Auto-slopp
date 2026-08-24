@@ -282,9 +282,8 @@ cli_configurations:
             temp_file_path = f.name
 
         try:
-            print(
-                f"DEBUG: Original environment has AUTO_SLOPP_CONFIG_FILE_PATH: {os.environ.get('AUTO_SLOPP_CONFIG_FILE_PATH')}"
-            )
+            original_value = os.environ.get("AUTO_SLOPP_CONFIG_FILE_PATH")
+            print(f"DEBUG: Original environment has AUTO_SLOPP_CONFIG_FILE_PATH: {original_value}")
 
             env_vars = {
                 "AUTO_SLOPP_CONFIG_FILE_PATH": temp_file_path,
@@ -293,18 +292,17 @@ cli_configurations:
 
             # Clear all environment variables and set only the ones we need
             with patch.dict(os.environ, env_vars, clear=True):
-                print(
-                    f"DEBUG: After patch.dict, environment has AUTO_SLOPP_CONFIG_FILE_PATH: {os.environ.get('AUTO_SLOPP_CONFIG_FILE_PATH')}"
-                )
+                patched_value = os.environ.get("AUTO_SLOPP_CONFIG_FILE_PATH")
+                print(f"DEBUG: After patch.dict, environment has AUTO_SLOPP_CONFIG_FILE_PATH: {patched_value}")
 
                 test_settings = Settings()
 
                 # Debug: Print the actual config_file_path value
                 print(f"DEBUG: test_settings.config_file_path = {test_settings.config_file_path}")
                 print(f"DEBUG: Expected: {temp_file_path}")
-                print(
-                    f"DEBUG: Types - actual: {type(test_settings.config_file_path)}, expected: {type(temp_file_path)}"
-                )
+                actual_type = type(test_settings.config_file_path)
+                expected_type = type(temp_file_path)
+                print(f"DEBUG: Types - actual: {actual_type}, expected: {expected_type}")
 
                 # Should load configurations from the custom file
                 assert len(test_settings.cli_configurations) == 1
@@ -320,7 +318,9 @@ cli_configurations:
     def test_cli_configurations_env_override_takes_precedence(self):
         """Test that environment variable override takes precedence over file configuration."""
         env_vars = {
-            "AUTO_SLOPP_CLI_CONFIGURATIONS": '[{"cli_command": "env-override", "cli_args": ["--env-arg"], "capability": 3}]',
+            "AUTO_SLOPP_CLI_CONFIGURATIONS": (
+                '[{"cli_command": "env-override", "cli_args": ["--env-arg"], "capability": 3}]'
+            ),
         }
         with patch.dict(os.environ, env_vars, clear=False):
             test_settings = Settings()
