@@ -19,7 +19,6 @@ Auto-slopp
 │   ├── Base Worker (worker.py)
 │   ├── Unified IssueWorker (issue_worker.py)
 │   ├── GitHubIssueWorker (github_issue_worker.py)
-│   ├── VikunjaWorker (vikunja_worker.py)
 │   ├── PRWorker (pr_worker.py)
 │   ├── PRReviewWorker (pr_review_worker.py)
 │   └── StaleBranchCleanupWorker (stale_branch_cleanup_worker.py)

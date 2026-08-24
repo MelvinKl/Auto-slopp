@@ -272,7 +272,7 @@ class IssueWorker(Worker):
 
 ### 5. Thin Worker Wrappers
 
-**GitHubIssueWorker** and **VikunjaWorker** now act as thin wrappers that instantiate IssueWorker with the appropriate TaskSource:
+**GitHubIssueWorker** acts as a thin wrapper that instantiates IssueWorker with the appropriate TaskSource:
 
 ```python
 class GitHubIssueWorker(Worker):
@@ -288,25 +288,11 @@ class GitHubIssueWorker(Worker):
 
     def run(self, repo_path: Path) -> Dict[str, Any]:
         return self._worker.run(repo_path)
-
-class VikunjaWorker(Worker):
-    """Thin wrapper for Vikunja task processing."""
-
-    def __init__(self, timeout: int | None = None, agent_args: Optional[List[str]] = None, dry_run: bool = False):
-        self._worker = IssueWorker(
-            task_source=VikunjaTaskSource(),
-            timeout=timeout,
-            agent_args=agent_args,
-            dry_run=dry_run,
-        )
-
-    def run(self, repo_path: Path) -> Dict[str, Any]:
-        return self._worker.run(repo_path)
 ```
 
 **Benefits:**
-- Maintains backward compatibility with existing worker interface
-- Zero code duplication between GitHub and Vikunja workers
+- Maintains backward compatibility with the existing worker interface
+- Zero code duplication between GitHub and Vikunja task processing
 - Easy to understand and maintain
 
 ### 6. Settings Management (settings/main.py)

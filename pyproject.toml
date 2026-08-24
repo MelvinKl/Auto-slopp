@@ -98,6 +98,7 @@ per-file-ignores = """
   src/auto_slopp/utils/github_operations.py: S404,S603,S607
   src/auto_slopp/utils/vikunja_operations.py: S404,S603
   src/auto_slopp/workers/github_task_source.py: S404,S603,S607
+  src/auto_slopp/workers/issue_worker.py: S404,S603,S607
   src/auto_slopp/workers/pr_worker.py: S404,S603,S607
 """
 

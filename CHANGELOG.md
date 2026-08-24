@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`GitHubTaskSource.on_skip` / `VikunjaTaskSource.on_skip`**: Now check whether the latest comment on the issue/task is already a skip comment and, if so, do not post another (and, for Vikunja, do not create another commit), preventing a prolonged outage from spamming the issue/task with identical skip comments on every retry cycle
 
 ### Changed
+- **`AUTO_SLOPP_GITHUB_ISSUE_PR_REVIEW_MAX_ITERATIONS`**: Default changed from 5 to 3 for maximum PR review/fix iterations before giving up
 - **IssueWorker/RalphExecutor**: Removed intermediate per-step acceptance checks; now only a single final acceptance check runs after all steps complete
 - **RalphExecutor**: Removed `remaining_steps_update_name` constructor parameter and associated dead code (`_execute_step_acceptance_check`, `_update_remaining_steps`, `_build_acceptance_check_instructions`, `_build_remaining_steps_update_instructions`, `_extract_step_block`, `_find_step_description`)
 - **Final acceptance check**: Now requires explicit `acceptance_status: pass` in output; empty/unknown output is treated as failure
@@ -40,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-step acceptance criteria validation after each step
 - Per-step remaining steps update after each step
 - `remaining_steps_update_name` parameter from `RalphExecutor` constructor and `IssueWorker` call site
+- **`AUTO_SLOPP_PR_REVIEW_WORKER_MIN_COMMENTS`** (breaking): the conservative review prompt no longer enforces a minimum comment count, so this setting was removed from `Settings`. Existing `.env` files containing `AUTO_SLOPP_PR_REVIEW_WORKER_MIN_COMMENTS` will have the value silently ignored (pydantic `extra="ignore"`); remove it from your `.env`. Users who previously relied on a minimum comment count should note that reviews may now contain fewer comments (or a single `praise:` line)
+- **`AUTO_SLOPP_PR_REVIEW_WORKER_MAX_COMMENTS`**: the old per-worker review prompts interpolated this value into the instruction text ("Generate between {min} and {max} comments"), but the new shared conservative review prompt no longer enforces a comment count, so the setting had no effect and was removed from `Settings`, `README.md`, `.env.example`, and `docs/08-concepts.md`. Existing `.env` files containing it are silently ignored; remove it from your `.env`
+- Duplicated conservative review prompt: the prompt previously copy-pasted in `PrReviewWorker._build_review_instructions` and `IssueWorker._build_review_instructions` now lives in a single shared helper, `build_conservative_review_instructions()` in `auto_slopp.utils.pr_review`
 
 ### Migration Notes
 - **TaskSource.on_skip()**: New optional lifecycle callback for skipping tasks that should be retried later (e.g., LLM unavailability). The method has a default no-op implementation, so this is **NOT a breaking change** for custom `TaskSource` implementations. Sources that track skip state (GitHub, Vikunja) override this method to add a skip comment while leaving the task/issue in a state that remains eligible for future processing.
