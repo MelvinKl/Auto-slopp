@@ -15,6 +15,7 @@ from auto_slopp.utils.github_operations import (
     remove_label_from_issue,
     submit_pr_review,
 )
+from auto_slopp.utils.pr_review import build_conservative_review_instructions
 from auto_slopp.utils.repository_utils import validate_repository
 from auto_slopp.worker import Worker
 from settings.main import settings
@@ -22,6 +23,9 @@ from settings.main import settings
 
 def _build_review_instructions(title: str, body: str, diff: str) -> str:
     """Build instructions for the CLI tool to review a PR.
+
+    Delegates to the shared conservative prompt in
+    ``auto_slopp.utils.pr_review`` so both review call sites stay in sync.
 
     Args:
         title: PR title
@@ -31,26 +35,7 @@ def _build_review_instructions(title: str, body: str, diff: str) -> str:
     Returns:
         Instructions string for the CLI tool.
     """
-    body_section = f"\n{body}" if body else ""
-    min_comments = settings.pr_review_worker_min_comments
-    max_comments = settings.pr_review_worker_max_comments
-
-    return (
-        f"You are a code review assistant. Review the following pull request:\n"
-        f"Title: {title}\n"
-        f"Description:{body_section}\n\n"
-        f"Diff:\n{diff}\n\n"
-        f"Provide a review using conventional comments format. "
-        f"Generate between {min_comments} and {max_comments} comments. "
-        f"Each comment should be on a new line and start with one of the following:\n"
-        f"- 'suggestion:' for suggesting improvements\n"
-        f"- 'issue:' for pointing out problems\n"
-        f"- 'nit:' for nitpicky comments\n"
-        f"- 'question:' for asking questions\n"
-        f"- 'praise:' for positive feedback\n"
-        f"- 'chore:' for chores or maintenance suggestions\n"
-        f"Only output the comments, one per line, without any additional text or explanation."
-    )
+    return build_conservative_review_instructions(title, body, diff)
 
 
 class PrReviewWorker(Worker):
@@ -182,6 +167,18 @@ class PrReviewWorker(Worker):
 
                 # Format the conventional comments
                 formatted_comments = self._format_conventional_comments(review_output)
+                if not formatted_comments:
+                    self.logger.warning(
+                        f"No review comments with valid prefixes for PR #{pr_number}; skipping review submission"
+                    )
+                    # Still remove the label to prevent infinite loop
+                    remove_success = remove_label_from_issue(repo_dir, pr_number, required_label)
+                    if not remove_success:
+                        self.logger.warning(
+                            f"Failed to remove '{required_label}' label from PR #{pr_number} after review"
+                        )
+                    results["pr_reviews_completed"] += 1
+                    continue
 
                 # Submit the review
                 review_success = submit_pr_review(repo_dir, pr_number, formatted_comments, event="COMMENT")
@@ -248,11 +245,20 @@ class PrReviewWorker(Worker):
             line_lower = line.lower()
             has_valid_prefix = any(line_lower.startswith(prefix) for prefix in valid_prefixes)
 
+            # Drop unprefixed lines: the prompt promises strictly prefixed
+            # output, and prepending 'suggestion:' to stray prose would post
+            # fake suggestions to the PR.
             if has_valid_prefix:
-                # Keep the line as-is if it already has a valid prefix
                 formatted_lines.append(line)
-            else:
-                # Default to 'suggestion:' if no valid prefix is found
-                formatted_lines.append(f"suggestion: {line}")
+
+        dropped_lines = len(lines) - len(formatted_lines)
+        if dropped_lines:
+            # Log dropped lines so a model ignoring the prefix format is
+            # diagnosable instead of silently posting an empty review.
+            self.logger.warning(
+                f"Dropped {dropped_lines} line(s) without a valid conventional comment prefix "
+                f"(expected one of: {', '.join(valid_prefixes)}). "
+                f"If the entire review was dropped, the model ignored the prefix format."
+            )
 
         return "\n".join(formatted_lines)

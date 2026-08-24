@@ -2105,7 +2105,7 @@ class TestIssueWorkerPrReviewLoop:
     @patch("auto_slopp.workers.issue_worker.run_cli_executor")
     @patch("auto_slopp.workers.issue_worker.get_pr_files")
     def test_review_pull_request_splits_and_dedupes_findings(self, mock_files, mock_cli):
-        """Actionable findings (issue:/suggestion:) are deduped; nits/chores are informational only."""
+        """Actionable findings (issue: only) are deduped; suggestions/nits/chores are informational and surfaced on the PR but are not findings."""
         mock_files.return_value = "diff --git a/x b/x"
         mock_cli.return_value = {
             "success": True,
@@ -2125,8 +2125,8 @@ class TestIssueWorkerPrReviewLoop:
         )
         assert has_findings is True
         assert error is None
-        assert findings == ["issue: fix bug A", "suggestion: use helper"]
-        # Informational lines are surfaced on the PR but are not findings
+        assert findings == ["issue: fix bug A"]
+        # Informational lines (including suggestions) are surfaced on the PR but are not findings
         assert "issue: fix bug A" in comment
         assert "suggestion: use helper" in comment
         assert "Non-blocking notes" in comment

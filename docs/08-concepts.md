@@ -291,10 +291,11 @@ The `PrReviewWorker` provides automated code review for pull requests:
 └──────────────────────────────────────────────────────┘
 ```
 
+**Review style**: Reviews are intentionally conservative. The reviewer only reports concrete, verified problems (broken code, real bugs, failing tests/lint) and prefers fewer high-confidence comments. If the code is fine it outputs a single `praise:` comment. In the issue worker's review/fix loop, only `issue:` findings are actionable and trigger a fix round; `suggestion:`, `nit:` and `chore:` comments are informational (non-blocking) so the loop cannot spin on nitpicks that never converge.
+
 **Configuration**:
 - `AUTO_SLOPP_PR_REVIEW_WORKER_REQUIRED_LABEL`: Label to trigger reviews (default: "AI")
-- `AUTO_SLOPP_PR_REVIEW_WORKER_MIN_COMMENTS`: Minimum comments per review (default: 0)
-- `AUTO_SLOPP_PR_REVIEW_WORKER_MAX_COMMENTS`: Maximum comments per review (default: 9)
+- `AUTO_SLOPP_GITHUB_ISSUE_PR_REVIEW_MAX_ITERATIONS`: Maximum PR review/fix iterations before giving up (default: 3)
 
 ## 8.10 Health Check Concept
 

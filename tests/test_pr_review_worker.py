@@ -52,8 +52,6 @@ class TestPRReviewWorker:
                     mock_get_files.return_value = mock_diff
                     with patch("auto_slopp.workers.pr_review_worker.settings") as mock_settings:
                         mock_settings.pr_review_worker_required_label = "AI Review"
-                        mock_settings.pr_review_worker_min_comments = 1
-                        mock_settings.pr_review_worker_max_comments = 5
                         with patch("auto_slopp.workers.pr_review_worker._build_review_instructions") as mock_build:
                             mock_build.return_value = mock_instructions
                             with patch("auto_slopp.workers.pr_review_worker.run_cli_executor") as mock_run_cli:
@@ -104,8 +102,6 @@ class TestPRReviewWorker:
                     mock_get_files.return_value = mock_diff
                     with patch("auto_slopp.workers.pr_review_worker.settings") as mock_settings:
                         mock_settings.pr_review_worker_required_label = "AI Review"
-                        mock_settings.pr_review_worker_min_comments = 1
-                        mock_settings.pr_review_worker_max_comments = 5
                         with patch("auto_slopp.workers.pr_review_worker._build_review_instructions") as mock_build:
                             mock_build.return_value = mock_instructions
                             with patch("auto_slopp.workers.pr_review_worker.run_cli_executor") as mock_run_cli:
@@ -151,8 +147,6 @@ class TestPRReviewWorker:
                     mock_get_files.return_value = mock_diff
                     with patch("auto_slopp.workers.pr_review_worker.settings") as mock_settings:
                         mock_settings.pr_review_worker_required_label = "AI Review"
-                        mock_settings.pr_review_worker_min_comments = 1
-                        mock_settings.pr_review_worker_max_comments = 5
                         with patch("auto_slopp.workers.pr_review_worker._build_review_instructions") as mock_build:
                             mock_build.return_value = mock_instructions
                             with patch("auto_slopp.workers.pr_review_worker.run_cli_executor") as mock_run_cli:
@@ -199,8 +193,6 @@ class TestPRReviewWorker:
                     mock_get_files.return_value = mock_diff
                     with patch("auto_slopp.workers.pr_review_worker.settings") as mock_settings:
                         mock_settings.pr_review_worker_required_label = "AI Review"
-                        mock_settings.pr_review_worker_min_comments = 1
-                        mock_settings.pr_review_worker_max_comments = 5
                         with patch("auto_slopp.workers.pr_review_worker._build_review_instructions") as mock_build:
                             mock_build.return_value = mock_instructions
                             with patch("auto_slopp.workers.pr_review_worker.run_cli_executor") as mock_run_cli:
@@ -252,8 +244,6 @@ class TestPRReviewWorker:
                     mock_get_files.return_value = mock_diff
                     with patch("auto_slopp.workers.pr_review_worker.settings") as mock_settings:
                         mock_settings.pr_review_worker_required_label = "AI Review"
-                        mock_settings.pr_review_worker_min_comments = 1
-                        mock_settings.pr_review_worker_max_comments = 5
                         with patch("auto_slopp.workers.pr_review_worker._build_review_instructions") as mock_build:
                             mock_build.return_value = mock_instructions
                             with patch("auto_slopp.workers.pr_review_worker.run_cli_executor") as mock_run_cli:
