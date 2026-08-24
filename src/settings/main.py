@@ -74,10 +74,25 @@ class CLIConfiguration(BaseModel):
         description="Task names for which this CLI configuration should not be used",
     )
 
-    @field_validator("timeout")
+    @field_validator("timeout", mode="before")
     @classmethod
     def validate_timeout(cls, v: int) -> int:
         """Only allow -1 (NO_TIMEOUT) or positive integers up to 1 year for timeout."""
+        # bool is a subclass of int; without this guard a boolean would be
+        # lax-coerced (True -> 1) before the range check below could reject it.
+        if isinstance(v, bool):
+            raise ValueError(
+                f"timeout must be an integer number of seconds "
+                f"({NO_TIMEOUT} for NO_TIMEOUT, or a positive integer up to {MAX_TIMEOUT_SECONDS}), "
+                f"not a boolean, got {v!r}"
+            )
+        if isinstance(v, str):
+            try:
+                v = int(v)
+            except ValueError as exc:
+                raise ValueError(f"timeout must be an integer number of seconds, got {v!r}") from exc
+        if v is None:
+            return v
         if v == NO_TIMEOUT:
             return v
         if 0 < v <= MAX_TIMEOUT_SECONDS:

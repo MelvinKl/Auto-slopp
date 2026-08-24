@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed (behavior, deliberate)
-- **CLI timeout resolution**: A float `-1.0` timeout (which previously compared equal to the `NO_TIMEOUT` sentinel `-1` and therefore meant *no timeout*) is now treated as a non-integer, out-of-range value: it is discarded with a diagnostic warning and resolves to the 600-second probe timeout. Float sentinels from hand-edited JSON configs will now get a 600s timeout instead of infinite; use the integer `-1` (`NO_TIMEOUT`) to disable timeouts.
+- **CLI timeout resolution**: In the CLI executor, a float `-1.0` timeout (which previously compared equal to the `NO_TIMEOUT` sentinel `-1` and therefore meant *no timeout*) is now treated as a non-integer, out-of-range value: it is discarded with a diagnostic warning and resolves to the 600-second probe timeout. This applies to values that reach the executor without `CLIConfiguration` validation (e.g., hand-edited JSON configs that bypass it); values validated through `CLIConfiguration(timeout=...)` are lax-coerced to integers first, so `-1.0` there is coerced to `-1` and still means `NO_TIMEOUT`. Use the integer `-1` (`NO_TIMEOUT`) to disable timeouts.
 - **Out-of-range timeout warning tracking**: The warned-values cache is now an `OrderedDict`-based LRU (least-recently-seen value evicted at the 1024-entry cap) instead of a plain set, so "warn once" semantics are deterministic; the README now also documents the eviction edge case.
 
 ### Added
