@@ -209,7 +209,7 @@ class IssueWorker(Worker):
         # (rather than letting the helper lazily import it from cli_executor)
         # so weak-pattern corroboration follows the same, patchable code path
         # as the cooldown check below.
-        if error_indicates_llm_unavailability(error_msg, cli_available=not are_all_clis_in_cooldown()):
+        if error_indicates_llm_unavailability(error_msg, all_clis_in_cooldown=are_all_clis_in_cooldown()):
             return True
         # CLI unavailability is treated only as a secondary confirmation, never
         # an independent trigger. A genuine code error (e.g. "syntax error in

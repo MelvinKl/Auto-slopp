@@ -879,18 +879,18 @@ def test_are_all_clis_in_cooldown_false_when_a_cli_is_available(monkeypatch):
 
 
 def test_error_indicates_llm_unavailability_explicit_cli_available_keeps_matching_pure(monkeypatch):
-    """An explicit cli_available value must be used without reading global state."""
+    """An explicit all_clis_in_cooldown value must be used without reading global state."""
     from auto_slopp.constants import error_indicates_llm_unavailability
 
-    # Weak pattern ("exhausted") corroborated by explicit unavailable state
-    assert error_indicates_llm_unavailability("all clients exhausted", cli_available=False) is True
-    # ...but not when a CLI is available
-    assert error_indicates_llm_unavailability("all clients exhausted", cli_available=True) is False
+    # Weak pattern ("exhausted") corroborated by explicit cooldown state
+    assert error_indicates_llm_unavailability("all clients exhausted", all_clis_in_cooldown=True) is True
+    # ...but not when CLIs are not all in cooldown
+    assert error_indicates_llm_unavailability("all clients exhausted", all_clis_in_cooldown=False) is False
     # Strong patterns and status codes are matched regardless of CLI state
-    assert error_indicates_llm_unavailability("LLM timed out", cli_available=True) is True
-    assert error_indicates_llm_unavailability("HTTP 503", cli_available=True) is True
+    assert error_indicates_llm_unavailability("LLM timed out", all_clis_in_cooldown=False) is True
+    assert error_indicates_llm_unavailability("HTTP 503", all_clis_in_cooldown=False) is True
     # No match at all
-    assert error_indicates_llm_unavailability("git push failed", cli_available=False) is False
+    assert error_indicates_llm_unavailability("git push failed", all_clis_in_cooldown=True) is False
 
 
 def test_error_indicates_llm_unavailability_weak_pattern_not_corroborated_without_configured_clis(monkeypatch):

@@ -998,6 +998,15 @@ class RalphExecutor:
         branch_name: str,
     ) -> Dict[str, Any]:
         """Execute issue processing using refined task execution in .ralph/github-<issue>.md."""
+        # Clear any error state left over from a previous task: IssueWorker
+        # reuses one executor for every task, and early-failure paths below
+        # (task-file update/refinement) only set _last_error, so a stale
+        # _last_iteration_failure_reason from an earlier task (e.g. an LLM
+        # timeout) could otherwise be surfaced by get_skip_reason() for this
+        # task and misroute a genuine failure to on_skip.
+        self._last_error = None
+        self._last_iteration_failure_reason = None
+
         task_path = self._get_issue_task_path(repo_dir, issue_number)
 
         if task_path.exists():
