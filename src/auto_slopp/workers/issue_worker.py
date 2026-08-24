@@ -36,6 +36,7 @@ from auto_slopp.utils.github_operations import (
     submit_pr_review,
 )
 from auto_slopp.utils.linking import ensure_issue_link_in_pr_body
+from auto_slopp.utils.pr_review import build_conservative_review_instructions
 from auto_slopp.utils.ralph import RalphExecutor
 from auto_slopp.worker import Worker
 from auto_slopp.workers.task_source import Task, TaskSource
@@ -781,6 +782,9 @@ Plan:
     def _build_review_instructions(self, title: str, body: str, diff: str) -> str:
         """Build instructions for the CLI tool to review a PR.
 
+        Delegates to the shared conservative prompt in
+        ``auto_slopp.utils.pr_review`` so both review call sites stay in sync.
+
         Args:
             title: PR title
             body: PR body description
@@ -789,27 +793,7 @@ Plan:
         Returns:
             Instructions string for the CLI tool.
         """
-        body_section = f"\n{body}" if body else ""
-
-        return (
-            f"You are a conservative code review assistant. Review the following pull request:\n"
-            f"Title: {title}\n"
-            f"Description:{body_section}\n\n"
-            f"Diff:\n{diff}\n\n"
-            f"Only report concrete, verified problems: code that is broken, causes a real bug, "
-            f"or breaks the project's tests or lint. Do NOT report style preferences, "
-            f"hypothetical improvements, or speculative issues. Prefer fewer, high-confidence "
-            f"comments over many. If the code is fine, output a single 'praise:' line and stop. "
-            f"Do not invent problems to reach a comment count. "
-            f"Each comment should be on a new line and start with one of the following:\n"
-            f"- 'issue:' for a concrete, verified problem that must be fixed (bug, correctness, security)\n"
-            f"- 'suggestion:' for a meaningful improvement that is not required\n"
-            f"- 'nit:' for minor style points\n"
-            f"- 'chore:' for maintenance suggestions\n"
-            f"- 'question:' for asking clarifying questions\n"
-            f"- 'praise:' for positive feedback when there is nothing wrong\n"
-            f"Only output the comments, one per line, without any additional text or explanation."
-        )
+        return build_conservative_review_instructions(title, body, diff)
 
     def _build_pr_fix_instructions(
         self,

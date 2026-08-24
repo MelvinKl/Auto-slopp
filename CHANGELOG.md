@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-step acceptance criteria validation after each step
 - Per-step remaining steps update after each step
 - `remaining_steps_update_name` parameter from `RalphExecutor` constructor and `IssueWorker` call site
+- **`AUTO_SLOPP_PR_REVIEW_WORKER_MIN_COMMENTS`** (breaking): the conservative review prompt no longer enforces a minimum comment count, so this setting was removed from `Settings`. Existing `.env` files containing `AUTO_SLOPP_PR_REVIEW_WORKER_MIN_COMMENTS` will have the value silently ignored (pydantic `extra="ignore"`); remove it from your `.env`. Users who previously relied on a minimum comment count should note that reviews may now contain fewer comments (or a single `praise:` line)
+- **`AUTO_SLOPP_PR_REVIEW_WORKER_MAX_COMMENTS`**: this setting was defined and documented but never read by any code, so it had no effect and was removed from `Settings`, `README.md`, `.env.example`, and `docs/08-concepts.md`. Existing `.env` files containing it are silently ignored; remove it from your `.env`
+- Duplicated conservative review prompt: the prompt previously copy-pasted in `PrReviewWorker._build_review_instructions` and `IssueWorker._build_review_instructions` now lives in a single shared helper, `build_conservative_review_instructions()` in `auto_slopp.utils.pr_review`
 
 ### Documentation
 - Updated README.md to reflect removal of intermediate checks and new final acceptance check behavior

@@ -286,4 +286,3 @@ class TestSettings:
                 test_settings = Settings()
 
         assert test_settings.pr_review_worker_required_label == "AI"
-        assert test_settings.pr_review_worker_max_comments == 5

@@ -638,7 +638,6 @@ AUTO_SLOPP_GITHUB_ISSUE_WORKER_REQUIRED_LABEL=ai        # Required label for iss
 AUTO_SLOPP_GITHUB_ISSUE_WORKER_ALLOWED_CREATOR=MelvinKl  # Whitelisted GitHub username whose comments are included in condensation (default: "MelvinKl")
 
 # PR review configuration (conservative: only concrete, verified problems are reported)
-AUTO_SLOPP_PR_REVIEW_WORKER_MAX_COMMENTS=5                # Maximum review comments per PR (default: 5)
 AUTO_SLOPP_GITHUB_ISSUE_PR_REVIEW_MAX_ITERATIONS=3        # Maximum PR review/fix iterations before giving up (default: 3)
 
 # Stale branch cleanup: days before a local-only branch is deleted (default: 1)

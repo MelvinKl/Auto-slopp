@@ -227,13 +227,6 @@ class Settings(BaseSettings):
         default="AI",
         description="Required label for PrReviewWorker to process a PR",
     )
-    pr_review_worker_max_comments: int = Field(
-        default=5,
-        ge=1,
-        le=20,
-        description="Maximum number of review comments per PR",
-    )
-
     additional_env_file: Optional[Path] = Field(
         default=None,
         description="Path to an additional .env file to be appended to subprocess calls for github_operations",
