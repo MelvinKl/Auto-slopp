@@ -868,8 +868,9 @@ Plan:
             - comment_string: string to post as a review comment on the PR
             - finding_lines: deduplicated list of actionable finding lines
             - error: error message if the review itself failed, else None
-              (informational nit:/chore: lines are included in comment_string
-              but never in finding_lines, so they do not trigger fix rounds)
+              (informational suggestion:/nit:/chore: lines are included in
+              comment_string but never in finding_lines, so they do not
+              trigger fix rounds)
         """
         try:
             # Extract PR number from URL

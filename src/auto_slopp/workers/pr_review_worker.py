@@ -232,11 +232,10 @@ class PrReviewWorker(Worker):
             line_lower = line.lower()
             has_valid_prefix = any(line_lower.startswith(prefix) for prefix in valid_prefixes)
 
+            # Drop unprefixed lines: the prompt promises strictly prefixed
+            # output, and prepending 'suggestion:' to stray prose would post
+            # fake suggestions to the PR.
             if has_valid_prefix:
-                # Keep the line as-is if it already has a valid prefix
                 formatted_lines.append(line)
-            else:
-                # Default to 'suggestion:' if no valid prefix is found
-                formatted_lines.append(f"suggestion: {line}")
 
         return "\n".join(formatted_lines)
