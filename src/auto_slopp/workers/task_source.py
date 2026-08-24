@@ -125,9 +125,9 @@ class TaskSource(ABC):
 
         The task remains open/active and can be retried later when conditions improve.
 
-        Note: This signature changed from ``on_skip(task)`` to
-        ``on_skip(task, reason: str = "")``. Implementations must accept the
-        ``reason`` parameter.
+        Note: The ``reason`` parameter already existed in the previous
+        signature (``on_skip(task, reason: str)``); it now has a default of
+        ``""``, which is backward-compatible for existing implementations.
 
         Args:
             task: The task that should be skipped

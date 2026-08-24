@@ -1033,6 +1033,8 @@ Plan:
             "repositories_processed": 0,
             "repositories_with_errors": 1,
             "tasks_processed": 0,
+            "tasks_skipped": 0,
+            "tasks_failed": 0,
             "openagent_executions": 0,
             "prs_created": 0,
             "tasks_completed": 0,

@@ -115,8 +115,9 @@ def validate_task_result(result: TaskResult) -> None:
     Raises:
         ValueError: If status is not one of the TaskStatus values,
             if the result is not in a terminal state (status=PENDING),
-            if skipped field is inconsistent with status, or if
-            success=None is inconsistent with status=SKIPPED.
+            if skipped field is inconsistent with status, if
+            success=None is inconsistent with status=SKIPPED, or if
+            skip_reason is missing when status=SKIPPED.
     """
     skipped = result.get("skipped")
     status = result.get("status")
@@ -142,3 +143,8 @@ def validate_task_result(result: TaskResult) -> None:
         raise ValueError("When success is None, status must be SKIPPED")
     if status == TaskStatus.SKIPPED and success is not None:
         raise ValueError("When status is SKIPPED, success must be None")
+
+    # A skipped result must carry its skip reason (documented as present
+    # when status == SKIPPED); without it, run() would only log 'Unknown'.
+    if status == TaskStatus.SKIPPED and "skip_reason" not in result:
+        raise ValueError("When status is SKIPPED, skip_reason must be present")
