@@ -231,10 +231,10 @@ class Settings(BaseSettings):
         default=0,
         ge=0,
         le=20,
-        description="Minimum number of review comments per PR",
+        description="Minimum number of review comments per PR (kept for compatibility; the review prompt is conservative and may output fewer)",
     )
     pr_review_worker_max_comments: int = Field(
-        default=9,
+        default=3,
         ge=1,
         le=20,
         description="Maximum number of review comments per PR",
@@ -272,9 +272,9 @@ class Settings(BaseSettings):
     )
 
     github_issue_pr_review_max_iterations: int | None = Field(
-        default=5,
+        default=3,
         ge=1,
-        description="Maximum PR review iterations to fix issues before giving up (default: 5)",
+        description="Maximum PR review iterations to fix issues before giving up (default: 3)",
     )
 
     ralph_enabled: bool = Field(

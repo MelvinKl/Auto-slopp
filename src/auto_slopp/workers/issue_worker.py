@@ -525,7 +525,7 @@ class IssueWorker(Worker):
             # This loop counts towards the overall iterations for the issue
             max_pr_review_iterations = settings.github_issue_pr_review_max_iterations
             if not isinstance(max_pr_review_iterations, int) or max_pr_review_iterations < 1:
-                max_pr_review_iterations = 5
+                max_pr_review_iterations = 3
             pr_review_iteration = 0
             pr_number = int(pr_url.split("/")[-1])
             # Normalized findings from the previous round. Used for stall
@@ -790,19 +790,21 @@ Plan:
             Instructions string for the CLI tool.
         """
         body_section = f"\n{body}" if body else ""
-        min_comments = settings.pr_review_worker_min_comments
         max_comments = settings.pr_review_worker_max_comments
 
         return (
-            f"You are a code review assistant. Review the following pull request:\n"
+            f"You are a conservative code review assistant. Review the following pull request:\n"
             f"Title: {title}\n"
             f"Description:{body_section}\n\n"
             f"Diff:\n{diff}\n\n"
-            f"Provide a review using conventional comments format. "
-            f"Generate between {min_comments} and {max_comments} comments. "
+            f"Only report concrete, verified problems: code that is broken, causes a real bug, "
+            f"or breaks the project's tests or lint. Do NOT report style preferences, "
+            f"hypothetical improvements, or speculative issues. Prefer fewer, high-confidence "
+            f"comments over many. If the code is fine, output a single 'praise:' line and stop. "
+            f"Generate at most {max_comments} comments. "
             f"Each comment should be on a new line and start with one of the following:\n"
-            f"- 'suggestion:' for suggesting improvements\n"
-            f"- 'issue:' for pointing out problems\n"
+            f"- 'issue:' for a concrete, verified problem that must be fixed\n"
+            f"- 'suggestion:' for an optional improvement (use sparingly, at most one)\n"
             f"- 'nit:' for nitpicky comments\n"
             f"- 'question:' for asking questions\n"
             f"- 'praise:' for positive feedback\n"
@@ -839,12 +841,13 @@ Plan:
             "- After fixing, run 'make lint' and 'make test' and make sure both pass."
         )
 
-    # Findings that block the PR and trigger a fix round. 'nit:' and 'chore:'
-    # are intentionally non-blocking: nitpicks do not converge (each fresh
-    # review surfaces new nits), so treating them as actionable would spin the
+    # Findings that block the PR and trigger a fix round are restricted to
+    # 'issue:' only. 'suggestion:', 'nit:' and 'chore:' are intentionally
+    # non-blocking: suggestions and nitpicks do not converge (each fresh review
+    # surfaces new ones), so treating them as actionable would spin the
     # fix/re-review loop until max iterations without ever going clean.
-    ACTIONABLE_FINDING_PREFIXES = ("issue:", "suggestion:")
-    INFORMATIONAL_FINDING_PREFIXES = ("nit:", "chore:")
+    ACTIONABLE_FINDING_PREFIXES = ("issue:",)
+    INFORMATIONAL_FINDING_PREFIXES = ("suggestion:", "nit:", "chore:")
 
     @staticmethod
     def _normalize_finding(line: str) -> str:
@@ -924,10 +927,10 @@ Plan:
             self.logger.warning(f"No review output generated for PR #{pr_number}")
             return False, "", [], "No review feedback was generated."
 
-        # Split the review output into actionable findings (issue:, suggestion:)
-        # and informational notes (nit:, chore:). 'question:' and 'praise:' are
-        # ignored. Actionable findings are deduplicated so the reviewer
-        # repeating itself does not inflate the fix list.
+        # Split the review output into actionable findings (issue: only) and
+        # informational notes (suggestion:, nit:, chore:). 'question:' and
+        # 'praise:' are ignored. Actionable findings are deduplicated so the
+        # reviewer repeating itself does not inflate the fix list.
         lines = [line.strip() for line in review_output.split("\n") if line.strip()]
         finding_lines: List[str] = []
         informational_lines: List[str] = []

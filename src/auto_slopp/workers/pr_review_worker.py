@@ -32,19 +32,21 @@ def _build_review_instructions(title: str, body: str, diff: str) -> str:
         Instructions string for the CLI tool.
     """
     body_section = f"\n{body}" if body else ""
-    min_comments = settings.pr_review_worker_min_comments
     max_comments = settings.pr_review_worker_max_comments
 
     return (
-        f"You are a code review assistant. Review the following pull request:\n"
+        f"You are a conservative code review assistant. Review the following pull request:\n"
         f"Title: {title}\n"
         f"Description:{body_section}\n\n"
         f"Diff:\n{diff}\n\n"
-        f"Provide a review using conventional comments format. "
-        f"Generate between {min_comments} and {max_comments} comments. "
+        f"Only report concrete, verified problems: code that is broken, causes a real bug, "
+        f"or breaks the project's tests or lint. Do NOT report style preferences, "
+        f"hypothetical improvements, or speculative issues. Prefer fewer, high-confidence "
+        f"comments over many. If the code is fine, output a single 'praise:' line and stop. "
+        f"Generate at most {max_comments} comments. "
         f"Each comment should be on a new line and start with one of the following:\n"
-        f"- 'suggestion:' for suggesting improvements\n"
-        f"- 'issue:' for pointing out problems\n"
+        f"- 'issue:' for a concrete, verified problem that must be fixed\n"
+        f"- 'suggestion:' for an optional improvement (use sparingly, at most one)\n"
         f"- 'nit:' for nitpicky comments\n"
         f"- 'question:' for asking questions\n"
         f"- 'praise:' for positive feedback\n"
