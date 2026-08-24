@@ -63,6 +63,7 @@ def _get_timeout_warn_level() -> int:
         _TIMEOUT_WARN_LOG_LEVEL = level
     return _TIMEOUT_WARN_LOG_LEVEL
 
+
 _PROBE_INSTRUCTIONS = "are you working?"
 # 600 seconds (10 minutes) balances catching hung tools without waiting too long.
 # CLI tools like Claude Code or Codex can take minutes to cold-start, so we
