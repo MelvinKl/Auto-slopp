@@ -7,6 +7,7 @@ for step-based execution.
 
 import logging
 import re
+import subprocess
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -36,11 +37,12 @@ from auto_slopp.utils.github_operations import (
     submit_pr_review,
 )
 from auto_slopp.utils.linking import ensure_issue_link_in_pr_body
+from auto_slopp.utils.pr_review import build_conservative_review_instructions
 from auto_slopp.utils.ralph import RalphExecutor
 from auto_slopp.worker import Worker
 from auto_slopp.workers.task_source import Task, TaskSource
 from auto_slopp.workers.task_types import TaskStatus, validate_task_result
-from settings.main import settings
+from settings.main import DEFAULT_PR_REVIEW_MAX_ITERATIONS, settings
 
 
 class IssueWorker(Worker):
@@ -518,7 +520,7 @@ class IssueWorker(Worker):
             # This loop counts towards the overall iterations for the issue
             max_pr_review_iterations = settings.github_issue_pr_review_max_iterations
             if not isinstance(max_pr_review_iterations, int) or max_pr_review_iterations < 1:
-                max_pr_review_iterations = 5
+                max_pr_review_iterations = DEFAULT_PR_REVIEW_MAX_ITERATIONS
             pr_review_iteration = 0
             pr_number = int(pr_url.split("/")[-1])
             # Normalized findings from the previous round. Used for stall
@@ -526,6 +528,38 @@ class IssueWorker(Worker):
             # previous round, the fixer is not making progress and further
             # rounds are wasted.
             previous_round_findings: set[str] = set()
+
+            # Cap the TOTAL number of PR review fix rounds across outer task
+            # runs. Each fix round commits "Task #<id>: fix PR review issues",
+            # so those commits persist in the branch history. Counting them
+            # against the budget stops the indefinite outer loop for PRs whose
+            # reviewer persistently re-flags the same finding.
+            prior_fix_rounds = self._count_prior_pr_review_fix_rounds(repo_dir, task_id)
+            if prior_fix_rounds >= max_pr_review_iterations:
+                self.logger.warning(
+                    f"PR review fix budget exhausted for task #{task_id}: "
+                    f"{prior_fix_rounds} prior fix round(s) already reach the maximum of "
+                    f"{max_pr_review_iterations}. Stopping automatic PR review for this PR."
+                )
+                label_removed = remove_label_from_issue(repo_dir, task.id, settings.github_issue_worker_required_label)
+                if label_removed:
+                    self.logger.info(f"Removed automatic work label from issue #{task.id} after PR review cap")
+                else:
+                    self.logger.warning(
+                        f"Failed to remove automatic work label from issue #{task.id} after PR review cap"
+                    )
+                result["task_completed"] = True
+                result["tasks_completed"] = 1
+                result["success"] = True
+                result["label_removed"] = label_removed
+                result["pr_review_done"] = True
+                # Report the prior fix rounds actually consumed (they are
+                # already committed to the branch) so downstream metrics
+                # reflect how many rounds were really used instead of 0.
+                result["pr_review_iterations"] = prior_fix_rounds
+                result["pr_review_capped"] = True
+                return result
+            max_pr_review_iterations -= prior_fix_rounds
 
             while pr_review_iteration < max_pr_review_iterations:
                 pr_review_iteration += 1
@@ -843,8 +877,12 @@ Plan:
 
         return ensure_issue_link_in_pr_body(generated_body, task.id)
 
-    def _build_review_instructions(self, title: str, body: str, diff: str) -> str:
+    @staticmethod
+    def _build_review_instructions(title: str, body: str, diff: str) -> str:
         """Build instructions for the CLI tool to review a PR.
+
+        Delegates to the shared conservative prompt in
+        ``auto_slopp.utils.pr_review`` so both review call sites stay in sync.
 
         Args:
             title: PR title
@@ -854,26 +892,7 @@ Plan:
         Returns:
             Instructions string for the CLI tool.
         """
-        body_section = f"\n{body}" if body else ""
-        min_comments = settings.pr_review_worker_min_comments
-        max_comments = settings.pr_review_worker_max_comments
-
-        return (
-            f"You are a code review assistant. Review the following pull request:\n"
-            f"Title: {title}\n"
-            f"Description:{body_section}\n\n"
-            f"Diff:\n{diff}\n\n"
-            f"Provide a review using conventional comments format. "
-            f"Generate between {min_comments} and {max_comments} comments. "
-            f"Each comment should be on a new line and start with one of the following:\n"
-            f"- 'suggestion:' for suggesting improvements\n"
-            f"- 'issue:' for pointing out problems\n"
-            f"- 'nit:' for nitpicky comments\n"
-            f"- 'question:' for asking questions\n"
-            f"- 'praise:' for positive feedback\n"
-            f"- 'chore:' for chores or maintenance suggestions\n"
-            f"Only output the comments, one per line, without any additional text or explanation."
-        )
+        return build_conservative_review_instructions(title, body, diff)
 
     def _build_pr_fix_instructions(
         self,
@@ -904,12 +923,66 @@ Plan:
             "- After fixing, run 'make lint' and 'make test' and make sure both pass."
         )
 
-    # Findings that block the PR and trigger a fix round. 'nit:' and 'chore:'
-    # are intentionally non-blocking: nitpicks do not converge (each fresh
-    # review surfaces new nits), so treating them as actionable would spin the
+    # Findings that block the PR and trigger a fix round are restricted to
+    # 'issue:' only. 'suggestion:', 'nit:' and 'chore:' are intentionally
+    # non-blocking: suggestions and nitpicks do not converge (each fresh review
+    # surfaces new ones), so treating them as actionable would spin the
     # fix/re-review loop until max iterations without ever going clean.
-    ACTIONABLE_FINDING_PREFIXES = ("issue:", "suggestion:")
-    INFORMATIONAL_FINDING_PREFIXES = ("nit:", "chore:")
+    #
+    # Previously ACTIONABLE_FINDING_PREFIXES included "suggestion:" but this
+    # caused infinite fix/re-review loops because suggestions are subjective
+    # and each review pass generates new ones.
+    ACTIONABLE_FINDING_PREFIXES = ("issue:",)
+    INFORMATIONAL_FINDING_PREFIXES = ("suggestion:", "nit:", "chore:")
+
+    @staticmethod
+    def _count_prior_pr_review_fix_rounds(repo_dir: Path, task_id: int) -> int:
+        """Count PR review fix commits on the current branch made by earlier task runs.
+
+        Each fix round commits with the message
+        "Task #{task_id}: fix PR review issues (iteration N)". Counting those
+        commits against the PR review budget caps the total fix rounds across
+        outer task runs, so a PR whose reviewer persistently re-flags the same
+        finding cannot loop indefinitely.
+
+        Args:
+            repo_dir: Path to the repository directory
+            task_id: Task/issue id whose fix commits are counted
+
+        Returns:
+            Number of prior PR review fix rounds, or 0 if it cannot be
+            determined (e.g., not a git repository or git failed).
+        """
+        try:
+            # Detect the default branch dynamically (e.g. main, master) so the
+            # comparison works for repos whose default branch is not "main".
+            base_branch = "main"
+            symbolic_ref = subprocess.run(
+                ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+                cwd=repo_dir,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if symbolic_ref.returncode == 0:
+                ref = symbolic_ref.stdout.strip()
+                if "/" in ref:
+                    base_branch = ref.rsplit("/", 1)[-1]
+            completed = subprocess.run(
+                ["git", "log", f"{base_branch}..HEAD", "--pretty=%s"],
+                cwd=repo_dir,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if completed.returncode != 0:
+                return 0
+            marker = f"Task #{task_id}: fix PR review issues"
+            marker_re = re.compile(rf"^{re.escape(marker)}(\s|\()")
+            return sum(1 for line in completed.stdout.splitlines() if marker_re.match(line))
+        except Exception as exc:
+            logging.getLogger(__name__).debug("Failed to count prior PR review fix rounds in %s: %s", repo_dir, exc)
+            return 0
 
     @staticmethod
     def _normalize_finding(line: str) -> str:
@@ -940,12 +1013,13 @@ Plan:
 
         Returns:
             Tuple of (has_findings, comment_string, finding_lines, error) where:
-            - has_findings: bool, True if actionable findings (issue:, suggestion:) were found
+            - has_findings: bool, True if actionable findings (issue: only) were found
             - comment_string: string to post as a review comment on the PR
             - finding_lines: deduplicated list of actionable finding lines
             - error: error message if the review itself failed, else None
-              (informational nit:/chore: lines are included in comment_string
-              but never in finding_lines, so they do not trigger fix rounds)
+              (informational suggestion:/nit:/chore: lines are included in
+              comment_string but never in finding_lines, so they do not
+              trigger fix rounds)
         """
         try:
             # Extract PR number from URL
@@ -991,10 +1065,10 @@ Plan:
             self.logger.warning(f"No review output generated for PR #{pr_number}")
             return False, "", [], "No review feedback was generated."
 
-        # Split the review output into actionable findings (issue:, suggestion:)
-        # and informational notes (nit:, chore:). 'question:' and 'praise:' are
-        # ignored. Actionable findings are deduplicated so the reviewer
-        # repeating itself does not inflate the fix list.
+        # Split the review output into actionable findings (issue: only) and
+        # informational notes (suggestion:, nit:, chore:). 'question:' and
+        # 'praise:' are ignored. Actionable findings are deduplicated so the
+        # reviewer repeating itself does not inflate the fix list.
         lines = [line.strip() for line in review_output.split("\n") if line.strip()]
         finding_lines: list[str] = []
         informational_lines: list[str] = []
