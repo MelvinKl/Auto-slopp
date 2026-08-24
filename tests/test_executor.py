@@ -13,7 +13,6 @@ from auto_slopp.workers import (
     PrReviewWorker,
     PRWorker,
     StaleBranchCleanupWorker,
-    VikunjaWorker,
 )
 
 
@@ -35,14 +34,9 @@ class TestWorkerRegistration:
         worker_classes = [w.__name__ for w in ALL_WORKERS]
         assert "StaleBranchCleanupWorker" in worker_classes
 
-    def test_all_workers_includes_vikunja_worker(self):
-        """Test that VikunjaWorker is registered in ALL_WORKERS."""
-        worker_classes = [w.__name__ for w in ALL_WORKERS]
-        assert "VikunjaWorker" in worker_classes
-
     def test_all_workers_count(self):
         """Test that ALL_WORKERS contains all expected workers."""
-        expected_count = 5
+        expected_count = 4
         assert len(ALL_WORKERS) == expected_count, (
             f"Expected {expected_count} workers in ALL_WORKERS, "
             f"but found {len(ALL_WORKERS)}: {[w.__name__ for w in ALL_WORKERS]}"
@@ -63,7 +57,6 @@ class TestWorkerRegistration:
                 PRWorker,
                 PrReviewWorker,
                 StaleBranchCleanupWorker,
-                VikunjaWorker,
             ], f"{worker_class.__name__} not found in workers module exports"
 
 

@@ -21,6 +21,8 @@ NO_TIMEOUT = -1
 
 _MAX_TIMEOUT_SECONDS = 31_536_000  # ~1 year in seconds
 
+DEFAULT_PR_REVIEW_MAX_ITERATIONS = 3
+
 
 class CLIConfiguration(BaseModel):
     """Single CLI configuration entry for tiered failover."""
@@ -222,19 +224,6 @@ class Settings(BaseSettings):
         default="AI",
         description="Required label for PrReviewWorker to process a PR",
     )
-    pr_review_worker_min_comments: int = Field(
-        default=0,
-        ge=0,
-        le=20,
-        description="Minimum number of review comments per PR",
-    )
-    pr_review_worker_max_comments: int = Field(
-        default=9,
-        ge=1,
-        le=20,
-        description="Maximum number of review comments per PR",
-    )
-
     additional_env_file: Optional[Path] = Field(
         default=None,
         description="Path to an additional .env file to be appended to subprocess calls for github_operations",
@@ -267,9 +256,12 @@ class Settings(BaseSettings):
     )
 
     github_issue_pr_review_max_iterations: int | None = Field(
-        default=5,
+        default=DEFAULT_PR_REVIEW_MAX_ITERATIONS,
         ge=1,
-        description="Maximum PR review iterations to fix issues before giving up (default: 5)",
+        description=(
+            "Maximum PR review iterations to fix issues before giving up "
+            f"(default: {DEFAULT_PR_REVIEW_MAX_ITERATIONS})"
+        ),
     )
 
     ralph_enabled: bool = Field(
