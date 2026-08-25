@@ -196,7 +196,7 @@ ALL_WORKERS: list[Type[Worker]] = [
 
 **Worker types**:
 - `GitHubIssueWorker`: Processes GitHub issues (wrapper around `IssueWorker` + `GitHubTaskSource`)
-- `PRWorker`: Tests open PR branches and fixes failing tests
+- `PRWorker`: Tests open PR branches and fixes failing tests and failing GitHub Actions runs (using the failure logs fetched from the failed runs)
 - `StaleBranchCleanupWorker`: Cleans up local branches without remote tracking
 - `PrReviewWorker`: Reviews PRs with the "AI Review" label
 
