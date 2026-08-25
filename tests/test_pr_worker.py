@@ -3,7 +3,7 @@
 from pathlib import Path
 from unittest.mock import patch
 
-from auto_slopp.workers.pr_worker import PRWorker
+from auto_slopp.workers.pr_worker import MAX_WORKFLOW_LOG_CHARS, PRWorker
 
 
 class TestPRWorker:
@@ -284,8 +284,9 @@ class TestPRWorker:
 class TestPRWorkerWorkflowRuns:
     """Test cases for PRWorker workflow run handling."""
 
+    @patch("auto_slopp.workers.pr_worker.get_failed_workflow_logs")
     @patch("auto_slopp.workers.pr_worker.get_workflow_runs_for_branch")
-    def test_get_and_log_workflow_runs_all_successful(self, mock_get_workflow_runs):
+    def test_get_and_log_workflow_runs_all_successful(self, mock_get_workflow_runs, mock_get_failed_logs):
         """Test _get_and_log_workflow_runs when all workflows are successful."""
         worker = PRWorker()
         repo_dir = Path("/tmp/repo")
@@ -310,10 +311,12 @@ class TestPRWorkerWorkflowRuns:
         ]
 
         result = worker._get_and_log_workflow_runs(repo_dir, "main")
-        assert result == []  # No failed workflows
+        assert result == ([], [])  # No failed workflows
+        mock_get_failed_logs.assert_not_called()
 
+    @patch("auto_slopp.workers.pr_worker.get_failed_workflow_logs")
     @patch("auto_slopp.workers.pr_worker.get_workflow_runs_for_branch")
-    def test_get_and_log_workflow_runs_with_failure(self, mock_get_workflow_runs):
+    def test_get_and_log_workflow_runs_with_failure(self, mock_get_workflow_runs, mock_get_failed_logs):
         """Test _get_and_log_workflow_runs when some workflows have failed."""
         worker = PRWorker()
         repo_dir = Path("/tmp/repo")
@@ -337,13 +340,18 @@ class TestPRWorkerWorkflowRuns:
             },
         ]
 
-        result = worker._get_and_log_workflow_runs(repo_dir, "main")
-        assert len(result) == 1
-        assert result[0]["conclusion"] == "failure"
-        assert result[0]["name"] == "Lint"
+        mock_get_failed_logs.return_value = "failure log"
 
+        result = worker._get_and_log_workflow_runs(repo_dir, "main")
+        assert len(result[0]) == 1
+        assert result[0][0]["conclusion"] == "failure"
+        assert result[0][0]["name"] == "Lint"
+        assert result[1] == [{"name": "Lint", "databaseId": 124, "log": "failure log"}]
+        mock_get_failed_logs.assert_called_once_with(repo_dir, result[0][0])
+
+    @patch("auto_slopp.workers.pr_worker.get_failed_workflow_logs")
     @patch("auto_slopp.workers.pr_worker.get_workflow_runs_for_branch")
-    def test_get_and_log_workflow_runs_with_in_progress(self, mock_get_workflow_runs):
+    def test_get_and_log_workflow_runs_with_in_progress(self, mock_get_workflow_runs, mock_get_failed_logs):
         """Test _get_and_log_workflow_runs when some workflows are in progress."""
         worker = PRWorker()
         repo_dir = Path("/tmp/repo")
@@ -368,10 +376,11 @@ class TestPRWorkerWorkflowRuns:
         ]
 
         result = worker._get_and_log_workflow_runs(repo_dir, "main")
-        assert result == []  # In-progress workflows should not be considered failures
+        assert result == ([], [])  # In-progress workflows should not be considered failures
 
+    @patch("auto_slopp.workers.pr_worker.get_failed_workflow_logs")
     @patch("auto_slopp.workers.pr_worker.get_workflow_runs_for_branch")
-    def test_get_and_log_workflow_runs_with_queued(self, mock_get_workflow_runs):
+    def test_get_and_log_workflow_runs_with_queued(self, mock_get_workflow_runs, mock_get_failed_logs):
         """Test _get_and_log_workflow_runs when some workflows are queued."""
         worker = PRWorker()
         repo_dir = Path("/tmp/repo")
@@ -396,10 +405,11 @@ class TestPRWorkerWorkflowRuns:
         ]
 
         result = worker._get_and_log_workflow_runs(repo_dir, "main")
-        assert result == []  # Queued workflows should not be considered failures
+        assert result == ([], [])  # Queued workflows should not be considered failures
 
+    @patch("auto_slopp.workers.pr_worker.get_failed_workflow_logs")
     @patch("auto_slopp.workers.pr_worker.get_workflow_runs_for_branch")
-    def test_get_and_log_workflow_runs_no_runs(self, mock_get_workflow_runs):
+    def test_get_and_log_workflow_runs_no_runs(self, mock_get_workflow_runs, mock_get_failed_logs):
         """Test _get_and_log_workflow_runs when no workflow runs are returned."""
         worker = PRWorker()
         repo_dir = Path("/tmp/repo")
@@ -407,4 +417,145 @@ class TestPRWorkerWorkflowRuns:
         mock_get_workflow_runs.return_value = []
 
         result = worker._get_and_log_workflow_runs(repo_dir, "main")
-        assert result == []  # No workflows means no failures
+        assert result == ([], [])  # No workflows means no failures
+
+
+class TestPRWorkerWorkflowFix:
+    """Test cases for PRWorker fixing failing GitHub Actions workflows."""
+
+    def test_fixes_failed_workflows_and_continues(self):
+        """Test that PRWorker fixes failed GitHub Actions workflows and continues instead of skipping."""
+        worker = PRWorker()
+        repo_dir = Path("/tmp/repo")
+
+        with (
+            patch.object(worker, "_get_open_pr_branches", return_value=["feature"]),
+            patch.object(worker, "_checkout_branch", return_value=True),
+            patch.object(
+                worker,
+                "_get_and_log_workflow_runs",
+                return_value=(
+                    [{"conclusion": "failure", "name": "CI"}],
+                    [{"name": "CI", "databaseId": 123, "log": "line1\nline2"}],
+                ),
+            ),
+            patch.object(worker, "_fix_workflows_with_cli", return_value={"success": True}) as mock_fix,
+            patch.object(worker, "_update_branch_with_main", return_value=True),
+            patch.object(
+                worker,
+                "_run_tests",
+                return_value={"success": True, "output": "", "error": None},
+            ),
+            patch.object(worker, "_push_branch", return_value=True) as mock_push_branch,
+            patch("auto_slopp.workers.pr_worker.has_changes", return_value=True),
+            patch("auto_slopp.workers.pr_worker.commit_and_push_changes", return_value=(True, None)) as mock_commit,
+        ):
+            result = worker._process_repository(repo_dir)
+
+        assert result["success"] is True
+        assert result["workflows_fixed"] is True
+        mock_fix.assert_called_once_with(repo_dir, [{"name": "CI", "databaseId": 123, "log": "line1\nline2"}])
+        mock_commit.assert_called_once_with(
+            repo_dir,
+            "fix: commit changes after CLI workflow fix for feature",
+            push_if_remote=False,
+        )
+        mock_push_branch.assert_called_once_with(repo_dir, "feature")
+
+    def test_continues_when_workflow_fix_fails(self):
+        """Test that PRWorker continues processing the branch even when the workflow fix fails."""
+        worker = PRWorker()
+        repo_dir = Path("/tmp/repo")
+
+        with (
+            patch.object(worker, "_get_open_pr_branches", return_value=["feature"]),
+            patch.object(worker, "_checkout_branch", return_value=True),
+            patch.object(
+                worker,
+                "_get_and_log_workflow_runs",
+                return_value=(
+                    [{"conclusion": "failure", "name": "CI"}],
+                    [{"name": "CI", "databaseId": 123, "log": "failure log"}],
+                ),
+            ),
+            patch.object(
+                worker,
+                "_fix_workflows_with_cli",
+                return_value={"success": False, "error": "fix failed"},
+            ),
+            patch.object(worker, "_update_branch_with_main", return_value=True),
+            patch.object(
+                worker,
+                "_run_tests",
+                return_value={"success": True, "output": "", "error": None},
+            ),
+            patch.object(worker, "_push_branch", return_value=True) as mock_push_branch,
+            patch("auto_slopp.workers.pr_worker.commit_and_push_changes", return_value=(True, None)) as mock_commit,
+        ):
+            result = worker._process_repository(repo_dir)
+
+        assert result["success"] is True
+        assert "fix failed" in result["error"]
+        mock_commit.assert_not_called()
+        mock_push_branch.assert_called_once_with(repo_dir, "feature")
+
+    def test_does_not_fix_when_no_failed_workflows(self):
+        """Test that PRWorker does not invoke the workflow fix when there are no failed runs."""
+        worker = PRWorker()
+        repo_dir = Path("/tmp/repo")
+
+        with (
+            patch.object(worker, "_get_open_pr_branches", return_value=["feature"]),
+            patch.object(worker, "_checkout_branch", return_value=True),
+            patch.object(worker, "_get_and_log_workflow_runs", return_value=([], [])),
+            patch.object(worker, "_fix_workflows_with_cli") as mock_fix,
+            patch.object(worker, "_update_branch_with_main", return_value=True),
+            patch.object(
+                worker,
+                "_run_tests",
+                return_value={"success": True, "output": "", "error": None},
+            ),
+            patch.object(worker, "_push_branch", return_value=True),
+        ):
+            result = worker._process_repository(repo_dir)
+
+        assert result["success"] is True
+        mock_fix.assert_not_called()
+
+    def test_fix_workflows_with_cli_truncates_long_logs(self):
+        """Test that _fix_workflows_with_cli truncates oversized logs."""
+        worker = PRWorker()
+        repo_dir = Path("/tmp/repo")
+        long_log = "x" * (MAX_WORKFLOW_LOG_CHARS + 100)
+
+        with patch("auto_slopp.workers.pr_worker.run_cli_executor") as mock_cli:
+            mock_cli.return_value = {"success": True, "stdout": "done", "return_code": 0}
+            worker._fix_workflows_with_cli(repo_dir, [{"name": "CI", "databaseId": 1, "log": long_log}])
+
+        instructions = mock_cli.call_args.kwargs["additional_instructions"]
+        assert "truncated" in instructions
+        assert "x" * (MAX_WORKFLOW_LOG_CHARS + 100) not in instructions
+        assert len(instructions) < MAX_WORKFLOW_LOG_CHARS + 500
+
+    def test_fix_workflows_with_cli_builds_instructions_from_logs(self):
+        """Test that _fix_workflows_with_cli passes the failure logs to the CLI executor."""
+        worker = PRWorker()
+        repo_dir = Path("/tmp/repo")
+
+        with patch("auto_slopp.workers.pr_worker.run_cli_executor") as mock_cli:
+            mock_cli.return_value = {"success": True, "stdout": "done", "return_code": 0}
+            result = worker._fix_workflows_with_cli(
+                repo_dir,
+                [
+                    {"name": "CI", "databaseId": 1, "log": "log one"},
+                    {"name": "Lint", "databaseId": 2, "log": "log two"},
+                ],
+            )
+
+        assert result["success"] is True
+        instructions = mock_cli.call_args.kwargs["additional_instructions"]
+        assert "CI" in instructions
+        assert "log one" in instructions
+        assert "Lint" in instructions
+        assert "log two" in instructions
+        assert mock_cli.call_args.kwargs["working_directory"] == repo_dir
