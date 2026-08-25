@@ -15,7 +15,7 @@
 | **Pydantic** | Python library for data validation using type hints (BaseSettings for configuration) |
 | **PR (Pull Request)** | A GitHub feature for proposing changes to a repository |
 | **PrReviewWorker** | Worker that reviews PRs with the "AI" label and provides conventional comments |
-| **PRWorker** | Worker that tests open PR branches and fixes failing tests |
+| **PRWorker** | Worker that tests open PR branches and fixes failing tests and failing GitHub Actions runs (using the fetched failure logs) |
 | **Ralph Loop** | Structured 5-step task execution pattern: Analyze → Implement → Test → Document → Validate |
 | **Repo Path** | Directory containing git repositories to be managed (`AUTO_SLOPP_BASE_REPO_PATH`) |
 | **StaleBranchCleanupWorker** | Worker that removes local branches not on remote and older than threshold |

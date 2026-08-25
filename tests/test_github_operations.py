@@ -213,12 +213,37 @@ class TestGetFailedWorkflowLogs:
 
     @patch("auto_slopp.utils.github_operations._run_gh_command")
     def test_get_failed_workflow_logs_failure(self, mock_run_gh):
-        """Test get_failed_workflow_logs returns empty string on failure."""
-        mock_run_gh.return_value = Mock(returncode=1, stderr="error")
+        """Test get_failed_workflow_logs returns empty string when gh and fallback both fail."""
+        mock_run_gh.side_effect = [
+            Mock(returncode=1, stderr="error"),
+            Mock(returncode=1, stderr="no jobs"),
+        ]
         repo_dir = Path("/tmp/test_repo")
         run = {"conclusion": "failure", "name": "CI", "status": "completed", "databaseId": 123}
         result = get_failed_workflow_logs(repo_dir, run)
         assert result == ""
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_failed_workflow_logs_falls_back_to_job_logs(self, mock_run_gh):
+        """Test get_failed_workflow_logs falls back to per-job logs when --log-failed is empty."""
+        jobs_json = (
+            '{"jobs": [{"name": "Build", "conclusion": "failure", "databaseId": 1}, '
+            '{"name": "Test", "conclusion": "success", "databaseId": 2}]}'
+        )
+        mock_run_gh.side_effect = [
+            Mock(returncode=0, stdout=""),
+            Mock(returncode=0, stdout=jobs_json),
+            Mock(returncode=0, stdout="job failure log"),
+        ]
+        repo_dir = Path("/tmp/test_repo")
+        run = {"conclusion": "failure", "name": "CI", "status": "completed", "databaseId": 123}
+        result = get_failed_workflow_logs(repo_dir, run)
+        assert "job failure log" in result
+        assert "Build" in result
+        mock_run_gh.assert_any_call(repo_dir, "run", "view", "123", "--json", "jobs", check=False, timeout=120)
+        mock_run_gh.assert_any_call(
+            repo_dir, "run", "view", "123", "--job", "1", "--log-failed", check=False, timeout=120
+        )
 
     @patch("auto_slopp.utils.github_operations._run_gh_command")
     def test_get_failed_workflow_logs_missing_database_id(self, mock_run_gh):

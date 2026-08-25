@@ -26,6 +26,9 @@ from auto_slopp.utils.repository_utils import validate_repository
 from auto_slopp.worker import Worker
 from settings.main import settings
 
+# Maximum number of characters of workflow failure log included per failed run in CLI fix instructions
+MAX_WORKFLOW_LOG_CHARS = 20000
+
 
 class PRWorker(Worker):
     """Worker for testing open PR branches and fixing failures with the configured CLI tool."""
@@ -172,6 +175,10 @@ class PRWorker(Worker):
                             f"Failed to fix GitHub Actions workflows for {branch} in {repo_dir.name}: "
                             f"{fix_result.get('error', 'Unknown error')}"
                         )
+                        result["error"] = (
+                            f"Failed to fix GitHub Actions workflows for {branch}: "
+                            f"{fix_result.get('error', 'Unknown error')}"
+                        )
 
                 if not self._update_branch_with_main(repo_dir, branch):
                     cli_tool = get_active_cli_command()
@@ -271,9 +278,10 @@ class PRWorker(Worker):
         self, repo_dir: Path, branch: str
     ) -> tuple[list[dict[str, Any]], list[str]]:  # noqa: C901
         """Get workflow runs for a branch and log their conclusions.
-        Returns a tuple of (failed workflow runs, failure logs) where the runs have failed
-        (conclusion != 'success' and status = 'completed') and are triggered by pull_request,
-        and the logs are the failed logs of each failed run."""
+        Returns a tuple of (failed workflow runs, failure logs). The runs have failed
+        (conclusion != 'success' and status = 'completed') and are triggered by pull_request.
+        The failure logs is a list of dicts, parallel to the failed runs, each with
+        'name', 'databaseId' and the fetched 'log' of that run."""
         runs = get_workflow_runs_for_branch(repo_dir, branch, event="pull_request")
         if not runs:
             self.logger.info(f"No workflow runs found for branch {branch} in {repo_dir.name}")
@@ -303,7 +311,13 @@ class PRWorker(Worker):
                         f"Fetching failure logs for workflow '{workflow_name}' (ID: {database_id}) "
                         f"for branch '{branch}'"
                     )
-                    failed_logs.append(get_failed_workflow_logs(repo_dir, run))
+                    failed_logs.append(
+                        {
+                            "name": workflow_name,
+                            "databaseId": database_id,
+                            "log": get_failed_workflow_logs(repo_dir, run),
+                        }
+                    )
                     if conclusion == "failure":
                         self.logger.warning(f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' failed.")
                     else:
@@ -318,7 +332,13 @@ class PRWorker(Worker):
                         f"Fetching failure logs for workflow '{workflow_name}' (ID: {database_id}) "
                         f"for branch '{branch}'"
                     )
-                    failed_logs.append(get_failed_workflow_logs(repo_dir, run))
+                    failed_logs.append(
+                        {
+                            "name": workflow_name,
+                            "databaseId": database_id,
+                            "log": get_failed_workflow_logs(repo_dir, run),
+                        }
+                    )
                     self.logger.warning(
                         f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' completed "
                         "but has no conclusion."
@@ -462,17 +482,27 @@ class PRWorker(Worker):
             "return_code": result["return_code"],
         }
 
-    def _fix_workflows_with_cli(self, repo_dir: Path, failed_logs: list[str]) -> dict[str, Any]:
+    def _fix_workflows_with_cli(self, repo_dir: Path, failed_logs: list[dict[str, Any]]) -> dict[str, Any]:
         """Use the configured CLI tool to fix failing GitHub Actions workflows.
 
         Args:
             repo_dir: Path to the repository directory
-            failed_logs: Failure logs of the failed workflow runs
+            failed_logs: Failure log entries of the failed workflow runs,
+                each a dict with 'name', 'databaseId' and 'log'
 
         Returns:
             Dictionary containing CLI execution results
         """
-        logs_section = "\n\n---\n\n".join(log for log in failed_logs if log) or "No logs available."
+        sections = []
+        for entry in failed_logs:
+            log = entry.get("log") or "(no logs available)"
+            if len(log) > MAX_WORKFLOW_LOG_CHARS:
+                log = (
+                    f"... (log truncated, showing last {MAX_WORKFLOW_LOG_CHARS} characters)\n"
+                    + log[-MAX_WORKFLOW_LOG_CHARS:]
+                )
+            sections.append(f"### Workflow: {entry.get('name', 'unknown')}\n{log}")
+        logs_section = "\n\n---\n\n".join(sections) or "No logs available."
         additional_instructions = (
             "The GitHub Actions workflows for this branch are failing. "
             f"Fix the issues in the repository. Relevant failure logs:\n\n{logs_section}"

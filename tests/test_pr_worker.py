@@ -3,7 +3,7 @@
 from pathlib import Path
 from unittest.mock import patch
 
-from auto_slopp.workers.pr_worker import PRWorker
+from auto_slopp.workers.pr_worker import MAX_WORKFLOW_LOG_CHARS, PRWorker
 
 
 class TestPRWorker:
@@ -346,7 +346,7 @@ class TestPRWorkerWorkflowRuns:
         assert len(result[0]) == 1
         assert result[0][0]["conclusion"] == "failure"
         assert result[0][0]["name"] == "Lint"
-        assert result[1] == ["failure log"]
+        assert result[1] == [{"name": "Lint", "databaseId": 124, "log": "failure log"}]
         mock_get_failed_logs.assert_called_once_with(repo_dir, result[0][0])
 
     @patch("auto_slopp.workers.pr_worker.get_failed_workflow_logs")
@@ -434,7 +434,10 @@ class TestPRWorkerWorkflowFix:
             patch.object(
                 worker,
                 "_get_and_log_workflow_runs",
-                return_value=([{"conclusion": "failure", "name": "CI"}], ["line1\nline2"]),
+                return_value=(
+                    [{"conclusion": "failure", "name": "CI"}],
+                    [{"name": "CI", "databaseId": 123, "log": "line1\nline2"}],
+                ),
             ),
             patch.object(worker, "_fix_workflows_with_cli", return_value={"success": True}) as mock_fix,
             patch.object(worker, "_update_branch_with_main", return_value=True),
@@ -451,7 +454,7 @@ class TestPRWorkerWorkflowFix:
 
         assert result["success"] is True
         assert result["workflows_fixed"] is True
-        mock_fix.assert_called_once_with(repo_dir, ["line1\nline2"])
+        mock_fix.assert_called_once_with(repo_dir, [{"name": "CI", "databaseId": 123, "log": "line1\nline2"}])
         mock_commit.assert_called_once_with(
             repo_dir,
             "fix: commit changes after CLI workflow fix for feature",
@@ -470,7 +473,10 @@ class TestPRWorkerWorkflowFix:
             patch.object(
                 worker,
                 "_get_and_log_workflow_runs",
-                return_value=([{"conclusion": "failure", "name": "CI"}], ["failure log"]),
+                return_value=(
+                    [{"conclusion": "failure", "name": "CI"}],
+                    [{"name": "CI", "databaseId": 123, "log": "failure log"}],
+                ),
             ),
             patch.object(
                 worker,
@@ -489,8 +495,47 @@ class TestPRWorkerWorkflowFix:
             result = worker._process_repository(repo_dir)
 
         assert result["success"] is True
+        assert "fix failed" in result["error"]
         mock_commit.assert_not_called()
         mock_push_branch.assert_called_once_with(repo_dir, "feature")
+
+    def test_does_not_fix_when_no_failed_workflows(self):
+        """Test that PRWorker does not invoke the workflow fix when there are no failed runs."""
+        worker = PRWorker()
+        repo_dir = Path("/tmp/repo")
+
+        with (
+            patch.object(worker, "_get_open_pr_branches", return_value=["feature"]),
+            patch.object(worker, "_checkout_branch", return_value=True),
+            patch.object(worker, "_get_and_log_workflow_runs", return_value=([], [])),
+            patch.object(worker, "_fix_workflows_with_cli") as mock_fix,
+            patch.object(worker, "_update_branch_with_main", return_value=True),
+            patch.object(
+                worker,
+                "_run_tests",
+                return_value={"success": True, "output": "", "error": None},
+            ),
+            patch.object(worker, "_push_branch", return_value=True),
+        ):
+            result = worker._process_repository(repo_dir)
+
+        assert result["success"] is True
+        mock_fix.assert_not_called()
+
+    def test_fix_workflows_with_cli_truncates_long_logs(self):
+        """Test that _fix_workflows_with_cli truncates oversized logs."""
+        worker = PRWorker()
+        repo_dir = Path("/tmp/repo")
+        long_log = "x" * (MAX_WORKFLOW_LOG_CHARS + 100)
+
+        with patch("auto_slopp.workers.pr_worker.run_cli_executor") as mock_cli:
+            mock_cli.return_value = {"success": True, "stdout": "done", "return_code": 0}
+            worker._fix_workflows_with_cli(repo_dir, [{"name": "CI", "databaseId": 1, "log": long_log}])
+
+        instructions = mock_cli.call_args.kwargs["additional_instructions"]
+        assert "truncated" in instructions
+        assert "x" * (MAX_WORKFLOW_LOG_CHARS + 100) not in instructions
+        assert len(instructions) < MAX_WORKFLOW_LOG_CHARS + 500
 
     def test_fix_workflows_with_cli_builds_instructions_from_logs(self):
         """Test that _fix_workflows_with_cli passes the failure logs to the CLI executor."""
@@ -499,10 +544,18 @@ class TestPRWorkerWorkflowFix:
 
         with patch("auto_slopp.workers.pr_worker.run_cli_executor") as mock_cli:
             mock_cli.return_value = {"success": True, "stdout": "done", "return_code": 0}
-            result = worker._fix_workflows_with_cli(repo_dir, ["log one", "log two"])
+            result = worker._fix_workflows_with_cli(
+                repo_dir,
+                [
+                    {"name": "CI", "databaseId": 1, "log": "log one"},
+                    {"name": "Lint", "databaseId": 2, "log": "log two"},
+                ],
+            )
 
         assert result["success"] is True
         instructions = mock_cli.call_args.kwargs["additional_instructions"]
+        assert "CI" in instructions
         assert "log one" in instructions
+        assert "Lint" in instructions
         assert "log two" in instructions
         assert mock_cli.call_args.kwargs["working_directory"] == repo_dir
