@@ -10,7 +10,6 @@ from auto_slopp.workers.pr_review_worker import PrReviewWorker
 from auto_slopp.workers.pr_worker import PRWorker
 from auto_slopp.workers.stale_branch_cleanup_worker import StaleBranchCleanupWorker
 from auto_slopp.workers.task_source import Task, TaskSource
-from auto_slopp.workers.vikunja_worker import VikunjaWorker
 
 __all__ = [
     "GitHubIssueWorker",
@@ -20,5 +19,4 @@ __all__ = [
     "StaleBranchCleanupWorker",
     "Task",
     "TaskSource",
-    "VikunjaWorker",
 ]

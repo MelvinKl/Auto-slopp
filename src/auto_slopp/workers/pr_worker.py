@@ -18,12 +18,16 @@ from auto_slopp.utils.git_operations import (
     push_branch,
 )
 from auto_slopp.utils.github_operations import (
+    get_failed_workflow_logs,
     get_open_prs,
     get_workflow_runs_for_branch,
 )
 from auto_slopp.utils.repository_utils import validate_repository
 from auto_slopp.worker import Worker
 from settings.main import settings
+
+# Maximum number of characters of workflow failure log included per failed run in CLI fix instructions
+MAX_WORKFLOW_LOG_CHARS = 20000
 
 
 class PRWorker(Worker):
@@ -147,13 +151,34 @@ class PRWorker(Worker):
                     continue
 
                 # Get and log workflow runs for the branch (as it exists on remote)
-                failed_workflows = self._get_and_log_workflow_runs(repo_dir, branch)
+                failed_workflows, failed_logs = self._get_and_log_workflow_runs(repo_dir, branch)
                 if failed_workflows:
+                    cli_tool = get_active_cli_command()
                     self.logger.info(
-                        f"Skipping fixes for branch {branch} due to {len(failed_workflows)} "
-                        "non-successful GitHub Actions workflow runs"
+                        f"{len(failed_workflows)} non-successful GitHub Actions workflow runs for {branch} "
+                        f"in {repo_dir.name}, using {cli_tool} to fix"
                     )
-                    continue
+                    fix_result = self._fix_workflows_with_cli(repo_dir, failed_logs)
+                    if fix_result["success"]:
+                        if has_changes(repo_dir):
+                            self.logger.info(
+                                f"Committing changes after CLI workflow fix for {branch} in {repo_dir.name}"
+                            )
+                            commit_and_push_changes(
+                                repo_dir,
+                                f"fix: commit changes after CLI workflow fix for {branch}",
+                                push_if_remote=False,
+                            )
+                        result["workflows_fixed"] = True
+                    else:
+                        self.logger.warning(
+                            f"Failed to fix GitHub Actions workflows for {branch} in {repo_dir.name}: "
+                            f"{fix_result.get('error', 'Unknown error')}"
+                        )
+                        result["error"] = (
+                            f"Failed to fix GitHub Actions workflows for {branch}: "
+                            f"{fix_result.get('error', 'Unknown error')}"
+                        )
 
                 if not self._update_branch_with_main(repo_dir, branch):
                     cli_tool = get_active_cli_command()
@@ -249,17 +274,22 @@ class PRWorker(Worker):
         return filtered_branches
 
     # PRWorker._get_and_log_workflow_runs: long orchestrator; splitting deferred (issue #419)
-    def _get_and_log_workflow_runs(self, repo_dir: Path, branch: str) -> list[dict[str, Any]]:  # noqa: C901
+    def _get_and_log_workflow_runs(
+        self, repo_dir: Path, branch: str
+    ) -> tuple[list[dict[str, Any]], list[str]]:  # noqa: C901
         """Get workflow runs for a branch and log their conclusions.
-        Returns a list of workflow runs that have failed (conclusion != 'success' and status = 'completed')
-        and are triggered by pull_request."""
+        Returns a tuple of (failed workflow runs, failure logs). The runs have failed
+        (conclusion != 'success' and status = 'completed') and are triggered by pull_request.
+        The failure logs is a list of dicts, parallel to the failed runs, each with
+        'name', 'databaseId' and the fetched 'log' of that run."""
         runs = get_workflow_runs_for_branch(repo_dir, branch, event="pull_request")
         if not runs:
             self.logger.info(f"No workflow runs found for branch {branch} in {repo_dir.name}")
             # If there are no runs, there are no failed runs
-            return []
+            return [], []
 
         failed_runs = []
+        failed_logs = []
         for run in runs:
             conclusion = run.get("conclusion")
             status = run.get("status")
@@ -277,6 +307,17 @@ class PRWorker(Worker):
             if status == "completed":
                 if conclusion and conclusion != "success":
                     failed_runs.append(run)
+                    self.logger.info(
+                        f"Fetching failure logs for workflow '{workflow_name}' (ID: {database_id}) "
+                        f"for branch '{branch}'"
+                    )
+                    failed_logs.append(
+                        {
+                            "name": workflow_name,
+                            "databaseId": database_id,
+                            "log": get_failed_workflow_logs(repo_dir, run),
+                        }
+                    )
                     if conclusion == "failure":
                         self.logger.warning(f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' failed.")
                     else:
@@ -287,6 +328,17 @@ class PRWorker(Worker):
                 # If conclusion is None for a completed workflow, treat as not success
                 elif conclusion is None:
                     failed_runs.append(run)
+                    self.logger.info(
+                        f"Fetching failure logs for workflow '{workflow_name}' (ID: {database_id}) "
+                        f"for branch '{branch}'"
+                    )
+                    failed_logs.append(
+                        {
+                            "name": workflow_name,
+                            "databaseId": database_id,
+                            "log": get_failed_workflow_logs(repo_dir, run),
+                        }
+                    )
                     self.logger.warning(
                         f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' completed "
                         "but has no conclusion."
@@ -303,40 +355,7 @@ class PRWorker(Worker):
                     f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' has unknown status '{status}'."
                 )
 
-        return failed_runs
-        """Check if all workflow runs for a branch have conclusion 'success'.
-        Logs the conclusions and returns True if all are success, False otherwise."""
-        runs = get_workflow_runs_for_branch(repo_dir, branch)
-        if not runs:
-            self.logger.info(f"No workflow runs found for branch {branch} in {repo_dir.name}")
-            # If there are no runs, we consider it as success (no failure)
-            return True
-
-        all_success = True
-        for run in runs:
-            conclusion = run.get("conclusion")
-            workflow_name = run.get("name")
-            if conclusion:
-                self.logger.info(
-                    f"Workflow run for branch {branch}: workflow '{workflow_name}' concluded with '{conclusion}'"
-                )
-                if conclusion != "success":
-                    all_success = False
-                    if conclusion == "failure":
-                        self.logger.warning(f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' failed.")
-                    else:
-                        self.logger.info(
-                            f"GitHub Actions workflow '{workflow_name}' for branch '{branch}' "
-                            f"concluded with '{conclusion}' (not success)."
-                        )
-            else:
-                self.logger.info(
-                    f"Workflow run for branch {branch}: workflow '{workflow_name}' has no conclusion yet "
-                    "(maybe in progress or queued)"
-                )
-                all_success = False
-
-        return all_success
+        return failed_runs, failed_logs
 
     def _checkout_branch(self, repo_dir: Path, branch: str) -> bool:
         """Checkout a specific branch in the repository.
@@ -446,6 +465,48 @@ class PRWorker(Worker):
             Dictionary containing CLI execution results
         """
         additional_instructions = "'make test' is failing, fix it"
+
+        result = run_cli_executor(
+            additional_instructions=additional_instructions,
+            working_directory=repo_dir,
+            timeout=self.timeout,
+            agent_args=[],
+            capture_output=True,
+            task_name="pr_review",
+        )
+
+        return {
+            "success": result["success"],
+            "output": result.get("stdout", ""),
+            "error": result.get("error") if not result["success"] else None,
+            "return_code": result["return_code"],
+        }
+
+    def _fix_workflows_with_cli(self, repo_dir: Path, failed_logs: list[dict[str, Any]]) -> dict[str, Any]:
+        """Use the configured CLI tool to fix failing GitHub Actions workflows.
+
+        Args:
+            repo_dir: Path to the repository directory
+            failed_logs: Failure log entries of the failed workflow runs,
+                each a dict with 'name', 'databaseId' and 'log'
+
+        Returns:
+            Dictionary containing CLI execution results
+        """
+        sections = []
+        for entry in failed_logs:
+            log = entry.get("log") or "(no logs available)"
+            if len(log) > MAX_WORKFLOW_LOG_CHARS:
+                log = (
+                    f"... (log truncated, showing last {MAX_WORKFLOW_LOG_CHARS} characters)\n"
+                    + log[-MAX_WORKFLOW_LOG_CHARS:]
+                )
+            sections.append(f"### Workflow: {entry.get('name', 'unknown')}\n{log}")
+        logs_section = "\n\n---\n\n".join(sections) or "No logs available."
+        additional_instructions = (
+            "The GitHub Actions workflows for this branch are failing. "
+            f"Fix the issues in the repository. Relevant failure logs:\n\n{logs_section}"
+        )
 
         result = run_cli_executor(
             additional_instructions=additional_instructions,

@@ -19,7 +19,6 @@ Auto-slopp
 │   ├── Base Worker (worker.py)
 │   ├── Unified IssueWorker (issue_worker.py)
 │   ├── GitHubIssueWorker (github_issue_worker.py)
-│   ├── VikunjaWorker (vikunja_worker.py)
 │   ├── PRWorker (pr_worker.py)
 │   ├── PRReviewWorker (pr_review_worker.py)
 │   └── StaleBranchCleanupWorker (stale_branch_cleanup_worker.py)
@@ -175,6 +174,7 @@ GitHub API operations via `gh` CLI:
 | `comment_on_pr()` | Add comment to PR |
 | `submit_pr_review()` | Submit review (COMMENT/APPROVE/REQUEST_CHANGES) |
 | `get_workflow_runs_for_branch()` | Get GitHub Actions workflow runs |
+| `get_failed_workflow_logs()` | Get failed logs of a single non-successful workflow run |
 | `remove_label_from_issue()` | Remove label from issue/PR |
 
 All operations use `_run_gh_command()` which loads env from `settings.additional_env_file`.

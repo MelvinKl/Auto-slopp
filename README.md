@@ -678,7 +678,7 @@ AUTO_SLOPP_BASE_REPO_PATH=/path/to/your/repo
 AUTO_SLOPP_DEBUG=false
 
 # Worker configuration (all workers enabled by default)
-# JSON list of disabled workers. Available: GitHubIssueWorker, PRWorker, StaleBranchCleanupWorker, VikunjaWorker
+# JSON list of disabled workers. Available: GitHubIssueWorker, PRWorker, StaleBranchCleanupWorker
 # Leave empty to enable all workers, or specify workers to disable:
 AUTO_SLOPP_WORKERS_DISABLED='[]'
 # Example: AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker"]'
@@ -686,6 +686,9 @@ AUTO_SLOPP_WORKERS_DISABLED='[]'
 # GitHub Issue Worker configuration
 AUTO_SLOPP_GITHUB_ISSUE_WORKER_REQUIRED_LABEL=ai        # Required label for issues to be processed (default: "ai")
 AUTO_SLOPP_GITHUB_ISSUE_WORKER_ALLOWED_CREATOR=MelvinKl  # Whitelisted GitHub username whose comments are included in condensation (default: "MelvinKl")
+
+# PR review configuration (conservative: only concrete, verified problems are reported)
+AUTO_SLOPP_GITHUB_ISSUE_PR_REVIEW_MAX_ITERATIONS=3        # Maximum PR review/fix iterations before giving up (default: 3)
 
 # Stale branch cleanup: days before a local-only branch is deleted (default: 1)
 AUTO_SLOPP_STALE_BRANCH_DAYS_THRESHOLD=1
@@ -836,7 +839,7 @@ To disable specific workers, set the `AUTO_SLOPP_WORKERS_DISABLED` variable in y
 AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker"]'
 
 # Disable all workers
-AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker", "VikunjaWorker"]'
+AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchCleanupWorker"]'
 ```
 
 ## Available Workers
@@ -844,7 +847,7 @@ AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchClean
 The project includes several workers for automation tasks:
 
 ### PRWorker
-Manages pull request operations.
+Manages pull request operations: for each open PR branch (from the allowed creator) it merges in main, runs `make test`, and fixes merge conflicts or test failures with the configured CLI tool. It also checks the branch's GitHub Actions runs: when a completed run has a non-successful conclusion, PRWorker fetches the failure logs (`gh run view --log-failed`) and asks the CLI tool to fix the issues described in those logs before continuing (merge main, run tests, push the branch).
 ```python
 from auto_slopp.workers import PRWorker
 
@@ -921,15 +924,6 @@ from auto_slopp.workers import StaleBranchCleanupWorker
 
 # Disable in AUTO_SLOPP_WORKERS_DISABLED
 # Returns: cleaned branches, deletion status
-```
-
-### VikunjaWorker
-Convenience wrapper around IssueWorker configured with VikunjaTaskSource. Processes Vikunja tasks as instructions. Searches open tasks in a Vikunja project (creating it if needed), filters tasks to only those tagged with "ai" and having no open dependencies, uses task title/description as instructions for the configured CLI tool, creates a new branch, executes the instructions, and updates the task status. Works on tasks indiscriminately regardless of assignment or creator. Additionally creates subtasks in Vikunja and pull requests in GitHub based on processing results.
-```python
-from auto_slopp.workers import VikunjaWorker
-
-# Disable in AUTO_SLOPP_WORKERS_DISABLED
-# Returns: task processing results, branch information, task status updates, subtask creation results, PR creation results
 ```
 
 ### TaskSource Classes
@@ -1294,7 +1288,7 @@ AUTO_SLOPP_LOG_FILE_DIR=/var/log/auto-slopp
 ```
 2024-01-15 14:30:00,123 - auto_slopp.workers.IssueWorker - WARNING - GitHub API rate limit approaching
 2024-01-15 14:30:05,456 - auto_slopp.executor - ERROR - Failed to process issue #42: Connection timeout
-2024-01-15 14:30:10,789 - auto_slopp.workers.VikunjaWorker - CRITICAL - Vikunja API returned 500
+2024-01-15 14:30:10,789 - auto_slopp.workers.IssueWorker - CRITICAL - Vikunja API returned 500
 ```
 
 ### Viewing Logs
