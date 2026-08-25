@@ -792,3 +792,44 @@ def get_workflow_runs_for_branch(repo_dir: Path, branch: str, event: Optional[st
     except Exception as e:
         logger.error(f"Unexpected error getting workflow runs for branch {branch} from {repo_dir.name}: {str(e)}")
         return []
+
+
+def get_failed_workflow_logs(repo_dir: Path, run: dict[str, Any]) -> str:
+    """Fetch the logs of a single completed, non-successful workflow run.
+
+    Args:
+        repo_dir: Path to the git repository
+        run: Workflow run dictionary (as returned by ``get_workflow_runs_for_branch``)
+
+    Returns:
+        The failed log output of the run, or an empty string if it could not be fetched.
+    """
+    database_id = run.get("databaseId")
+    if not database_id:
+        logger.warning(f"Workflow run in {repo_dir.name} has no databaseId, cannot fetch logs")
+        return ""
+
+    try:
+        result = _run_gh_command(
+            repo_dir,
+            "run",
+            "view",
+            str(database_id),
+            "--log-failed",
+            check=False,
+            timeout=120,
+        )
+
+        if result.returncode != 0:
+            error_msg = result.stderr.strip() or result.stdout.strip()
+            logger.error(f"Failed to fetch logs for workflow run {database_id} in {repo_dir.name}: {error_msg}")
+            return ""
+
+        return result.stdout
+
+    except GitHubOperationError as e:
+        logger.error(f"Error fetching logs for workflow run {database_id} in {repo_dir.name}: {str(e)}")
+        return ""
+    except Exception as e:
+        logger.error(f"Unexpected error fetching logs for workflow run {database_id} in {repo_dir.name}: {str(e)}")
+        return ""

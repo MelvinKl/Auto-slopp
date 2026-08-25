@@ -7,6 +7,7 @@ import pytest
 
 from auto_slopp.utils.github_operations import (
     GitHubOperationError,
+    get_failed_workflow_logs,
     get_open_prs_with_label,
     get_pr_files,
     get_workflow_runs_for_branch,
@@ -190,8 +191,58 @@ class TestGetWorkflowRunsForBranch:
 
     @patch("auto_slopp.utils.github_operations._run_gh_command")
     def test_get_workflow_runs_for_branch_handles_json_decode_error(self, mock_run_gh):
-        """Test get_workflow_runs_for_branch handles JSON decode error."""
+        """Test get_workflow_runs_for_branch handles JSON decode errors."""
         mock_run_gh.return_value = Mock(returncode=0, stdout="invalid json")
         repo_dir = Path("/tmp/test_repo")
         result = get_workflow_runs_for_branch(repo_dir, "main")
         assert result == []
+
+
+class TestGetFailedWorkflowLogs:
+    """Test cases for get_failed_workflow_logs function."""
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_failed_workflow_logs_success(self, mock_run_gh):
+        """Test successful retrieval of failed workflow logs."""
+        mock_run_gh.return_value = Mock(returncode=0, stdout="error output")
+        repo_dir = Path("/tmp/test_repo")
+        run = {"conclusion": "failure", "name": "CI", "status": "completed", "databaseId": 123}
+        result = get_failed_workflow_logs(repo_dir, run)
+        assert result == "error output"
+        mock_run_gh.assert_called_once_with(repo_dir, "run", "view", "123", "--log-failed", check=False, timeout=120)
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_failed_workflow_logs_failure(self, mock_run_gh):
+        """Test get_failed_workflow_logs returns empty string on failure."""
+        mock_run_gh.return_value = Mock(returncode=1, stderr="error")
+        repo_dir = Path("/tmp/test_repo")
+        run = {"conclusion": "failure", "name": "CI", "status": "completed", "databaseId": 123}
+        result = get_failed_workflow_logs(repo_dir, run)
+        assert result == ""
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_failed_workflow_logs_missing_database_id(self, mock_run_gh):
+        """Test get_failed_workflow_logs returns empty string when the run has no databaseId."""
+        repo_dir = Path("/tmp/test_repo")
+        run = {"conclusion": "failure", "name": "CI", "status": "completed"}
+        result = get_failed_workflow_logs(repo_dir, run)
+        assert result == ""
+        mock_run_gh.assert_not_called()
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_failed_workflow_logs_handles_github_operation_error(self, mock_run_gh):
+        """Test get_failed_workflow_logs handles GitHubOperationError."""
+        mock_run_gh.side_effect = GitHubOperationError("API error")
+        repo_dir = Path("/tmp/test_repo")
+        run = {"conclusion": "failure", "name": "CI", "status": "completed", "databaseId": 123}
+        result = get_failed_workflow_logs(repo_dir, run)
+        assert result == ""
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_failed_workflow_logs_handles_unexpected_exception(self, mock_run_gh):
+        """Test get_failed_workflow_logs handles unexpected exceptions."""
+        mock_run_gh.side_effect = RuntimeError("Unexpected error")
+        repo_dir = Path("/tmp/test_repo")
+        run = {"conclusion": "failure", "name": "CI", "status": "completed", "databaseId": 123}
+        result = get_failed_workflow_logs(repo_dir, run)
+        assert result == ""
