@@ -797,3 +797,118 @@ def get_workflow_runs_for_branch(repo_dir: Path, branch: str, event: Optional[st
     except Exception as e:
         logger.error(f"Unexpected error getting workflow runs for branch {branch} from {repo_dir.name}: {str(e)}")
         return []
+
+
+def _get_failed_job_logs(repo_dir: Path, database_id: Any) -> str:  # noqa: C901
+    """Fetch the failed logs of each failed job of a workflow run.
+
+    Args:
+        repo_dir: Path to the git repository
+        database_id: Database ID of the workflow run
+
+    Returns:
+        Concatenated failed job logs, or an empty string if they could not be fetched.
+    """
+    try:
+        jobs_result = _run_gh_command(
+            repo_dir,
+            "run",
+            "view",
+            str(database_id),
+            "--json",
+            "jobs",
+            check=False,
+            timeout=120,
+        )
+
+        if jobs_result.returncode != 0:
+            error_msg = jobs_result.stderr.strip() or jobs_result.stdout.strip()
+            logger.error(f"Failed to list jobs for workflow run {database_id} in {repo_dir.name}: {error_msg}")
+            return ""
+
+        jobs = json.loads(jobs_result.stdout).get("jobs", [])
+        chunks = []
+        for job in jobs:
+            conclusion = job.get("conclusion")
+            job_id = job.get("databaseId")
+            job_name = job.get("name", "unknown")
+            if not job_id or (conclusion and conclusion == "success"):
+                continue
+
+            job_result = _run_gh_command(
+                repo_dir,
+                "run",
+                "view",
+                str(database_id),
+                "--job",
+                str(job_id),
+                "--log-failed",
+                check=False,
+                timeout=120,
+            )
+            if job_result.returncode == 0 and job_result.stdout.strip():
+                chunks.append(f"### Failed job: {job_name}\n{job_result.stdout}")
+
+        return "\n\n".join(chunks)
+
+    except GitHubOperationError as e:
+        logger.error(f"Error fetching failed job logs for workflow run {database_id} in {repo_dir.name}: {str(e)}")
+        return ""
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse jobs JSON for workflow run {database_id} in {repo_dir.name}: {str(e)}")
+        return ""
+    except Exception as e:
+        logger.error(
+            f"Unexpected error fetching failed job logs for workflow run {database_id} in {repo_dir.name}: {str(e)}"
+        )
+        return ""
+
+
+def get_failed_workflow_logs(repo_dir: Path, run: dict[str, Any]) -> str:
+    """Fetch the logs of a single completed, non-successful workflow run.
+
+    Uses ``gh run view <databaseId> --log-failed``. If that is unavailable or
+    returns empty output, falls back to fetching the logs of each failed job.
+
+    Args:
+        repo_dir: Path to the git repository
+        run: Workflow run dictionary (as returned by ``get_workflow_runs_for_branch``)
+
+    Returns:
+        The failed log output of the run, or an empty string if it could not be fetched.
+    """
+    database_id = run.get("databaseId")
+    if not database_id:
+        logger.warning(f"Workflow run in {repo_dir.name} has no databaseId, cannot fetch logs")
+        return ""
+
+    try:
+        result = _run_gh_command(
+            repo_dir,
+            "run",
+            "view",
+            str(database_id),
+            "--log-failed",
+            check=False,
+            timeout=120,
+        )
+
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout
+
+        if result.returncode != 0:
+            error_msg = result.stderr.strip() or result.stdout.strip()
+            logger.warning(
+                f"gh run view --log-failed returned no usable logs for run {database_id} "
+                f"in {repo_dir.name}: {error_msg}"
+            )
+
+        logger.info(f"Falling back to failed job logs for run {database_id} in {repo_dir.name}")
+        return _get_failed_job_logs(repo_dir, database_id)
+
+    except GitHubOperationError as e:
+        logger.error(f"Error fetching logs for workflow run {database_id} in {repo_dir.name}: {str(e)}")
+        return ""
+    except Exception as e:
+        logger.error(f"Unexpected error fetching logs for workflow run {database_id} in {repo_dir.name}: {str(e)}")
+        return ""
