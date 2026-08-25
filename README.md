@@ -801,7 +801,7 @@ AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker", "StaleBranchClean
 The project includes several workers for automation tasks:
 
 ### PRWorker
-Manages pull request operations.
+Manages pull request operations: for each open PR branch (from the allowed creator) it merges in main, runs `make test`, and fixes merge conflicts or test failures with the configured CLI tool. It also checks the branch's GitHub Actions runs: when a completed run has a non-successful conclusion, PRWorker fetches the failure logs (`gh run view --log-failed`) and asks the CLI tool to fix the issues described in those logs before continuing (merge main, run tests, push the branch).
 ```python
 from auto_slopp.workers import PRWorker
 
