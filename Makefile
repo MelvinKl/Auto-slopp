@@ -1,4 +1,4 @@
-.PHONY: help test lint format clean install dev-install coverage security
+.PHONY: help test lint format clean install dev-install coverage security dev-check ci test-unit test-performance test-integration
 
 # Default target
 help:
@@ -21,7 +21,7 @@ dev-install:
 	uv sync --extra dev
 
 # Main target: run all tests and linting checks
-test: lint security test-unit
+test: dev-install lint security test-unit
 	@echo "✅ All checks passed!"
 
 # Run linting checks (fails if any issue found)
