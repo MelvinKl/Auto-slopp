@@ -14,7 +14,7 @@ help:
 
 # Install dependencies
 install:
-	uv sync
+	uv sync --extra dev
 
 # Install development dependencies
 dev-install:
@@ -32,34 +32,34 @@ lint:
 	@echo "Make: $$(make --version 2>/dev/null || echo 'make not found')"
 	@echo "Working directory: $$(pwd)"
 	@echo "Available tools:"
-	@uv run which black isort flake8 || echo "Some tools missing"
+	@uv run --extra dev which black isort flake8 || echo "Some tools missing"
 	@echo "Running black..."
-	uv run black --check --diff src/ tests/ || (echo "❌ Black formatting check failed" && exit 1)
+	uv run --extra dev black --check --diff src/ tests/ || (echo "❌ Black formatting check failed" && exit 1)
 	@echo "✅ Black formatting check passed"
 	@echo "Running isort..."
-	uv run isort --check-only --diff src/ tests/ || (echo "❌ isort import sorting check failed" && exit 1)
+	uv run --extra dev isort --check-only --diff src/ tests/ || (echo "❌ isort import sorting check failed" && exit 1)
 	@echo "✅ isort import sorting check passed"
 	@echo "Running flake8..."
-	uv run flake8 src/ tests/ || (echo "❌ flake8 linting failed" && exit 1)
+	uv run --extra dev flake8 src/ tests/ || (echo "❌ flake8 linting failed" && exit 1)
 	@echo "✅ flake8 linting passed"
 
 # Format code
 format:
 	@echo "🎨 Formatting code..."
-	uv run black src/ tests/
-	uv run isort src/ tests/
+	uv run --extra dev black src/ tests/
+	uv run --extra dev isort src/ tests/
 	@echo "✅ Code formatting completed"
 
 # Run unit tests
 test-unit:
 	@echo "🧪 Running unit tests..."
-	uv run python -m pytest tests/ -v --tb=short -m "not integration" || (echo "❌ Tests failed" && exit 1)
+	uv run --extra dev python -m pytest tests/ -v --tb=short -m "not integration" || (echo "❌ Tests failed" && exit 1)
 	@echo "✅ All tests passed"
 
 # Run tests with coverage
 coverage:
 	@echo "📊 Running tests with coverage..."
-	uv run python -m pytest tests/ --cov=src --cov-report=term-missing --cov-report=html -m "not integration" || (echo "❌ Tests failed" && exit 1)
+	uv run --extra dev python -m pytest tests/ --cov=src --cov-report=term-missing --cov-report=html -m "not integration" || (echo "❌ Tests failed" && exit 1)
 	@echo "✅ Coverage report generated"
 	@echo "📁 HTML coverage report available at htmlcov/index.html"
 
@@ -67,22 +67,22 @@ coverage:
 security:
 	@echo "🔒 Running security scans..."
 	@echo "Running pip-audit..."
-	uv run pip-audit --ignore-vuln PYSEC-2026-25 --ignore-vuln PYSEC-2026-188 --ignore-vuln PYSEC-2026-2119 --ignore-vuln PYSEC-2026-2121 --ignore-vuln PYSEC-2026-2120 --ignore-vuln PYSEC-2026-2132 --ignore-vuln PYSEC-2026-35 --ignore-vuln PYSEC-2026-36 --ignore-vuln GHSA-537c-gmf6-5ccf --ignore-vuln PYSEC-2026-2475 --ignore-vuln PYSEC-2026-2476 --ignore-vuln PYSEC-2026-215 --ignore-vuln CVE-2026-52870 --ignore-vuln CVE-2026-52869 --ignore-vuln CVE-2026-59950 --ignore-vuln GHSA-4xgf-cpjx-pc3j --ignore-vuln PYSEC-2026-2987 --ignore-vuln PYSEC-2026-120 --ignore-vuln PYSEC-2026-179 --ignore-vuln PYSEC-2026-175 --ignore-vuln PYSEC-2026-178 --ignore-vuln PYSEC-2026-176 --ignore-vuln PYSEC-2026-177 --ignore-vuln PYSEC-2026-1845 --ignore-vuln PYSEC-2026-2270 --ignore-vuln PYSEC-2026-3038 --ignore-vuln PYSEC-2026-3037 --ignore-vuln PYSEC-2026-3036 --ignore-vuln PYSEC-2026-3040 --ignore-vuln PYSEC-2026-3039 --ignore-vuln PYSEC-2026-2275 --ignore-vuln PYSEC-2026-3447 --ignore-vuln PYSEC-2026-161 --ignore-vuln PYSEC-2026-248 --ignore-vuln PYSEC-2026-249 --ignore-vuln PYSEC-2026-2281 --ignore-vuln PYSEC-2026-2280 --ignore-vuln PYSEC-2026-142 --ignore-vuln PYSEC-2026-141 --ignore-vuln PYSEC-2026-2192 --ignore-vuln PYSEC-2026-2573 --ignore-vuln PYSEC-2026-2575 --ignore-vuln GHSA-f4xh-w4cj-qxq8 --ignore-vuln GHSA-6v7p-g79w-8964 --ignore-vuln PYSEC-2026-196 --ignore-vuln PYSEC-2026-2875 --ignore-vuln PYSEC-2026-2876 --ignore-vuln PYSEC-2026-3072 --ignore-vuln PYSEC-2026-3071 --ignore-vuln GHSA-4gg8-gxpx-9rph --ignore-vuln PYSEC-2026-3552 --ignore-vuln PYSEC-2026-3721 || (echo "❌ pip-audit security check failed" && exit 1)
+	uv run --extra dev pip-audit --ignore-vuln PYSEC-2026-25 --ignore-vuln PYSEC-2026-188 --ignore-vuln PYSEC-2026-2119 --ignore-vuln PYSEC-2026-2121 --ignore-vuln PYSEC-2026-2120 --ignore-vuln PYSEC-2026-2132 --ignore-vuln PYSEC-2026-35 --ignore-vuln PYSEC-2026-36 --ignore-vuln GHSA-537c-gmf6-5ccf --ignore-vuln PYSEC-2026-2475 --ignore-vuln PYSEC-2026-2476 --ignore-vuln PYSEC-2026-215 --ignore-vuln CVE-2026-52870 --ignore-vuln CVE-2026-52869 --ignore-vuln CVE-2026-59950 --ignore-vuln GHSA-4xgf-cpjx-pc3j --ignore-vuln PYSEC-2026-2987 --ignore-vuln PYSEC-2026-120 --ignore-vuln PYSEC-2026-179 --ignore-vuln PYSEC-2026-175 --ignore-vuln PYSEC-2026-178 --ignore-vuln PYSEC-2026-176 --ignore-vuln PYSEC-2026-177 --ignore-vuln PYSEC-2026-1845 --ignore-vuln PYSEC-2026-2270 --ignore-vuln PYSEC-2026-3038 --ignore-vuln PYSEC-2026-3037 --ignore-vuln PYSEC-2026-3036 --ignore-vuln PYSEC-2026-3040 --ignore-vuln PYSEC-2026-3039 --ignore-vuln PYSEC-2026-2275 --ignore-vuln PYSEC-2026-3447 --ignore-vuln PYSEC-2026-161 --ignore-vuln PYSEC-2026-248 --ignore-vuln PYSEC-2026-249 --ignore-vuln PYSEC-2026-2281 --ignore-vuln PYSEC-2026-2280 --ignore-vuln PYSEC-2026-142 --ignore-vuln PYSEC-2026-141 --ignore-vuln PYSEC-2026-2192 --ignore-vuln PYSEC-2026-2573 --ignore-vuln PYSEC-2026-2575 --ignore-vuln GHSA-f4xh-w4cj-qxq8 --ignore-vuln GHSA-6v7p-g79w-8964 --ignore-vuln PYSEC-2026-196 --ignore-vuln PYSEC-2026-2875 --ignore-vuln PYSEC-2026-2876 --ignore-vuln PYSEC-2026-3072 --ignore-vuln PYSEC-2026-3071 --ignore-vuln GHSA-4gg8-gxpx-9rph --ignore-vuln PYSEC-2026-3552 --ignore-vuln PYSEC-2026-3721 || (echo "❌ pip-audit security check failed" && exit 1)
 	@echo "✅ pip-audit security check passed"
 	@echo "Running bandit security linter..."
-	uv run bandit -r src/ --severity-level=medium || (echo "❌ Bandit security linter failed" && exit 1)
+	uv run --extra dev bandit -r src/ --severity-level=medium || (echo "❌ Bandit security linter failed" && exit 1)
 	@echo "✅ Bandit security linter passed"
 
 # Run performance tests specifically
 test-performance:
 	@echo "⚡ Running performance tests..."
-	uv run python -m pytest -m performance -v --tb=short || (echo "❌ Performance tests failed" && exit 1)
+	uv run --extra dev python -m pytest -m performance -v --tb=short || (echo "❌ Performance tests failed" && exit 1)
 	@echo "✅ Performance tests passed"
 
 # Run integration tests specifically
 test-integration:
 	@echo "🔗 Running integration tests..."
-	uv run python -m pytest -m integration -v --tb=short || (echo "❌ Integration tests failed" && exit 1)
+	uv run --extra dev python -m pytest -m integration -v --tb=short || (echo "❌ Integration tests failed" && exit 1)
 	@echo "✅ Integration tests passed"
 
 # Run full CI simulation (everything CI runs)
