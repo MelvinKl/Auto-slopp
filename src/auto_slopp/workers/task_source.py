@@ -106,6 +106,9 @@ class TaskSource(ABC):
     def on_task_failure(self, task: Task, error: str) -> None:
         """Called when a task fails.
 
+        The error description is internal detail: implementations must not
+        post raw error details as a comment on the issue/task.
+
         Args:
             task: The failed task
             error: Error description
@@ -125,18 +128,23 @@ class TaskSource(ABC):
 
         The task remains open/active and can be retried later when conditions improve.
 
+        The skip reason is an error message: it is logged locally but never posted
+        to the issue, so any posted comment must stay generic.
+
         Args:
             task: The task that should be skipped
-            reason: Reason for skipping (e.g., "LLM unavailable")
+            reason: Reason for skipping (e.g., "LLM unavailable"); logged locally, never posted
         """
 
     @abstractmethod
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.
 
+        The posted comment never contains raw error details; they stay in local logs only.
+
         Args:
             task: The task that hit the iteration limit
             steps_completed: Number of steps completed
             total_steps: Total number of steps
-            error: Last error message
+            error: Last error message (logged locally, never posted to the issue)
         """
