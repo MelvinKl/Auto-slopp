@@ -858,7 +858,7 @@ Convenience wrapper around IssueWorker configured with GitHubTaskSource. Handles
 
 **Comment Condensation**: When processing GitHub issues, Auto-slopp condenses comments from the issue author and/or the whitelisted `allowed_creator` into a single summary comment. Comments from other users are ignored. After condensation, the original comments from the author/allowed creator are deleted and replaced with the summary.
 
-**LLM Unavailability Handling**: When the LLM is unavailable (e.g., rate limiting, connection errors, timeouts), Auto-slopp skips the task instead of failing it. A comment is added to the issue/task explaining the skip, and the required label/tag is preserved so the task can be retried when the LLM becomes available. This prevents permanent failures for transient issues.
+**LLM Unavailability Handling**: When the LLM is unavailable (e.g., rate limiting, connection errors, timeouts), Auto-slopp skips the task instead of failing it. A generic comment is added to the issue/task announcing the skip — raw error details are never posted to GitHub issues, they remain in local logs only — and the required label/tag is preserved so the task can be retried when the LLM becomes available. This prevents permanent failures for transient issues.
 
 ```python
 from auto_slopp.workers import GitHubIssueWorker

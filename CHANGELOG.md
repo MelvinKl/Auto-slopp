@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`auto_slopp.utils.linking`**: Supports `owner/repo#123` format (including nested paths like `org/subteam/repo#123`) in existing-link detection
 - **`auto_slopp.utils.github_operations.get_failed_workflow_logs()`**: Fetches the failed logs of a single completed, non-successful workflow run
 ### Changed
+- **GitHubTaskSource**: Error details are no longer posted as comments on GitHub issues. The skip comment (`on_skip`) is now generic (the raw skip reason is an error message and is only logged locally), and the max-iterations failure comment (`on_max_iterations_reached`) no longer includes the last error. Both comments previously embedded raw error text in the issue.
 - **PRWorker**: Branches with non-successful GitHub Actions runs are no longer skipped; the failure logs are fetched and passed to the CLI tool (`_fix_workflows_with_cli`) to fix them before continuing
 - **PRWorker._get_and_log_workflow_runs**: Now returns a tuple of (failed runs, failure logs) instead of only the failed runs
 - **`AUTO_SLOPP_GITHUB_ISSUE_PR_REVIEW_MAX_ITERATIONS`**: Default changed from 5 to 3 for maximum PR review/fix iterations before giving up

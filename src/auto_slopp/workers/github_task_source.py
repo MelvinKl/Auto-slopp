@@ -347,24 +347,28 @@ class GitHubTaskSource(TaskSource):
         """Called when the ralph loop reaches max iterations without completing.
 
         Removes the required label from the issue and adds a failure comment.
+        Error details are never posted to the GitHub issue; the last error is
+        only logged locally.
 
         Args:
             task: The task that hit the iteration limit
             steps_completed: Number of steps completed
             total_steps: Total number of steps
-            error: Last error message
+            error: Last error message (logged locally, never posted to the issue)
         """
         repo_path = task.raw.get("_repo_path")
         if repo_path is None:
             logger.warning(f"No repo_path found in task #{task.id}, skipping max-iterations handling")
             return
 
+        # Error details are never posted to the GitHub issue; keep them in local logs only
+        logger.warning(f"Ralph loop hit max iterations for task #{task.id}; last error: {error}")
+
         failure_comment = (
             f"⚠️ **Task Failed: Maximum Iterations Reached**\n\n"
-            f" Ralph loop reached maximum iterations without completing all steps.\n\n"
+            f"Ralph loop reached maximum iterations without completing all steps.\n\n"
             f"**Progress:**\n"
-            f"- Steps completed: {steps_completed}/{total_steps}\n"
-            f"- Last error: {error}\n\n"
+            f"- Steps completed: {steps_completed}/{total_steps}\n\n"
             f"This issue will not be processed again automatically."
         )
         comment_on_issue(repo_path, task.id, failure_comment)
@@ -383,24 +387,29 @@ class GitHubTaskSource(TaskSource):
         """Called when a task is skipped (e.g., due to LLM unavailability).
 
         Adds a skip comment to the issue but does NOT remove the required label,
-        so the issue remains eligible for future processing.
+        so the issue remains eligible for future processing. The skip reason is
+        an error message: it is only logged locally and is never posted to the
+        issue, so the posted comment is generic.
 
         Args:
             task: The task being skipped
-            reason: Reason for skipping (e.g., "LLM unavailable")
+            reason: Reason for skipping (e.g., "LLM unavailable"); logged locally, never posted
         """
         repo_path = task.raw.get("_repo_path")
         if repo_path is None:
             logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
             return
 
+        # The raw skip reason is an error message and is never posted to the
+        # GitHub issue; it stays in local logs only.
+        logger.info(f"Skipping task #{task.id}: {reason}")
+
         skip_comment = (
-            f"⏭️ **Task Skipped**\n\n"
-            f"Reason: {reason}\n\n"
-            f"This issue will be retried when the LLM becomes available."
+            "⏭️ **Task Skipped**\n\n"
+            "The task could not be processed at this time.\n\n"
+            "This issue will be retried when the LLM becomes available."
         )
         comment_on_issue(repo_path, task.id, skip_comment)
-        logger.info(f"Added skip comment to issue #{task.id}: {reason}")
 
     def _filter_renovate_issues(self, issues: list[dict]) -> list[dict]:
         """Filter out issues created by Renovate.

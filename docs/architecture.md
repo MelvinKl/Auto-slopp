@@ -136,14 +136,19 @@ class TaskSource(ABC):
 
     @abstractmethod
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
-        """Called when the ralph loop reaches max iterations without completing."""
+        """Called when the ralph loop reaches max iterations without completing.
+
+        The posted comment never contains raw error details; they stay in local logs only.
+        """
 
     @abstractmethod
     def on_skip(self, task: Task, reason: str) -> None:
         """Called when a task is skipped (e.g., due to LLM unavailability).
 
         The task should remain processable for future retries. Do not remove
-        the required label/tag that identifies tasks for processing.
+        the required label/tag that identifies tasks for processing. The skip
+        reason is an error message: it is logged locally but never posted to the
+        issue, so the posted comment stays generic.
         """
 ```
 

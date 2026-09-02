@@ -575,6 +575,12 @@ class TestGitHubTaskSource:
         task_source.on_max_iterations_reached(task, 8, 15, "Max iterations reached")
 
         mock_comment.assert_called_once()
+        posted_comment = mock_comment.call_args[0][2]
+        assert "Maximum Iterations Reached" in posted_comment
+        assert "8/15" in posted_comment
+        # Error details must never be posted to the GitHub issue
+        assert "Last error" not in posted_comment
+        assert "Max iterations reached" not in posted_comment
         mock_remove.assert_called_once_with(Path("/test"), 42, "test-label")
 
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
@@ -603,6 +609,8 @@ class TestGitHubTaskSource:
         task_source.on_skip(task, "LLM unavailable")
 
         mock_comment.assert_called_once()
+        # The raw skip reason is an error message and must never be posted
+        assert "LLM unavailable" not in mock_comment.call_args[0][2]
         mock_remove.assert_not_called()
 
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
@@ -861,8 +869,9 @@ class TestGitHubTaskSource:
         assert call_args[0] == Path("/test")
         assert call_args[1] == 42
         assert "Task Skipped" in call_args[2]
-        assert "LLM unavailable" in call_args[2]
         assert "retried when the LLM becomes available" in call_args[2]
+        # The raw skip reason is an error message and must never be posted to the issue
+        assert "LLM unavailable" not in call_args[2]
 
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
     @patch("auto_slopp.workers.github_task_source.settings")
