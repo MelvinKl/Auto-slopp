@@ -558,6 +558,35 @@ registry.load_plugins(Path("plugins/"))
 - **Certificate Validation**: SSL certificates are validated
 - **Retry Logic**: Safe retry logic for network failures
 
+### 5. No Error Messages in GitHub Issues
+
+**Guarantee:** Auto-slopp never posts raw error messages (tracebacks, CLI failures,
+timeouts, exception text, etc.) as comments on GitHub issues. Error details are
+written to local logs only.
+
+**Audit of issue-posting code paths:** `comment_on_issue()` in
+`src/auto_slopp/utils/github_operations.py` is the *single* function that posts a
+comment to a GitHub issue (it wraps `gh issue comment`). It is called from
+`GitHubTaskSource` in `src/auto_slopp/workers/github_task_source.py`:
+
+| Caller | Posted content | Can contain raw error text? |
+|---|---|---|
+| `_condense_and_replace_comments()` | CLI condensation output | Yes, pre-guard; now rejected by `looks_like_error_message()` before posting, originals kept |
+| `on_task_complete()` (findings) | PR review findings | No; additionally rejected by posting-layer guard if it ever did |
+| `on_task_complete()` (success) | `Completed by PR: <url>` | No |
+| `on_no_changes()` | Fixed no-changes text | No |
+| `on_max_iterations_reached()` | Generic failure comment (no error details) | No; `error` arg is logged locally only |
+| `on_skip()` | Generic skip comment | No; `reason` is logged locally only |
+
+**Enforcement (defense in depth):**
+
+1. **Posting-layer guard:** `comment_on_issue()` refuses any comment for which
+   `looks_like_error_message()` (same module) returns `True`. No caller can bypass
+   this guarantee, present or future. The message is only logged locally.
+2. **Caller-level hardening:** `_condense_and_replace_comments()` checks the
+   condensation output before posting; on a match it keeps the original comments
+   instead of posting and only logs the error.
+
 ## Scalability
 
 ### 1. Worker Scalability
