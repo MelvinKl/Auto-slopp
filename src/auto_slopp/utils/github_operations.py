@@ -25,6 +25,42 @@ class GitHubOperationError(Exception):
     pass
 
 
+# Lowercase substrings that indicate a string is an error message rather than
+# ordinary prose. Error-like text must never be posted to GitHub issues.
+_ERROR_MESSAGE_INDICATORS = (
+    "traceback (most recent call last)",
+    "traceback",
+    "exception",
+    "error:",
+    "fatal:",
+    "command failed",
+    "timed out",
+    "exit code",
+    "returncode",
+    "stack trace",
+    "segfault",
+    "core dumped",
+)
+
+
+def looks_like_error_message(text: str) -> bool:
+    """Detect whether a string looks like a raw error message.
+
+    Heuristic check used to enforce the guarantee that raw error details are
+    never posted as comments on GitHub issues.
+
+    Args:
+        text: Text to inspect
+
+    Returns:
+        True if the text looks like an error message, False otherwise
+    """
+    if not text:
+        return False
+    lowered = text.lower()
+    return any(indicator in lowered for indicator in _ERROR_MESSAGE_INDICATORS)
+
+
 def _run_gh_command(
     repo_dir: Path,
     *args: str,
@@ -293,8 +329,16 @@ def comment_on_issue(repo_dir: Path, issue_number: int, comment: str) -> bool:
         comment: Comment text to add
 
     Returns:
-        True if successful, False otherwise.
+        True if successful, False otherwise. Never posts error-like text:
+        if the comment looks like a raw error message, the post is refused
+        and only logged locally.
     """
+    if looks_like_error_message(comment):
+        logger.warning(
+            f"Refusing to post error-like message to issue #{issue_number} in {repo_dir.name}; "
+            f"raw error details are never posted to GitHub issues. Message: {comment!r}"
+        )
+        return False
     try:
         result = _run_gh_command(
             repo_dir,

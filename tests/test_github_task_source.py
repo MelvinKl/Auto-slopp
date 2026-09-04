@@ -390,6 +390,49 @@ class TestGitHubTaskSource:
         # Comment from other-user should NOT be deleted
         assert (Path("/test"), 1, 300) not in [(c[0][0], c[0][1], c[0][2]) for c in mock_delete.call_args_list]
 
+    @patch("auto_slopp.workers.github_task_source.delete_issue_comment")
+    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.execute_with_instructions")
+    @patch("auto_slopp.workers.github_task_source.get_open_issues")
+    @patch("auto_slopp.workers.github_task_source.get_issue_comments")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_condense_comments_never_posts_error_message(
+        self, mock_settings, mock_get_comments, mock_get_issues, mock_execute, mock_comment, mock_delete
+    ):
+        """Test that condensation output that looks like an error is never posted to the issue."""
+        mock_settings.github_issue_worker_required_label = "test-label"
+        mock_settings.github_issue_worker_allowed_creator = "test-user"
+
+        mock_issues = [
+            {
+                "number": 1,
+                "title": "Test Issue",
+                "body": "Test Body",
+                "author": {"login": "test-user"},
+                "labels": [{"name": "test-label"}],
+            }
+        ]
+        mock_get_issues.return_value = mock_issues
+        mock_get_comments.return_value = [
+            {"author": "test-user", "body": "Comment 1", "databaseId": 100},
+            {"author": "test-user", "body": "Comment 2", "databaseId": 200},
+        ]
+        # CLI executor returned raw error output instead of a summary
+        mock_execute.return_value = {
+            "stdout": 'Traceback (most recent call last):\n  File "cli.py", line 5\nError: something failed',
+            "success": False,
+        }
+
+        task_source = GitHubTaskSource()
+        tasks = task_source.get_tasks(Path("/test"))
+
+        assert len(tasks) == 1
+        # No error text may ever reach the issue comment
+        assert tasks[0].comments == ["Comment 1", "Comment 2"]
+        mock_comment.assert_not_called()
+        # Original comments are kept (not deleted) when posting is refused
+        mock_delete.assert_not_called()
+
     @patch("auto_slopp.workers.github_task_source.get_open_issues")
     @patch("auto_slopp.workers.github_task_source.get_issue_comments")
     @patch("auto_slopp.workers.github_task_source.settings")

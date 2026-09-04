@@ -15,6 +15,7 @@ A Python-based automation framework for task execution with pluggable worker sys
 - **Modern Python**: Built with Python 3.14+ using uv package manager
 - **Comprehensive Testing**: Full test suite with pytest and mocked dependencies
 - **Real-time Monitoring**: Telegram bot integration for instant error notifications and status updates
+- **No Error Messages in GitHub Issues**: The program never posts raw error messages as comments on GitHub issues. Error details (tracebacks, CLI failures, etc.) are only written to local logs. A defensive guard in the posting layer (`looks_like_error_message()` in `src/auto_slopp/utils/github_operations.py`) refuses any comment that looks like an error, so no caller can bypass this guarantee.
 
 ## Important Setup Recommendation
 

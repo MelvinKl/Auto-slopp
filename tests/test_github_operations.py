@@ -7,13 +7,90 @@ import pytest
 
 from auto_slopp.utils.github_operations import (
     GitHubOperationError,
+    comment_on_issue,
     get_failed_workflow_logs,
     get_open_prs_with_label,
     get_pr_files,
     get_workflow_runs_for_branch,
+    looks_like_error_message,
     remove_label_from_issue,
     submit_pr_review,
 )
+
+
+class TestLooksLikeErrorMessage:
+    """Test cases for looks_like_error_message function."""
+
+    def test_plain_text_is_not_error(self):
+        assert looks_like_error_message("Completed by PR: https://github.com/user/repo/pull/123") is False
+        assert looks_like_error_message("Please increase the timeout value to 60 seconds.") is False
+        assert looks_like_error_message("No changes required for this issue.") is False
+
+    def test_empty_text_is_not_error(self):
+        assert looks_like_error_message("") is False
+
+    def test_traceback_is_error(self):
+        text = 'Traceback (most recent call last):\n  File "main.py", line 3, in <module>'
+        assert looks_like_error_message(text) is True
+
+    def test_error_prefix_is_error(self):
+        assert looks_like_error_message("Error: gh command failed with exit code 1") is True
+
+    def test_exception_text_is_error(self):
+        assert looks_like_error_message("Unhandled exception while running the task") is True
+
+    def test_cli_failure_output_is_error(self):
+        assert looks_like_error_message("Fatal: GitHub command timed out after 30s") is True
+
+
+class TestCommentOnIssue:
+    """Test cases for comment_on_issue function."""
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_comment_on_issue_success(self, mock_run_gh):
+        """Test successful comment posting."""
+        mock_run_gh.return_value = Mock(returncode=0)
+        repo_dir = Path("/tmp/test_repo")
+
+        result = comment_on_issue(repo_dir, 42, "Completed by PR: https://example.com/pull/1")
+
+        assert result is True
+        mock_run_gh.assert_called_once_with(
+            repo_dir, "issue", "comment", "42", "--body", "Completed by PR: https://example.com/pull/1", check=False
+        )
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_comment_on_issue_refuses_error_message(self, mock_run_gh):
+        """Test that raw error messages are never posted to the issue."""
+        mock_run_gh.return_value = Mock(returncode=0)
+        repo_dir = Path("/tmp/test_repo")
+
+        result = comment_on_issue(
+            repo_dir, 42, 'Traceback (most recent call last):\n  File "main.py", line 3\nException: boom'
+        )
+
+        assert result is False
+        mock_run_gh.assert_not_called()
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_comment_on_issue_failure_nonzero_exit(self, mock_run_gh):
+        """Test comment posting with non-zero exit code."""
+        mock_run_gh.return_value = Mock(returncode=1)
+        repo_dir = Path("/tmp/test_repo")
+
+        result = comment_on_issue(repo_dir, 42, "Plain comment")
+
+        assert result is False
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_comment_on_issue_handles_unexpected_exception(self, mock_run_gh):
+        """Test comment posting handles unexpected exceptions."""
+        mock_run_gh.side_effect = RuntimeError("Unexpected error")
+        repo_dir = Path("/tmp/test_repo")
+
+        result = comment_on_issue(repo_dir, 42, "Plain comment")
+
+        assert result is False
 
 
 class TestRemoveLabelFromIssue:

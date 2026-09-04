@@ -20,6 +20,7 @@ from auto_slopp.utils.github_operations import (
     get_issue_comments,
     get_open_issues,
     get_open_prs,
+    looks_like_error_message,
     remove_label_from_issue,
 )
 from auto_slopp.utils.linking import ensure_issue_link_in_pr_body
@@ -190,6 +191,16 @@ class GitHubTaskSource(TaskSource):
         if not condensed:
             logger.debug(f"[Condense] Condensation empty, using fallback for issue #{issue_number}")
             condensed = "\n\n---\n\n".join([c.get("body", "") or "" for c in filtered_comments])
+        # Never post an error message to the issue: if the condensation output
+        # looks like a raw error message (e.g. the CLI executor failed and its
+        # error output came back as stdout), skip posting, keep the original
+        # comments, and only log the error locally.
+        if looks_like_error_message(condensed):
+            logger.warning(
+                f"[Condense] Condensation output for issue #{issue_number} looks like an error "
+                f"message; refusing to post it and keeping the original comments. Output: {condensed!r}"
+            )
+            return [c.get("body", "") or "" for c in filtered_comments]
         # Post the condensed summary as a new comment
         logger.debug(f"[Condense] Posting condensed summary for issue #{issue_number}")
         comment_on_issue(repo_path, issue_number, condensed)
