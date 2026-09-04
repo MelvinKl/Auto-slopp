@@ -6,6 +6,7 @@ This module provides a centralized utility for executing configured CLI commands
 
 import logging
 import subprocess
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -29,12 +30,14 @@ _PROBE_INSTRUCTIONS = "are you working?"
 _PROBE_TIMEOUT_SECONDS = 600
 
 _cli_states: dict[int, dict[str, Any]] = {}
+_cli_lock = threading.Lock()
 
 
 def _get_cli_state(index: int) -> dict[str, Any]:
-    if index not in _cli_states:
-        _cli_states[index] = {"active": True, "cooldown_until": 0.0}
-    return _cli_states[index]
+    with _cli_lock:
+        if index not in _cli_states:
+            _cli_states[index] = {"active": True, "cooldown_until": 0.0}
+        return _cli_states[index]
 
 
 def _config_to_dict(config: CLIConfiguration) -> dict[str, Any]:
@@ -69,26 +72,40 @@ def _check_startup_health(working_dir: Path) -> None:
             state["cooldown_until"] = time.time() + config.cooldown_seconds
 
 
+def _update_cli_state(index: int, **updates: Any) -> None:
+    """Merge updates into the stored state for a CLI configuration."""
+    with _cli_lock:
+        if index not in _cli_states:
+            _cli_states[index] = {"active": True, "cooldown_until": 0.0}
+        _cli_states[index].update(updates)
+
+
+def _probe_recovery(index: int, config: CLIConfiguration, working_dir: Path, now: float) -> None:
+    """Re-probe a cooled-down configuration, either reactivating it or resetting its cooldown."""
+    c_dict = _config_to_dict(config)
+    try:
+        if _probe_configuration(c_dict, working_dir, timeout=config.timeout):
+            logger.info(f"CLI tool {config.name} successfully recovered.")
+            _update_cli_state(index, active=True)
+            return
+        logger.warning(f"CLI tool {config.name} still timing out. Resetting cooldown.")
+    except (
+        subprocess.TimeoutExpired,
+        OSError,
+    ) as e:
+        logger.warning(f"CLI tool {config.name} probe raised {type(e).__name__}: {e}. Resetting cooldown.")
+    _update_cli_state(index, cooldown_until=now + config.cooldown_seconds)
+
+
 def _check_cooldowns(working_dir: Path) -> None:
     now = time.time()
+    with _cli_lock:
+        states_snapshot = {k: dict(v) for k, v in _cli_states.items()}
     for index, config in enumerate(settings.cli_configurations):
-        state = _get_cli_state(index)
+        state = states_snapshot.get(index, {"active": True, "cooldown_until": 0.0})
         if not state["active"] and now >= state["cooldown_until"]:
             logger.info(f"Checking if CLI tool {config.name} has recovered...")
-            c_dict = _config_to_dict(config)
-            try:
-                if _probe_configuration(c_dict, working_dir, timeout=config.timeout):
-                    logger.info(f"CLI tool {config.name} successfully recovered.")
-                    state["active"] = True
-                else:
-                    logger.warning(f"CLI tool {config.name} still timing out. Resetting cooldown.")
-                    state["cooldown_until"] = now + config.cooldown_seconds
-            except (
-                subprocess.TimeoutExpired,
-                OSError,
-            ) as e:
-                logger.warning(f"CLI tool {config.name} probe raised {type(e).__name__}: {e}. Resetting cooldown.")
-                state["cooldown_until"] = now + config.cooldown_seconds
+            _probe_recovery(index, config, working_dir, now)
 
 
 def _choose_best_config_index(task_rating: TaskRating, working_dir: Path, task_name: str = "default") -> int:
@@ -98,7 +115,8 @@ def _choose_best_config_index(task_rating: TaskRating, working_dir: Path, task_n
     best_score = float("inf")
 
     for i, config in enumerate(settings.cli_configurations):
-        state = _get_cli_state(i)
+        with _cli_lock:
+            state = dict(_cli_states.get(i, {"active": True, "cooldown_until": 0.0}))
         if not state["active"]:
             continue
 
@@ -132,7 +150,8 @@ def get_active_cli_command() -> str:
     if not configs:
         return "unknown"
 
-    index = _active_cli_configuration_index
+    with _cli_lock:
+        index = _active_cli_configuration_index
     if index >= len(configs):
         index = 0
 
@@ -362,6 +381,9 @@ def run_cli_executor(  # noqa: C901 -- long orchestrator; splitting deferred (is
     """
     global _active_cli_configuration_index
 
+    with _cli_lock:
+        states_snapshot = dict(_cli_states)
+
     start_time = time.time()
     agent_args = agent_args or []
     working_dir = working_directory or Path.cwd()
@@ -396,7 +418,8 @@ def run_cli_executor(  # noqa: C901 -- long orchestrator; splitting deferred (is
             )
             break
 
-        state = _get_cli_state(config_index)
+        with _cli_lock:
+            state = dict(states_snapshot.get(config_index, {"active": True, "cooldown_until": 0.0}))
 
         if config_index in tried_indices or not state["active"]:
             break
@@ -439,11 +462,17 @@ def run_cli_executor(  # noqa: C901 -- long orchestrator; splitting deferred (is
 
         if not result.get("success", False):
             logger.warning(f"Error on configuration {config['name']}, placing in cooldown")
-            state["active"] = False
-            state["cooldown_until"] = time.time() + settings.cli_configurations[config_index].cooldown_seconds
+            with _cli_lock:
+                if config_index not in _cli_states:
+                    _cli_states[config_index] = {"active": True, "cooldown_until": 0.0}
+                _cli_states[config_index]["active"] = False
+                _cli_states[config_index]["cooldown_until"] = (
+                    time.time() + settings.cli_configurations[config_index].cooldown_seconds
+                )
             continue
 
-        _active_cli_configuration_index = config_index
+        with _cli_lock:
+            _active_cli_configuration_index = config_index
         break
 
     if final_result is None:

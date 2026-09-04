@@ -1,6 +1,7 @@
 """Endless loop executor for running Worker instances."""
 
 import subprocess
+import threading
 import time
 import traceback
 from pathlib import Path
@@ -39,6 +40,10 @@ class Executor:
         """
         self.repo_path = repo_path
         self.running = False
+        self._repo_locks: dict[Path, threading.Lock] = {}
+        self._repo_locks_lock = threading.Lock()
+        self._worker_threads: list[threading.Thread] = []
+        self._stop_event = threading.Event()
 
     def start(self) -> None:
         """Start the endless execution loop."""
@@ -48,7 +53,8 @@ class Executor:
         try:
             while self.running:
                 self._run_iteration()
-                self._check_for_updates()
+                if self._check_for_updates():
+                    break
                 time.sleep(settings.executor_sleep_interval)
         except KeyboardInterrupt:
             print("\nReceived interrupt signal, shutting down...")
@@ -70,8 +76,21 @@ class Executor:
 
             print(f"Running {len(enabled_workers)} workers: {[w.__name__ for w in enabled_workers]}")
 
+            self._worker_threads = []
             for worker_class in enabled_workers:
-                self._execute_worker(worker_class)
+                thread = threading.Thread(
+                    target=self._execute_worker,
+                    args=(worker_class,),
+                    name=f"worker-{worker_class.__name__}",
+                )
+                thread.start()
+                self._worker_threads.append(thread)
+
+            # Wait for all worker threads to finish their current iteration
+            for thread in self._worker_threads:
+                thread.join(timeout=10)
+                if thread.is_alive():
+                    print(f"Warning: Worker thread {thread.name} did not finish within timeout")
 
         except Exception as e:
             print(f"Error in iteration: {e}")
@@ -123,22 +142,46 @@ class Executor:
         print(f"Found {len(subdirectories)} subdirectories to process")
 
         for subdirectory in subdirectories:
+            # Check if we should stop after this subdirectory
+            if self._stop_event.is_set():
+                print(
+                    f"Worker {worker_class.__name__} received stop signal, finishing current subdirectory and exiting."
+                )
+                break
+
             try:
                 print(f"Processing subdirectory: {subdirectory.name}")
 
-                worker = self._instantiate_worker(worker_class)
+                repo_lock = self._get_repo_lock(subdirectory)
 
-                start_time = time.time()
-                result = worker.run(subdirectory)
-                execution_time = time.time() - start_time
+                with repo_lock:
+                    worker = self._instantiate_worker(worker_class)
 
-                print(f"Worker {worker_class.__name__} on {subdirectory.name} completed in {execution_time:.2f}s")
-                if result is not None:
-                    print(f"Result: {result}")
+                    start_time = time.time()
+                    result = worker.run(subdirectory)
+                    execution_time = time.time() - start_time
+
+                    print(f"Worker {worker_class.__name__} on {subdirectory.name} completed in {execution_time:.2f}s")
+                    if result is not None:
+                        print(f"Result: {result}")
 
             except Exception as e:
                 print(f"Error executing worker {worker_class.__name__} on {subdirectory.name}: {e}")
                 traceback.print_exc()
+
+    def _get_repo_lock(self, repo_path: Path) -> threading.Lock:
+        """Get or create a lock for a specific repository.
+
+        Args:
+            repo_path: Path to the repository.
+
+        Returns:
+            threading.Lock for the given repository.
+        """
+        with self._repo_locks_lock:
+            if repo_path not in self._repo_locks:
+                self._repo_locks[repo_path] = threading.Lock()
+            return self._repo_locks[repo_path]
 
     def _check_for_updates(self) -> bool:
         """Execute git pull in the working directory and detect if updates were downloaded.
@@ -163,6 +206,11 @@ class Executor:
 
             if update_detected:
                 print(f"Update detected: {output.strip()}")
+                # Signal all worker threads to stop after their current iteration
+                self._stop_event.set()
+                # Wait for all threads to finish their current subdirectory
+                for thread in self._worker_threads:
+                    thread.join()
                 self._schedule_reboot(settings.auto_update_reboot_delay)
                 return True
 

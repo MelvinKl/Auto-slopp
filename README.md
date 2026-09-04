@@ -9,6 +9,10 @@ A Python-based automation framework for task execution with pluggable worker sys
 ## Features
 
 - **Pluggable Worker System**: Abstract base class for creating custom automation workers
+- **Multi-Threaded Execution**: Each worker runs in its own thread for independent, concurrent execution
+- **Per-Repository Locking**: Only one worker can access a repository at a time, preventing concurrent access conflicts
+- **Shared Cooldown State**: CLI tool cooldown timers are shared across all worker threads
+- **Graceful Shutdown**: Stop signal allows all workers to finish their current iteration before stopping
 - **Configuration Management**: Pydantic-based settings with environment variable support
 - **Flexible Logging**: Built-in logging with rotating file handler (WARNING+) and optional Telegram integration for remote notifications
 - **Task Execution**: Configurable execution of worker implementations
@@ -881,6 +885,34 @@ Base class and implementations for loading tasks from different sources:
 - `TaskSource`: Abstract base class for task loading
 - `GitHubTaskSource`: Loads tasks from GitHub issues
 - `VikunjaTaskSource`: Loads tasks from Vikunja project
+
+## Multi-Threaded Execution
+
+Auto-slopp runs each enabled worker in its own independent thread for concurrent execution:
+
+```
+Executor
+  ├── Thread: GitHubIssueWorker   (independent)
+  ├── Thread: PRWorker            (independent)
+  ├── Thread: StaleBranchCleanupWorker (independent)
+  ├── Thread: VikunjaWorker       (independent)
+  └── Thread: PrReviewWorker      (independent)
+```
+
+### Key Design Decisions
+
+- **One worker per thread**: Each worker runs in its own `threading.Thread`, largely independent of other workers.
+- **Per-repository locking**: Only one worker can work on a repository at a time. The `Executor` maintains a `_repo_locks` dictionary keyed by repository path, ensuring concurrent workers don't interfere with each other.
+- **Shared cooldown state**: CLI tool cooldown timers are shared across all worker threads via a module-level `_cli_lock`, preventing multiple workers from simultaneously hitting rate-limited tools.
+- **Graceful stop**: When an update is detected, a `threading.Event` signals all worker threads to finish their current subdirectory and stop. After all threads are joined, the update check and reboot occur.
+
+### Configuration
+
+Disable specific workers to reduce thread count:
+
+```bash
+AUTO_SLOPP_WORKERS_DISABLED='["GitHubIssueWorker", "PRWorker"]'
+```
 
 ## API Reference
 
