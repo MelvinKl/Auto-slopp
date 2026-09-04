@@ -50,6 +50,13 @@ packages = ["src/auto_slopp"]
 [project.scripts]
 auto-slopp = "auto_slopp.main:main"
 
+[tool.uv]
+# CVE-2026-69247 (SFTY-20260803-51569): cryptography <50.0.0 is vulnerable to a
+# Bleichenbacher Oracle attack; force the patched release for the transitive dep.
+constraint-dependencies = [
+    "cryptography>=50.0.0",
+]
+
 [tool.black]
 line-length = 120
 exclude = '''
