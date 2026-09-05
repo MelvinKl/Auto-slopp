@@ -182,14 +182,16 @@ class TestCreatePullRequest:
         )
 
     @patch("auto_slopp.utils.github_operations._run_gh_command")
-    def test_create_pull_request_sanitizes_error_title(self, mock_run_gh):
+    def test_create_pull_request_sanitizes_error_title(self, mock_run_gh, caplog):
         """Test that an error-like PR title is replaced with a generic one before posting."""
         mock_run_gh.return_value = Mock(returncode=0, stdout="https://github.com/user/repo/pull/123")
         repo_dir = Path("/tmp/test_repo")
 
-        result = create_pull_request(repo_dir, "Error: gh command failed", "Plain body", head="feature")
+        with caplog.at_level("WARNING", logger="auto_slopp.utils.github_operations"):
+            result = create_pull_request(repo_dir, "Error: gh command failed", "Plain body", head="feature")
 
         assert result == {"url": "https://github.com/user/repo/pull/123", "number": 123}
+        assert any("never posted to GitHub" in r.getMessage() for r in caplog.records)
         mock_run_gh.assert_called_once_with(
             repo_dir,
             "pr",
@@ -206,16 +208,18 @@ class TestCreatePullRequest:
         )
 
     @patch("auto_slopp.utils.github_operations._run_gh_command")
-    def test_create_pull_request_sanitizes_error_body(self, mock_run_gh):
+    def test_create_pull_request_sanitizes_error_body(self, mock_run_gh, caplog):
         """Test that an error-like PR body is replaced with a generic one before posting."""
         mock_run_gh.return_value = Mock(returncode=0, stdout="https://github.com/user/repo/pull/123")
         repo_dir = Path("/tmp/test_repo")
 
-        result = create_pull_request(
-            repo_dir, "#42: Fix bug", "Traceback (most recent call last):\nException: boom", head="feature"
-        )
+        with caplog.at_level("WARNING", logger="auto_slopp.utils.github_operations"):
+            result = create_pull_request(
+                repo_dir, "#42: Fix bug", "Traceback (most recent call last):\nException: boom", head="feature"
+            )
 
         assert result == {"url": "https://github.com/user/repo/pull/123", "number": 123}
+        assert any("never posted to GitHub" in r.getMessage() for r in caplog.records)
         mock_run_gh.assert_called_once_with(
             repo_dir,
             "pr",
@@ -347,14 +351,18 @@ class TestSubmitPRReview:
         assert result is False
 
     @patch("auto_slopp.utils.github_operations._run_gh_command")
-    def test_submit_pr_review_sanitizes_error_body(self, mock_run_gh):
+    def test_submit_pr_review_sanitizes_error_body(self, mock_run_gh, caplog):
         """Test that an error-like review body is replaced with a generic one before posting."""
         mock_run_gh.return_value = Mock(returncode=0)
         repo_dir = Path("/tmp/test_repo")
 
-        result = submit_pr_review(repo_dir, 123, "Traceback (most recent call last):\nException: boom", event="COMMENT")
+        with caplog.at_level("WARNING", logger="auto_slopp.utils.github_operations"):
+            result = submit_pr_review(
+                repo_dir, 123, "Traceback (most recent call last):\nException: boom", event="COMMENT"
+            )
 
         assert result is True
+        assert any("never posted to GitHub" in r.getMessage() for r in caplog.records)
         mock_run_gh.assert_called_once_with(
             repo_dir,
             "pr",
