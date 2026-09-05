@@ -8,6 +8,8 @@ import pytest
 from auto_slopp.utils.github_operations import (
     GitHubOperationError,
     comment_on_issue,
+    comment_on_pr,
+    create_pull_request,
     get_failed_workflow_logs,
     get_open_prs_with_label,
     get_pr_files,
@@ -41,6 +43,25 @@ class TestLooksLikeErrorMessage:
 
     def test_cli_failure_output_is_error(self):
         assert looks_like_error_message("Fatal: GitHub command timed out after 30s") is True
+
+    def test_extended_indicators_are_errors(self):
+        assert looks_like_error_message("Error occurred while connecting to the API") is True
+        assert looks_like_error_message("Fatal error: out of memory while running tests") is True
+        assert looks_like_error_message("Command not found: foo") is True
+        assert looks_like_error_message("Command aborted by the user") is True
+        assert looks_like_error_message("Exit status 1: build step") is True
+        assert looks_like_error_message("Process ended with a non-zero exit code") is True
+        assert looks_like_error_message("Stack dump saved to /tmp/core.dump") is True
+        assert looks_like_error_message("Panic: runtime error in worker") is True
+        assert looks_like_error_message("Permission denied: /etc/passwd") is True
+        assert looks_like_error_message("Connection refused by host") is True
+        assert looks_like_error_message("No such file or directory: main.py") is True
+        assert looks_like_error_message("Assertion failed: value == expected") is True
+
+    def test_extended_indicators_do_not_flag_plain_text(self):
+        assert looks_like_error_message("Completed by PR: https://github.com/user/repo/pull/123") is False
+        assert looks_like_error_message("Please increase the timeout value to 60 seconds.") is False
+        assert looks_like_error_message("No changes required for this issue.") is False
 
 
 class TestCommentOnIssue:
@@ -91,6 +112,108 @@ class TestCommentOnIssue:
         result = comment_on_issue(repo_dir, 42, "Plain comment")
 
         assert result is False
+
+
+class TestCommentOnPR:
+    """Test cases for comment_on_pr function."""
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_comment_on_pr_success(self, mock_run_gh):
+        """Test successful PR comment posting."""
+        mock_run_gh.return_value = Mock(returncode=0)
+        repo_dir = Path("/tmp/test_repo")
+
+        result = comment_on_pr(repo_dir, 42, "Looks good, thanks!")
+
+        assert result is True
+        mock_run_gh.assert_called_once_with(
+            repo_dir, "pr", "comment", "42", "--body", "Looks good, thanks!", check=False
+        )
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_comment_on_pr_refuses_error_message(self, mock_run_gh):
+        """Test that raw error messages are never posted to the PR."""
+        mock_run_gh.return_value = Mock(returncode=0)
+        repo_dir = Path("/tmp/test_repo")
+
+        result = comment_on_pr(
+            repo_dir, 42, 'Traceback (most recent call last):\n  File "main.py", line 3\nException: boom'
+        )
+
+        assert result is False
+        mock_run_gh.assert_not_called()
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_comment_on_pr_failure_nonzero_exit(self, mock_run_gh):
+        """Test PR comment posting with non-zero exit code."""
+        mock_run_gh.return_value = Mock(returncode=1)
+        repo_dir = Path("/tmp/test_repo")
+
+        result = comment_on_pr(repo_dir, 42, "Plain comment")
+
+        assert result is False
+
+
+class TestCreatePullRequest:
+    """Test cases for create_pull_request function."""
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_create_pull_request_success(self, mock_run_gh):
+        """Test successful PR creation."""
+        mock_run_gh.return_value = Mock(returncode=0, stdout="https://github.com/user/repo/pull/123")
+        repo_dir = Path("/tmp/test_repo")
+
+        result = create_pull_request(repo_dir, "#42: Fix bug", "Changes described here", head="ai/issue-42-fix-bug")
+
+        assert result == {"url": "https://github.com/user/repo/pull/123", "number": 123}
+        mock_run_gh.assert_called_once_with(
+            repo_dir,
+            "pr",
+            "create",
+            "--title",
+            "#42: Fix bug",
+            "--body",
+            "Changes described here",
+            "--head",
+            "ai/issue-42-fix-bug",
+            "--base",
+            "main",
+            check=False,
+        )
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_create_pull_request_refuses_error_title(self, mock_run_gh):
+        """Test that a PR with an error-like title is never created."""
+        mock_run_gh.return_value = Mock(returncode=0)
+        repo_dir = Path("/tmp/test_repo")
+
+        result = create_pull_request(repo_dir, "Error: gh command failed", "Plain body", head="feature")
+
+        assert result is None
+        mock_run_gh.assert_not_called()
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_create_pull_request_refuses_error_body(self, mock_run_gh):
+        """Test that a PR with an error-like body is never created."""
+        mock_run_gh.return_value = Mock(returncode=0)
+        repo_dir = Path("/tmp/test_repo")
+
+        result = create_pull_request(
+            repo_dir, "#42: Fix bug", "Traceback (most recent call last):\nException: boom", head="feature"
+        )
+
+        assert result is None
+        mock_run_gh.assert_not_called()
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_create_pull_request_failure_nonzero_exit(self, mock_run_gh):
+        """Test PR creation with non-zero exit code."""
+        mock_run_gh.return_value = Mock(returncode=1, stderr="error")
+        repo_dir = Path("/tmp/test_repo")
+
+        result = create_pull_request(repo_dir, "#42: Fix bug", "Plain body", head="feature")
+
+        assert result is None
 
 
 class TestRemoveLabelFromIssue:
@@ -196,6 +319,17 @@ class TestSubmitPRReview:
         repo_dir = Path("/tmp/test_repo")
         result = submit_pr_review(repo_dir, 123, "Looks good")
         assert result is False
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_submit_pr_review_refuses_error_body(self, mock_run_gh):
+        """Test that a review with an error-like body is never submitted."""
+        mock_run_gh.return_value = Mock(returncode=0)
+        repo_dir = Path("/tmp/test_repo")
+
+        result = submit_pr_review(repo_dir, 123, "Traceback (most recent call last):\nException: boom", event="COMMENT")
+
+        assert result is False
+        mock_run_gh.assert_not_called()
 
 
 class TestGetWorkflowRunsForBranch:
