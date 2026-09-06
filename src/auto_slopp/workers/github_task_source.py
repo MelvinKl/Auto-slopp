@@ -399,7 +399,6 @@ class GitHubTaskSource(TaskSource):
             f"Reason: {reason}\n\n"
             f"This issue will be retried when the LLM becomes available."
         )
-        comment_on_issue(repo_path, task.id, skip_comment)
         logger.info(f"Added skip comment to issue #{task.id}: {reason}")
 
     def _filter_renovate_issues(self, issues: list[dict]) -> list[dict]:
