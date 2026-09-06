@@ -1,13 +1,21 @@
 """Tests for Pydantic settings validation."""
 
 import os
+import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 from pydantic import ValidationError
 
-from settings.main import NO_TIMEOUT, CLIConfiguration, Settings
+from settings.main import (
+    MAX_TIMEOUT_SECONDS,
+    NO_TIMEOUT,
+    CLIConfiguration,
+    Settings,
+    settings,
+)
 
 
 class TestSettings:
@@ -102,10 +110,52 @@ class TestSettings:
 
     def test_global_settings_instance(self):
         """Test that global settings instance is available."""
-        from settings.main import settings
-
         assert isinstance(settings, Settings)
         assert hasattr(settings, "base_repo_path")
+
+    def test_import_settings_main_emits_no_user_warning(self):
+        """Importing settings.main must not emit a UserWarning.
+
+        Regression test: duplicate field/validator definitions in
+        CLIConfiguration made Pydantic emit a UserWarning at class-definition
+        time (i.e. on import). The import is run in a subprocess and the
+        stderr output is checked for the specific Pydantic
+        duplicate-decorator message, which cannot silently return. Note we
+        deliberately do NOT escalate UserWarnings to errors here: the
+        `module=` filter of `warnings.filterwarnings` matches the module where
+        `warnings.warn()` is called (a Pydantic-internal module for this
+        warning, not `settings.main`), so such escalation would be dead code,
+        while dropping the filter entirely would make unrelated import-chain
+        UserWarnings fail the test.
+        """
+        env = os.environ.copy()
+        # Layout assumption: this test lives in <repo>/tests/ and the package
+        # sources live in <repo>/src/, so parent.parent / "src" points at the
+        # exact source tree under test. If the package is ever installed
+        # non-editable or the layout changes, the subprocess could import a
+        # different `settings` than the one being tested; update this path
+        # (or drop it and rely on the installed package) accordingly.
+        src_dir = Path(__file__).resolve().parent.parent / "src"
+        env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(src_dir), env.get("PYTHONPATH")]))
+        code = "import settings.main  # noqa: F401"
+        proc = subprocess.run(
+            [sys.executable, "-c", code],
+            env=env,
+            capture_output=True,
+            text=True,
+            # 30s is ample for a plain import; keep it tight so a hung import
+            # fails fast instead of stalling the suite.
+            timeout=30,
+        )
+        assert proc.returncode == 0, f"importing settings.main failed:\n{proc.stderr}"
+        # The stderr check is the only guard here: the Pydantic duplicate-decorator
+        # warning is emitted from a Pydantic-internal module, so a warnings filter
+        # scoped to settings.main could never catch it. Unrelated dependencies may
+        # emit their own UserWarnings during import, so we deliberately do not
+        # assert on those.
+        assert (
+            "overrides an existing Pydantic" not in proc.stderr
+        ), f"duplicate Pydantic decorator warning during import:\n{proc.stderr}"
 
     def test_workers_disabled_default(self):
         """Test that workers_disabled has correct default value."""
@@ -270,6 +320,13 @@ class TestSettings:
         """Test that CLIConfiguration rejects negative timeout values other than -1."""
         with pytest.raises(ValidationError):
             CLIConfiguration(cli_command="tool", timeout=-5)
+
+    def test_cli_configuration_timeout_max_boundary(self):
+        """Test that CLIConfiguration accepts MAX_TIMEOUT_SECONDS and rejects values above it."""
+        config = CLIConfiguration(cli_command="tool", timeout=MAX_TIMEOUT_SECONDS)
+        assert config.timeout == MAX_TIMEOUT_SECONDS
+        with pytest.raises(ValidationError, match=f"timeout must be {NO_TIMEOUT}"):
+            CLIConfiguration(cli_command="tool", timeout=MAX_TIMEOUT_SECONDS + 1)
 
     def test_pr_review_worker_settings_defaults(self):
         """Test that PR review worker settings have correct defaults."""

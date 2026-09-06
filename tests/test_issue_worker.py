@@ -1,9 +1,23 @@
-"""Tests for unified IssueWorker."""
+"""Tests for unified IssueWorker.
+
+The ``_mock_pr_review_no_findings`` fixture in this module stubs
+``IssueWorker._review_pull_request`` (which shells out to ``gh``) so tests
+can focus on the behavior under test; see the fixture's docstring for why it
+is intentionally not autouse.
+
+Tests that want to exercise the real PR review loop simply do not request the
+fixture and patch ``_review_pull_request`` themselves to script the review
+outcomes (see ``TestPRReviewLoop``). To guard against the loop being silently
+skipped, ``test_run_with_successful_execution`` patches
+``_review_pull_request`` and asserts the loop was actually reached.
+"""
 
 import subprocess
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from auto_slopp.utils.linking import ensure_issue_link_in_pr_body
 from auto_slopp.workers.github_task_source import GitHubTaskSource
@@ -72,6 +86,20 @@ class CapturingTaskSourceWithFindings(MockTaskSource):
     def on_task_complete(self, task: Task, branch_name: str, pr_url: str, findings=None) -> None:
         super().on_task_complete(task, branch_name, pr_url, findings)
         self.captured_findings = findings
+
+
+@pytest.fixture
+def _mock_pr_review_no_findings():
+    """Stub the PR review loop so tests focus on the behavior under test.
+
+    This fixture is NOT autouse: it must be requested explicitly (via
+    ``@pytest.mark.usefixtures``) by the tests that drive the worker through
+    the PR review loop and want to avoid the real ``_review_pull_request``
+    implementation (which shells out to ``gh``). Tests that do not request it
+    exercise the real code path.
+    """
+    with patch.object(IssueWorker, "_review_pull_request", return_value=(False, "", [], None)):
+        yield
 
 
 class TestIssueWorker:
@@ -304,6 +332,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_multiple_tasks_processing(
         self,
         mock_commits_ahead,
@@ -323,6 +352,7 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -564,6 +594,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_commits_during_ralph_loop_still_creates_pr(
         self,
         mock_cli,
@@ -582,6 +613,7 @@ class TestIssueWorker:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
+        mock_settings.github_issue_pr_review_max_iterations = 1
         # has_changes returns False because Ralph already committed everything
         mock_has_changes.return_value = False
         # But there ARE commits ahead of main (committed during Ralph loop)
@@ -662,6 +694,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_process_single_task_passes_condensed_comments_directly(
         self,
         mock_commits_ahead,
@@ -688,6 +721,7 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -832,6 +866,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_existing_open_pr_reused(
         self,
         mock_commits_ahead,
@@ -851,6 +886,7 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -883,8 +919,10 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @patch("auto_slopp.workers.issue_worker.IssueWorker._review_pull_request")
     def test_run_with_successful_execution(
         self,
+        mock_review,
         mock_commits_ahead,
         mock_cli,
         mock_execute,
@@ -898,10 +936,17 @@ class TestIssueWorker:
         mock_checkout,
         mock_commit_push,
     ):
-        """Test that run handles successful execution with PR creation."""
+        """Test that run handles successful execution with PR creation.
+
+        ``_review_pull_request`` is patched and asserted to be called, so this
+        test also verifies that the PR review loop is actually reached during a
+        successful run.
+        """
+        mock_review.return_value = (False, "", [], None)
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -920,6 +965,8 @@ class TestIssueWorker:
         assert result["tasks_completed"] == 1
         assert task_source.on_task_complete_called is True
         mock_create_pr.assert_called_once()
+        # The PR review loop must have been reached (not silently stubbed away).
+        mock_review.assert_called_once()
 
     @patch("auto_slopp.workers.issue_worker.commit_and_push_changes")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
@@ -1047,6 +1094,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_on_task_complete_receives_correct_pr_url(
         self,
         mock_commits_ahead,
@@ -1066,6 +1114,7 @@ class TestIssueWorker:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -1102,6 +1151,7 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_ralph_enabled_success_with_push_and_pr(
         self,
         mock_commits_ahead,
@@ -1121,6 +1171,7 @@ class TestIssueWorker:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -1635,12 +1686,19 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.create_pull_request")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_gitignore_integration_ralph_added_when_missing(
-        self, mock_settings, mock_commits_ahead, mock_create_pr, mock_get_pr, mock_push
+        self,
+        mock_settings,
+        mock_commits_ahead,
+        mock_create_pr,
+        mock_get_pr,
+        mock_push,
     ):
         """Integration test: .ralph is added to .gitignore when missing."""
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commits_ahead.return_value = 1
         mock_push.return_value = (True, "")
         mock_get_pr.return_value = None
@@ -1685,12 +1743,19 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.create_pull_request")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_gitignore_integration_ralph_not_duplicated(
-        self, mock_settings, mock_commits_ahead, mock_create_pr, mock_get_pr, mock_push
+        self,
+        mock_settings,
+        mock_commits_ahead,
+        mock_create_pr,
+        mock_get_pr,
+        mock_push,
     ):
         """Integration test: .ralph is not duplicated when already in .gitignore."""
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commits_ahead.return_value = 1
         mock_push.return_value = (True, "")
         mock_get_pr.return_value = None
@@ -1909,6 +1974,7 @@ class TestGeneratePRBodyFromTaskFileIntegration:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_ralph_enabled_pr_body_contains_issue_link(
         self,
         mock_commits_ahead,
@@ -1937,6 +2003,7 @@ class TestGeneratePRBodyFromTaskFileIntegration:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
@@ -1982,6 +2049,7 @@ class TestGeneratePRBodyFromTaskFileIntegration:
     @patch("auto_slopp.workers.issue_worker.execute_with_instructions")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_ralph_disabled_pr_body_contains_issue_link(
         self,
         mock_commits_ahead,
@@ -2006,6 +2074,7 @@ class TestGeneratePRBodyFromTaskFileIntegration:
         mock_commits_ahead.return_value = 1
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
@@ -2041,6 +2110,7 @@ class TestGeneratePRBodyFromTaskFileIntegration:
     @patch("auto_slopp.workers.issue_worker.get_pr_for_branch")
     @patch("auto_slopp.workers.issue_worker.get_active_cli_command")
     @patch("auto_slopp.workers.issue_worker.get_commits_ahead_of_branch")
+    @pytest.mark.usefixtures("_mock_pr_review_no_findings")
     def test_ralph_enabled_pr_body_preserves_existing_link(
         self,
         mock_commits_ahead,
@@ -2063,6 +2133,7 @@ class TestGeneratePRBodyFromTaskFileIntegration:
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = True
         mock_settings.github_issue_step_max_iterations = 10
+        mock_settings.github_issue_pr_review_max_iterations = 1
         mock_has_changes.return_value = True
         mock_commit_push.return_value = (True, None)
         mock_checkout.return_value = True

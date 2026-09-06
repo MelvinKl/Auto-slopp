@@ -46,6 +46,7 @@ Auto-slopp supports a tiered CLI configuration system with capability-based task
 #   - `-1` (NO_TIMEOUT): no timeout (subprocess runs indefinitely)
 #   - Positive integer: seconds before the CLI command is killed
 #   - Zero or negative values other than `-1` are rejected with a validation error
+#   - Values above 31,536,000 seconds (~1 year) are rejected with a validation error
 #
 # Note: `-1` is the sentinel value for `NO_TIMEOUT` (no timeout). It is not an error
 # — it explicitly disables the timeout so the CLI tool can run indefinitely.
@@ -84,8 +85,8 @@ AUTO_SLOPP_CLI_CONFIGURATIONS='[
 
 Each CLI configuration supports a `timeout` field to control how long a CLI command can run before being terminated:
 
-- **`-1`** (default): No timeout — the command runs indefinitely
-- **Positive integer**: Timeout in seconds after which the command is killed
+- **`-1`** (the `NO_TIMEOUT` sentinel; default): No timeout — the command runs indefinitely
+- **Positive integer**: Timeout in seconds after which the command is killed (values above 31,536,000 seconds, ~1 year, are rejected)
 
 ```bash
 # Example: Limit opencode to 10 minutes
@@ -101,6 +102,12 @@ AUTO_SLOPP_CLI_CONFIGURATIONS='[
 ```
 
 When a CLI command times out, the task enters a cooldown period and the next available CLI configuration is tried. Set `timeout: -1` to disable this behavior and let commands run indefinitely.
+
+Out-of-range timeout values (e.g., non-positive values or values above 31,536,000 seconds) are discarded and a diagnostic warning is logged (once per distinct value; the cache of warned values is bounded to 1024 entries, so under churn from a continuously misconfigured value a value can be evicted and, if it reappears, warn again). The log level of these warnings can be adjusted with the `AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL` environment variable. Valid values: `DEBUG`, `INFO`, `WARNING` (default), `ERROR`, and `CRITICAL` (`FATAL` is accepted as an alias for `CRITICAL`). The value is resolved once and cached on first use, so changing the variable at runtime has no effect until the next process start. For example, set it to `DEBUG` to reduce log volume in production:
+
+```bash
+AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL=DEBUG
+```
 
 # Task difficulty ratings (JSON object)
 # Each task specifies min/max/recommended capability requirements

@@ -7,12 +7,13 @@ This module provides a centralized utility for executing configured CLI commands
 import logging
 import subprocess
 import time
+from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
 from settings.main import (
-    _MAX_TIMEOUT_SECONDS,
+    MAX_TIMEOUT_SECONDS,
     NO_TIMEOUT,
     CLIConfiguration,
     TaskRating,
@@ -21,6 +22,47 @@ from settings.main import (
 
 logger = logging.getLogger(__name__)
 _active_cli_configuration_index = 0
+
+# Out-of-range timeout values already logged at warning level; subsequent
+# resolutions of the same value log at debug only. OrderedDict is used so
+# _warn_once_tracked can maintain deterministic LRU eviction order (a plain
+# set's pop() would evict an arbitrary, unspecified element).
+_warned_out_of_range_timeouts: "OrderedDict[Any, bool]" = OrderedDict()
+
+# Log level for out-of-range timeout warnings. Configured via the
+# Settings.cli_executor_timeout_warn_level field (environment variable
+# AUTO_SLOPP_CLI_EXECUTOR_TIMEOUT_WARN_LEVEL).
+# Defaults to WARNING; set to DEBUG to reduce log volume in production.
+# Resolved on first use (and cached thereafter), so the setting may be
+# changed after import but before the first call to _get_timeout_warn_level.
+_TIMEOUT_WARN_LOG_LEVEL: Optional[int] = None
+
+
+def _get_timeout_warn_level() -> int:
+    """Resolve the out-of-range timeout warning log level (cached after first use)."""
+    global _TIMEOUT_WARN_LOG_LEVEL
+    # No lock around the lazy init: concurrent first-use callers may both
+    # compute the level, but the write is idempotent so the race is benign.
+    if _TIMEOUT_WARN_LOG_LEVEL is None:
+        warn_level = settings.cli_executor_timeout_warn_level
+        level = logging.WARNING
+        if warn_level:
+            # Validate against an explicit set of allowed level names rather
+            # than getattr(logging, ...), which would also accept non-level
+            # attributes such as NOTSET or module internals. FATAL is the
+            # standard logging alias for CRITICAL and is accepted as such.
+            if warn_level.upper() in _VALID_WARN_LEVELS:
+                level = getattr(logging, warn_level.upper())
+            else:
+                logger.warning(
+                    "Invalid cli_executor_timeout_warn_level value: %r. "
+                    "Valid values: DEBUG, INFO, WARNING, ERROR, CRITICAL (FATAL accepted as an alias for CRITICAL). "
+                    "Using WARNING.",
+                    warn_level,
+                )
+        _TIMEOUT_WARN_LOG_LEVEL = level
+    return _TIMEOUT_WARN_LOG_LEVEL
+
 
 _PROBE_INSTRUCTIONS = "are you working?"
 # 600 seconds (10 minutes) balances catching hung tools without waiting too long.
@@ -234,27 +276,119 @@ def _execute_command(
         }
 
 
-def _resolve_timeout(raw_timeout: Optional[int], fallback: Optional[int] = None) -> Optional[int]:
+# Allowed level names for the out-of-range timeout warning level
+# (Settings.cli_executor_timeout_warn_level). FATAL is the standard
+# logging alias for CRITICAL and is accepted as such.
+_VALID_WARN_LEVELS: frozenset = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL"})
+
+# Upper bound on distinct values remembered by _warn_once_tracked.
+# When the bound is hit, the least-recently-seen value is evicted and, if it
+# reappears, it warns once more (see README note on out-of-range warnings).
+_MAX_TRACKED_WARN_VALUES = 1024
+
+
+def _warn_once_tracked(
+    tracked: "OrderedDict[Any, bool]",
+    value: Any,
+    level: int,
+    fmt: str,
+    *args: Any,
+) -> None:
+    """Log ``fmt % args`` at ``level`` once per distinct ``value``.
+
+    ``tracked`` must be an :class:`collections.OrderedDict` used as an LRU
+    cache: seeing a value moves it to the end, and when the bound
+    :data:`_MAX_TRACKED_WARN_VALUES` is exceeded the least-recently-seen
+    value is evicted first, so "warn once" semantics are deterministic even
+    with a churning stream of misconfigured values.
+
+    Values already present in ``tracked`` are logged at debug level with an
+    "(already warned)" suffix; new values are added to ``tracked``.
+
+    Unhashable values (e.g., a list or dict ``timeout`` from a hand-edited
+    JSON config) are tracked by ``repr(value)`` so they are still warned
+    about and discarded gracefully instead of raising ``TypeError``.
+    """
+    try:
+        key: Any = value
+        hash(key)
+    except TypeError:
+        # Unhashable values cannot serve as dict keys; fall back to their
+        # repr (stable for equal values) so "warn once" still applies.
+        key = repr(value)
+    # No lock around the check-then-add: under concurrent first-use of the
+    # same value, two callers may both miss it in ``tracked`` and both log
+    # the warning (a harmless duplicate, unlike the idempotent lazy init in
+    # _get_timeout_warn_level).
+    if key in tracked:
+        # LRU bookkeeping: refresh recency so this value survives eviction.
+        tracked.move_to_end(key)
+        logger.log(logging.DEBUG, fmt + " (already warned)", *args)
+    else:
+        tracked[key] = True
+        # Keep the tracked cache bounded so frequently-varying misconfigured
+        # values cannot grow it without limit for the process lifetime.
+        # Evicted values simply warn again if they reappear.
+        while len(tracked) > _MAX_TRACKED_WARN_VALUES:
+            # Evict the least-recently-seen value (deterministic, unlike
+            # set.pop() which removes an arbitrary element).
+            tracked.popitem(last=False)
+        logger.log(level, fmt, *args)
+
+
+def _resolve_timeout(raw_timeout: Optional[Any]) -> Optional[int]:
     """Resolve a raw timeout value to an effective timeout.
 
-    Handles the NO_TIMEOUT sentinel (-1), validates range (0 < timeout ≤ 30 days),
-    and falls back to _PROBE_TIMEOUT_SECONDS when the value is invalid.
+    Handles the NO_TIMEOUT sentinel (-1), treats non-integer or out-of-range
+    values as invalid (valid range: 0 < timeout ≤ MAX_TIMEOUT_SECONDS, ~1 year),
+    and resolves None (unspecified) or invalid values to _PROBE_TIMEOUT_SECONDS.
+
+    Note:
+        The parameter is intentionally typed ``Optional[Any]`` rather than
+        ``Optional[int]``: callers (or a hand-edited JSON config) may pass
+        non-integer values such as ``str``, ``float``, ``bool``, ``list``, or
+        ``dict``; those are deliberately accepted here, diagnosed with a
+        warning, and resolved to :data:`_PROBE_TIMEOUT_SECONDS`.
 
     Args:
-        raw_timeout: The timeout value (None for unspecified, -1 for NO_TIMEOUT, or a positive integer).
-        fallback: Default timeout in seconds to use when raw_timeout is None, non-positive,
-                  or exceeds the maximum. Defaults to None; when None, falls back to
-                  _PROBE_TIMEOUT_SECONDS (600s).
+        raw_timeout: The timeout value (None for unspecified, -1 for NO_TIMEOUT, a positive integer,
+        or any other value that will be diagnosed and discarded).
 
     Returns:
         None if raw_timeout is NO_TIMEOUT (-1), the raw_timeout value if positive and within range,
-        or the fallback value (or _PROBE_TIMEOUT_SECONDS if fallback is None) otherwise.
+        or _PROBE_TIMEOUT_SECONDS otherwise.
     """
-    if raw_timeout == NO_TIMEOUT:
+    # bool is a subclass of int, but True/False are not valid timeouts; treat
+    # them as non-integer (without this, True would silently pass as 1 second).
+    is_int = isinstance(raw_timeout, int) and not isinstance(raw_timeout, bool)
+    if raw_timeout == NO_TIMEOUT and is_int:
         return None
-    if raw_timeout is not None and 0 < raw_timeout <= _MAX_TIMEOUT_SECONDS:
+    if is_int and 0 < raw_timeout <= MAX_TIMEOUT_SECONDS:
         return raw_timeout
-    return fallback if fallback is not None else _PROBE_TIMEOUT_SECONDS
+    if raw_timeout is not None:
+        # raw_timeout was present but invalid (non-integer or out of range);
+        # log the discarded value so configuration mistakes are diagnosable.
+        # Distinguish non-integer, non-positive, and above-maximum values to make
+        # misconfiguration diagnosis faster (mirrors the Pydantic validator).
+        if not is_int:
+            problem = f"non-integer value ({raw_timeout!r})"
+        elif raw_timeout <= 0:
+            problem = f"non-positive value ({raw_timeout})"
+        else:
+            problem = f"value above the maximum ({MAX_TIMEOUT_SECONDS} seconds)"
+        # Warn once per distinct value; repeated resolutions of the same
+        # misconfigured value (e.g., probe/failover loops) log at debug only.
+        _warn_once_tracked(
+            _warned_out_of_range_timeouts,
+            raw_timeout,
+            _get_timeout_warn_level(),
+            "Discarding out-of-range timeout %r (%s; valid range: 0 < timeout <= %d seconds); " "using %r instead",
+            raw_timeout,
+            problem,
+            MAX_TIMEOUT_SECONDS,
+            _PROBE_TIMEOUT_SECONDS,
+        )
+    return _PROBE_TIMEOUT_SECONDS
 
 
 def _probe_configuration(config: dict[str, Any], working_dir: Path, timeout: Optional[int] = None) -> bool:

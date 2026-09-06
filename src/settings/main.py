@@ -7,6 +7,15 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
 
+__all__ = [
+    "CLIConfiguration",
+    "MAX_TIMEOUT_SECONDS",
+    "NO_TIMEOUT",
+    "Settings",
+    "TaskRating",
+    "settings",
+]
+
 
 class TaskRating(BaseModel):
     """Rating configuration for a task type."""
@@ -17,9 +26,15 @@ class TaskRating(BaseModel):
 
 
 NO_TIMEOUT = -1
-"""Sentinel value for timeout: -1 means never timeout (subprocess runs indefinitely)."""
+"""Sentinel value for timeout: -1 means never timeout (subprocess runs indefinitely).
 
-_MAX_TIMEOUT_SECONDS = 31_536_000  # ~1 year in seconds
+This is the public API for disabling timeouts in CLI configurations and executor calls.
+"""
+
+MAX_TIMEOUT_SECONDS = 31_536_000  # ~1 year in seconds
+"""Canonical upper bound (in seconds) for CLI timeouts, shared by
+:data:`CLIConfiguration.validate_timeout` and the CLI executor's
+:func:`_resolve_timeout <auto_slopp.utils.cli_executor._resolve_timeout>`."""
 
 DEFAULT_PR_REVIEW_MAX_ITERATIONS = 3
 
@@ -35,10 +50,11 @@ class CLIConfiguration(BaseModel):
         description="Arguments to pass to the CLI command",
     )
     timeout: int = Field(
-        default=-1,
+        default=NO_TIMEOUT,
         description=(
-            "Timeout in seconds for CLI execution. Set to -1 to disable timeout (never timeout). "
-            "Must be -1 or a positive integer."
+            "Timeout in seconds for CLI command execution. "
+            "Set to NO_TIMEOUT to disable timeout (never timeout). "
+            "When NO_TIMEOUT, the caller-provided timeout is ignored for this configuration."
         ),
     )
     capability: int = Field(
@@ -59,26 +75,33 @@ class CLIConfiguration(BaseModel):
         default_factory=list,
         description="Task names for which this CLI configuration should not be used",
     )
-    timeout: int = Field(
-        default=NO_TIMEOUT,
-        description=(
-            "Timeout in seconds for CLI command execution. "
-            "Set to NO_TIMEOUT to disable timeout (never timeout). "
-            "When NO_TIMEOUT, the caller-provided timeout is ignored for this configuration."
-        ),
-    )
 
-    @field_validator("timeout")
+    @field_validator("timeout", mode="before")
     @classmethod
     def validate_timeout(cls, v: int) -> int:
         """Only allow -1 (NO_TIMEOUT) or positive integers up to 1 year for timeout."""
+        # bool is a subclass of int; without this guard a boolean would be
+        # lax-coerced (True -> 1) before the range check below could reject it.
+        if isinstance(v, bool):
+            raise ValueError(
+                f"timeout must be an integer number of seconds "
+                f"({NO_TIMEOUT} for NO_TIMEOUT, or a positive integer up to {MAX_TIMEOUT_SECONDS}), "
+                f"not a boolean, got {v!r}"
+            )
+        if isinstance(v, str):
+            try:
+                v = int(v)
+            except ValueError as exc:
+                raise ValueError(f"timeout must be an integer number of seconds, got {v!r}") from exc
+        if v is None:
+            return v
         if v == NO_TIMEOUT:
             return v
-        if 0 < v <= _MAX_TIMEOUT_SECONDS:
+        if 0 < v <= MAX_TIMEOUT_SECONDS:
             return v
         raise ValueError(
-            f"timeout must be -1 (NO_TIMEOUT) or a positive integer up to {_MAX_TIMEOUT_SECONDS} seconds "
-            f"(~1 year), got {v}. A value of -1 means never timeout; positive values specify seconds."
+            f"timeout must be {NO_TIMEOUT} (NO_TIMEOUT) or a positive integer up to {MAX_TIMEOUT_SECONDS} seconds "
+            f"(~1 year), got {v}. A value of {NO_TIMEOUT} means never timeout; positive values specify seconds."
         )
 
 
@@ -203,11 +226,24 @@ class Settings(BaseSettings):
         ),
     )
 
+    cli_executor_timeout_warn_level: str = Field(
+        default="WARNING",
+        description=(
+            "Log level for out-of-range timeout warnings in the CLI executor. "
+            "Valid values: DEBUG, INFO, WARNING, ERROR, CRITICAL (FATAL accepted as an alias for CRITICAL). "
+            "Defaults to WARNING; set to DEBUG to reduce log volume in production."
+        ),
+    )
+
     slop_timeout: int = Field(
         default=10000,
         ge=1,
         le=30 * 24 * 60 * 60,
-        description="Timeout for slopmachine execution in seconds (1 to 30 days)",
+        description=(
+            "Timeout for slopmachine execution in seconds (1 to 30 days). "
+            "Note: this 30-day ceiling is intentionally a different (tighter) "
+            "bound than MAX_TIMEOUT_SECONDS (~1 year), which caps CLI timeouts."
+        ),
     )
 
     github_issue_worker_required_label: str = Field(
