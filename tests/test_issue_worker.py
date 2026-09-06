@@ -397,6 +397,126 @@ class TestIssueWorker:
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.settings")
+    def test_ralph_max_loops_reached_with_llm_unavailable_calls_on_skip(
+        self, mock_settings, mock_create_branch, mock_checkout
+    ):
+        """Test that an LLM outage inside the Ralph loop triggers on_skip, not on_max_iterations_reached."""
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        # Simulate an LLM outage mid-loop that exhausted all iterations; the
+        # executor preserves the mid-loop failure reason (surfaced via
+        # get_skip_reason) rather than the worker reading the result dict.
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": False,
+            "max_loops_reached": True,
+            "loops_executed": 10,
+            "steps_completed": 8,
+            "total_steps": 15,
+            "error": "Maximum iterations (10) reached before all steps completed",
+        }
+        worker.ralph_executor.get_skip_reason = lambda: "LLM timed out waiting for response"
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert len(result["task_results"]) == 1
+        task_result = result["task_results"][0]
+        assert task_source.on_skip_called is True
+        assert task_source.on_max_iterations_called is False
+        assert task_source.on_task_failure_called is False
+        assert "timed out" in task_source.skip_reason
+        assert task_result.get("skipped") is True
+        assert task_result.get("skip_reason")
+        assert "timed out" in task_result["skip_reason"]
+        # The underlying mid-loop failure must be carried in result["error"]
+        # (and result["root_error"]) rather than the generic
+        # "Maximum iterations reached" message, so the fields don't contradict
+        # each other.
+        assert task_result.get("root_error")
+        assert "timed out" in task_result["root_error"]
+        assert task_result.get("error")
+        assert "timed out" in task_result["error"]
+        assert "Maximum iterations" not in task_result["error"]
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_ralph_max_loops_reached_without_llm_unavailable_calls_on_max_iterations(
+        self, mock_settings, mock_create_branch, mock_checkout
+    ):
+        """Test that genuine iteration exhaustion still calls on_max_iterations_reached, not on_skip."""
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        # Non-unavailability mid-loop failure reason
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": False,
+            "max_loops_reached": True,
+            "loops_executed": 10,
+            "steps_completed": 8,
+            "total_steps": 15,
+            "error": "Maximum iterations (10) reached before all steps completed",
+        }
+        worker.ralph_executor.get_skip_reason = lambda: None
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert len(result["task_results"]) == 1
+        task_result = result["task_results"][0]
+        assert task_source.on_max_iterations_called is True
+        assert task_source.on_skip_called is False
+        assert task_source.on_task_failure_called is False
+        assert task_result.get("skipped") is None
+        assert task_result.get("skip_reason") is None
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_ralph_max_loops_reached_with_stale_last_error_drops_task(
+        self, mock_settings, mock_create_branch, mock_checkout
+    ):
+        """Test that a stale last_error left in the result dict does not trigger a skip.
+
+        Scenario: an early iteration fails with a timeout, later iterations
+        succeed, and the loop still ends at max iterations. The executor's
+        preserved state is clean, so the task is dropped as exhausted rather
+        than skipped on the stale error from the result dict.
+        """
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = 10
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+        worker.ralph_executor.execute = lambda *args, **kwargs: {
+            "success": False,
+            "max_loops_reached": True,
+            "loops_executed": 10,
+            "steps_completed": 8,
+            "total_steps": 15,
+            "error": "Maximum iterations (10) reached before all steps completed",
+            # Stale failure from an earlier iteration; later iterations succeeded
+            "last_error": "LLM timed out waiting for response",
+        }
+        # The executor's own error state was cleared by the successful iterations
+        worker.ralph_executor.get_skip_reason = lambda: None
+        result = worker.run(Path("/tmp"))
+        assert result["success"] is True
+        assert len(result["task_results"]) == 1
+        task_result = result["task_results"][0]
+        assert task_source.on_max_iterations_called is True
+        assert task_source.on_skip_called is False
+        assert task_source.on_task_failure_called is False
+        assert task_result.get("skipped") is None
+        assert task_result.get("skip_reason") is None
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
     def test_ralph_executor_llm_unavailable_calls_on_skip(self, mock_settings, mock_create_branch, mock_checkout):
         """Test that on_skip is called when Ralph executor fails due to LLM unavailability."""
         mock_settings.ralph_enabled = True
@@ -405,15 +525,22 @@ class TestIssueWorker:
         mock_create_branch.return_value = True
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
-        # Mock the RalphExecutor.execute to simulate LLM unavailability
-        worker.ralph_executor.execute = lambda *args, **kwargs: {
-            "success": False,
-            "loops_executed": 1,
-            "steps_completed": 0,
-            "total_steps": 3,
-            "max_loops_reached": False,
-            "error": "No active CLI configuration available",
-        }
+
+        # Mock the RalphExecutor.execute to simulate LLM unavailability. Like
+        # the real execute(), record the failure in the executor's error
+        # state: get_skip_reason() is the source of truth for skip decisions.
+        def mock_execute(*args, **kwargs):
+            worker.ralph_executor._last_error = "No active CLI configuration available"
+            return {
+                "success": False,
+                "loops_executed": 1,
+                "steps_completed": 0,
+                "total_steps": 3,
+                "max_loops_reached": False,
+                "error": "No active CLI configuration available",
+            }
+
+        worker.ralph_executor.execute = mock_execute
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
@@ -425,6 +552,7 @@ class TestIssueWorker:
         assert task_source.on_max_iterations_called is False
         assert task_source.on_task_failure_called is False
 
+    @patch("auto_slopp.workers.issue_worker.are_all_clis_in_cooldown")
     @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
     @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
     @patch("auto_slopp.workers.issue_worker.has_changes")
@@ -441,10 +569,15 @@ class TestIssueWorker:
         mock_has_changes,
         mock_create_branch,
         mock_checkout,
+        mock_is_any_cli,
     ):
         """Test that on_skip is called when direct CLI execution fails due to LLM unavailability."""
         mock_cli.return_value = "opencode"
         mock_settings.ralph_enabled = False
+        # "exhausted"/"all cli" are weak patterns: corroboration by all
+        # configured CLIs being in cooldown is required for the error to
+        # classify as unavailable.
+        mock_is_any_cli.return_value = True
         mock_checkout.return_value = True
         mock_create_branch.return_value = True
         mock_execute.return_value = {
@@ -1276,14 +1409,21 @@ class TestIssueWorker:
         mock_create_branch.return_value = True
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
-        worker.ralph_executor.execute = lambda *args, **kwargs: {
-            "success": False,
-            "loops_executed": 1,
-            "steps_completed": 2,
-            "total_steps": 5,
-            "max_loops_reached": False,
-            "error": "LLM timed out waiting for response",
-        }
+
+        # Like the real execute(), record the failure in the executor's error
+        # state: get_skip_reason() is the source of truth for skip decisions.
+        def mock_execute(*args, **kwargs):
+            worker.ralph_executor._last_error = "LLM timed out waiting for response"
+            return {
+                "success": False,
+                "loops_executed": 1,
+                "steps_completed": 2,
+                "total_steps": 5,
+                "max_loops_reached": False,
+                "error": "LLM timed out waiting for response",
+            }
+
+        worker.ralph_executor.execute = mock_execute
         result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
@@ -1375,68 +1515,29 @@ class TestIssueWorker:
         assert worker._is_llm_unavailable("Git push failed") is False
         assert worker._is_llm_unavailable("Permission denied") is False
         assert worker._is_llm_unavailable("no cli configuration found") is False
-        assert worker._is_llm_unavailable("LLM is unavailable") is False  # Too broad, not a specific pattern
+        assert (
+            worker._is_llm_unavailable("LLM is unavailable") is True
+        )  # Matched via the shared UNAVAILABILITY_PATTERNS
         assert worker._is_llm_unavailable("") is False
 
-    @patch("auto_slopp.workers.issue_worker.settings")
-    def test_is_llm_unavailable_via_cli_states(self, mock_settings):
-        """Test that _is_llm_unavailable checks _cli_states against cli_configurations."""
-        import time
-
-        from auto_slopp.utils.cli_executor import _cli_states
-
+    @patch("auto_slopp.workers.issue_worker.are_all_clis_in_cooldown")
+    def test_is_llm_unavailable_cli_state_is_secondary_confirmation(self, mock_is_any_cli):
+        """Test that all-CLIs-in-cooldown is only a secondary confirmation, never an independent trigger."""
         task_source = MockTaskSource()
         worker = IssueWorker(task_source=task_source)
 
-        num_configs = 3
-        mock_settings.cli_configurations = [type("Config", (), {"name": f"config{i}"}) for i in range(num_configs)]
+        # All configured CLIs in cooldown: a pattern-matching error is still unavailable...
+        mock_is_any_cli.return_value = True
+        assert worker._is_llm_unavailable("LLM timed out waiting for response") is True
+        # ...but a non-matching error is NOT classified as unavailable just because
+        # all CLIs happen to be in a transient cooldown window
+        assert worker._is_llm_unavailable("Step implementation failed: syntax error in code") is False
+        assert worker._is_llm_unavailable("") is False
 
-        # Save original _cli_states
-        original_cli_states = _cli_states.copy()
-
-        try:
-            # Test 1: All configs inactive, cooldown not expired -> True
-            now = time.time()
-            _cli_states.clear()
-            _cli_states.update({i: {"active": False, "cooldown_until": now + 3600} for i in range(num_configs)})
-            assert worker._is_llm_unavailable("") is True
-
-            # Test 2: All configs active -> False
-            _cli_states.clear()
-            _cli_states.update({i: {"active": True, "cooldown_until": 0.0} for i in range(num_configs)})
-            assert worker._is_llm_unavailable("") is False
-
-            # Test 3: One config active, others inactive -> False
-            _cli_states.clear()
-            _cli_states.update(
-                {
-                    0: {"active": True, "cooldown_until": 0.0},
-                    1: {"active": False, "cooldown_until": now + 3600},
-                    2: {"active": False, "cooldown_until": now + 3600},
-                }
-            )
-            assert worker._is_llm_unavailable("") is False
-
-            # Test 4: All inactive but one cooldown expired -> False
-            _cli_states.clear()
-            _cli_states.update(
-                {
-                    0: {"active": False, "cooldown_until": now - 3600},
-                    1: {"active": False, "cooldown_until": now + 3600},
-                    2: {"active": False, "cooldown_until": now + 3600},
-                }
-            )
-            assert worker._is_llm_unavailable("") is False
-
-            # Test 5: String matching still works alongside cli_states check
-            _cli_states.clear()
-            _cli_states.update({i: {"active": True, "cooldown_until": 0.0} for i in range(num_configs)})
-            assert worker._is_llm_unavailable("LLM timed out") is True
-            assert worker._is_llm_unavailable("Git push failed") is False
-        finally:
-            # Restore original _cli_states
-            _cli_states.clear()
-            _cli_states.update(original_cli_states)
+        # At least one CLI available: only the error text matters
+        mock_is_any_cli.return_value = False
+        assert worker._is_llm_unavailable("LLM timed out") is True
+        assert worker._is_llm_unavailable("Git push failed") is False
 
     def test_is_permanent_error(self):
         """Test that _is_permanent_error correctly detects permanent configuration issues."""
@@ -1487,9 +1588,9 @@ class TestIssueWorker:
         mock_current_branch.return_value = "main"
         task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
         worker = IssueWorker(task_source=task_source, dry_run=False)
-        # Mock _is_llm_unavailable to return True
-        worker._is_llm_unavailable = lambda _: True
-        result = worker.run(Path("/tmp"))
+        # All configured CLIs in cooldown so the no-changes skip path fires
+        with patch("auto_slopp.workers.issue_worker.are_all_clis_in_cooldown", return_value=True):
+            result = worker.run(Path("/tmp"))
         assert result["success"] is True
         assert result["tasks_processed"] == 0
         assert result["tasks_skipped"] == 1
@@ -1544,9 +1645,12 @@ class TestIssueWorker:
             "steps_completed": 3,
             "total_steps": 3,
         }
-        # Mock _is_llm_unavailable to return True
-        worker._is_llm_unavailable = lambda _: True
-        with tempfile.TemporaryDirectory() as temp_dir, caplog.at_level("WARNING"):
+        # All configured CLIs in cooldown so the no-commits-ahead skip path fires
+        with (
+            patch("auto_slopp.workers.issue_worker.are_all_clis_in_cooldown", return_value=True),
+            tempfile.TemporaryDirectory() as temp_dir,
+            caplog.at_level("WARNING"),
+        ):
             result = worker.run(Path(temp_dir))
 
         assert result["success"] is True

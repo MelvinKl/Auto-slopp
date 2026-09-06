@@ -1263,6 +1263,35 @@ class TestRalphExecutor:
             assert result["max_loops_reached"] is True
             assert "loops_executed" in result
 
+    def test_run_refined_task_loop_max_iterations_preserves_llm_unavailable_last_error(self, ralph_executor):
+        """Test that the mid-loop LLM-unavailability reason is preserved as 'last_error' at max iterations."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. Step that will never complete\n")
+
+            ralph_executor.max_iterations = 3
+            # Force every batch iteration to fail with an LLM-unavailability error
+            ralph_executor.execute_fn = lambda *args, **kwargs: {
+                "success": False,
+                "error": "claude timed out after 7200 seconds",
+            }
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+                issue_number=1,
+            )
+
+            assert result["success"] is False
+            assert result["max_loops_reached"] is True
+            assert result["loops_executed"] == 3
+            assert "timed out" in result["last_error"], "last_error must keep the mid-loop LLM timeout reason"
+
     def test_run_refined_task_loop_final_check_failure_sets_error(self, ralph_executor):
         """Test that a final acceptance check failure is reported via 'error', not just 'last_error'."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1406,6 +1435,138 @@ class TestRalphExecutor:
             assert not task_path.exists(), "Task file should be deleted on failed evaluation at max iterations"
             assert validation_calls[0] == 1
 
+    def test_run_refined_task_loop_max_iterations_final_check_failure_recorded_in_error_state(self, ralph_executor):
+        """Test that a final acceptance check failure at max iterations is recorded in the error state.
+
+        If the last step iteration succeeded (clearing ``_last_error`` and
+        ``_last_iteration_failure_reason``) and the final acceptance check
+        then fails, ``get_skip_reason()`` must still be able to surface the
+        failure so an LLM timeout during the final check skips the issue for
+        retry instead of dropping it via ``on_max_iterations_reached``.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Second step\n")
+
+            ralph_executor.max_iterations = 2
+            ralph_executor.has_changes_fn = lambda path: False
+
+            def tracking_execute_fn(*args, **kwargs):
+                task_name = kwargs.get("task_name", "unknown")
+                if task_name == "task_implementation_validation":
+                    return {"success": False, "error": "LLM timed out waiting for response"}
+                # Implementation call: close only step 1, leaving step 2 open
+                task_path.write_text("# Test\n\n## Steps\n\n- [x] 1. First step\n- [ ] 2. Second step\n")
+                return {"success": True}
+
+            ralph_executor.execute_fn = tracking_execute_fn
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+                issue_number=1,
+            )
+
+            assert result["success"] is False
+            assert result["max_loops_reached"] is True
+            assert result["last_error"] == "LLM timed out waiting for response"
+            # The failure must also be recorded in the executor's error state
+            # (the successful step iterations cleared it).
+            assert ralph_executor._last_error == "LLM timed out waiting for response"
+            assert ralph_executor._last_iteration_failure_reason == "LLM timed out waiting for response"
+            assert ralph_executor.get_skip_reason() == "LLM timed out waiting for response"
+
+    def test_run_refined_task_loop_no_open_steps_final_check_llm_failure_recorded_in_error_state(self, ralph_executor):
+        """Test that a final acceptance check failure with no open steps is recorded in the error state.
+
+        If all steps complete and the final acceptance check then fails with
+        an LLM outage, the worker sees ``max_loops_reached=False``; without
+        the failure recorded in the executor's error state,
+        ``get_skip_reason()`` would return None and the issue would be
+        dropped via ``on_task_failure`` instead of skipped for retry.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Second step\n")
+
+            ralph_executor.max_iterations = 2
+            ralph_executor.has_changes_fn = lambda path: False
+
+            def tracking_execute_fn(*args, **kwargs):
+                task_name = kwargs.get("task_name", "unknown")
+                if task_name == "task_implementation_validation":
+                    return {"success": False, "error": "LLM timed out waiting for response"}
+                # Implementation call: close all steps so the next iteration
+                # hits the no-open-steps final-check path
+                task_path.write_text("# Test\n\n## Steps\n\n- [x] 1. First step\n- [x] 2. Second step\n")
+                return {"success": True}
+
+            ralph_executor.execute_fn = tracking_execute_fn
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+                issue_number=1,
+            )
+
+            assert result["success"] is False
+            assert result["max_loops_reached"] is False
+            assert result["last_error"] == "LLM timed out waiting for response"
+            # The failure must also be recorded in the executor's error state
+            # so the worker can route it to on_skip instead of on_task_failure.
+            assert ralph_executor._last_error == "LLM timed out waiting for response"
+            assert ralph_executor._last_iteration_failure_reason == "LLM timed out waiting for response"
+            assert ralph_executor.get_skip_reason() == "LLM timed out waiting for response"
+
+    def test_run_refined_task_loop_no_open_steps_final_check_genuine_failure_not_recorded(self, ralph_executor):
+        """Test that a non-LLM final acceptance check failure does not poison the error state.
+
+        A genuine final-check failure (e.g. a `make test` failure) must not be
+        recorded in the executor's error state, so ``get_skip_reason()``
+        returns None and the task is handled via ``on_task_failure``.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n")
+
+            ralph_executor.max_iterations = 2
+            ralph_executor.has_changes_fn = lambda path: False
+
+            def tracking_execute_fn(*args, **kwargs):
+                task_name = kwargs.get("task_name", "unknown")
+                if task_name == "task_implementation_validation":
+                    return {"success": False, "error": "Final acceptance check: make test failed with exit code 2"}
+                task_path.write_text("# Test\n\n## Steps\n\n- [x] 1. First step\n")
+                return {"success": True}
+
+            ralph_executor.execute_fn = tracking_execute_fn
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+                issue_number=1,
+            )
+
+            assert result["success"] is False
+            assert result["max_loops_reached"] is False
+            assert result["last_error"] == "Final acceptance check: make test failed with exit code 2"
+            assert ralph_executor.get_skip_reason() is None
+
     def test_run_refined_task_loop_no_intermediate_checks(self, ralph_executor):
         """Test that refined task loop executes steps in a single batch call with final validation."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1461,9 +1622,238 @@ class TestRalphExecutor:
 
             implementation_calls = [c for c in call_log if c == "implementation"]
             validation_calls = [c for c in call_log if c == "task_implementation_validation"]
+            remaining_steps_calls = [c for c in call_log if c == "remaining_steps_update"]
 
             # With batch execution, all steps are implemented in a single CLI call
             assert (
                 len(implementation_calls) == 1
             ), f"Expected 1 batched implementation call, got {len(implementation_calls)}"
             assert len(validation_calls) == 1, f"Expected 1 final validation call, got {len(validation_calls)}"
+            assert (
+                len(remaining_steps_calls) == 0
+            ), f"Expected 0 remaining_steps_update calls, got {len(remaining_steps_calls)}"
+
+    def test_is_llm_unavailable_no_error(self, ralph_executor):
+        """Test _is_llm_unavailable returns False when no error is set."""
+        assert ralph_executor._is_llm_unavailable() is False
+
+    def test_is_llm_unavailable_timeout(self, ralph_executor):
+        """Test _is_llm_unavailable detects timeout errors."""
+        ralph_executor._last_error = "claude timed out after 7200 seconds"
+        assert ralph_executor._is_llm_unavailable() is True
+
+    def test_is_llm_unavailable_rate_limit(self, ralph_executor):
+        """Test _is_llm_unavailable detects rate limit errors."""
+        ralph_executor._last_error = "Rate limit exceeded: too many requests"
+        assert ralph_executor._is_llm_unavailable() is True
+
+    def test_is_llm_unavailable_connection_refused(self, ralph_executor):
+        """Test _is_llm_unavailable detects connection refused errors."""
+        ralph_executor._last_error = "Connection refused to API endpoint"
+        assert ralph_executor._is_llm_unavailable() is True
+
+    def test_is_llm_unavailable_503(self, ralph_executor):
+        """Test _is_llm_unavailable detects 503 service unavailable errors."""
+        ralph_executor._last_error = "503 Service Unavailable"
+        assert ralph_executor._is_llm_unavailable() is True
+
+    def test_is_llm_unavailable_step_failure_not_unavailable(self, ralph_executor):
+        """Test _is_llm_unavailable returns False for non-LLM failures."""
+        ralph_executor._last_error = "Step implementation failed: syntax error in code"
+        assert ralph_executor._is_llm_unavailable() is False
+
+    def test_is_llm_unavailable_parse_failure_not_unavailable(self, ralph_executor):
+        """Test _is_llm_unavailable returns False for parse failures."""
+        ralph_executor._last_error = "Failed to parse updated task file: invalid format"
+        assert ralph_executor._is_llm_unavailable() is False
+
+    def test_is_llm_unavailable_llm_down(self, ralph_executor):
+        """Test _is_llm_unavailable detects explicit LLM down indicators."""
+        ralph_executor._last_error = "LLM is down, please try again later"
+        assert ralph_executor._is_llm_unavailable() is True
+
+    def test_is_llm_unavailable_service_unavailable(self, ralph_executor):
+        """Test _is_llm_unavailable detects service unavailable errors."""
+        ralph_executor._last_error = "Service unavailable: API endpoint not responding"
+        assert ralph_executor._is_llm_unavailable() is True
+
+    def test_is_llm_unavailable_prefers_last_iteration_failure_reason(self, ralph_executor):
+        """Test _is_llm_unavailable prefers _last_iteration_failure_reason over _last_error."""
+        # Set a stale non-LLM error from earlier in the run
+        ralph_executor._last_error = "Step implementation failed: syntax error"
+        # Set the current iteration error that indicates LLM unavailability
+        ralph_executor._last_iteration_failure_reason = "timed out waiting for response"
+        assert ralph_executor._is_llm_unavailable() is True
+
+    def test_is_llm_unavailable_last_iteration_failure_reason_fallback(self, ralph_executor):
+        """Test _is_llm_unavailable falls back to _last_error when _last_iteration_failure_reason is None."""
+        ralph_executor._last_iteration_failure_reason = None
+        ralph_executor._last_error = "timed out after 7200 seconds"
+        assert ralph_executor._is_llm_unavailable() is True
+
+    def test_is_llm_unavailable_last_iteration_failure_reason_clears_on_success(self, ralph_executor):
+        """Test that _last_iteration_failure_reason is cleared after a successful iteration."""
+        ralph_executor._last_iteration_failure_reason = "timed out waiting for response"
+        assert ralph_executor._is_llm_unavailable() is True
+
+        # Simulate a successful iteration clearing the error
+        ralph_executor._last_iteration_failure_reason = None
+        assert ralph_executor._is_llm_unavailable() is False
+
+    def test_get_skip_reason_no_error(self, ralph_executor):
+        """Test get_skip_reason returns None when no error is set."""
+        assert ralph_executor.get_skip_reason() is None
+
+    def test_get_skip_reason_returns_reason_when_unavailable(self, ralph_executor):
+        """Test get_skip_reason returns the error message when it indicates LLM unavailability."""
+        ralph_executor._last_error = "LLM timed out waiting for response"
+        assert ralph_executor.get_skip_reason() == "LLM timed out waiting for response"
+
+    def test_get_skip_reason_prefers_last_iteration_failure_reason(self, ralph_executor):
+        """Test get_skip_reason prefers _last_iteration_failure_reason over _last_error."""
+        ralph_executor._last_error = "stale error from earlier phase"
+        ralph_executor._last_iteration_failure_reason = "connection refused"
+        assert ralph_executor.get_skip_reason() == "connection refused"
+
+    def test_get_skip_reason_none_for_non_unavailable_error(self, ralph_executor):
+        """Test get_skip_reason returns None for errors that do not indicate LLM unavailability."""
+        ralph_executor._last_error = "Step implementation failed: syntax error"
+        assert ralph_executor.get_skip_reason() is None
+
+    def test_run_refined_task_loop_sets_last_iteration_failure_reason_on_failure(self, ralph_executor):
+        """Test that _last_iteration_failure_reason is set during the loop on step failure."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. Step that will fail\n")
+
+            ralph_executor.max_iterations = 2
+            call_count = [0]
+
+            def failing_execute_fn(*args, **kwargs):
+                call_count[0] += 1
+                return {"success": False, "error": "timed out waiting for response"}
+
+            ralph_executor.execute_fn = failing_execute_fn
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is False
+            assert result["max_loops_reached"] is True
+            # Verify _last_iteration_failure_reason was set during the loop
+            assert ralph_executor._last_iteration_failure_reason is not None
+            assert "timed out" in ralph_executor._last_iteration_failure_reason
+
+    def test_run_refined_task_loop_last_iteration_failure_reason_cleared_on_success(self, ralph_executor):
+        """Test that _last_iteration_failure_reason is cleared after a successful iteration."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Second step that fails\n")
+
+            ralph_executor.max_iterations = 5
+            call_count = [0]
+
+            def success_then_fail(*args, **kwargs):
+                call_count[0] += 1
+                if call_count[0] == 1:
+                    return {"success": True, "stdout": "Done"}
+                return {"success": False, "error": "timed out waiting for response"}
+
+            ralph_executor.execute_fn = success_then_fail
+            ralph_executor.has_changes_fn = lambda path: True
+            ralph_executor.commit_fn = lambda path, msg, push: (True, None)
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is False
+            # After the first successful iteration, _last_iteration_failure_reason should be None
+            # (it was cleared), then set again on the second failure
+            assert ralph_executor._last_iteration_failure_reason is not None
+            assert "timed out" in ralph_executor._last_iteration_failure_reason
+
+    def test_run_refined_task_loop_clears_last_error_after_successful_iteration(self, ralph_executor):
+        """Test that a stale _last_error is cleared after a successful iteration."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Second step that fails\n")
+
+            ralph_executor.max_iterations = 5
+            # Simulate a transient timeout from an earlier phase of the run.
+            ralph_executor._last_error = "timed out waiting for response"
+            call_count = [0]
+            error_after_success = []
+
+            def success_then_fail(*args, **kwargs):
+                call_count[0] += 1
+                if call_count[0] == 1:
+                    return {"success": True, "stdout": "Done"}
+                # The stale error must have been cleared by the successful
+                # first iteration before the second iteration runs.
+                error_after_success.append(ralph_executor._last_error)
+                return {"success": False, "error": "timed out waiting for response"}
+
+            ralph_executor.execute_fn = success_then_fail
+            ralph_executor.has_changes_fn = lambda path: True
+            ralph_executor.commit_fn = lambda path, msg, push: (True, None)
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+            )
+
+            assert result["success"] is False
+            # The first call after the successful iteration must see a cleared
+            # _last_error (later failures set it again).
+            assert error_after_success[0] is None
+
+    def test_run_refined_task_loop_clears_error_state_on_successful_completion(self, ralph_executor):
+        """Test that both error fields are cleared when the run completes successfully."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [x] 1. Completed step\n- [x] 2. Also completed\n")
+
+            # Simulate a transient timeout that occurred in an earlier run/phase.
+            ralph_executor._last_error = "timed out waiting for response"
+            ralph_executor._last_iteration_failure_reason = "timed out waiting for response"
+
+            ralph_executor.execute_fn = lambda *args, **kwargs: {
+                "success": True,
+                "stdout": "acceptance_status: pass",
+            }
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+                issue_number=1,
+            )
+
+            assert result["success"] is True
+            assert ralph_executor._last_error is None
+            assert ralph_executor._last_iteration_failure_reason is None
+            # A successful completion must not be misclassified as LLM-unavailable.
+            assert ralph_executor.get_skip_reason() is None

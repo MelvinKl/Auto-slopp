@@ -12,8 +12,9 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
+from auto_slopp.constants import error_indicates_llm_unavailability
 from auto_slopp.utils.cli_executor import (
-    _cli_states,
+    are_all_clis_in_cooldown,
     execute_with_instructions,
     get_active_cli_command,
     run_cli_executor,
@@ -188,7 +189,15 @@ class IssueWorker(Worker):
     def _is_llm_unavailable(self, error_msg: str) -> bool:
         """Check if the error indicates LLM unavailability.
 
-        Uses specific patterns to avoid false positives from unrelated errors.
+        Uses the shared unavailability patterns from :mod:`auto_slopp.constants`
+        (the same source of truth as :class:`RalphExecutor`) to avoid false
+        positives from unrelated errors. HTTP status codes are matched with
+        word boundaries via the shared constant.
+
+        CLI unavailability (all configured CLIs in cooldown) is treated only
+        as a secondary confirmation via the shared
+        :func:`are_all_clis_in_cooldown` helper, never as an independent
+        trigger (mirrors :meth:`RalphExecutor._is_llm_unavailable`).
 
         Args:
             error_msg: The error message to check
@@ -196,42 +205,24 @@ class IssueWorker(Worker):
         Returns:
             True if the error indicates LLM is unavailable, False otherwise
         """
-        error_lower = error_msg.lower()
-        error_indicates_unavailable = (
-            "timed out" in error_lower
-            or "connection refused" in error_lower
-            or "connection reset" in error_lower
-            or "rate limit" in error_lower
-            or "too many requests" in error_lower
-            or "service unavailable" in error_lower
-            or "gateway timeout" in error_lower
-            or re.search(r"\bllm unavailable\b", error_lower) is not None
-            or "no active cli" in error_lower
-            or "all cli" in error_lower
-            or "exhausted" in error_lower
-            or "cooldown" in error_lower
-            or "no configuration meets" in error_lower
-            or "503" in error_lower
-            or "502" in error_lower
-            or "504" in error_lower
-            or "internal server error" in error_lower
-        )
-        # Also check if all CLI configurations are inactive (in cooldown) and cooldown hasn't expired
-        all_clis_inactive = False
-        cli_configs = settings.cli_configurations
-        if cli_configs and _cli_states:
-            now = time.time()
-            num_configs = len(cli_configs)
-            if num_configs > 0:
-                all_clis_inactive = True
-                for i in range(num_configs):
-                    state = _cli_states.get(i, {"active": True, "cooldown_until": 0.0})
-                    # CLI is available if active, or if inactive but cooldown has expired
-                    if state.get("active", True) or now >= state.get("cooldown_until", 0.0):
-                        all_clis_inactive = False
-                        break
-
-        return error_indicates_unavailable or all_clis_inactive
+        if not error_msg:
+            return False
+        # Pass the explicit CLI state derived from this module's own import
+        # (rather than letting the helper lazily import it from cli_executor)
+        # so weak-pattern corroboration follows the same, patchable code path
+        # as the cooldown check below.
+        if error_indicates_llm_unavailability(error_msg, all_clis_in_cooldown=are_all_clis_in_cooldown()):
+            return True
+        # CLI unavailability is treated only as a secondary confirmation, never
+        # an independent trigger. A genuine code error (e.g. "syntax error in
+        # code") must not be misclassified as "LLM unavailable" just because all
+        # CLIs happen to be in a transient cooldown window.
+        if are_all_clis_in_cooldown():
+            self.logger.debug(
+                f"Error did not match unavailability patterns and all configured CLIs "
+                f"are in cooldown; not treating as LLM unavailable: {error_msg!r}"
+            )
+        return False
 
     def _is_permanent_error(self, error_msg: str) -> bool:
         """Check if the error indicates a permanent configuration/setup issue.
@@ -340,6 +331,29 @@ class IssueWorker(Worker):
                     result["error"] = ralph_error
 
                     if ralph_result.get("max_loops_reached", False):
+                        # LLM outages inside the step loop also surface as max_loops_reached
+                        # after all iterations are exhausted. Ask the executor for its
+                        # preserved mid-loop failure reason (stale run-level errors are
+                        # already cleared/demoted inside get_skip_reason) so the issue is
+                        # skipped for retry instead of being permanently dropped as
+                        # "exhausted iterations".
+                        skip_reason = self.ralph_executor.get_skip_reason()
+                        if skip_reason:
+                            self.logger.warning(
+                                f"LLM unavailable during Ralph loop, skipping task #{task_id}: {skip_reason}"
+                            )
+                            self.task_source.on_skip(task, skip_reason)
+                            result["success"] = True
+                            result["skipped"] = True
+                            result["skip_reason"] = skip_reason
+                            # The generic "Maximum iterations reached" message
+                            # in result["error"] does not describe the actual
+                            # failure; carry the underlying mid-loop failure in
+                            # result["root_error"] as well so the two don't
+                            # contradict each other.
+                            result["root_error"] = skip_reason
+                            result["error"] = skip_reason
+                            return result
                         self.logger.warning(f"Ralph loop reached max iterations for task #{task_id}")
                         self.task_source.on_max_iterations_reached(
                             task,
@@ -347,12 +361,16 @@ class IssueWorker(Worker):
                             ralph_result.get("total_steps", 0),
                             ralph_result.get("error", "Unknown error"),
                         )
-                    elif self._is_llm_unavailable(ralph_error):
-                        self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                        self.task_source.on_skip(task, ralph_error)
+                    elif skip_reason := self.ralph_executor.get_skip_reason():
+                        # RalphExecutor.execute() records early failures
+                        # (update/refinement) into its error state, so both
+                        # skip decisions above reference the same source of
+                        # truth as the max_loops_reached branch.
+                        self.logger.warning(f"LLM unavailable, skipping task #{task_id}: {skip_reason}")
+                        self.task_source.on_skip(task, skip_reason)
                         result["success"] = True
                         result["skipped"] = True
-                        result["skip_reason"] = ralph_error
+                        result["skip_reason"] = skip_reason
                         return result
                     elif self._is_permanent_error(ralph_error):
                         self.logger.error(f"Permanent error detected for task #{task_id}: {ralph_error}")
@@ -404,8 +422,14 @@ class IssueWorker(Worker):
 
             current_branch = get_current_branch(repo_dir)
             if current_branch in ("main", "master"):
-                if self._is_llm_unavailable(""):
-                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
+                # A run that reaches this point has succeeded, which clears the
+                # executor's error state (get_skip_reason() can only return None
+                # here), so the skip trigger is the CLI state itself: if all
+                # configured CLIs are in cooldown the task is skipped for retry
+                # instead of being closed as "no changes" (a deployment with no
+                # configured CLIs is a misconfiguration, not an outage).
+                if are_all_clis_in_cooldown():
+                    self.logger.warning(f"All CLIs in cooldown, skipping task #{task_id}: no changes made")
                     self.task_source.on_skip(task, "LLM unavailable - no changes made")
                     result["success"] = True
                     result["skipped"] = True
@@ -428,8 +452,12 @@ class IssueWorker(Worker):
             # to ensure everything is committed before proceeding.
             ahead_count = get_commits_ahead_of_branch(repo_dir, base_branch="main")
             if ahead_count == 0:
-                if self._is_llm_unavailable(""):
-                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
+                # See the "no changes made" branch above: a run that reaches
+                # this point has succeeded, so the skip trigger is the CLI
+                # state itself (all configured CLIs in cooldown), not the
+                # executor's (cleared) failure reason.
+                if are_all_clis_in_cooldown():
+                    self.logger.warning(f"All CLIs in cooldown, skipping task #{task_id}: no commits ahead")
                     self.task_source.on_skip(task, "LLM unavailable - no commits ahead")
                     result["success"] = True
                     result["skipped"] = True

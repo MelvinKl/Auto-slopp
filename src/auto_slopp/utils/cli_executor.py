@@ -467,6 +467,52 @@ def run_cli_executor(  # noqa: C901 -- long orchestrator; splitting deferred (is
     return final_result
 
 
+def is_any_cli_available() -> bool:
+    """Check if any CLI configuration is currently available (active or cooldown expired).
+
+    This is a public API to avoid tight coupling with the private _cli_states module variable.
+    Used by RalphExecutor and IssueWorker to detect LLM unavailability.
+
+    Returns:
+        True if at least one CLI configuration is available, False otherwise.
+    """
+    now = time.time()
+    for index in range(len(settings.cli_configurations)):
+        state = _get_cli_state(index)
+        # CLI is available if active, or if inactive but cooldown has expired
+        if state.get("active", True) or now >= state.get("cooldown_until", 0.0):
+            return True
+    return False
+
+
+def has_cli_configurations() -> bool:
+    """Return True if at least one CLI configuration is defined.
+
+    A deployment with zero configured CLIs is a misconfiguration, not a
+    transient outage. Callers use this to distinguish "no CLI configured"
+    from "all configured CLIs are in cooldown".
+
+    Returns:
+        True if ``settings.cli_configurations`` is non-empty, False otherwise.
+    """
+    return len(settings.cli_configurations) > 0
+
+
+def are_all_clis_in_cooldown() -> bool:
+    """Return True when CLIs are configured but none is currently available.
+
+    Unlike :func:`is_any_cli_available` (which also returns False when zero
+    CLIs are configured), this returns False for the no-CLI-configured
+    misconfiguration, so it only reports a transient all-in-cooldown state
+    where retrying later is meaningful.
+
+    Returns:
+        True if at least one CLI is configured and none is available, False
+        otherwise (including when no CLIs are configured at all).
+    """
+    return has_cli_configurations() and not is_any_cli_available()
+
+
 def execute_with_instructions(
     instructions: str,
     work_dir: Path,

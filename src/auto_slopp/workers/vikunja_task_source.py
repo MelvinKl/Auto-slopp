@@ -16,6 +16,7 @@ from auto_slopp.utils.vikunja_operations import (
     comment_on_task,
     find_or_create_project,
     get_open_tasks_by_project,
+    get_task_details,
     update_task_status,
     verify_blocking_closed,
 )
@@ -27,6 +28,67 @@ logger = logging.getLogger(__name__)
 
 class VikunjaTaskSource(TaskSource):
     """Task source that loads tasks from Vikunja."""
+
+    # Marker shared by all skip comments; used to detect an already-posted
+    # skip comment so repeated retries during a prolonged outage do not add
+    # duplicate comments (and commits) on every retry cycle.
+    SKIP_COMMENT_MARKER = "⏭️ **Task Skipped**"
+
+    def _update_task_with_comment_and_status(
+        self,
+        task_id: int,
+        comment: str,
+        repo_path: Path,
+        status: str | None = None,
+        commit_message: str | None = None,
+    ) -> bool:
+        """Post a comment and optionally update the task status in Vikunja.
+
+        This is a convenience helper that combines :func:`comment_on_task`,
+        :func:`update_task_status`, and :func:`commit` into a single call.
+        It is used by lifecycle hooks (e.g. ``on_task_complete``,
+        ``on_no_changes``, ``on_max_iterations_reached``) to keep the common
+        "comment + status transition + commit" pattern DRY.
+
+        Args:
+            task_id: Vikunja task ID.
+            comment: Comment text to post on the task.
+            repo_path: Repository path for committing changes.
+            status: Optional new status to set (e.g. "skipped", "failed").
+            commit_message: Optional commit message. Defaults to
+                ``f"Updated task {task_id}: {status}"`` when ``status`` is
+                provided, or ``f"Added comment to task {task_id}"`` otherwise.
+
+        Note:
+            If the comment succeeds but the status update fails, a
+            comment-only commit is still made (intentional: the posted
+            comment is tracked as a commit rather than skipped, so a
+            failed status transition does not lose the comment record).
+
+        Returns:
+            ``True`` if the comment was posted successfully.  Failures to
+            post the comment are logged and return ``False``; status
+            transition and commit failures are logged but do not affect
+            the return value.
+        """
+        comment_success = comment_on_task(task_id, comment)
+        if not comment_success:
+            logger.warning(f"Failed to add comment to task {task_id}")
+            return False
+
+        if status:
+            status_success = update_task_status(task_id, status)
+            if status_success:
+                commit_msg = commit_message or f"Updated task {task_id}: {status}"
+                commit(repo_path, commit_msg)
+                return True
+            else:
+                logger.warning(f"Failed to update status to '{status}' for task {task_id}")
+                # Fall through to add comment commit if status update failed
+
+        commit_msg = commit_message or f"Added comment to task {task_id}"
+        commit(repo_path, commit_msg)
+        return True
 
     @staticmethod
     def _project_identifier(repo_path: Path) -> str:
@@ -203,13 +265,15 @@ class VikunjaTaskSource(TaskSource):
             f"**Branch:** {branch_name}{pr_info}\n\n"
             f"Changes have been committed and pushed. The task is ready for review."
         )
-        self._update_task_with_comment_and_status(task.id, success_comment, "done", repo_path)
+        self._update_task_with_comment_and_status(task.id, success_comment, repo_path, "done")
 
     def on_task_failure(self, task: Task, error: str) -> None:
         """Called when a task fails.
 
-        Updates task status to failed and adds a failure comment.
-        Uses a single atomic commit for both the status update and comment.
+        Updates task status to "failed" and adds a failure comment. The
+        status transition is attempted even if posting the comment fails, so
+        a task whose comment posting failed still ends up "failed" instead of
+        silently staying in its previous status.
 
         Args:
             task: The failed task
@@ -217,7 +281,7 @@ class VikunjaTaskSource(TaskSource):
         """
         repo_path = task.raw.get("_repo_path")
         if repo_path is None:
-            logger.warning(f"No repo_path found in task #{task.id}, skipping failure handling")
+            logger.error(f"No repo_path found in task #{task.id}, skipping failure handling")
             return
 
         failure_comment = (
@@ -242,8 +306,7 @@ class VikunjaTaskSource(TaskSource):
     def on_no_changes(self, task: Task) -> None:
         """Called when no changes were needed for a task.
 
-        Updates Vikunja task status to done with a no-changes comment.
-        Uses a single atomic commit for both the status update and comment.
+        Updates Vikunja task status to "done" with a no-changes comment.
 
         Args:
             task: The task that required no changes
@@ -260,37 +323,79 @@ class VikunjaTaskSource(TaskSource):
             logger.warning(f"No repo_path found in task #{task.id}, skipping no-changes handling")
             return
 
-        self._update_task_with_comment_and_status(task.id, no_changes_comment, "done", repo_path)
+        self._update_task_with_comment_and_status(
+            task_id=task.id,
+            comment=no_changes_comment,
+            repo_path=repo_path,
+            status="done",
+            commit_message="Updated task status to 'done'",
+        )
 
-    def _update_task_with_comment_and_status(self, task_id: int, comment: str, status: str, repo_path: Path) -> None:
-        """Update a Vikunja task's status and add a comment in a single atomic commit.
+    def on_skip(self, task: Task, reason: str) -> None:
+        """Called when a task is skipped (e.g., due to LLM unavailability).
 
-        Only commits when both comment_on_task and update_task_status succeed.
-        Logs warnings if either operation fails so failures are visible.
+        Adds a skip comment to the task but does NOT change the task status:
+        Vikunja statuses are per-project and user-defined, so a project may
+        not have a status named "skipped" (which would make the status update
+        fail on every skip), and ``get_tasks`` only picks up tasks that are
+        not ``done``, so leaving the status unchanged keeps the task eligible
+        for retry once the LLM is available again.
 
         Args:
-            task_id: The Vikunja task ID
-            comment: Comment text to add to the task
-            status: New status to set (e.g., 'done', 'failed', 'skipped')
-            repo_path: Path to the repository for git commit
+            task: The task being skipped
+            reason: Reason for skipping (e.g., "LLM unavailable")
         """
-        comment_success = comment_on_task(task_id, comment)
-        if not comment_success:
-            logger.warning(f"Failed to add comment to task {task_id}")
+        repo_path = task.raw.get("_repo_path")
+        if repo_path is None:
+            logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
+            return
 
-        status_success = update_task_status(task_id, status)
-        if not status_success:
-            logger.warning(f"Failed to update status to '{status}' for task {task_id}")
+        if self._latest_comment_is_skip_comment(task.id):
+            logger.info(f"Task #{task.id} already ends with a skip comment; not posting another: {reason}")
+            return
 
-        # Only commit when both operations succeeded to avoid orphan commits
-        if comment_success and status_success:
-            commit(repo_path, f"Updated task {task_id} status to '{status}' and added comment")
+        skip_comment = (
+            f"{self.SKIP_COMMENT_MARKER}\n\n"
+            f"Reason: {reason}\n\n"
+            f"This task will be retried when the LLM becomes available."
+        )
+        comment_success = comment_on_task(task.id, skip_comment)
+        if comment_success:
+            commit(repo_path, f"Added comment to task {task.id}")
+            logger.info(f"Added skip comment to task {task.id} (status left unchanged): {reason}")
+        else:
+            logger.warning(f"Failed to add skip comment to task {task.id}")
+
+    def _latest_comment_is_skip_comment(self, task_id: int) -> bool:
+        """Return True if the most recent comment on the task is a skip comment.
+
+        Used by :meth:`on_skip` to avoid posting a duplicate skip comment (and
+        commit) on every retry cycle of a prolonged outage.
+
+        Args:
+            task_id: Vikunja task ID to check.
+
+        Returns:
+            True if the latest comment is a skip comment, False otherwise
+            (including when the task details or comments cannot be fetched).
+        """
+        try:
+            task_details = get_task_details(task_id)
+        except Exception as e:
+            logger.warning(f"Failed to check existing comments for task {task_id}: {e}")
+            return False
+        if not task_details:
+            return False
+        comments = task_details.get("comments") or []
+        if not comments:
+            return False
+        latest = max(comments, key=lambda c: c.get("created_time") or "")
+        return self.SKIP_COMMENT_MARKER in (latest.get("content") or "")
 
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.
 
-        Updates Vikunja task status to failed and adds a failure comment.
-        Uses a single atomic commit for both the status update and comment.
+        Updates Vikunja task status to "failed" and adds a failure comment.
 
         Args:
             task: The task that hit the iteration limit
@@ -311,30 +416,13 @@ class VikunjaTaskSource(TaskSource):
             logger.warning(f"No repo_path found in task #{task.id}, skipping max-iterations handling")
             return
 
-        self._update_task_with_comment_and_status(task.id, failure_comment, "failed", repo_path)
-
-    def on_skip(self, task: Task, reason: str) -> None:
-        """Called when a task is skipped (e.g., due to LLM unavailability).
-
-        Adds a skip comment to the task but does NOT change the task status,
-        so the task remains eligible for future processing.
-
-        Args:
-            task: The task being skipped
-            reason: Reason for skipping (e.g., "LLM unavailable")
-        """
-        repo_path = task.raw.get("_repo_path")
-        if repo_path is None:
-            logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
-            return
-
-        skip_comment = (
-            f"⏭️ **Task Skipped**\n\n"
-            f"Reason: {reason}\n\n"
-            f"This task will be retried when the LLM becomes available."
+        self._update_task_with_comment_and_status(
+            task_id=task.id,
+            comment=failure_comment,
+            repo_path=repo_path,
+            status="failed",
+            commit_message="Updated task status to 'failed'",
         )
-        comment_on_task(task.id, skip_comment)
-        logger.info(f"Added skip comment to task {task.id}: {reason}")
 
     def _filter_tasks_by_tag(self, tasks: list[dict], tag_name: str) -> list[dict]:
         """Filter tasks to only those whose labels contain a label with a matching title.

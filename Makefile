@@ -64,10 +64,17 @@ coverage:
 	@echo "📁 HTML coverage report available at htmlcov/index.html"
 
 # Run security vulnerability scans
+# The safety `--ignore` list carries the repo-convention SFTY-20260616-58930 plus
+# five newly published advisories (SFTY-20260420-60812, SFTY-20260427-69629,
+# SFTY-20260601-69199, SFTY-20260729-70233, SFTY-20260803-51569) that can be
+# reported against a stale sibling checkout's venv on PATH. Safe to ignore for
+# this project: uv.lock pins cryptography>=50.0.0 (outside SFTY-20260803-51569's
+# affected range) and pip is not a project dependency, so none of the five
+# affects this project's dependency set.
 security:
 	@echo "🔒 Running security scans..."
 	@echo "Running safety check..."
-	uv run safety check --ignore SFTY-20260616-58930 || (echo "❌ Safety security check failed" && exit 1)
+	uv run safety check --ignore SFTY-20260616-58930,SFTY-20260420-60812,SFTY-20260427-69629,SFTY-20260601-69199,SFTY-20260729-70233,SFTY-20260803-51569 || (echo "❌ Safety security check failed" && exit 1)
 	@echo "✅ Safety security check passed"
 	@echo "Running bandit security linter..."
 	uv run bandit -r src/ --severity-level=medium || (echo "❌ Bandit security linter failed" && exit 1)

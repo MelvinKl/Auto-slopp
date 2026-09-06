@@ -804,8 +804,8 @@ from auto_slopp.workers import PRWorker
 # Disable in AUTO_SLOPP_WORKERS_DISABLED
 # Returns: PR status, merge results, branch information
 ```
-
 ### IssueWorker
+
 A unified worker class that processes tasks/issues using the Ralph execution logic. It accepts a TaskSource (base class) that abstracts the task loading mechanism, allowing it to work with different task sources (GitHub issues, Vikunja tasks, etc.).
 
 The Ralph executor implements a structured 5-step process for handling issues:
@@ -829,7 +829,15 @@ vikunja_worker = IssueWorker(task_source=VikunjaTaskSource())
 
 The task execution creates a markdown-based plan file in `.ralph/` with checkboxes for each step. Steps are executed sequentially. Completed steps are committed automatically. A final acceptance check validates all steps at once after completion. The final step always verifies that `make test` passes.
 
-If the final evaluation fails (either after all steps complete or at max iterations), the task file is deleted so it will be recreated from scratch on the next iteration, ensuring a completely fresh context.
+#### LLM Unavailability Handling
+
+When the Ralph loop hits the maximum iteration limit, the worker now distinguishes between two scenarios:
+
+- **Genuine iteration exhaustion**: The task genuinely requires more iterations than allowed. The task is marked as failed permanently via `on_max_iterations_reached`, and the issue/task is closed with a failure comment.
+
+- **LLM unavailability during execution**: The LLM/CLI tool became unavailable mid-loop (timeouts, connection errors, rate limits, service unavailable). The task is **skipped** via `on_skip` instead of failed, preserving it for automatic retry when the LLM becomes available again. A skip comment is posted to the issue (GitHub keeps the required label so it stays eligible for retry) or committed to the task (Vikunja, which leaves the task status unchanged) so it can be picked up on the next cycle.
+
+This behavior is detected in the worker's `max_loops_reached` handling: `IssueWorker` asks the Ralph executor via `RalphExecutor.get_skip_reason()`, which checks the failure reasons preserved by the executor (the per-iteration reason from the step loop is preferred, falling back to the run-level error) for patterns like "timed out", "rate limit", "connection refused", "service unavailable", "503", etc. A mid-loop LLM outage is therefore skipped for retry rather than dropped as exhausted iterations.
 
 ### PR-to-Issue Linking
 

@@ -14,6 +14,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from auto_slopp.constants import UNAVAILABILITY_PATTERNS as _UNAVAILABILITY_PATTERNS
+from auto_slopp.constants import error_indicates_llm_unavailability
+from auto_slopp.utils.cli_executor import are_all_clis_in_cooldown
+
 logger = logging.getLogger(__name__)
 
 
@@ -222,11 +226,33 @@ class RalphExecutor:
     task plans defined in markdown files with step-by-step checkboxes.
 
     Error tracking fields:
-        - ``_last_error``: The most recent error encountered during execution.
-          This is overwritten on every iteration (successful or not) and represents
-          the latest error state.
+        _last_error: Stores the most recent error message from any Ralph
+            operation (e.g., refinement, parsing, final acceptance check).
+            This field is set early in the run (before the step loop) and
+            persists as a "stale" error until overwritten or cleared. It is
+            cleared after a successful iteration and on successful
+            completion so it cannot be mistaken for the cause of a later
+            skip decision. It is used as a fallback by
+            :meth:`_is_llm_unavailable` when no per-iteration
+            error is available.
+        _last_iteration_failure_reason: Stores the error reason from the
+            most recent iteration inside the step loop. This is cleared
+            after a successful iteration and overwritten on failure. It
+            takes precedence over :attr:`_last_error` in
+            :meth:`_is_llm_unavailable` because it reflects the actual
+            failure that caused loop exhaustion (e.g., an LLM outage mid-loop)
+            rather than a stale error from an earlier phase.
 
+    Class constants:
+        UNAVAILABILITY_PATTERNS: Lowercase substrings that indicate the LLM/
+            CLI tool is unavailable. Used by :meth:`_is_llm_unavailable` to
+            distinguish temporary outages (which should trigger a skip for
+            retry) from genuine iteration exhaustion (which should drop the
+            task via :meth:`TaskSource.on_max_iterations_reached`).
     """
+
+    # Shared source of truth for LLM unavailability detection.
+    UNAVAILABILITY_PATTERNS: tuple[str, ...] = _UNAVAILABILITY_PATTERNS
 
     def __init__(
         self,
@@ -270,10 +296,11 @@ class RalphExecutor:
 
         # Error tracking fields.
         # _last_error: overwritten on every iteration; represents the latest error state.
-        self._last_error: Optional[str] = None
         self.task_planning_name = task_planning_name
         self.implementation_name = implementation_name
         self.validation_name = validation_name
+        self._last_error: Optional[str] = None
+        self._last_iteration_failure_reason: Optional[str] = None
 
     def _get_issue_task_path(self, repo_dir: Path, issue_number: int) -> Path:
         """Get the canonical task file path for a task."""
@@ -802,6 +829,76 @@ class RalphExecutor:
 
         return {"success": True}
 
+    def _current_failure_reason(self) -> Optional[str]:
+        """Return the most relevant recent failure reason.
+
+        The per-iteration reason is preferred over the run-level
+        :attr:`_last_error` because it reflects the failure that actually
+        caused the loop to stop (e.g., an LLM outage mid-loop) rather than
+        a stale error from an earlier phase. Both :meth:`_is_llm_unavailable`
+        and :meth:`get_skip_reason` use this helper so the precedence rule
+        stays in one place.
+
+        Returns:
+            The most recent failure reason, or ``None`` if no error is set.
+        """
+        return self._last_iteration_failure_reason or self._last_error
+
+    def _is_llm_unavailable(self) -> bool:
+        """Check if the last error indicates the LLM/CLI tool is unavailable.
+
+        Detects LLM unavailability by looking for timeout patterns and other
+        indicators that the CLI tool (e.g., Claude Code, opencode) cannot
+        respond. This is used to distinguish between genuine iteration
+        exhaustion and temporary LLM outages that should trigger a skip
+        for retry.
+
+        Returns:
+            True if the last error indicates LLM unavailability, False otherwise.
+        """
+        # Prefer the error from the last iteration (most accurate for
+        # distinguishing LLM unavailability during the loop from stale
+        # errors set earlier in the run).
+        error = self._current_failure_reason()
+        if not error:
+            return False
+
+        error_indicates_unavailable = error_indicates_llm_unavailability(error)
+        if error_indicates_unavailable:
+            return True
+
+        # CLI unavailability is treated only as a secondary confirmation, never
+        # an independent trigger. A genuine code error (e.g. "syntax error in
+        # code") must not be misclassified as "LLM unavailable" just because all
+        # CLIs happen to be in a transient cooldown window.
+        if are_all_clis_in_cooldown():
+            logger.debug(
+                f"Error did not match unavailability patterns and all configured CLIs "
+                f"are in cooldown; not treating as LLM unavailable: {error!r}"
+            )
+        return False
+
+    def get_skip_reason(self) -> Optional[str]:
+        """Return the last failure reason if it indicates LLM unavailability.
+
+        Public accessor so callers (e.g. :class:`IssueWorker`) do not need to
+        reach into the executor's private error-tracking fields. It wraps
+        :meth:`_is_llm_unavailable` and returns the underlying error message
+        (per-iteration reason preferred over the stale run-level error) so the
+        caller can surface the actual failure (e.g. "timed out waiting for
+        response") in skip comments.
+
+        Returns:
+            The most recent failure reason if it indicates the LLM/CLI tool is
+            unavailable, ``None`` otherwise.
+        """
+        error = self._current_failure_reason()
+        if not error:
+            return None
+        if self._is_llm_unavailable():
+            return error
+        return None
+
     def _step_is_closed(self, task_path: Path, step_number: int) -> bool:
         """Check whether a step is marked as completed in the task file."""
         try:
@@ -854,6 +951,15 @@ class RalphExecutor:
         branch_name: str,
     ) -> dict[str, Any]:
         """Execute issue processing using refined task execution in .ralph/github-<issue>.md."""
+        # Clear any error state left over from a previous task: IssueWorker
+        # reuses one executor for every task, and early-failure paths below
+        # (task-file update/refinement) only set _last_error, so a stale
+        # _last_iteration_failure_reason from an earlier task (e.g. an LLM
+        # timeout) could otherwise be surfaced by get_skip_reason() for this
+        # task and misroute a genuine failure to on_skip.
+        self._last_error = None
+        self._last_iteration_failure_reason = None
+
         task_path = self._get_issue_task_path(repo_dir, issue_number)
 
         if task_path.exists():
@@ -868,6 +974,7 @@ class RalphExecutor:
                 branch_name=branch_name,
             )
             if not update_result.get("success", False):
+                self._last_error = update_result.get("error") or "Failed to update issue task file"
                 return {
                     "success": False,
                     "error": update_result.get("error", "Failed to update issue task file"),
@@ -894,6 +1001,7 @@ class RalphExecutor:
                 branch_name=branch_name,
             )
             if not refinement_result.get("success", False):
+                self._last_error = refinement_result.get("error") or "Failed to refine issue task"
                 return {
                     "success": False,
                     "error": refinement_result.get("error", "Failed to refine issue task"),
@@ -990,6 +1098,11 @@ class RalphExecutor:
                     branch_name=branch_name,
                 )
                 if final_check_result.get("success", False):
+                    # Successful completion – clear any stale error state so
+                    # post-success paths (e.g. "no changes made") cannot
+                    # misclassify the task as LLM-unavailable.
+                    self._last_error = None
+                    self._last_iteration_failure_reason = None
                     result["success"] = True
                     result["loops_executed"] = iteration - 1
                     return result
@@ -1000,6 +1113,16 @@ class RalphExecutor:
                 result["last_error"] = final_check_result.get("error", "Final acceptance check failed")
                 result["loops_executed"] = iteration - 1
                 result["error"] = final_check_result.get("error", "Final acceptance check failed")
+                # Also record the failure in the executor's error state (the
+                # same way the max-iterations final-check branch does): without
+                # this, a final-check failure caused by an LLM outage leaves
+                # max_loops_reached=False and get_skip_reason()=None, so the
+                # worker would drop the issue via on_task_failure instead of
+                # skipping it for retry. Non-outage final-check failures must
+                # not poison the executor's error state.
+                if error_indicates_llm_unavailability(result["last_error"]):
+                    self._last_error = result["last_error"]
+                    self._last_iteration_failure_reason = self._last_error
                 return result
 
             # Execute ALL remaining open steps in a single batched CLI call
@@ -1015,6 +1138,8 @@ class RalphExecutor:
 
             if not step_result.get("success", False):
                 result["last_error"] = step_result.get("error", "Step implementation failed")
+                self._last_error = result["last_error"]
+                self._last_iteration_failure_reason = self._last_error
                 self.logger.warning(
                     f"Batch step execution failed on iteration {iteration}: {step_result.get('error', 'Unknown error')}"
                 )
@@ -1034,6 +1159,20 @@ class RalphExecutor:
                 repo_has_changes = self.has_changes_fn(repo_dir)
             except Exception as e:
                 self.logger.warning(f"Could not determine git changes after batch execution: {str(e)}")
+            try:
+                updated_plan = PlanParser.parse_file(task_path)
+                result["steps_completed"] = len([step for step in updated_plan.steps if step.is_closed])
+            except Exception as e:  # noqa: S110
+                self.logger.debug(f"Could not re-parse plan after batch execution: {e}")
+
+            # Successful iteration – clear the last-iteration error and any
+            # stale run-level error so a transient failure in an earlier
+            # iteration (e.g. a timeout) cannot be confused with the state
+            # of a later successful one.
+            self._last_iteration_failure_reason = None
+            self._last_error = None
+
+            result["loops_executed"] = iteration
 
             if repo_has_changes:
                 commit_message = f"Complete issue steps {result['steps_completed']}/{result['total_steps']}"
@@ -1059,12 +1198,30 @@ class RalphExecutor:
             )
             if final_check_result.get("success", False):
                 if result["steps_completed"] >= result["total_steps"]:
-                    # All steps were completed and pass validation
+                    # All steps were completed and pass validation – clear
+                    # any stale error state so post-success paths cannot
+                    # misclassify the task as LLM-unavailable.
+                    self._last_error = None
+                    self._last_iteration_failure_reason = None
                     result["success"] = True
                     result["max_loops_reached"] = False
                     result.pop("error", None)
             else:
                 result["last_error"] = final_check_result.get("error", "Final acceptance check failed")
+                # Only record the final-check failure in the executor's error
+                # state when it itself indicates LLM unavailability. A
+                # genuine final-check failure (e.g. a `make test` failure
+                # after the outage recovered) must not overwrite a
+                # mid-loop outage reason (e.g. a timeout): otherwise
+                # get_skip_reason() returns None and the issue is dropped
+                # via on_max_iterations_reached even though the loop was
+                # exhausted by the outage. When the final check itself fails
+                # due to an outage, recording it here also covers the case
+                # where a prior successful iteration cleared both error
+                # fields.
+                if error_indicates_llm_unavailability(result["last_error"]):
+                    self._last_error = result["last_error"]
+                    self._last_iteration_failure_reason = self._last_error
                 # Final acceptance check failed at max iterations. Delete the
                 # task file so it is recreated from scratch on the next Ralph
                 # invocation.
