@@ -927,3 +927,22 @@ class TestGitHubTaskSource:
         task_source.on_skip(task, "LLM unavailable")
 
         mock_comment.assert_not_called()
+
+    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_on_skip_never_posts_reported_incident_reason(self, mock_settings, mock_comment):
+        """Regression (#428): pin the reported incident end-to-end.
+
+        The skip reason 'CLI tool failed to review PR #429: Unknown error' was
+        posted to a GitHub issue; it must never appear in the posted comment.
+        """
+        mock_settings.github_issue_worker_required_label = "test-label"
+        task_source = GitHubTaskSource()
+        task = Task(id=428, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
+
+        task_source.on_skip(task, "CLI tool failed to review PR #429: Unknown error")
+
+        mock_comment.assert_called_once()
+        posted_comment = mock_comment.call_args[0][2]
+        assert "failed to review" not in posted_comment
+        assert "Unknown error" not in posted_comment

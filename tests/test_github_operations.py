@@ -63,6 +63,21 @@ class TestLooksLikeErrorMessage:
         assert looks_like_error_message("Please increase the timeout value to 60 seconds.") is False
         assert looks_like_error_message("No changes required for this issue.") is False
 
+    def test_cli_tool_failure_reason_is_error(self):
+        # Regression (#428): skip reasons like the reported "CLI tool failed to
+        # review PR #429: Unknown error" slipped past the detector and were posted.
+        assert looks_like_error_message("CLI tool failed to review PR #429: Unknown error") is True
+        assert looks_like_error_message("Ralph loop failed to finish: Unknown error") is True
+
+    def test_generic_skip_comment_is_not_error(self):
+        # The generic on_skip comment must not be flagged by the extended detector
+        comment = (
+            "⏭️ **Task Skipped**\n\n"
+            "The task could not be processed at this time.\n\n"
+            "This issue will be retried when the LLM becomes available."
+        )
+        assert looks_like_error_message(comment) is False
+
 
 class TestCommentOnIssue:
     """Test cases for comment_on_issue function."""
@@ -89,6 +104,23 @@ class TestCommentOnIssue:
         result = comment_on_issue(
             repo_dir, 42, 'Traceback (most recent call last):\n  File "main.py", line 3\nException: boom'
         )
+
+        assert result is False
+        mock_run_gh.assert_not_called()
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_incident_skip_comment_is_refused(self, mock_run_gh):
+        """Regression (#428): the reported Task Skipped comment embedded a raw
+        CLI tool failure reason; the posting guard must refuse it end-to-end."""
+        mock_run_gh.return_value = Mock(returncode=0)
+        repo_dir = Path("/tmp/test_repo")
+        incident_comment = (
+            "⏭️ **Task Skipped**\n\n"
+            "Reason: CLI tool failed to review PR #429: Unknown error\n\n"
+            "This issue will be retried when the LLM becomes available."
+        )
+
+        result = comment_on_issue(repo_dir, 428, incident_comment)
 
         assert result is False
         mock_run_gh.assert_not_called()

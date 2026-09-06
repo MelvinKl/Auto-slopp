@@ -60,6 +60,8 @@ _ERROR_MESSAGE_INDICATORS = (
     "tests failed",
     "assertion failed",
     "assertionerror",
+    "failed to",
+    "unknown error",
 )
 
 
