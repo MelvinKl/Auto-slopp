@@ -561,8 +561,9 @@ registry.load_plugins(Path("plugins/"))
 ### 5. No Error Messages in GitHub Issues
 
 **Guarantee:** Auto-slopp never posts raw error messages (tracebacks, CLI failures,
-timeouts, exception text, etc.) as comments on GitHub issues. Error details are
-written to local logs only.
+timeouts, exception text, etc.) to GitHub — not as issue comments and not as PR
+comments, PR titles/bodies, or PR review bodies. Error details are written to
+local logs only.
 
 **Audit of issue-posting code paths:** `comment_on_issue()` in
 `src/auto_slopp/utils/github_operations.py` is the *single* function that posts a
@@ -578,11 +579,25 @@ comment to a GitHub issue (it wraps `gh issue comment`). It is called from
 | `on_max_iterations_reached()` | Generic failure comment (no error details) | No; `error` arg is logged locally only |
 | `on_skip()` | Generic skip comment | No; `reason` is logged locally only |
 
+**Audit of PR-posting code paths:** the same guarantee covers the pull request
+posting functions in `src/auto_slopp/utils/github_operations.py`:
+
+| Function | Guard behavior |
+|---|---|
+| `comment_on_pr()` | Refuses any comment for which `looks_like_error_message()` returns `True` (logged locally only) |
+| `create_pull_request()` | Error-like title/body is substituted with a generic placeholder before posting (substitution logged locally only) |
+| `submit_pr_review()` | Error-like review body is substituted with a generic placeholder before posting (substitution logged locally only) |
+
 **Enforcement (defense in depth):**
 
-1. **Posting-layer guard:** `comment_on_issue()` refuses any comment for which
-   `looks_like_error_message()` (same module) returns `True`. No caller can bypass
-   this guarantee, present or future. The message is only logged locally.
+1. **Posting-layer guard:** `looks_like_error_message()` (same module) is
+   applied to every posting path: `comment_on_issue()` and `comment_on_pr()`
+   refuse error-like text, and `create_pull_request()` and `submit_pr_review()`
+   substitute it with safe generic values before posting. The detector covers
+   common error message classes, including CLI failure reasons of the form
+   "... failed to ...: Unknown error" (pinned by regression tests in
+   `tests/test_github_operations.py`). No caller can bypass this guarantee,
+   present or future. Raw messages are only logged locally.
 2. **Caller-level hardening:** `_condense_and_replace_comments()` checks the
    condensation output before posting; on a match it keeps the original comments
    instead of posting and only logs the error.
