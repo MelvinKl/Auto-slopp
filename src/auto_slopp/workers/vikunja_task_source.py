@@ -286,6 +286,36 @@ class VikunjaTaskSource(TaskSource):
         if comment_success and status_success:
             commit(repo_path, f"Updated task {task_id} status to '{status}' and added comment")
 
+    def on_skip(self, task: Task, reason: str = "") -> None:
+        """Called when a task should be skipped (e.g., when LLM is unavailable).
+
+        Comments on the task explaining the skip. The required tag is NOT
+        removed so the task can be retried in a future run.
+
+        Args:
+            task: The task that should be skipped
+            reason: Optional reason for skipping (e.g., "LLM unavailable")
+        """
+        repo_path = task.raw.get("_repo_path")
+        if repo_path is None:
+            logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
+            return
+
+        title = "Task Skipped"
+        reason_section = f"**Reason:** {reason}\n\n" if reason else ""
+        skip_comment = (
+            f"⏭️ **{title}**\n\n"
+            f"{reason_section}"
+            f"This task has been skipped for this iteration and will be retried in a future run.\n\n"
+            f"**Task:** {task.title}"
+        )
+        comment_success = comment_on_task(task.id, skip_comment)
+        if not comment_success:
+            logger.warning(f"Failed to add skip comment to task {task.id}")
+        else:
+            log_reason = f" - {reason}" if reason else ""
+            logger.info(f"Skipped task #{task.id}{log_reason}, tag preserved for retry")
+
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.
 
@@ -312,29 +342,6 @@ class VikunjaTaskSource(TaskSource):
             return
 
         self._update_task_with_comment_and_status(task.id, failure_comment, "failed", repo_path)
-
-    def on_skip(self, task: Task, reason: str) -> None:
-        """Called when a task is skipped (e.g., due to LLM unavailability).
-
-        Adds a skip comment to the task but does NOT change the task status,
-        so the task remains eligible for future processing.
-
-        Args:
-            task: The task being skipped
-            reason: Reason for skipping (e.g., "LLM unavailable")
-        """
-        repo_path = task.raw.get("_repo_path")
-        if repo_path is None:
-            logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
-            return
-
-        skip_comment = (
-            f"⏭️ **Task Skipped**\n\n"
-            f"Reason: {reason}\n\n"
-            f"This task will be retried when the LLM becomes available."
-        )
-        comment_on_task(task.id, skip_comment)
-        logger.info(f"Added skip comment to task {task.id}: {reason}")
 
     def _filter_tasks_by_tag(self, tasks: list[dict], tag_name: str) -> list[dict]:
         """Filter tasks to only those whose labels contain a label with a matching title.

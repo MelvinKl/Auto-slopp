@@ -881,6 +881,57 @@ The task execution creates a markdown-based plan file in `.ralph/` with checkbox
 
 If the final evaluation fails (either after all steps complete or at max iterations), the task file is deleted so it will be recreated from scratch on the next iteration, ensuring a completely fresh context.
 
+#### TaskResult Structure
+
+Each processed task produces a `TaskResult` dict. The `success` field uses `None` as the canonical signal for a skipped task (in addition to `status="skipped"`). All result-returning paths use `_init_result()` to ensure a consistent structure.
+
+**Status values (`TaskStatus` enum):**
+
+| `status` value | `success` value | Description |
+|---|---|---|
+| `pending` | `True` (initial) | Task was initialised but not yet processed |
+| `success` | `True` | Task completed successfully |
+| `failure` | `False` | Task failed due to an error (logged as warning) |
+| `skipped` | `None` | Task was skipped intentionally — **not** counted as a failure |
+
+**Helper methods:**
+
+- `_init_result()` — Creates the base result with `status=TaskStatus.PENDING` and `success=True` (neutral pending state).
+- `_skip_task()` — Sets canonical skip signal: `success=None`, `status=TaskStatus.SKIPPED`, and calls `task_source.on_skip(task, reason)`.
+- `_set_failure()` — Sets `status=TaskStatus.FAILURE`, `success=False`, and `task_completed=False`.
+
+**Result dict fields:**
+
+| Field | Type | Description |
+|---|---|---|
+| `repository` | `str` | Repository name |
+| `task_id` | `int` | Task/issue ID |
+| `task_title` | `str` | Task title |
+| `success` | `bool \| None` | `True`=success, `False`=failure, `None`=skipped (canonical skip signal) |
+| `status` | `str` | Outcome label: `'pending'`, `'success'`, `'failure'`, or `'skipped'` |
+| `openagent_executed` | `bool` | Whether an agent was executed |
+| `openagent_executions` | `int` | Number of agent executions |
+| `task_completed` | `bool` | Whether the task was fully completed |
+| `tasks_completed` | `int` | Count of fully completed sub-tasks |
+| `pr_created` | `bool` | Whether a PR was created |
+| `prs_created` | `int` | Count of PRs created |
+| `error` | `str \| None` | Error message (if any) |
+| `ralph_loops_executed` | `int` | Number of Ralph loops executed |
+| `ralph_steps_completed` | `int` | Number of Ralph steps completed |
+| `skip_reason` | `str \| None` | Reason for skipping (present only when `status == "skipped"`) |
+| `skipped` | `bool` | Legacy flag, `True` when `status == "skipped"`. The canonical skip signal is `success=None` + `status="skipped"`; this field is kept for backward compatibility |
+| `no_changes` | `bool` | True when task required no changes (optional) |
+| `pr_url` | `str` | URL of the created PR (optional) |
+| `pr_review_done` | `bool` | True when PR review was performed (optional) |
+| `pr_review_iterations` | `int` | Number of PR review iterations performed (optional) |
+| `label_removed` | `bool` | True when an automatic label was removed (optional) |
+
+The completion summary logs task counts broken down by outcome:
+
+```
+IssueWorker completed. Processed: 3, Skipped: 1, opencode executions: 3, PRs created: 2, Tasks completed: 2, Errors: 0
+```
+
 ### PR-to-Issue Linking
 
 When Auto-slopp creates a pull request, it automatically links the PR to the source issue using GitHub's [closing keywords](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/using-keywords-in-issues-and-pull-requests/).
@@ -908,7 +959,7 @@ Convenience wrapper around IssueWorker configured with GitHubTaskSource. Handles
 
 **Comment Condensation**: When processing GitHub issues, Auto-slopp condenses comments from the issue author and/or the whitelisted `allowed_creator` into a single summary comment. Comments from other users are ignored. After condensation, the original comments from the author/allowed creator are deleted and replaced with the summary.
 
-**LLM Unavailability Handling**: When the LLM is unavailable (e.g., rate limiting, connection errors, timeouts), Auto-slopp skips the task instead of failing it. A comment is added to the issue/task explaining the skip, and the required label/tag is preserved so the task can be retried when the LLM becomes available. This prevents permanent failures for transient issues.
+**LLM Unavailability Handling**: When the LLM is unavailable (e.g., rate limiting, connection errors, timeouts), Auto-slopp skips the task instead of failing it. The required label/tag is preserved so the task can be retried when the LLM becomes available. This prevents permanent failures for transient issues. Note: For GitHub tasks, skip events are logged only (no comment posted to avoid cluttering issues). For Vikunja tasks, a skip comment is added to the task.
 
 ```python
 from auto_slopp.workers import GitHubIssueWorker
@@ -931,6 +982,14 @@ Base class and implementations for loading tasks from different sources:
 - `TaskSource`: Abstract base class for task loading
 - `GitHubTaskSource`: Loads tasks from GitHub issues
 - `VikunjaTaskSource`: Loads tasks from Vikunja project
+
+The `TaskSource` interface defines lifecycle hooks for task processing:
+- `on_task_start(task, branch_name)`: Called when task processing begins
+- `on_task_complete(task, branch_name, pr_url, findings)`: Called on successful completion
+- `on_task_failure(task, error)`: Called when a task fails
+- `on_no_changes(task)`: Called when no changes were needed
+- `on_skip(task, reason="")`: Called when a task is skipped (e.g., LLM unavailable). For GitHub tasks, skips are logged only (no comment posted). For Vikunja tasks, a skip comment is added to the task. The `reason` parameter provides context for the skip and now has a default of `""` (it was already a required parameter in the previous signature), so existing custom `TaskSource` overrides remain backward-compatible unchanged.
+- `on_max_iterations_reached(task, steps_completed, total_steps, error)`: Called when max iterations are reached
 
 ## API Reference
 

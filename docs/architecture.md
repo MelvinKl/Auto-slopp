@@ -139,7 +139,7 @@ class TaskSource(ABC):
         """Called when the ralph loop reaches max iterations without completing."""
 
     @abstractmethod
-    def on_skip(self, task: Task, reason: str) -> None:
+    def on_skip(self, task: Task, reason: str = "") -> None:
         """Called when a task is skipped (e.g., due to LLM unavailability).
 
         The task should remain processable for future retries. Do not remove
@@ -264,6 +264,8 @@ class IssueWorker(Worker):
 - Uses source-specific configuration via `task_source` methods
 - Calls lifecycle hooks: `on_task_start`, `on_task_complete`, `on_task_failure`, `on_no_changes`, `on_max_iterations_reached`, `on_skip`
 - Supports Ralph loop for step-based task execution
+
+**Task outcomes:** Every task result carries a `status` field (see `TaskStatus`: `pending`, `success`, `skipped`, `failure`). An intentional skip (e.g., LLM unavailable) is a distinct, non-error outcome: `success=None` with `status="skipped"` and a `skip_reason`, and it is reported as `tasks_skipped` in the completion summary — never counted as a failure or logged as "Failed to process task".
 
 **Benefits:**
 - Single implementation for all task processing logic
