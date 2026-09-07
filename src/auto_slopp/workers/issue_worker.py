@@ -41,6 +41,7 @@ from auto_slopp.utils.pr_review import build_conservative_review_instructions
 from auto_slopp.utils.ralph import RalphExecutor
 from auto_slopp.worker import Worker
 from auto_slopp.workers.task_source import Task, TaskSource
+from auto_slopp.workers.task_types import TaskStatus, validate_task_result
 from settings.main import DEFAULT_PR_REVIEW_MAX_ITERATIONS, settings
 
 
@@ -126,22 +127,67 @@ class IssueWorker(Worker):
             return results
 
         for task in tasks:
-            task_result = self._process_single_task(repo_path, task)
-            results["task_results"].append(task_result)
+            results = self._record_task_result(results, repo_path, task)
 
-            if task_result.get("skipped"):
-                results["tasks_skipped"] += 1
-                self.logger.info(f"Task #{task.id} skipped: {task_result.get('skip_reason', 'Unknown')}")
-            elif task_result["success"]:
-                results["tasks_processed"] += 1
-                results["openagent_executions"] += task_result.get("openagent_executions", 0)
-                results["prs_created"] += task_result.get("prs_created", 0)
-                results["tasks_completed"] += task_result.get("tasks_completed", 0)
-            else:
-                self.logger.warning(f"Failed to process task #{task.id}: {task_result.get('error', 'Unknown error')}")
+        # Mirror per-task failures into the top-level run status.
+        if results["tasks_failed"] > 0:
+            results["success"] = False
 
         results["execution_time"] = self._get_elapsed_time(start_time)
         self._log_completion_summary(results)
+
+        return results
+
+    def _record_task_result(
+        self,
+        results: dict[str, Any],
+        repo_path: Path,
+        task: Task,
+    ) -> dict[str, Any]:
+        """Process one task and fold its result into the run-level stats.
+
+        Args:
+            results: Run-level results dict to update in place
+            repo_path: Path to the repository directory
+            task: The task to process
+
+        Returns:
+            The updated results dict
+        """
+        task_result = self._process_single_task(repo_path, task)
+        try:
+            validate_task_result(task_result)
+        except ValueError as e:
+            # Data-consistency invariant on internal state: record the
+            # result as a failure instead of aborting the whole run and
+            # discarding accumulated task results.
+            self.logger.error(f"Inconsistent task result for task #{task.id}: {e}")
+            self._mark_inconsistent(task_result, f"Inconsistent task result: {e}")
+        results["task_results"].append(task_result)
+
+        # A skip is a distinct, non-error outcome: it is counted and
+        # logged separately from real failures (success=False).
+        if task_result.get("status") == TaskStatus.SKIPPED.value:
+            results["tasks_skipped"] += 1
+            # A task can be skipped after the agent already ran and a PR
+            # was created (e.g. the PR-review LLM-unavailable path); still
+            # count the executions and the PR.
+            results["openagent_executions"] += task_result.get("openagent_executions", 0)
+            results["prs_created"] += task_result.get("prs_created", 0)
+            self.logger.info(f"Task #{task.id} skipped: {task_result.get('skip_reason', 'Unknown')}")
+        elif task_result["success"]:
+            results["tasks_processed"] += 1
+            results["openagent_executions"] += task_result.get("openagent_executions", 0)
+            results["prs_created"] += task_result.get("prs_created", 0)
+            results["tasks_completed"] += task_result.get("tasks_completed", 0)
+        else:
+            results["tasks_failed"] += 1
+            # A task can fail after the agent already ran and a PR was
+            # created (e.g. an unexpected exception in the PR-review loop);
+            # still count the executions and the PR.
+            results["openagent_executions"] += task_result.get("openagent_executions", 0)
+            results["prs_created"] += task_result.get("prs_created", 0)
+            self.logger.warning(f"Failed to process task #{task.id}: {task_result.get('error', 'Unknown error')}")
 
         return results
 
@@ -157,6 +203,7 @@ class IssueWorker(Worker):
             "repositories_with_errors": 0,
             "tasks_processed": 0,
             "tasks_skipped": 0,
+            "tasks_failed": 0,
             "openagent_executions": 0,
             "prs_created": 0,
             "tasks_completed": 0,
@@ -280,21 +327,7 @@ class IssueWorker(Worker):
 
         self.logger.info(f"Processing task #{task_id}: {task_title}")
 
-        result = {
-            "repository": repo_dir.name,
-            "task_id": task_id,
-            "task_title": task_title,
-            "success": False,
-            "openagent_executed": False,
-            "openagent_executions": 0,
-            "task_completed": False,
-            "tasks_completed": 0,
-            "pr_created": False,
-            "prs_created": 0,
-            "error": None,
-            "ralph_loops_executed": 0,
-            "ralph_steps_completed": 0,
-        }
+        result = self._init_result(repo_dir, task)
 
         try:
             branch_name = self.task_source.get_branch_name(task)
@@ -302,18 +335,17 @@ class IssueWorker(Worker):
             if self.dry_run:
                 self.logger.info(f"DRY RUN: Would create branch {branch_name} and execute with Ralph loop")
                 result["openagent_executed"] = True
-                result["success"] = True
-                return result
+                return self._set_success(result)
 
             self.task_source.on_task_start(task, branch_name)
 
             branch_created = create_and_checkout_branch(repo_dir, branch_name, base_branch="main")
             if not branch_created:
+                # Branch creation failure is an operational error, not an
+                # intentional skip: record it as a failure.
                 error_msg = f"Failed to create branch '{branch_name}' for task #{task_id}"
                 self.logger.error(error_msg)
-                result["error"] = error_msg
-                self.task_source.on_task_failure(task, error_msg)
-                return result
+                return self._set_failure(result, task, error_msg)
 
             # Ensure .ralph is in .gitignore before Ralph execution
             if not ensure_ralph_in_gitignore(repo_dir):
@@ -337,7 +369,6 @@ class IssueWorker(Worker):
 
                 if not ralph_result.get("success", False):
                     ralph_error = f"Ralph loop failed: {ralph_result.get('error', 'Unknown error')}"
-                    result["error"] = ralph_error
 
                     if ralph_result.get("max_loops_reached", False):
                         self.logger.warning(f"Ralph loop reached max iterations for task #{task_id}")
@@ -347,20 +378,14 @@ class IssueWorker(Worker):
                             ralph_result.get("total_steps", 0),
                             ralph_result.get("error", "Unknown error"),
                         )
+                        return self._set_failure(result, task, ralph_error)
                     elif self._is_llm_unavailable(ralph_error):
-                        self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                        self.task_source.on_skip(task, ralph_error)
-                        result["success"] = True
-                        result["skipped"] = True
-                        result["skip_reason"] = ralph_error
-                        return result
+                        return self._skip_task(result, task, ralph_error)
                     elif self._is_permanent_error(ralph_error):
                         self.logger.error(f"Permanent error detected for task #{task_id}: {ralph_error}")
-                        self.task_source.on_task_failure(task, ralph_error)
+                        return self._set_failure(result, task, ralph_error)
                     else:
-                        self.task_source.on_task_failure(task, ralph_error)
-
-                    return result
+                        return self._set_failure(result, task, ralph_error)
 
                 result["openagent_executed"] = True
             else:
@@ -387,40 +412,25 @@ class IssueWorker(Worker):
                 if not openagent_result["success"]:
                     cli_tool = get_active_cli_command()
                     error_msg = f"{cli_tool} execution failed: {openagent_result.get('error', 'Unknown error')}"
-                    result["error"] = error_msg
                     if self._is_llm_unavailable(error_msg):
-                        self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                        self.task_source.on_skip(task, error_msg)
-                        result["success"] = True
-                        result["skipped"] = True
-                        result["skip_reason"] = error_msg
-                        return result
+                        return self._skip_task(result, task, error_msg)
                     elif self._is_permanent_error(error_msg):
                         self.logger.error(f"Permanent error detected for task #{task_id}: {error_msg}")
-                        self.task_source.on_task_failure(task, error_msg)
+                        return self._set_failure(result, task, error_msg)
                     else:
-                        self.task_source.on_task_failure(task, error_msg)
-                    return result
+                        return self._set_failure(result, task, error_msg)
 
             current_branch = get_current_branch(repo_dir)
             if current_branch in ("main", "master"):
-                if self._is_llm_unavailable(""):
-                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                    self.task_source.on_skip(task, "LLM unavailable - no changes made")
-                    result["success"] = True
-                    result["skipped"] = True
-                    result["skip_reason"] = "LLM unavailable - no changes made"
-                    return result
-
+                # A successful execution already implies the LLM was available,
+                # so this path can only be reached with real (no-change) results.
                 self.logger.info(f"No changes made for task #{task_id}, closing task")
                 self.task_source.on_no_changes(task)
 
                 result["task_completed"] = True
                 result["tasks_completed"] = 1
-
-                result["success"] = True
                 result["no_changes"] = True
-                return result
+                return self._set_success(result)
 
             # Check if there are any commits ahead of main (regardless of uncommitted changes).
             # This is the authoritative check: if the branch has commits ahead of main, work was done
@@ -428,14 +438,6 @@ class IssueWorker(Worker):
             # to ensure everything is committed before proceeding.
             ahead_count = get_commits_ahead_of_branch(repo_dir, base_branch="main")
             if ahead_count == 0:
-                if self._is_llm_unavailable(""):
-                    self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                    self.task_source.on_skip(task, "LLM unavailable - no commits ahead")
-                    result["success"] = True
-                    result["skipped"] = True
-                    result["skip_reason"] = "LLM unavailable - no commits ahead"
-                    return result
-
                 self.logger.info(f"No commits ahead of main for task #{task_id}, closing issue")
                 # Clean up the branch since no work was done
                 try:
@@ -446,9 +448,8 @@ class IssueWorker(Worker):
                 self.task_source.on_no_changes(task)
                 result["task_completed"] = True
                 result["tasks_completed"] = 1
-                result["success"] = True
                 result["no_changes"] = True
-                return result
+                return self._set_success(result)
 
             # There are commits ahead of main - commit any remaining uncommitted changes and push
             changes_present = has_changes(repo_dir)
@@ -460,17 +461,13 @@ class IssueWorker(Worker):
                 if not commit_success:
                     error_msg = f"Failed to commit outstanding changes for task #{task_id}"
                     self.logger.error(error_msg)
-                    result["error"] = error_msg
-                    self.task_source.on_task_failure(task, error_msg)
-                    return result
+                    return self._set_failure(result, task, error_msg)
 
             push_success, push_message = push_to_remote(repo_dir, remote="origin", branch=current_branch)
             if not push_success:
                 error_msg = f"Failed to push branch '{current_branch}' for task #{task_id}: {push_message}"
                 self.logger.error(error_msg)
-                result["error"] = error_msg
-                self.task_source.on_task_failure(task, error_msg)
-                return result
+                return self._set_failure(result, task, error_msg)
 
             if settings.ralph_enabled:
                 pr_body = self._generate_pr_body_from_task_file(
@@ -503,17 +500,13 @@ class IssueWorker(Worker):
                 else:
                     error_msg = f"Failed to create pull request for task #{task_id} on branch '{current_branch}'"
                     self.logger.error(error_msg)
-                    result["error"] = error_msg
-                    self.task_source.on_task_failure(task, error_msg)
-                    return result
+                    return self._set_failure(result, task, error_msg)
 
             pr_url = result.get("pr_url", "")
             if not pr_url:
                 error_msg = f"Task #{task_id} processed but no PR URL available for branch '{current_branch}'"
                 self.logger.error(error_msg)
-                result["error"] = error_msg
-                self.task_source.on_task_failure(task, error_msg)
-                return result
+                return self._set_failure(result, task, error_msg)
 
             # Check if we should skip the PR review (e.g., in dry run mode)
             if self.dry_run:
@@ -521,8 +514,7 @@ class IssueWorker(Worker):
                 self.task_source.on_task_complete(task, current_branch, pr_url)
                 result["task_completed"] = True
                 result["tasks_completed"] = 1
-                result["success"] = True
-                return result
+                return self._set_success(result)
 
             # PR Review Loop: Review PR, fix issues, and re-review until clean
             # This loop counts towards the overall iterations for the issue
@@ -583,11 +575,7 @@ class IssueWorker(Worker):
                 if review_error is not None:
                     self.logger.error(f"PR review failed for PR #{pr_number}: {review_error}")
                     if self._is_llm_unavailable(review_error):
-                        self.logger.warning(f"LLM unavailable, skipping task #{task_id}")
-                        self.task_source.on_skip(task, review_error)
-                        result["success"] = True
-                        result["skipped"] = True
-                        result["skip_reason"] = review_error
+                        self._skip_task(result, task, review_error)
                         result["pr_review_iterations"] = pr_review_iteration
                         return result
                     # Review tooling failed: don't post the error as a PR review
@@ -628,10 +616,9 @@ class IssueWorker(Worker):
 
                     result["task_completed"] = True
                     result["tasks_completed"] = 1
-                    result["success"] = True
                     result["label_removed"] = True
                     result["pr_review_iterations"] = pr_review_iteration
-                    return result
+                    return self._set_success(result)
 
                 # Findings found - fix them by calling CLI tool with the PR review results
                 self.logger.info(f"PR review found {len(finding_lines)} issue(s) requiring fixes for task #{task_id}")
@@ -711,9 +698,86 @@ class IssueWorker(Worker):
 
         except Exception as e:
             self.logger.error(f"Error processing task #{task_id}: {str(e)}")
-            result["error"] = str(e)
-            self.task_source.on_task_failure(task, str(e))
+            self._set_failure(result, task, str(e))
 
+        return result
+
+    def _init_result(self, repo_dir: Path, task: Task) -> dict[str, Any]:
+        """Create the base result dict for a task (status pending, success True)."""
+        return {
+            "repository": repo_dir.name,
+            "task_id": task.id,
+            "task_title": task.title,
+            "success": True,
+            "status": TaskStatus.PENDING.value,
+            "openagent_executed": False,
+            "openagent_executions": 0,
+            "task_completed": False,
+            "tasks_completed": 0,
+            "pr_created": False,
+            "prs_created": 0,
+            "error": None,
+            "ralph_loops_executed": 0,
+            "ralph_steps_completed": 0,
+        }
+
+    def _skip_task(self, result: dict[str, Any], task: Task, reason: str) -> dict[str, Any]:
+        """Mark a task result as skipped (a distinct, non-error outcome).
+
+        Sets the canonical skip signal (``success=None`` +
+        ``status='skipped'``) and notifies the task source via ``on_skip``.
+        Skips are NOT counted as failures by ``run()``.
+        """
+        result["success"] = None
+        result["status"] = TaskStatus.SKIPPED.value
+        result["skipped"] = True
+        result["skip_reason"] = reason
+        self.logger.info(f"Task #{task.id} skipped: {reason}")
+        try:
+            self.task_source.on_skip(task, reason)
+        except Exception as e:
+            # A buggy task source must not turn an intentional skip into a
+            # failure (the outer except in _process_single_task would).
+            self.logger.warning(f"on_skip failed for task #{task.id}: {e}")
+        return result
+
+    def _mark_inconsistent(self, result: dict[str, Any], error: str) -> dict[str, Any]:
+        """Mark a task result as failed after a result-validation invariant violation.
+
+        Mirrors the dict mutation of ``_set_failure`` but does not notify the
+        task source: the task already reached its terminal state before
+        validation ran, so no ``on_task_failure`` callback should fire.
+        """
+        result["success"] = False
+        result["status"] = TaskStatus.FAILURE.value
+        result["task_completed"] = False
+        result["error"] = error
+        # A validation violation means the result is NOT a valid skip: clear
+        # any stale skip fields so the recorded result satisfies the
+        # skip invariants enforced by validate_task_result.
+        result["skipped"] = False
+        result.pop("skip_reason", None)
+        return result
+
+    def _set_failure(self, result: dict[str, Any], task: Task, error: str) -> dict[str, Any]:
+        """Mark a task result as a real failure and notify the task source."""
+        result["success"] = False
+        result["status"] = TaskStatus.FAILURE.value
+        result["task_completed"] = False
+        result["error"] = error
+        try:
+            self.task_source.on_task_failure(task, error)
+        except Exception as e:
+            # A buggy task source must not abort the run (the outer except in
+            # _process_single_task would propagate it and discard all
+            # accumulated task results).
+            self.logger.warning(f"on_task_failure failed for task #{task.id}: {e}")
+        return result
+
+    def _set_success(self, result: dict[str, Any]) -> dict[str, Any]:
+        """Mark a task result as successful."""
+        result["success"] = True
+        result["status"] = TaskStatus.SUCCESS.value
         return result
 
     def _build_instructions(
@@ -931,6 +995,7 @@ Plan:
         result["task_completed"] = False
         result["tasks_completed"] = 0
         result["success"] = True
+        result["status"] = TaskStatus.SUCCESS.value
         result["pr_review_done"] = True
         result["pr_review_iterations"] = iterations
 
@@ -1068,6 +1133,8 @@ Plan:
             "repositories_processed": 0,
             "repositories_with_errors": 1,
             "tasks_processed": 0,
+            "tasks_skipped": 0,
+            "tasks_failed": 0,
             "openagent_executions": 0,
             "prs_created": 0,
             "tasks_completed": 0,
@@ -1089,6 +1156,7 @@ Plan:
             f"IssueWorker completed. Processed: "
             f"{results['tasks_processed']}, "
             f"Skipped: {results['tasks_skipped']}, "
+            f"Failed: {results['tasks_failed']}, "
             f"{cli_tool} executions: {results['openagent_executions']}, "
             f"PRs created: {results['prs_created']}, "
             f"Tasks completed: {results['tasks_completed']}, "

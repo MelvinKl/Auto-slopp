@@ -20,10 +20,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **RalphExecutor**: Removed `remaining_steps_update_name` constructor parameter and associated dead code (`_execute_step_acceptance_check`, `_update_remaining_steps`, `_build_acceptance_check_instructions`, `_build_remaining_steps_update_instructions`, `_extract_step_block`, `_find_step_description`)
 - **Final acceptance check**: Now requires explicit `acceptance_status: pass` in output; empty/unknown output is treated as failure
 - **Loop behavior**: `loops_executed` now consistently reports `iteration - 1` on both success and final-check failure paths; final check runs on max-iterations with partial work and result recorded in `last_error`
+- **TaskSource.on_skip**: The `reason` parameter (already required in the previous signature `on_skip(task, reason: str)`) now has a default of `""`. Backward-compatible for external subclasses: existing overrides that accept `reason` continue to work unchanged, and callers may now omit `reason`
+- **IssueWorker**: Removed unreachable LLM-unavailability checks in the no-changes and no-commits-ahead code paths (a successful execution already implies the LLM was available)
 - **`checkout_branch_resilient`**: Replaced `git reset --hard` fallback with `git stash`/`git stash pop` to preserve uncommitted local changes when branch checkout fails due to conflicting modifications
 
 ### Fixed
 - **Git checkout**: Uncommitted local changes are no longer silently discarded when switching branches. Changes are now stashed before checkout and restored afterward, preventing data loss from previous worker operations leaving temporary files in the working directory
+- **IssueWorker**: Skipped tasks (e.g., when the LLM is unavailable) are no longer recorded as failures. A new `status` field on task results distinguishes between `success`, `failure`, and `skipped`. The summary now reports skipped task counts separately from failures.
+- **IssueWorker**: Branch creation failures are recorded as failures again (with `on_task_failure` invoked and an error-level log) instead of skips, since they are operational errors rather than intentional skips.
+- **IssueWorker**: `_skip_task` now mutates the existing result dict instead of rebuilding it, so state accumulated before a skip is preserved. The legacy `skipped` result field is now documented in the `TaskResult` TypedDict and README.
+- **VikunjaTaskSource**: Skip comment no longer repeats the skip reason in both the title and the body.
+- **GitHubTaskSource**: Simplified `on_skip` to only log skip events without posting GitHub comments, reducing issue clutter.
+- **PR-to-issue linking**: Pull requests now always contain a valid GitHub closing keyword (`Closes`, `Fixes`, or `Resolves`) linking to the source issue. The `ensure_issue_link_in_pr_body` helper function guarantees at least one closing keyword is present in the PR body, preventing issues from remaining open after PR creation.
+- **`validate_issue_link`**: Now validates `issue_id` (raises `TypeError` for non-integers and `ValueError` for non-positive values), matching the documented contract and the behavior of `ensure_issue_link_in_pr_body`
+- **Linking pattern**: Cross-repo references now require at least one slash (e.g. `owner/repo#123`). A single segment like `Closes docs#123` is not a valid GitHub issue reference and is no longer treated as an existing link, so a closing keyword is reliably prepended
+- **IssueWorker class structure**: Moved orphaned class methods (`_generate_pr_body_from_task_file`, `_build_review_instructions`, `_review_pull_request`, `_build_pr_description_instructions`, `_create_error_result`, `_get_current_time`, `_get_elapsed_time`, `_log_completion_summary`) back inside the `IssueWorker` class where they were incorrectly defined outside the class.
 
 ### Removed
 - Per-step acceptance criteria validation after each step
@@ -35,12 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 - Updated README.md to reflect removal of intermediate checks and new final acceptance check behavior
-
-### Fixed
-- **PR-to-issue linking**: Pull requests now always contain a valid GitHub closing keyword (`Closes`, `Fixes`, or `Resolves`) linking to the source issue. The `ensure_issue_link_in_pr_body` helper function guarantees at least one closing keyword is present in the PR body, preventing issues from remaining open after PR creation.
-- **`validate_issue_link`**: Now validates `issue_id` (raises `TypeError` for non-integers and `ValueError` for non-positive values), matching the documented contract and the behavior of `ensure_issue_link_in_pr_body`
-- **Linking pattern**: Cross-repo references now require at least one slash (e.g. `owner/repo#123`). A single segment like `Closes docs#123` is not a valid GitHub issue reference and is no longer treated as an existing link, so a closing keyword is reliably prepended
-- **IssueWorker class structure**: Moved orphaned class methods (`_generate_pr_body_from_task_file`, `_build_review_instructions`, `_review_pull_request`, `_build_pr_description_instructions`, `_create_error_result`, `_get_current_time`, `_get_elapsed_time`, `_log_completion_summary`) back inside the `IssueWorker` class where they were incorrectly defined outside the class.
+- Updated README.md to document `on_skip` behavior (GitHub tasks log-only, Vikunja tasks post comments) and TaskSource lifecycle hooks
+- Updated `test_github_task_source.py` to reflect simplified `on_skip` behavior (removed unnecessary mocks)
 
 ## [0.1.0] - 2024-01-01
 

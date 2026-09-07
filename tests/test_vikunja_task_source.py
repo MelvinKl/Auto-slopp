@@ -359,8 +359,23 @@ class TestVikunjaTaskSource:
         assert call_args[0] == 42
         assert "Task Skipped" in call_args[1]
         assert "LLM unavailable" in call_args[1]
-        assert "retried when the LLM becomes available" in call_args[1]
+        assert "will be retried in a future run" in call_args[1]
         # Status should NOT be updated and no commit should be made
+        mock_commit.assert_not_called()
+
+    @patch("auto_slopp.workers.vikunja_task_source.commit")
+    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
+    def test_on_skip_non_llm_reason_does_not_mention_llm(self, mock_comment, mock_commit):
+        """Test that a non-LLM skip reason (e.g., branch creation failure) does not produce LLM-specific wording."""
+        task_source = VikunjaTaskSource()
+        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
+
+        task_source.on_skip(task, "Could not create branch 'feature/test'")
+
+        mock_comment.assert_called_once()
+        call_args = mock_comment.call_args[0]
+        assert "Could not create branch 'feature/test'" in call_args[1]
+        assert "LLM" not in call_args[1]
         mock_commit.assert_not_called()
 
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
