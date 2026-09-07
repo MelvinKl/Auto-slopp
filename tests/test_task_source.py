@@ -38,10 +38,10 @@ class ConcreteTaskSource(TaskSource):
     def on_no_changes(self, task: Task) -> None:
         pass
 
-    def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
+    def on_skip(self, task: Task, reason: str = "") -> None:
         pass
 
-    def on_skip(self, task: Task, reason: str) -> None:
+    def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         pass
 
 
