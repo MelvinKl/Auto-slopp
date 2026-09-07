@@ -10,6 +10,7 @@ from auto_slopp.workers.pr_review_worker import PrReviewWorker
 from auto_slopp.workers.pr_worker import PRWorker
 from auto_slopp.workers.stale_branch_cleanup_worker import StaleBranchCleanupWorker
 from auto_slopp.workers.task_source import Task, TaskSource
+from auto_slopp.workers.task_types import TaskOutcome, TaskResult, TaskStatus
 
 __all__ = [
     "GitHubIssueWorker",
@@ -18,5 +19,8 @@ __all__ = [
     "PrReviewWorker",
     "StaleBranchCleanupWorker",
     "Task",
+    "TaskOutcome",
+    "TaskResult",
     "TaskSource",
+    "TaskStatus",
 ]

@@ -315,23 +315,6 @@ class TestVikunjaTaskSource:
     @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_on_task_failure_updates_status_even_when_comment_fails(self, mock_comment, mock_update, mock_commit):
-        """Test that the status is still updated to 'failed' when posting the comment fails."""
-        mock_comment.return_value = False
-        mock_update.return_value = True
-        task_source = VikunjaTaskSource()
-        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test/repo")})
-
-        task_source.on_task_failure(task, "Test error")
-
-        mock_comment.assert_called_once()
-        # The status transition must not be skipped just because the comment failed
-        mock_update.assert_called_once_with(42, "failed")
-        mock_commit.assert_called_once_with(Path("/test/repo"), "Updated task status to 'failed'")
-
-    @patch("auto_slopp.workers.vikunja_task_source.commit")
-    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
-    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
     def test_on_no_changes_updates_status_and_comments(self, mock_comment, mock_update, mock_commit):
         """Test that on_no_changes updates status and adds comment."""
         task_source = VikunjaTaskSource()
@@ -362,21 +345,10 @@ class TestVikunjaTaskSource:
         assert "8/15" in comment_args[1]
         assert "Max iterations reached" in comment_args[1]
 
-    @patch("auto_slopp.workers.vikunja_task_source.get_task_details")
     @patch("auto_slopp.workers.vikunja_task_source.commit")
-    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_on_skip_adds_comment_and_keeps_task_eligible(
-        self, mock_comment, mock_update, mock_commit, mock_task_details
-    ):
-        mock_task_details.return_value = None
-        """Test that on_skip adds a skip comment but does NOT change the task status.
-
-        Vikunja statuses are per-project and user-defined (the project may not
-        have a "skipped" status), and get_tasks only fetches tasks that are
-        not done, so the status must stay unchanged to keep the task eligible
-        for retry.
-        """
+    def test_on_skip_adds_comment_and_does_not_change_status(self, mock_comment, mock_commit):
+        """Test that on_skip adds a skip comment but does NOT change the task status."""
         task_source = VikunjaTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
 
@@ -387,58 +359,24 @@ class TestVikunjaTaskSource:
         assert call_args[0] == 42
         assert "Task Skipped" in call_args[1]
         assert "LLM unavailable" in call_args[1]
-        assert "retried when the LLM becomes available" in call_args[1]
-        # Status must NOT be updated: the project may not have a "skipped"
-        # status, and the task must remain eligible for future processing.
-        mock_update.assert_not_called()
-        mock_commit.assert_called_once()
-
-    @patch("auto_slopp.workers.vikunja_task_source.get_task_details")
-    @patch("auto_slopp.workers.vikunja_task_source.commit")
-    @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_on_skip_does_not_post_duplicate_skip_comment(self, mock_comment, mock_commit, mock_task_details):
-        """Test that on_skip does not post another skip comment (or commit) when the latest comment is already one."""
-        mock_task_details.return_value = {
-            "id": 42,
-            "comments": [
-                {"content": "some earlier comment", "created_time": "2024-01-01T00:00:00Z"},
-                {
-                    "content": (
-                        "⏭️ **Task Skipped**\n\nReason: LLM unavailable\n\n"
-                        "This task will be retried when the LLM becomes available."
-                    ),
-                    "created_time": "2024-01-02T00:00:00Z",
-                },
-            ],
-        }
-        task_source = VikunjaTaskSource()
-        task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
-
-        task_source.on_skip(task, "LLM unavailable")
-
-        mock_comment.assert_not_called()
+        assert "will be retried in a future run" in call_args[1]
+        # Status should NOT be updated and no commit should be made
         mock_commit.assert_not_called()
 
-    @patch("auto_slopp.workers.vikunja_task_source.get_task_details")
     @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_on_skip_posts_when_latest_comment_is_not_a_skip_comment(
-        self, mock_comment, mock_commit, mock_task_details
-    ):
-        """Test that on_skip still posts when the latest comment is not a skip comment."""
-        mock_task_details.return_value = {
-            "id": 42,
-            "comments": [
-                {"content": "⏭️ **Task Skipped**\n\nReason: LLM unavailable", "created_time": "2024-01-01T00:00:00Z"},
-                {"content": "a newer non-skip comment", "created_time": "2024-01-02T00:00:00Z"},
-            ],
-        }
+    def test_on_skip_non_llm_reason_does_not_mention_llm(self, mock_comment, mock_commit):
+        """Test that a non-LLM skip reason (e.g., branch creation failure) does not produce LLM-specific wording."""
         task_source = VikunjaTaskSource()
         task = Task(id=42, title="Test", body="", comments=[], raw={"_repo_path": Path("/test")})
 
-        task_source.on_skip(task, "LLM unavailable")
+        task_source.on_skip(task, "Could not create branch 'feature/test'")
 
         mock_comment.assert_called_once()
+        call_args = mock_comment.call_args[0]
+        assert "Could not create branch 'feature/test'" in call_args[1]
+        assert "LLM" not in call_args[1]
+        mock_commit.assert_not_called()
 
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
     def test_on_skip_handles_missing_repo_path(self, mock_comment):
@@ -546,24 +484,23 @@ class TestVikunjaTaskSource:
             ), f"Identifier {identifier} doesn't start with prefix {expected_prefix}"
 
     @patch("auto_slopp.workers.vikunja_task_source.commit")
-    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
     @patch("auto_slopp.workers.vikunja_task_source.settings")
-    def test_on_skip_adds_comment_and_preserves_tag(self, mock_settings, mock_comment, mock_update, mock_commit):
+    def test_on_skip_adds_comment_and_preserves_tag(self, mock_settings, mock_comment, mock_commit):
         """Test that on_skip adds a comment but does NOT remove the required tag."""
         mock_settings.github_issue_worker_required_label = "test-tag"
         mock_comment.return_value = True
-        mock_update.return_value = True
         task_source = VikunjaTaskSource()
         task = Task(id=42, title="Test Task", body="", comments=[], raw={"_repo_path": Path("/test")})
 
-        task_source.on_skip(task, "test reason")
+        task_source.on_skip(task, "LLM unavailable")
 
         mock_comment.assert_called_once()
         comment_args = mock_comment.call_args[0]
         assert comment_args[0] == 42
         assert "Task Skipped" in comment_args[1]
-        assert "test reason" in comment_args[1]
+        assert "LLM unavailable" in comment_args[1]
+        assert "test-tag" not in comment_args[1].lower()  # Tag should not be mentioned as removed
 
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
     @patch("auto_slopp.workers.vikunja_task_source.settings")
@@ -575,26 +512,24 @@ class TestVikunjaTaskSource:
         task = Task(id=42, title="Test Task", body="", comments=[], raw={})
 
         # Should not raise an exception
-        task_source.on_skip(task, "test reason")
+        task_source.on_skip(task, "LLM unavailable")
 
         mock_comment.assert_not_called()
 
-    @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
     @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.settings")
-    def test_on_skip_does_not_update_status(self, mock_settings, mock_commit, mock_comment, mock_update):
-        """Test that on_skip does not update the task status (task stays eligible for retry)."""
+    def test_on_skip_does_not_call_commit(self, mock_settings, mock_commit, mock_comment):
+        """Test that on_skip does not change task status via API operations."""
         mock_settings.github_issue_worker_required_label = "test-tag"
         mock_comment.return_value = True
         task_source = VikunjaTaskSource()
         task = Task(id=42, title="Test Task", body="", comments=[], raw={"_repo_path": Path("/test")})
 
-        task_source.on_skip(task, "test reason")
+        task_source.on_skip(task, "LLM unavailable")
 
         mock_comment.assert_called_once()
-        mock_update.assert_not_called()
-        mock_commit.assert_called_once()
+        mock_commit.assert_not_called()
 
     @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
@@ -608,12 +543,11 @@ class TestVikunjaTaskSource:
         task_source = VikunjaTaskSource()
         repo_path = Path("/test/repo")
 
-        result = task_source._update_task_with_comment_and_status(42, "Comment text", repo_path, "done")
+        task_source._update_task_with_comment_and_status(42, "Comment text", "done", repo_path)
 
-        assert result is True
         mock_comment.assert_called_once_with(42, "Comment text")
         mock_update.assert_called_once_with(42, "done")
-        mock_commit.assert_called_once_with(repo_path, "Updated task 42: done")
+        mock_commit.assert_called_once_with(repo_path, "Updated task 42 status to 'done' and added comment")
 
     @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
@@ -621,56 +555,54 @@ class TestVikunjaTaskSource:
     def test_update_task_with_comment_and_status_skips_commit_when_comment_fails(
         self, mock_comment, mock_update, mock_commit, caplog
     ):
-        """Test that commit is NOT called and the helper returns False when comment_on_task fails."""
+        """Test that commit is NOT called when comment_on_task fails."""
         mock_comment.return_value = False
         mock_update.return_value = True
         task_source = VikunjaTaskSource()
         repo_path = Path("/test/repo")
 
-        result = task_source._update_task_with_comment_and_status(42, "Comment text", repo_path, "done")
+        task_source._update_task_with_comment_and_status(42, "Comment text", "done", repo_path)
 
-        assert result is False
         mock_comment.assert_called_once()
-        mock_update.assert_not_called()
+        mock_update.assert_called_once()
         mock_commit.assert_not_called()
         assert "Failed to add comment to task 42" in caplog.text
 
     @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_update_task_with_comment_and_status_comment_only_commit_when_status_fails(
+    def test_update_task_with_comment_and_status_skips_commit_when_status_fails(
         self, mock_comment, mock_update, mock_commit, caplog
     ):
-        """Test that a comment-only commit is still made when update_task_status fails (intentional fallthrough)."""
+        """Test that commit is NOT called when update_task_status fails."""
         mock_comment.return_value = True
         mock_update.return_value = False
         task_source = VikunjaTaskSource()
         repo_path = Path("/test/repo")
 
-        result = task_source._update_task_with_comment_and_status(42, "Comment text", repo_path, "done")
+        task_source._update_task_with_comment_and_status(42, "Comment text", "done", repo_path)
 
-        assert result is True
         mock_comment.assert_called_once()
         mock_update.assert_called_once()
-        mock_commit.assert_called_once_with(repo_path, "Added comment to task 42")
+        mock_commit.assert_not_called()
         assert "Failed to update status to 'done' for task 42" in caplog.text
 
     @patch("auto_slopp.workers.vikunja_task_source.commit")
     @patch("auto_slopp.workers.vikunja_task_source.update_task_status")
     @patch("auto_slopp.workers.vikunja_task_source.comment_on_task")
-    def test_update_task_with_comment_and_status_no_commit_when_both_fail(
+    def test_update_task_with_comment_and_status_skips_commit_when_both_fail(
         self, mock_comment, mock_update, mock_commit, caplog
     ):
-        """Test that commit is NOT called and the helper returns False when both operations fail."""
+        """Test that commit is NOT called when both operations fail."""
         mock_comment.return_value = False
         mock_update.return_value = False
         task_source = VikunjaTaskSource()
         repo_path = Path("/test/repo")
 
-        result = task_source._update_task_with_comment_and_status(42, "Comment text", repo_path, "done")
+        task_source._update_task_with_comment_and_status(42, "Comment text", "done", repo_path)
 
-        assert result is False
         mock_comment.assert_called_once()
-        mock_update.assert_not_called()
+        mock_update.assert_called_once()
         mock_commit.assert_not_called()
         assert "Failed to add comment to task 42" in caplog.text
+        assert "Failed to update status to 'done' for task 42" in caplog.text

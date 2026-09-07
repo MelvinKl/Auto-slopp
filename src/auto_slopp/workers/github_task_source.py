@@ -32,11 +32,6 @@ logger = logging.getLogger(__name__)
 class GitHubTaskSource(TaskSource):
     """Task source that loads tasks from GitHub Issues."""
 
-    # Marker shared by all skip comments; used to detect an already-posted
-    # skip comment so repeated retries during a prolonged outage do not spam
-    # the issue with identical comments.
-    SKIP_COMMENT_MARKER = "⏭️ **Task Skipped**"
-
     def get_tasks(self, repo_path: Path) -> list[Task]:
         """Fetch and filter tasks from GitHub Issues.
 
@@ -348,6 +343,26 @@ class GitHubTaskSource(TaskSource):
         comment_on_issue(repo_path, task.id, no_changes_comment)
         close_issue(repo_path, task.id)
 
+    def on_skip(self, task: Task, reason: str = "") -> None:
+        """Called when a task should be skipped (e.g., when LLM is unavailable).
+
+        No comment is posted to the issue - skip information is only recorded
+        in the logs. The required label is NOT removed so
+        the task can be retried in a future run.
+
+        Skip events are still logged for observability, so future maintainers
+        understand the information isn't lost, just moved to logs.
+
+        Args:
+            task: The task that should be skipped
+            reason: Optional reason for skipping (e.g., "LLM unavailable")
+        """
+        # No GitHub comment is posted for skips — skip events are logged-only
+        # to avoid cluttering issues with skip notifications. The label is preserved
+        # so the task can be retried in a future run.
+        reason_str = f" - {reason}" if reason else ""
+        logger.info(f"Skipped issue #{task.id}{reason_str}, label preserved for retry")
+
     def on_max_iterations_reached(self, task: Task, steps_completed: int, total_steps: int, error: str) -> None:
         """Called when the ralph loop reaches max iterations without completing.
 
@@ -383,61 +398,6 @@ class GitHubTaskSource(TaskSource):
             logger.info(f"Removed required label '{settings.github_issue_worker_required_label}' from issue #{task.id}")
         else:
             logger.warning(f"Failed to remove required label from issue #{task.id}")
-
-    def on_skip(self, task: Task, reason: str) -> None:
-        """Called when a task is skipped (e.g., due to LLM unavailability).
-
-        Adds a skip comment to the issue but does NOT remove the required label,
-        so the issue remains eligible for future processing.
-
-        Args:
-            task: The task being skipped
-            reason: Reason for skipping (e.g., "LLM unavailable")
-        """
-        repo_path = task.raw.get("_repo_path")
-        if repo_path is None:
-            logger.warning(f"No repo_path found in task #{task.id}, skipping skip handling")
-            return
-
-        if self._latest_comment_is_skip_comment(repo_path, task.id):
-            logger.info(f"Issue #{task.id} already ends with a skip comment; not posting another: {reason}")
-            return
-
-        skip_comment = (
-            f"{self.SKIP_COMMENT_MARKER}\n\n"
-            f"Reason: {reason}\n\n"
-            f"This issue will be retried when the LLM becomes available."
-        )
-        comment_on_issue(repo_path, task.id, skip_comment)
-        logger.info(f"Task skipped for issue #{task.id}: {reason}")
-
-    def _latest_comment_is_skip_comment(self, repo_path: Path, issue_number: int) -> bool:
-        """Return True if the most recent comment on the issue is a skip comment.
-
-        Only the most recent up to 100 comments are checked (fetched via
-        GraphQL ``last: 100``), which is sufficient because a duplicate skip
-        comment would always be among the newest comments.
-
-        Used by :meth:`on_skip` to avoid posting a duplicate skip comment on
-        every retry cycle of a prolonged outage.
-
-        Args:
-            repo_path: Path to the repository.
-            issue_number: Issue number to check.
-
-        Returns:
-            True if the latest comment is a skip comment, False otherwise
-            (including when the comments cannot be fetched).
-        """
-        try:
-            comments = get_issue_comments(repo_path, issue_number, latest=True)
-        except Exception as e:
-            logger.warning(f"Failed to check existing comments for issue #{issue_number}: {e}")
-            return False
-        if not comments:
-            return False
-        latest = max(comments, key=lambda c: c.get("createdAt") or "")
-        return self.SKIP_COMMENT_MARKER in (latest.get("body") or "")
 
     def _filter_renovate_issues(self, issues: list[dict]) -> list[dict]:
         """Filter out issues created by Renovate.
