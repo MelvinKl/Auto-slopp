@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`checkout_branch_resilient`**: Replaced `git reset --hard` fallback with `git stash`/`git stash pop` to preserve uncommitted local changes when branch checkout fails due to conflicting modifications
 
 ### Fixed
+- **`settings.main` (`CLIConfiguration`)**: Eliminated the Pydantic `UserWarning` at import time ("`validate_timeout` overrides an existing Pydantic `@field_validator` decorator") caused by a duplicate `timeout` field and a duplicate `@field_validator("timeout")` definition. `CLIConfiguration` now declares the `timeout` field and the `validate_timeout` validator exactly once, preserving the CLI timeout behavior (`NO_TIMEOUT` sentinel; positive values up to ~1 year). The timeout cap constant was promoted from private `_MAX_TIMEOUT_SECONDS` to public `MAX_TIMEOUT_SECONDS` (exported via the module's `__all__`), and the tests now import that public name
 - **Git checkout**: Uncommitted local changes are no longer silently discarded when switching branches. Changes are now stashed before checkout and restored afterward, preventing data loss from previous worker operations leaving temporary files in the working directory
 
 ### Removed
