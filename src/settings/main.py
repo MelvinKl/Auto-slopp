@@ -1,11 +1,15 @@
 """Main settings configuration using Pydantic BaseSettings."""
 
+import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
+import yaml
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
+
+logger = logging.getLogger(__name__)
 
 
 class TaskRating(BaseModel):
@@ -106,6 +110,7 @@ class Settings(BaseSettings):
     @field_validator(
         "base_repo_path",
         "additional_env_file",
+        "config_file_path",
         mode="before",
     )
     @classmethod
@@ -155,49 +160,14 @@ class Settings(BaseSettings):
         default=False, description="Disable notification sound for Telegram messages"
     )
 
+    config_file_path: Union[str, Path] = Field(
+        default="config/default.yaml",
+        description="Path to the configuration file for complex settings like cli_configurations",
+        validation_alias=AliasChoices("AUTO_SLOPP_CONFIG_FILE_PATH", "AUTO_SLOPP_CONFIG_FILE"),
+    )
+
     cli_configurations: list[CLIConfiguration] = Field(
-        default_factory=lambda: [
-            CLIConfiguration(
-                cli_command="pi",
-                cli_args=[
-                    "--model",
-                    "llama-cpp/Qwen3.6-35B-A3B",
-                    "-p",
-                ],
-                capability=6,
-                name="pi Qwen3.6-35B-A3B",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "opencode/nemotron-3-ultra-free",
-                    "run",
-                ],
-                capability=7,
-                name="opencode nemotron-3-ultra-free",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "openai/gpt-5",
-                    "run",
-                ],
-                capability=8,
-                name="opencode gpt-5",
-            ),
-            CLIConfiguration(
-                cli_command="opencode",
-                cli_args=[
-                    "--model",
-                    "openai/gpt-5-mini",
-                    "run",
-                ],
-                capability=9,
-                name="opencode gpt-5-mini",
-            ),
-        ],
+        default_factory=list,  # Will be populated in _load_cli_configurations_from_file
         description=(
             "Tiered CLI configurations ordered by preference. " "Lower index entries are preferred and used first."
         ),
@@ -286,6 +256,36 @@ class Settings(BaseSettings):
         "env_file": ".env",
         "env_file_encoding": "utf-8",
     }
+
+    def model_post_init(self, __context) -> None:
+        """Load CLI configurations from file after model initialization."""
+        # Only load from file if cli_configurations is empty (not set via env vars)
+        if not self.cli_configurations:
+            self._load_cli_configurations_from_file()
+
+    def _load_cli_configurations_from_file(self) -> None:
+        """Load CLI configurations from the specified file."""
+        try:
+            config_path = Path(self.config_file_path)
+            # Handle relative paths by making them relative to the project root
+            if not config_path.is_absolute():
+                config_path = Path.cwd() / config_path
+
+            if config_path.exists():
+                with open(config_path, "r") as f:
+                    config_data = yaml.safe_load(f)
+
+                if config_data and "cli_configurations" in config_data:
+                    configs = []
+                    for config_dict in config_data["cli_configurations"]:
+                        configs.append(CLIConfiguration(**config_dict))
+                    self.cli_configurations = configs
+            # If file doesn't exist, cli_configurations remains empty list
+            # This allows env vars to override with an empty list if needed
+        except Exception as e:
+            # Log error but don't fail - allow empty configurations
+            logger.debug("Failed to load CLI configurations from file: %s", e)
+            # Keep cli_configurations as empty list
 
 
 # Load .env file automatically before creating settings instance

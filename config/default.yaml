@@ -1,0 +1,83 @@
+# Default configuration file for auto-slopp
+# This file contains configurations that are not easily set by environment variables
+# The path to this file can be customized using the AUTO_SLOPP_CONFIG_FILE environment variable
+
+cli_configurations:
+  - cli_command: claude
+    cli_args:
+      - "--model"
+      - "opus"
+      - "-p"
+    capability: 10
+    cooldown_seconds: 3600
+    name: "claude opus"
+  - cli_command: claude
+    cli_args:
+      - "--model"
+      - "sonnet"
+      - "-p"
+    capability: 8
+    cooldown_seconds: 3600
+    name: "claude sonnet"
+  - cli_command: claude
+    cli_args:
+      - "--model"
+      - "haiku"
+      - "-p"
+    capability: 4
+    cooldown_seconds: 3600
+    name: "claude haiku"
+  - cli_command: opencode
+    cli_args:
+      - "--model"
+      - "nvidia/private/nvidia/nemotron-3-super-120b-a12b"
+      - "run"
+    capability: 7
+    cooldown_seconds: 3600
+    name: "opencode nvidia nemotron 3"
+  - cli_command: opencode
+    cli_args:
+      - "--model"
+      - "zai-coding-plan/glm-4.7"
+      - "run"
+    capability: 8
+    cooldown_seconds: 3600
+    name: "opencode glm-4.7"
+  - cli_command: gemini
+    cli_args:
+      - "--yolo"
+      - "--model"
+      - "gemini-3.1-pro-preview"
+      - "-p"
+    capability: 5
+    cooldown_seconds: 3600
+    name: "gemini gemini-3.1-pro-preview"
+  - cli_command: codex
+    cli_args: ["--dangerously-bypass-approvals-and-sandbox", "exec"]
+    capability: 8
+    cooldown_seconds: 3600
+    name: "codex"
+  - cli_command: opencode
+    cli_args:
+      - "--model"
+      - "opencode/big-pickle"
+      - "run"
+    capability: 5
+    cooldown_seconds: 3600
+    name: "opencode big pickle"
+  - cli_command: opencode
+    cli_args:
+      - "--model"
+      - "opencode/nemotron-3-super-free"
+      - "run"
+    capability: 7
+    cooldown_seconds: 3600
+    name: "opencode nemotron-3-super-free"
+  - cli_command: opencode
+    cli_args:
+      - "--model"
+      - "zai-coding-plan/glm-4.7-flash"
+      - "run"
+    capability: 1
+    cooldown_seconds: 3600
+    name: "opencode glm-4.7-flash"
