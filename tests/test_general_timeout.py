@@ -102,6 +102,38 @@ def test_run_vikunja_command_uses_general_timeout(mock_subprocess_run):
 
 
 @patch("auto_slopp.utils.git_operations.subprocess.run")
+def test_get_current_branch_uses_general_timeout(mock_subprocess_run):
+    """Public git functions (get_current_branch) apply settings.general_timeout."""
+    from auto_slopp.utils.git_operations import get_current_branch
+
+    result = MagicMock()
+    result.returncode = 0
+    result.stdout = "main"
+    mock_subprocess_run.return_value = result
+
+    with patch("auto_slopp.utils.git_operations.settings.general_timeout", 123):
+        get_current_branch("/tmp/repo")
+
+    assert _capture_kwargs(mock_subprocess_run)["timeout"] == 123
+
+
+@patch("auto_slopp.utils.git_operations.subprocess.run")
+def test_get_remote_branches_uses_general_timeout(mock_subprocess_run):
+    """Public git functions (get_remote_branches) apply settings.general_timeout."""
+    from auto_slopp.utils.git_operations import get_remote_branches
+
+    result = MagicMock()
+    result.returncode = 0
+    result.stdout = ""
+    mock_subprocess_run.return_value = result
+
+    with patch("auto_slopp.utils.git_operations.settings.general_timeout", 250):
+        get_remote_branches("/tmp/repo")
+
+    assert _capture_kwargs(mock_subprocess_run)["timeout"] == 250
+
+
+@patch("auto_slopp.utils.git_operations.subprocess.run")
 def test_is_git_repo_uses_general_timeout(mock_subprocess_run):
     """is_git_repo should invoke git with the general timeout."""
     from auto_slopp.utils.git_operations import is_git_repo
