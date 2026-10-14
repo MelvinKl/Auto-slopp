@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`tests/test_linking.py`**: Comprehensive test suite for the linking utilities (82 tests)
 - **`auto_slopp.utils.linking`**: Supports `owner/repo#123` format (including nested paths like `org/subteam/repo#123`) in existing-link detection
 - **`auto_slopp.utils.github_operations.get_failed_workflow_logs()`**: Fetches the failed logs of a single completed, non-successful workflow run
+- **General timeout (`AUTO_SLOPP_GENERAL_TIMEOUT`)**: An adjustable, general timeout (default 300 seconds / 5 minutes) applied to all CLI commands that do not manage their own timeout (git, gh, vikunja and other direct shell invocations). Applied via `_run_git_command`, `_run_gh_command`, `_run_vikunja_command`, worker git/gh calls and the executor's `git pull`. The coding CLI tool keeps its own per-configuration `timeout` (including `NO_TIMEOUT` = no timeout).
 ### Changed
 - **PRWorker**: Branches with non-successful GitHub Actions runs are no longer skipped; the failure logs are fetched and passed to the CLI tool (`_fix_workflows_with_cli`) to fix them before continuing
 - **PRWorker._get_and_log_workflow_runs**: Now returns a tuple of (failed runs, failure logs) instead of only the failed runs

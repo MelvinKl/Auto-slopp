@@ -34,13 +34,6 @@ class CLIConfiguration(BaseModel):
         default_factory=list,
         description="Arguments to pass to the CLI command",
     )
-    timeout: int = Field(
-        default=-1,
-        description=(
-            "Timeout in seconds for CLI execution. Set to -1 to disable timeout (never timeout). "
-            "Must be -1 or a positive integer."
-        ),
-    )
     capability: int = Field(
         default=5,
         ge=0,
