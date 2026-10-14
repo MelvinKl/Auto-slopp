@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from auto_slopp.utils.cli_executor import get_active_cli_command, run_cli_executor
+from settings.main import settings
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ def _run_git_command(
     repo_dir: Path,
     *args: str,
     check: bool = True,
-    timeout: int = 60,
+    timeout: Optional[int] = None,
     capture_output: bool = True,
 ) -> subprocess.CompletedProcess:
     """Run a git command in the specified repository.
@@ -59,7 +60,8 @@ def _run_git_command(
         repo_dir: Path to the git repository
         *args: Git command arguments
         check: Whether to raise exception on non-zero return code
-        timeout: Timeout for the command in seconds
+        timeout: Timeout for the command in seconds. When ``None`` (default), the
+            general timeout from settings is applied.
         capture_output: Whether to capture output
 
     Returns:
@@ -68,6 +70,9 @@ def _run_git_command(
     Raises:
         GitOperationError: If git command fails and check is True
     """
+    if timeout is None:
+        timeout = settings.general_timeout
+
     try:
         result = subprocess.run(
             ["git", *args],
@@ -814,6 +819,7 @@ def is_git_repo(directory: Path) -> bool:
             cwd=directory,
             capture_output=True,
             text=True,
+            timeout=settings.general_timeout,
         )
         return result.returncode == 0
     except Exception:

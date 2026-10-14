@@ -152,6 +152,7 @@ class Executor:
                 cwd=Path.cwd(),
                 capture_output=True,
                 text=True,
+                timeout=settings.general_timeout,
             )
 
             if result.returncode != 0:

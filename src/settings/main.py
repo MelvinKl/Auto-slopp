@@ -210,6 +210,16 @@ class Settings(BaseSettings):
         description="Timeout for slopmachine execution in seconds (1 to 30 days)",
     )
 
+    general_timeout: int = Field(
+        default=300,
+        ge=1,
+        le=_MAX_TIMEOUT_SECONDS,
+        description=(
+            "General timeout in seconds applied to CLI commands (git, gh, vikunja, etc.) that do "
+            "not specify their own timeout. Defaults to 300 seconds (5 minutes)."
+        ),
+    )
+
     github_issue_worker_required_label: str = Field(
         default="ai",
         description="Required label for GitHubIssueWorker to process an issue",
