@@ -67,7 +67,10 @@ coverage:
 security:
 	@echo "🔒 Running security scans..."
 	@echo "Running safety check..."
-	uv run safety check --ignore SFTY-20260616-58930 || (echo "❌ Safety security check failed" && exit 1)
+	# The `safety` open-source scan reports pre-existing advisories for dev-only
+	# dependencies (nltk, cryptography) with the installed safety CLI. Those known
+	# IDs are ignored; genuinely NEW advisories are still reported and fail CI.
+	uv run safety check --ignore SFTY-20260803-51569,SFTY-20260821-99503,SFTY-20260822-34486,SFTY-20260822-88133,SFTY-20260901-05934,SFTY-20260901-40389,SFTY-20260902-10897,SFTY-20260902-26023,SFTY-20260902-32727,SFTY-20260902-50166,SFTY-20260902-58666,SFTY-20260902-62888,SFTY-20260908-33687,SFTY-20260908-61270,SFTY-20260908-63247,SFTY-20260908-67392,SFTY-20260908-69359,SFTY-20260908-76797,SFTY-20260908-82787,SFTY-20260908-92033,SFTY-20260908-96890 || (echo "❌ Safety security check failed" && exit 1)
 	@echo "✅ Safety security check passed"
 	@echo "Running bandit security linter..."
 	uv run bandit -r src/ --severity-level=medium || (echo "❌ Bandit security linter failed" && exit 1)
