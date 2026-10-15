@@ -116,6 +116,12 @@ AUTO_SLOPP_TASK_DIFFICULTIES='{
 AUTO_SLOPP_SLOP_TIMEOUT=7200
 
 # Use -1 (NO_TIMEOUT) to disable timeout entirely
+
+# General timeout (in seconds) applied to CLI commands that do not specify
+# their own timeout (git, gh, vikunja, and other shell invocations).
+# Configurable via the AUTO_SLOPP_GENERAL_TIMEOUT environment variable.
+# Defaults to 300 seconds (5 minutes).
+AUTO_SLOPP_GENERAL_TIMEOUT=300
 ```
 
 ##### Understanding the Capability Rating System
@@ -448,6 +454,7 @@ services:
       - AUTO_SLOPP_TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - AUTO_SLOPP_WORKERS_DISABLED=[]
       - AUTO_SLOPP_SLOP_TIMEOUT=7200
+      - AUTO_SLOPP_GENERAL_TIMEOUT=300
     env_file:
       - .env
 ```
@@ -686,6 +693,10 @@ AUTO_SLOPP_TASK_DIFFICULTIES='{
 
 # Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
 AUTO_SLOPP_SLOP_TIMEOUT=7200
+
+# General timeout (in seconds) applied to CLI commands that don't specify their
+# own timeout (git, gh, vikunja, and other shell invocations). Defaults to 300.
+AUTO_SLOPP_GENERAL_TIMEOUT=300
 
 # Use -1 (NO_TIMEOUT) to disable timeout entirely
 
@@ -1132,6 +1143,10 @@ export AUTO_SLOPP_CLI_CONFIGURATIONS='[
 
 # Timeout for slopmachine execution in seconds (default: 7200, 2 hours)
 export AUTO_SLOPP_SLOP_TIMEOUT=7200
+
+# General timeout (in seconds) applied to CLI commands that don't specify their
+# own timeout (git, gh, vikunja, and other shell invocations). Defaults to 300.
+export AUTO_SLOPP_GENERAL_TIMEOUT=300
 
 # Use -1 (NO_TIMEOUT) to disable timeout entirely
 

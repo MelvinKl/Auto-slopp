@@ -34,13 +34,6 @@ class CLIConfiguration(BaseModel):
         default_factory=list,
         description="Arguments to pass to the CLI command",
     )
-    timeout: int = Field(
-        default=-1,
-        description=(
-            "Timeout in seconds for CLI execution. Set to -1 to disable timeout (never timeout). "
-            "Must be -1 or a positive integer."
-        ),
-    )
     capability: int = Field(
         default=5,
         ge=0,
@@ -208,6 +201,16 @@ class Settings(BaseSettings):
         ge=1,
         le=30 * 24 * 60 * 60,
         description="Timeout for slopmachine execution in seconds (1 to 30 days)",
+    )
+
+    general_timeout: int = Field(
+        default=300,
+        ge=1,
+        le=_MAX_TIMEOUT_SECONDS,
+        description=(
+            "General timeout in seconds applied to CLI commands (git, gh, vikunja, etc.) that do "
+            "not specify their own timeout. Defaults to 300 seconds (5 minutes)."
+        ),
     )
 
     github_issue_worker_required_label: str = Field(

@@ -25,27 +25,15 @@ class GitHubOperationError(Exception):
     pass
 
 
-def _run_gh_command(
-    repo_dir: Path,
-    *args: str,
-    check: bool = True,
-    timeout: int = 30,
-    capture_output: bool = True,
-) -> subprocess.CompletedProcess:
-    """Run a gh command in the specified repository.
+def _build_gh_env() -> dict[str, str]:
+    """Build the environment used for gh CLI subprocess calls.
 
-    Args:
-        repo_dir: Path to the git repository
-        *args: GitHub CLI command arguments
-        check: Whether to raise exception on non-zero return code
-        timeout: Timeout for the command in seconds
-        capture_output: Whether to capture output
+    Copies the current environment and, when configured, appends the contents of
+    the optional ``additional_env_file`` (filtering out ``None`` values to avoid
+    ``TypeError`` during interpolation).
 
     Returns:
-        CompletedProcess instance
-
-    Raises:
-        GitHubOperationError: If gh command fails and check is True
+        The environment dictionary to pass to ``subprocess.run``.
     """
     env = os.environ.copy()
     if settings.additional_env_file and settings.additional_env_file.exists():
@@ -54,6 +42,37 @@ def _run_gh_command(
         for k, v in parsed_env.items():
             if v is not None:
                 env[k] = str(v)
+
+    return env
+
+
+def _run_gh_command(
+    repo_dir: Path,
+    *args: str,
+    check: bool = True,
+    timeout: Optional[int] = None,
+    capture_output: bool = True,
+) -> subprocess.CompletedProcess:
+    """Run a gh command in the specified repository.
+
+    Args:
+        repo_dir: Path to the git repository
+        *args: GitHub CLI command arguments
+        check: Whether to raise exception on non-zero return code
+        timeout: Timeout for the command in seconds. When ``None`` (default), the
+            general timeout from settings is applied.
+        capture_output: Whether to capture output
+
+    Returns:
+        CompletedProcess instance
+
+    Raises:
+        GitHubOperationError: If gh command fails and check is True
+    """
+    env = _build_gh_env()
+
+    if timeout is None:
+        timeout = settings.general_timeout
 
     # Ensure GH_TOKEN is set if GITHUB_TOKEN is present (gh cli prefers GH_TOKEN)
     if "GH_TOKEN" not in env and "GITHUB_TOKEN" in env:
@@ -753,7 +772,7 @@ def get_workflow_runs_for_branch(repo_dir: Path, branch: str, event: Optional[st
             cwd=repo_dir,
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=settings.general_timeout,
         )
         if sha_result.returncode != 0:
             logger.warning(f"Could not resolve origin/{branch} SHA for workflow run lookup")

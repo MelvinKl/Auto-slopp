@@ -608,7 +608,7 @@ class GitHubTaskSource(TaskSource):
                     cwd=repo_path,
                     capture_output=True,
                     text=True,
-                    timeout=10,
+                    timeout=settings.general_timeout,
                 )
                 if result.returncode == 0:
                     recent_commits = result.stdout
@@ -639,7 +639,7 @@ class GitHubTaskSource(TaskSource):
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
-                timeout=10,
+                timeout=settings.general_timeout,
             )
             if result.returncode == 0:
                 import json

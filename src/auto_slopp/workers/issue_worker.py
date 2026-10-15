@@ -962,7 +962,7 @@ Plan:
                 cwd=repo_dir,
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=settings.general_timeout,
             )
             if symbolic_ref.returncode == 0:
                 ref = symbolic_ref.stdout.strip()
@@ -973,7 +973,7 @@ Plan:
                 cwd=repo_dir,
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=settings.general_timeout,
             )
             if completed.returncode != 0:
                 return 0

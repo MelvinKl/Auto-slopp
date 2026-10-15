@@ -9,6 +9,8 @@ import logging
 import subprocess
 from typing import Any, Optional, Union
 
+from settings.main import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -21,7 +23,7 @@ class VikunjaOperationError(Exception):
 def _run_vikunja_command(
     *args: str,
     check: bool = True,
-    timeout: int = 30,
+    timeout: Optional[int] = None,
     capture_output: bool = True,
 ) -> subprocess.CompletedProcess:
     """Run a vikunja-cli-helper command.
@@ -29,7 +31,8 @@ def _run_vikunja_command(
     Args:
         *args: Vikunja CLI command arguments
         check: Whether to raise exception on non-zero return code
-        timeout: Timeout for the command in seconds
+        timeout: Timeout for the command in seconds. When ``None`` (default), the
+            general timeout from settings is applied.
         capture_output: Whether to capture output
 
     Returns:
@@ -38,6 +41,9 @@ def _run_vikunja_command(
     Raises:
         VikunjaOperationError: If vikunja-cli-helper command fails and check is True
     """
+    if timeout is None:
+        timeout = settings.general_timeout
+
     cmd = ["vikunja-cli-helper", *args]
     try:
         result = subprocess.run(
