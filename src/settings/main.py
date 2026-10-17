@@ -220,6 +220,14 @@ class Settings(BaseSettings):
         description="Allowed GitHub username for GitHubIssueWorker to process issues",
     )
 
+    github_issue_worker_auto_merge_label: str = Field(
+        default="auto-merge",
+        description=(
+            "Issue label that triggers automatic merging of the PR that closes the issue "
+            "once the issue is finished (default: 'auto-merge')"
+        ),
+    )
+
     pr_review_worker_required_label: str = Field(
         default="AI",
         description="Required label for PrReviewWorker to process a PR",

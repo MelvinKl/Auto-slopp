@@ -278,3 +278,17 @@ class TestSettings:
             test_settings = Settings()
 
         assert test_settings.pr_review_worker_required_label == "AI"
+
+    def test_auto_merge_label_default(self):
+        """Test default auto-merge label value."""
+        test_settings = Settings()
+        assert test_settings.github_issue_worker_auto_merge_label == "auto-merge"
+
+    def test_auto_merge_label_custom(self):
+        """Test that the auto-merge label can be customized via environment variable."""
+        env_vars = {
+            "AUTO_SLOPP_GITHUB_ISSUE_AUTO_MERGE_LABEL": "needs-auto-merge",
+        }
+        with patch.dict(os.environ, env_vars, clear=True):
+            test_settings = Settings()
+        assert test_settings.github_issue_worker_auto_merge_label == "needs-auto-merge"

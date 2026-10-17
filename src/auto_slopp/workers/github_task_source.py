@@ -20,6 +20,8 @@ from auto_slopp.utils.github_operations import (
     get_issue_comments,
     get_open_issues,
     get_open_prs,
+    get_pull_requests_for_issue,
+    merge_pull_request,
     remove_label_from_issue,
 )
 from auto_slopp.utils.linking import ensure_issue_link_in_pr_body
@@ -287,15 +289,88 @@ class GitHubTaskSource(TaskSource):
             # Do NOT close the issue or remove the automatic work label
             return
 
-        # No findings (or findings is None/empty): follow the original behavior
-        close_success = close_issue(repo_path, task.id)
-        if close_success:
-            comment = f"Completed by PR: {pr_url}"
-            comment_success = comment_on_issue(repo_path, task.id, comment)
-            if not comment_success:
-                logger.warning(f"Failed to add comment to issue #{task.id}")
+        # No findings (or findings is None/empty): follow the original behavior.
+        labels = task.raw.get("labels", [])
+        if self._issue_has_auto_merge_label(labels):
+            # When the issue carries the auto-merge label, automatically merge
+            # the PR that actually closes the issue (resolved by link/reference)
+            # as soon as the issue is finished. The outcome is reflected in a
+            # comment so the auto-merge action is observable.
+            merged, merged_pr_number = self._auto_merge_closing_pr(repo_path, task.id)
+            merged_pr_str = str(merged_pr_number) if merged_pr_number is not None else ""
+            if merged:
+                comment = f"Auto-merged (label '{settings.github_issue_worker_auto_merge_label}'): #{merged_pr_str}"
+            else:
+                comment = f"Auto-merge failed (label '{settings.github_issue_worker_auto_merge_label}'): #{merged_pr_str}"
+            comment_on_issue(repo_path, task.id, comment)
         else:
-            logger.warning(f"Failed to close issue #{task.id}")
+            close_success = close_issue(repo_path, task.id)
+            if close_success:
+                comment = f"Completed by PR: {pr_url}"
+                comment_success = comment_on_issue(repo_path, task.id, comment)
+                if not comment_success:
+                    logger.warning(f"Failed to add comment to issue #{task.id}")
+            else:
+                logger.warning(f"Failed to close issue #{task.id}")
+
+    def _issue_has_auto_merge_label(self, labels: list) -> bool:
+        """Return whether the issue carries the configurable auto-merge label.
+
+        Args:
+            labels: Issue labels (list of strings or dicts with a "name" key)
+
+        Returns:
+            True if the issue carries the configured auto-merge label.
+        """
+        auto_merge_label = settings.github_issue_worker_auto_merge_label
+        for name in self._get_label_names(labels):
+            if name == auto_merge_label or name.lower() == auto_merge_label.lower():
+                return True
+        return False
+
+    @staticmethod
+    def _get_label_names(labels: list) -> list[str]:
+        """Extract label names whether labels are strings or dicts."""
+        names: list[str] = []
+        for label in labels:
+            if isinstance(label, str):
+                names.append(label)
+            elif isinstance(label, dict):
+                names.append(label.get("name", ""))
+        return names
+
+    def _auto_merge_closing_pr(self, repo_path: Path, issue_number: int) -> tuple[bool, Optional[int]]:
+        """Automatically merge the PR that closes the issue when labelled.
+
+        Finds the pull request linked to (closing) the issue via link/reference,
+        and merges it using the GitHub CLI merge configuration.
+
+        Args:
+            repo_path: Path to the git repository
+            issue_number: Issue number whose closing PR should be auto-merged
+
+        Returns:
+            A tuple ``(merged, pr_number)`` where ``merged`` indicates whether the
+            closing PR was merged successfully and ``pr_number`` is the number of
+            the PR that was merged (or ``None`` if none was found).
+        """
+        linked_prs = get_pull_requests_for_issue(repo_path, issue_number)
+        if not linked_prs:
+            logger.warning(f"Issue #{issue_number} is labelled for auto-merge but has no linked PR to merge")
+            return False, None
+
+        pr = linked_prs[0]
+        pr_number = pr.get("number")
+        if pr_number is None:
+            logger.warning(f"Linked PR for issue #{issue_number} has no number, skipping auto-merge")
+            return False, None
+
+        merged = merge_pull_request(repo_path, pr_number)
+        if merged:
+            logger.info(f"Auto-merged PR #{pr_number} for labelled issue #{issue_number}")
+        else:
+            logger.warning(f"Failed to auto-merge PR #{pr_number} for issue #{issue_number}")
+        return merged, pr_number
 
     def on_task_failure(self, task: Task, error: str) -> None:
         """Called when a task fails.

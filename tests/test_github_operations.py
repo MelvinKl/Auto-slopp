@@ -10,7 +10,9 @@ from auto_slopp.utils.github_operations import (
     get_failed_workflow_logs,
     get_open_prs_with_label,
     get_pr_files,
+    get_pull_requests_for_issue,
     get_workflow_runs_for_branch,
+    merge_pull_request,
     remove_label_from_issue,
     submit_pr_review,
 )
@@ -271,3 +273,103 @@ class TestGetFailedWorkflowLogs:
         run = {"conclusion": "failure", "name": "CI", "status": "completed", "databaseId": 123}
         result = get_failed_workflow_logs(repo_dir, run)
         assert result == ""
+
+
+class TestGetPullRequestsForIssue:
+    """Test cases for get_pull_requests_for_issue function."""
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_pull_requests_for_issue_success(self, mock_run_gh):
+        """Test success returns the linked PRs as a list."""
+        mock_run_gh.return_value = Mock(
+            returncode=0, stdout='[{"number": 7, "title": "Fix", "state": "CLOSED", "url": "u"}]'
+        )
+        repo_dir = Path("/tmp/test_repo")
+        result = get_pull_requests_for_issue(repo_dir, 42)
+        assert result == [{"number": 7, "title": "Fix", "state": "CLOSED", "url": "u"}]
+        mock_run_gh.assert_called_once_with(
+            repo_dir,
+            "issue",
+            "view",
+            "42",
+            "--pulls",
+            "--json=number,title,state,url",
+            check=False,
+        )
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_pull_requests_for_issue_object_with_pulls_key(self, mock_run_gh):
+        """Test object-form response (gh <2) is unwrapped into a list."""
+        mock_run_gh.return_value = Mock(
+            returncode=0, stdout='{"pulls": [{"number": 7, "title": "Fix", "state": "CLOSED", "url": "u"}]}'
+        )
+        repo_dir = Path("/tmp/test_repo")
+        result = get_pull_requests_for_issue(repo_dir, 42)
+        assert result == [{"number": 7, "title": "Fix", "state": "CLOSED", "url": "u"}]
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_pull_requests_for_issue_empty_output(self, mock_run_gh):
+        """Test empty output returns an empty list."""
+        mock_run_gh.return_value = Mock(returncode=0, stdout="")
+        repo_dir = Path("/tmp/test_repo")
+        result = get_pull_requests_for_issue(repo_dir, 42)
+        assert result == []
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_pull_requests_for_issue_failure(self, mock_run_gh):
+        """Test failure returns empty list."""
+        mock_run_gh.return_value = Mock(returncode=1, stderr="no linked pull requests")
+        repo_dir = Path("/tmp/test_repo")
+        result = get_pull_requests_for_issue(repo_dir, 42)
+        assert result == []
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_get_pull_requests_for_issue_handles_exceptions(self, mock_run_gh):
+        """Test unexpected errors return an empty list without raising."""
+        mock_run_gh.side_effect = RuntimeError("boom")
+        repo_dir = Path("/tmp/test_repo")
+        result = get_pull_requests_for_issue(repo_dir, 42)
+        assert result == []
+
+
+class TestMergePullRequest:
+    """Test cases for merge_pull_request function."""
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_merge_pull_request_default_squash(self, mock_run_gh):
+        """Test default merge method is squash and returns success."""
+        mock_run_gh.return_value = Mock(returncode=0)
+        repo_dir = Path("/tmp/test_repo")
+        result = merge_pull_request(repo_dir, 7)
+        assert result is True
+        mock_run_gh.assert_called_once_with(
+            repo_dir, "pr", "merge", "7", "--squash", check=False
+        )
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_merge_pull_request_method_flags(self, mock_run_gh):
+        """Test that the merge method and options map to gh flags."""
+        mock_run_gh.return_value = Mock(returncode=0)
+        repo_dir = Path("/tmp/test_repo")
+        result = merge_pull_request(repo_dir, 7, merge_method="rebase", delete_branch=True, skip_status_checks=True)
+        assert result is True
+        mock_run_gh.assert_called_once_with(
+            repo_dir, "pr", "merge", "7", "--rebase", "--delete-branch", "--skip-checks", check=False
+        )
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_merge_pull_request_failure(self, mock_run_gh):
+        """Test merge returns False on failure."""
+        mock_run_gh.return_value = Mock(returncode=1, stderr="conflict")
+        repo_dir = Path("/tmp/test_repo")
+        result = merge_pull_request(repo_dir, 7)
+        assert result is False
+
+    @patch("auto_slopp.utils.github_operations._run_gh_command")
+    def test_merge_pull_request_handles_exceptions(self, mock_run_gh):
+        """Test merge returns False on unexpected errors without raising."""
+        mock_run_gh.side_effect = RuntimeError("boom")
+        repo_dir = Path("/tmp/test_repo")
+        result = merge_pull_request(repo_dir, 7)
+        assert result is False
+

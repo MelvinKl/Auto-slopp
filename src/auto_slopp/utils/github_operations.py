@@ -658,6 +658,125 @@ def get_open_prs_with_label(repo_dir: Path, label: str) -> list[dict]:
         return []
 
 
+def get_pull_requests_for_issue(repo_dir: Path, issue_number: int) -> list[dict[str, Any]]:
+    """Get the pull requests that are linked to (i.e. close) an issue.
+
+    Uses ``gh issue view <number> --pulls`` so the returned PRs are those
+    linked to the issue by link/reference, not merely by title/body matching.
+
+    Args:
+        repo_dir: Path to the git repository
+        issue_number: Issue number to look up linked pull requests for
+
+    Returns:
+        List of dictionaries containing pull request information
+        (number, title, state, url). Empty list when the issue has no
+        linked pull requests or the command fails.
+    """
+    try:
+        result = _run_gh_command(
+            repo_dir,
+            "issue",
+            "view",
+            str(issue_number),
+            "--pulls",
+            "--json=number,title,state,url",
+            check=False,
+        )
+
+        if result.returncode != 0:
+            pr_error = result.stderr.strip() or result.stdout.strip()
+            if "Could not resolve to a Repository" in pr_error:
+                logger.warning(
+                    f"Cannot access repository {repo_dir.name}: likely permission denied or repository not found. "
+                    f"Verify the GitHub token has access to this repository."
+                )
+            else:
+                logger.debug(f"No linked PRs for issue #{issue_number} in {repo_dir.name}: {pr_error}")
+            return []
+
+        raw = result.stdout.strip()
+        if not raw:
+            return []
+
+        data = json.loads(raw)
+        # ``gh issue view --pulls`` returns either a JSON array of PRs or an
+        # object containing a ``pulls`` key depending on the gh version.
+        if isinstance(data, dict):
+            prs = data.get("pulls", [])
+        else:
+            prs = data
+
+        return prs if prs else []
+
+    except GitHubOperationError as e:
+        logger.error(f"Error getting linked PRs for issue #{issue_number} from {repo_dir.name}: {str(e)}")
+        return []
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse linked PRs JSON for issue #{issue_number} from {repo_dir.name}: {str(e)}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error getting linked PRs for issue #{issue_number} from {repo_dir.name}: {str(e)}")
+        return []
+
+
+# Maps a human-readable merge method to the corresponding ``gh pr merge`` flag.
+_MERGE_METHOD_FLAGS = {
+    "squash": "--squash",
+    "rebase": "--rebase",
+    "merge": "--merge",
+    "fast-forward": "--ff",
+}
+
+
+def merge_pull_request(
+    repo_dir: Path,
+    pr_number: int,
+    *,
+    merge_method: str = "squash",
+    delete_branch: bool = False,
+    skip_status_checks: bool = False,
+) -> bool:
+    """Merge a pull request using the GitHub CLI.
+
+    Args:
+        repo_dir: Path to the git repository
+        pr_number: Pull request number to merge
+        merge_method: Merge method to use ("squash", "rebase", "merge", "fast-forward").
+            Defaults to "squash".
+        delete_branch: Whether to delete the head branch after merging.
+        skip_status_checks: Whether to skip required status checks before merging.
+
+    Returns:
+        True if the PR was merged successfully, False otherwise.
+    """
+    try:
+        flags = []
+        method_flag = _MERGE_METHOD_FLAGS.get((merge_method or "squash").lower(), "--squash")
+        flags.append(method_flag)
+        if delete_branch:
+            flags.append("--delete-branch")
+        if skip_status_checks:
+            flags.append("--skip-checks")
+
+        result = _run_gh_command(
+            repo_dir,
+            "pr",
+            "merge",
+            str(pr_number),
+            *flags,
+            check=False,
+        )
+        return result.returncode == 0
+
+    except GitHubOperationError as e:
+        logger.error(f"Error merging PR #{pr_number} in {repo_dir.name}: {str(e)}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error merging PR #{pr_number} in {repo_dir.name}: {str(e)}")
+        return False
+
+
 def get_pr_files(repo_dir: Path, pr_number: int) -> str:
     """Get the full diff text for a pull request.
 
