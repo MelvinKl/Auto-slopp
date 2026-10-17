@@ -1263,6 +1263,124 @@ class TestRalphExecutor:
             assert result["max_loops_reached"] is True
             assert "loops_executed" in result
 
+    def test_run_refined_task_loop_unbounded_completes(self, ralph_executor):
+        """Test that with -1 (unbounded) the loop runs every needed iteration and
+        completes the issue instead of breaking on a hard cap."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. First step\n- [ ] 2. Second step\n")
+
+            ralph_executor.max_iterations = -1
+            ralph_executor.has_changes_fn = lambda path: False
+
+            def close_one_more_step(*args, **kwargs):
+                task_name = kwargs.get("task_name", "unknown")
+                if task_name == "task_implementation_validation":
+                    return {"success": True, "stdout": "ACCEPTANCE_STATUS: pass"}
+                # Implementation/batch call: mark the next open step as done.
+                content = task_path.read_text()
+                closed = False
+                new_lines = []
+                for line in content.splitlines(keepends=True):
+                    if (not closed) and "[ ] " in line:
+                        line = line.replace("[ ] ", "[x] ", 1)
+                        closed = True
+                    new_lines.append(line)
+                task_path.write_text("".join(new_lines))
+                return {"success": True}
+
+            ralph_executor.execute_fn = close_one_more_step
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+                issue_number=1,
+            )
+
+            # Unbounded: never breaks on the cap and completes the issue.
+            assert result["success"] is True
+            assert result["max_loops_reached"] is False
+            assert result["steps_completed"] == 2
+
+    def test_run_refined_task_loop_unbounded_terminal_error_stops(self, ralph_executor):
+        """Test that a cap-independent failure (unparseable task file) still aborts
+        the loop even when the limit is unbounded (-1)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            # No task file at all -> parse fails -> aborts with an error.
+            ralph_executor.max_iterations = -1
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=repo_dir / "task.md",
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+                issue_number=1,
+            )
+
+            assert result["success"] is False
+            assert result["max_loops_reached"] is False
+            assert "parse task file" in result.get("error", "")
+
+    def test_run_refined_task_loop_single_hard_cap(self, ralph_executor):
+        """Test that a single hard cap (max_iterations=1) still aborts when the
+        issue never completes."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. Never completes\n")
+
+            ralph_executor.max_iterations = 1
+            ralph_executor.has_changes_fn = lambda path: False
+            ralph_executor.execute_fn = lambda *args, **kwargs: {"success": False, "error": "boom"}
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+                issue_number=1,
+            )
+
+            assert result["success"] is False
+            assert result["max_loops_reached"] is True
+            assert result["loops_executed"] == 1
+
+    def test_run_refined_task_loop_multi_hard_cap(self, ralph_executor):
+        """Test that a multi hard cap (max_iterations=3) still aborts at that exact
+        cap when the issue never completes (unchanged behaviour)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = Path(tmpdir)
+            task_path = repo_dir / "task.md"
+            task_path.write_text("# Test\n\n## Steps\n\n- [ ] 1. Never completes\n")
+
+            ralph_executor.max_iterations = 3
+            ralph_executor.has_changes_fn = lambda path: False
+            ralph_executor.execute_fn = lambda *args, **kwargs: {"success": False, "error": "boom"}
+
+            result = ralph_executor._run_refined_task_loop(
+                repo_dir=repo_dir,
+                task_path=task_path,
+                issue_title="Test Issue",
+                issue_body="Test body",
+                comment_texts=[],
+                branch_name="ai/branch",
+                issue_number=1,
+            )
+
+            assert result["success"] is False
+            assert result["max_loops_reached"] is True
+            assert result["loops_executed"] == 3
+
     def test_run_refined_task_loop_final_check_failure_sets_error(self, ralph_executor):
         """Test that a final acceptance check failure is reported via 'error', not just 'last_error'."""
         with tempfile.TemporaryDirectory() as tmpdir:

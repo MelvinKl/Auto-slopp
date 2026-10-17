@@ -220,7 +220,7 @@ All configuration is via environment variables with `AUTO_SLOPP_` prefix:
 | `AUTO_SLOPP_LOG_FILE_DIR` | No | Directory for rotating log files |
 | `AUTO_SLOPP_WORKERS_DISABLED` | No | Comma-separated list of disabled worker names |
 | `AUTO_SLOPP_RALPH_MAX_LOOPS` | No | Max Ralph loop iterations (default: 500) |
-| `AUTO_SLOPP_GITHUB_ISSUE_STEP_MAX_ITERATIONS` | No | Max step iterations per issue (default: 50) |
+| `AUTO_SLOPP_GITHUB_ISSUE_STEP_MAX_ITERATIONS` | No | Max step iterations per issue (-1 = unbounded, default: 50) |
 | `AUTO_SLOPP_RALPH_ENABLED` | No | Enable Ralph loop (default: true) |
 | `AUTO_SLOPP_ADDITIONAL_ENV_FILE` | No | Path to additional .env file for subprocess calls |
 | `AUTO_SLOPP_STALE_BRANCH_DAYS_THRESHOLD` | No | Days before branch is stale (default: 1) |

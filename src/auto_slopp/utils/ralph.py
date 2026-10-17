@@ -955,6 +955,10 @@ class RalphExecutor:
         a final acceptance check validates all steps.
         """
         max_iterations = self.max_iterations
+        # Sentinel value -1 means "unbounded": never break on a max-iterations
+        # cap. Keep looping until the issue is fully implemented or a genuine
+        # (cap-independent) terminal condition/fatal error occurs.
+        unbounded = max_iterations == -1
         result: dict[str, Any] = {
             "success": False,
             "loops_executed": 0,
@@ -963,7 +967,11 @@ class RalphExecutor:
             "max_loops_reached": False,
         }
 
-        for iteration in range(1, max_iterations + 1):
+        # When unbounded, loop until an internal return; otherwise hard-cap the
+        # number of iterations exactly as before.
+        iteration = 0
+        while unbounded or iteration < max_iterations:
+            iteration += 1
             try:
                 plan = PlanParser.parse_file(task_path)
             except Exception as e:

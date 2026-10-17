@@ -192,6 +192,35 @@ class TestSettings:
         test_settings = Settings()
         assert test_settings.github_issue_step_max_iterations == 50
 
+    def test_github_issue_step_max_iterations_unbounded(self):
+        """Test that -1 is accepted as an unbounded limit."""
+        env_vars = {
+            "AUTO_SLOPP_GITHUB_ISSUE_STEP_MAX_ITERATIONS": "-1",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            test_settings = Settings()
+        assert test_settings.github_issue_step_max_iterations == -1
+
+    def test_github_issue_step_max_iterations_negative_rejected(self):
+        """Test that negative values other than the -1 sentinel raise."""
+        env_vars = {
+            "AUTO_SLOPP_GITHUB_ISSUE_STEP_MAX_ITERATIONS": "-2",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True), pytest.raises(ValidationError):
+            Settings()
+
+    def test_github_issue_step_max_iterations_positive_allowed(self):
+        """Test that a positive integer is accepted and keeps the hard cap."""
+        env_vars = {
+            "AUTO_SLOPP_GITHUB_ISSUE_STEP_MAX_ITERATIONS": "10",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            test_settings = Settings()
+        assert test_settings.github_issue_step_max_iterations == 10
+
     def test_github_issue_step_max_iterations_validation(self):
         """Test github_issue_step_max_iterations must be at least 1."""
         env_vars = {

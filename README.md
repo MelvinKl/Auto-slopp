@@ -640,6 +640,10 @@ AUTO_SLOPP_GITHUB_ISSUE_WORKER_ALLOWED_CREATOR=MelvinKl  # Whitelisted GitHub us
 # PR review configuration (conservative: only concrete, verified problems are reported)
 AUTO_SLOPP_GITHUB_ISSUE_PR_REVIEW_MAX_ITERATIONS=3        # Maximum PR review/fix iterations before giving up (default: 3)
 
+# Maximum step-iteration attempts for the GitHub issue Ralph loop (default: 50).
+# Use -1 for an unbounded limit that never breaks on a max-iterations cap.
+AUTO_SLOPP_GITHUB_ISSUE_STEP_MAX_ITERATIONS=50
+
 # Stale branch cleanup: days before a local-only branch is deleted (default: 1)
 AUTO_SLOPP_STALE_BRANCH_DAYS_THRESHOLD=1
 
@@ -830,6 +834,8 @@ vikunja_worker = IssueWorker(task_source=VikunjaTaskSource())
 The task execution creates a markdown-based plan file in `.ralph/` with checkboxes for each step. Steps are executed sequentially. Completed steps are committed automatically. A final acceptance check validates all steps at once after completion. The final step always verifies that `make test` passes.
 
 If the final evaluation fails (either after all steps complete or at max iterations), the task file is deleted so it will be recreated from scratch on the next iteration, ensuring a completely fresh context.
+
+The number of Ralph loop iterations is controlled by the `AUTO_SLOPP_GITHUB_ISSUE_STEP_MAX_ITERATIONS` environment variable (default: `50`). Setting it to `-1` makes the loop **unbounded**: it never aborts on a "maximum iterations reached" condition and keeps working until the issue is fully implemented and the final acceptance check passes. Any positive integer keeps the normal hard-cap behaviour.
 
 #### TaskResult Structure
 

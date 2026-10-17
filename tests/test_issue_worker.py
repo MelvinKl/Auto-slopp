@@ -110,6 +110,51 @@ class TestIssueWorker:
         assert worker.ralph_executor is not None
         assert worker.ralph_executor.file_prefix == "test"
 
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_ralph_executor_unbounded_forwards_to_executor(self, mock_settings):
+        """Test that -1 (unbounded) is forwarded from settings to the executor."""
+        mock_settings.github_issue_step_max_iterations = -1
+        task_source = MockTaskSource()
+        worker = IssueWorker(task_source=task_source)
+        assert worker.ralph_executor.max_iterations == -1
+
+    @patch("auto_slopp.workers.issue_worker.checkout_branch_resilient")
+    @patch("auto_slopp.workers.issue_worker.create_and_checkout_branch")
+    @patch("auto_slopp.workers.issue_worker.settings")
+    def test_ralph_executor_run_unbounded_never_reports_max_loops(
+        self, mock_settings, mock_create_branch, mock_checkout
+    ):
+        """Test that with -1 (unbounded) the worker never triggers the
+        on_max_iterations_reached teardown; the loop runs until it truly
+        finishes and reports max_loops_reached=False."""
+        mock_settings.ralph_enabled = True
+        mock_settings.github_issue_step_max_iterations = -1
+        mock_checkout.return_value = True
+        mock_create_branch.return_value = True
+        task_source = MockTaskSource(tasks=[Task(id=1, title="Test", body="")])
+        worker = IssueWorker(task_source=task_source, dry_run=False)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Unbounded run: reports max_loops_reached=False and a genuine
+            # skip-style error so no hard-cap teardown is triggered.
+            worker.ralph_executor.execute = lambda *args, **kwargs: {
+                "success": False,
+                "loops_executed": 999,
+                "steps_completed": 0,
+                "total_steps": 3,
+                "max_loops_reached": False,
+                "error": "Max iterations reached",
+            }
+            result = worker.run(Path(temp_dir))
+
+        # Unbounded: even when the loop ultimately fails, the hard-cap teardown
+        # (on_max_iterations_reached) must never fire because the limit is -1;
+        # the loop keeps working instead. The executed-iteration count flows
+        # through from the unbounded run.
+        assert result["tasks_processed"] == 0
+        assert result["task_results"][0].get("ralph_loops_executed") == 999
+        assert task_source.on_max_iterations_called is False
+
     def test_run_with_nonexistent_path(self):
         """Test that run handles non-existent repository path."""
         task_source = MockTaskSource()

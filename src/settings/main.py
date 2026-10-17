@@ -251,9 +251,29 @@ class Settings(BaseSettings):
 
     github_issue_step_max_iterations: int = Field(
         default=50,
-        ge=1,
-        description="Maximum step-iteration attempts for GitHub issue Ralph execution (default: 50)",
+        description=(
+            "Maximum step-iteration attempts for GitHub issue Ralph execution "
+            "(default: 50). -1 is the unbounded sentinel (never breaks on a "
+            "max-iterations cap); any positive integer keeps the hard cap."
+        ),
     )
+
+    @field_validator("github_issue_step_max_iterations")
+    @classmethod
+    def validate_github_issue_step_max_iterations(cls, v: int) -> int:
+        """Accept -1 as an unbounded sentinel or any positive integer >= 1.
+
+        Any other value (0, -2, -3, ...) is rejected. A value of -1 means the
+        Ralph issue loop never breaks on a maximum-iterations cap and keeps
+        working until the issue is fully implemented.
+        """
+        if v == -1:
+            return v
+        if v >= 1:
+            return v
+        raise ValueError(
+            f"github_issue_step_max_iterations must be -1 (unbounded) or a positive integer >= 1, got {v}."
+        )
 
     github_issue_pr_review_max_iterations: int | None = Field(
         default=DEFAULT_PR_REVIEW_MAX_ITERATIONS,
