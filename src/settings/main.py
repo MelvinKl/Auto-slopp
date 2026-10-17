@@ -222,9 +222,11 @@ class Settings(BaseSettings):
 
     github_issue_worker_auto_merge_label: str = Field(
         default="auto-merge",
+        validation_alias="AUTO_SLOPP_GITHUB_ISSUE_AUTO_MERGE_LABEL",
         description=(
             "Issue label that triggers automatic merging of the PR that closes the issue "
-            "once the issue is finished (default: 'auto-merge')"
+            "once the issue is finished (default: 'auto-merge'). "
+            "Configure via the AUTO_SLOPP_GITHUB_ISSUE_AUTO_MERGE_LABEL environment variable."
         ),
     )
 

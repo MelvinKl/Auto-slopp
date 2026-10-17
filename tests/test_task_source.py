@@ -541,9 +541,7 @@ class TestAutoMerge:
         mock_close.assert_not_called()
         mock_prs.assert_called_once_with("/tmp", 42)
         mock_merge.assert_called_once_with("/tmp", 7)
-        mock_comment.assert_called_once_with(
-            "/tmp", 42, "Auto-merged (label 'auto-merge'): #7"
-        )
+        mock_comment.assert_called_once_with("/tmp", 42, "Auto-merged (label 'auto-merge'): #7")
 
     @patch("auto_slopp.workers.github_task_source.settings")
     @patch("auto_slopp.workers.github_task_source.merge_pull_request")
@@ -563,9 +561,7 @@ class TestAutoMerge:
         task = Task(id=42, title="Test", body="", raw={"_repo_path": "/tmp", "labels": [{"name": "auto-merge"}]})
         source.on_task_complete(task, "ai/issue-42", "https://github.com/test/pr/1")
         mock_merge.assert_called_once_with("/tmp", 7)
-        mock_comment.assert_called_once_with(
-            "/tmp", 42, "Auto-merge failed (label 'auto-merge'): #7"
-        )
+        mock_comment.assert_called_once_with("/tmp", 42, "Auto-merge failed (label 'auto-merge'): #7")
 
     @patch("auto_slopp.workers.github_task_source.settings")
     @patch("auto_slopp.workers.github_task_source.merge_pull_request")
@@ -614,9 +610,7 @@ class TestAutoMerge:
     @patch("auto_slopp.workers.github_task_source.get_pull_requests_for_issue")
     @patch("auto_slopp.workers.github_task_source.comment_on_issue")
     @patch("auto_slopp.workers.github_task_source.close_issue")
-    def test_on_task_case_insensitive_label(
-        self, mock_close, mock_comment, mock_prs, mock_merge, mock_settings
-    ):
+    def test_on_task_case_insensitive_label(self, mock_close, mock_comment, mock_prs, mock_merge, mock_settings):
         """The auto-merge label match is case-insensitive."""
         mock_settings.github_issue_worker_auto_merge_label = "auto-merge"
         mock_prs.return_value = [{"number": 9}]

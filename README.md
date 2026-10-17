@@ -637,6 +637,9 @@ AUTO_SLOPP_WORKERS_DISABLED='[]'
 AUTO_SLOPP_GITHUB_ISSUE_WORKER_REQUIRED_LABEL=ai        # Required label for issues to be processed (default: "ai")
 AUTO_SLOPP_GITHUB_ISSUE_WORKER_ALLOWED_CREATOR=MelvinKl  # Whitelisted GitHub username whose comments are included in condensation (default: "MelvinKl")
 
+# Auto-merge: issue label that triggers automatic merging of the closing PR once the issue is finished (default: "auto-merge")
+AUTO_SLOPP_GITHUB_ISSUE_AUTO_MERGE_LABEL=auto-merge     # Leave unset/empty to disable auto-merging
+
 # PR review configuration (conservative: only concrete, verified problems are reported)
 AUTO_SLOPP_GITHUB_ISSUE_PR_REVIEW_MAX_ITERATIONS=3        # Maximum PR review/fix iterations before giving up (default: 3)
 
@@ -917,6 +920,21 @@ from auto_slopp.workers import GitHubIssueWorker
 # Disable in AUTO_SLOPP_WORKERS_DISABLED
 # Returns: issue status, updates, management results
 ```
+
+### Auto-Merge
+
+Issues can be tagged with a configurable label (default `auto-merge`) to trigger **automatic merging** of the pull request that closes them. When a task is completed, the worker checks whether the resolved issue carries the configured label:
+
+- **With the label**: the PR that actually closes the issue (resolved by link/reference, e.g. `Closes #123`) is merged automatically using the same merge method and status-check configuration the worker already uses, and a comment such as `Auto-merged (label 'auto-merge'): #123` is posted.
+- **Without the label**: behavior is unchanged — the issue is simply closed with the usual `Completed by PR` comment. No auto-merge is performed.
+
+The label name is **configurable** via the `AUTO_SLOPP_GITHUB_ISSUE_AUTO_MERGE_LABEL` environment variable (default `"auto-merge"`), so teams can reuse a different label:
+
+```bash
+AUTO_SLOPP_GITHUB_ISSUE_AUTO_MERGE_LABEL=needs-auto-merge
+```
+
+Auto-merging only happens for the PR that closes the issue and respects required status checks. It is a no-op when the issue has no linked closing PR.
 
 ### StaleBranchCleanupWorker
 Cleans up stale git branches.

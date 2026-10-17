@@ -658,7 +658,7 @@ def get_open_prs_with_label(repo_dir: Path, label: str) -> list[dict]:
         return []
 
 
-def get_pull_requests_for_issue(repo_dir: Path, issue_number: int) -> list[dict[str, Any]]:
+def get_pull_requests_for_issue(repo_dir: Path, issue_number: int) -> list[dict[str, Any]]:  # noqa: C901
     """Get the pull requests that are linked to (i.e. close) an issue.
 
     Uses ``gh issue view <number> --pulls`` so the returned PRs are those

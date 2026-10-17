@@ -342,9 +342,7 @@ class TestMergePullRequest:
         repo_dir = Path("/tmp/test_repo")
         result = merge_pull_request(repo_dir, 7)
         assert result is True
-        mock_run_gh.assert_called_once_with(
-            repo_dir, "pr", "merge", "7", "--squash", check=False
-        )
+        mock_run_gh.assert_called_once_with(repo_dir, "pr", "merge", "7", "--squash", check=False)
 
     @patch("auto_slopp.utils.github_operations._run_gh_command")
     def test_merge_pull_request_method_flags(self, mock_run_gh):
@@ -372,4 +370,3 @@ class TestMergePullRequest:
         repo_dir = Path("/tmp/test_repo")
         result = merge_pull_request(repo_dir, 7)
         assert result is False
-

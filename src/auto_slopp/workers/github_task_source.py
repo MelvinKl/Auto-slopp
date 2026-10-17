@@ -291,6 +291,7 @@ class GitHubTaskSource(TaskSource):
 
         # No findings (or findings is None/empty): follow the original behavior.
         labels = task.raw.get("labels", [])
+        auto_merge_label = settings.github_issue_worker_auto_merge_label
         if self._issue_has_auto_merge_label(labels):
             # When the issue carries the auto-merge label, automatically merge
             # the PR that actually closes the issue (resolved by link/reference)
@@ -298,10 +299,8 @@ class GitHubTaskSource(TaskSource):
             # comment so the auto-merge action is observable.
             merged, merged_pr_number = self._auto_merge_closing_pr(repo_path, task.id)
             merged_pr_str = str(merged_pr_number) if merged_pr_number is not None else ""
-            if merged:
-                comment = f"Auto-merged (label '{settings.github_issue_worker_auto_merge_label}'): #{merged_pr_str}"
-            else:
-                comment = f"Auto-merge failed (label '{settings.github_issue_worker_auto_merge_label}'): #{merged_pr_str}"
+            action = "Auto-merged" if merged else "Auto-merge failed"
+            comment = f"{action} (label '{auto_merge_label}'): #{merged_pr_str}"
             comment_on_issue(repo_path, task.id, comment)
         else:
             close_success = close_issue(repo_path, task.id)
@@ -323,10 +322,10 @@ class GitHubTaskSource(TaskSource):
             True if the issue carries the configured auto-merge label.
         """
         auto_merge_label = settings.github_issue_worker_auto_merge_label
-        for name in self._get_label_names(labels):
-            if name == auto_merge_label or name.lower() == auto_merge_label.lower():
-                return True
-        return False
+        return any(
+            name == auto_merge_label or name.lower() == auto_merge_label.lower()
+            for name in self._get_label_names(labels)
+        )
 
     @staticmethod
     def _get_label_names(labels: list) -> list[str]:
