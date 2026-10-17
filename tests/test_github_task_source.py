@@ -539,6 +539,134 @@ class TestGitHubTaskSource:
         mock_close.assert_not_called()
         mock_comment.assert_not_called()
 
+    @patch("auto_slopp.workers.github_task_source.merge_pull_request")
+    @patch("auto_slopp.workers.github_task_source.get_pull_requests_for_issue")
+    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.close_issue")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_on_task_complete_auto_merges_labelled_issue(
+        self, mock_settings, mock_close, mock_comment, mock_linked_prs, mock_merge
+    ):
+        """Auto-merge path: with the configured label the closing PR is merged."""
+        mock_settings.github_issue_worker_auto_merge_label = "auto-merge"
+        mock_linked_prs.return_value = [{"number": 99, "title": "#99: Fix", "state": "MERGED"}]
+        mock_merge.return_value = True
+        mock_close.return_value = True
+
+        task_source = GitHubTaskSource()
+        task = Task(
+            id=42,
+            title="Test",
+            body="",
+            comments=[],
+            raw={"_repo_path": Path("/test"), "labels": [{"name": "auto-merge"}]},
+        )
+
+        task_source.on_task_complete(task, "ai/issue-42-test", "https://github.com/test/pr/1")
+
+        # The issue is NOT closed, but its closing PR (99, linked by link/reference) is merged,
+        # even though the ``pr_url`` passed here points at #1 (AC4).
+        mock_close.assert_not_called()
+        mock_linked_prs.assert_called_once_with(Path("/test"), 42)
+        mock_merge.assert_called_once_with(Path("/test"), 99)
+        # A comment reflects the auto-merge outcome (AC6).
+        mock_comment.assert_called_once_with(Path("/test"), 42, "Auto-merged (label 'auto-merge'): #99")
+
+    @patch("auto_slopp.workers.github_task_source.merge_pull_request")
+    @patch("auto_slopp.workers.github_task_source.get_pull_requests_for_issue")
+    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.close_issue")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_on_task_complete_auto_merge_configurable_label(
+        self, mock_settings, mock_close, mock_comment, mock_linked_prs, mock_merge
+    ):
+        """The trigger label name is configurable (AC2), not hard-coded."""
+        mock_settings.github_issue_worker_auto_merge_label = "needs-auto-merge"
+        mock_linked_prs.return_value = [{"number": 7, "title": "#7: Fix"}]
+        mock_merge.return_value = True
+
+        task_source = GitHubTaskSource()
+        task = Task(
+            id=42,
+            title="Test",
+            body="",
+            comments=[],
+            raw={"_repo_path": Path("/test"), "labels": [{"name": "needs-auto-merge"}]},
+        )
+
+        task_source.on_task_complete(task, "ai/issue-42-test", "https://github.com/test/pr/7")
+
+        mock_merge.assert_called_once_with(Path("/test"), 7)
+        mock_comment.assert_called_once_with(Path("/test"), 42, "Auto-merged (label 'needs-auto-merge'): #7")
+
+    @patch("auto_slopp.workers.github_task_source.get_pull_requests_for_issue")
+    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.close_issue")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_on_task_complete_without_label_does_not_auto_merge(
+        self, mock_settings, mock_close, mock_comment, mock_linked_prs
+    ):
+        """Without the configured label, no auto-merge is performed (AC3)."""
+        mock_settings.github_issue_worker_auto_merge_label = "auto-merge"
+        mock_close.return_value = True
+
+        task_source = GitHubTaskSource()
+        task = Task(
+            id=42,
+            title="Test",
+            body="",
+            comments=[],
+            raw={"_repo_path": Path("/test"), "labels": [{"name": "ai"}]},
+        )
+
+        task_source.on_task_complete(task, "ai/issue-42-test", "https://github.com/test/pr/1")
+
+        mock_linked_prs.assert_not_called()
+        mock_close.assert_called_once_with(Path("/test"), 42)
+        mock_comment.assert_called_once_with(Path("/test"), 42, "Completed by PR: https://github.com/test/pr/1")
+
+    @patch("auto_slopp.workers.github_task_source.get_pull_requests_for_issue")
+    @patch("auto_slopp.workers.github_task_source.comment_on_issue")
+    @patch("auto_slopp.workers.github_task_source.close_issue")
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_on_task_complete_auto_merge_no_linked_pr(self, mock_settings, mock_close, mock_comment, mock_linked_prs):
+        """Auto-merge is a no-op when there is no linked closing PR."""
+        mock_settings.github_issue_worker_auto_merge_label = "auto-merge"
+        mock_linked_prs.return_value = []
+
+        task_source = GitHubTaskSource()
+        task = Task(
+            id=42,
+            title="Test",
+            body="",
+            comments=[],
+            raw={"_repo_path": Path("/test"), "labels": [{"name": "auto-merge"}]},
+        )
+
+        task_source.on_task_complete(task, "ai/issue-42-test", "https://github.com/test/pr/1")
+
+        mock_linked_prs.assert_called_once_with(Path("/test"), 42)
+        mock_close.assert_not_called()
+
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_issue_has_auto_merge_label_reads_configuration(self, mock_settings):
+        """The label check reads the configured label, not a hard-coded value."""
+        mock_settings.github_issue_worker_auto_merge_label = "custom-label"
+        task_source = GitHubTaskSource()
+        labels = [{"name": "auto-merge"}]
+
+        assert task_source._issue_has_auto_merge_label(labels) is False
+
+        mock_settings.github_issue_worker_auto_merge_label = "auto-merge"
+        assert task_source._issue_has_auto_merge_label(labels) is True
+
+    @patch("auto_slopp.workers.github_task_source.settings")
+    def test_issue_has_auto_merge_label_case_insensitive(self, mock_settings):
+        """The configured label match is case-insensitive."""
+        mock_settings.github_issue_worker_auto_merge_label = "Auto-Merge"
+        task_source = GitHubTaskSource()
+        assert task_source._issue_has_auto_merge_label([{"name": "auto-merge"}]) is True
+
     @patch("auto_slopp.workers.github_task_source.settings")
     def test_on_task_failure_is_noop(self, mock_settings):
         """Test that on_task_failure is a no-op."""
